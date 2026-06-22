@@ -1,0 +1,10 @@
+.git
+_site
+.jekyll-cache
+.sass-cache
+node_modules
+test-results
+playwright-report
+worker/.wrangler
+worker/node_modules
+worker/.dev.vars

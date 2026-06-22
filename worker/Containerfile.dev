@@ -1,0 +1,13 @@
+ARG WORKER_NODE_IMAGE=docker.io/library/node:24-bookworm-slim
+FROM ${WORKER_NODE_IMAGE}
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    git \
+    python3 \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+CMD ["bash", "/workspace/scripts/podman-worker-entrypoint.sh"]

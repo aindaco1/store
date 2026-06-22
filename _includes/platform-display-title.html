@@ -1,0 +1,11 @@
+{%- assign platform_name = include.name | default: site.platform.name | default: site.title | default: "Store" | strip -%}
+{%- assign platform_company = include.company | default: site.platform.company_name | default: site.author | default: "" | strip -%}
+{%- assign platform_title = platform_name -%}
+{%- if platform_company != "" -%}
+  {%- assign platform_name_downcase = platform_name | downcase -%}
+  {%- assign platform_company_downcase = platform_company | downcase -%}
+  {%- unless platform_name_downcase contains platform_company_downcase -%}
+    {%- assign platform_title = platform_company | append: " " | append: platform_name -%}
+  {%- endunless -%}
+{%- endif -%}
+{{- platform_title -}}

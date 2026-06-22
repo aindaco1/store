@@ -1,0 +1,11 @@
+---
+permalink: /assets/i18n.json
+---
+{
+  "en": {
+    "email": {{ site.data.i18n.en.email | jsonify }}
+  },
+  "es": {
+    "email": {{ site.data.i18n.es.email | jsonify }}
+  }
+}

@@ -1,0 +1,137 @@
+{%- assign indexable = include.indexable -%}
+{%- if indexable == nil -%}{%- assign indexable = true -%}{%- endif -%}
+{%- unless indexable == false -%}
+  {%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+  {%- assign platform_title = site.platform.name | default: site.title -%}
+  {%- assign site_base = site.platform.site_url | default: site.url -%}
+  {%- assign org_id = site_base | append: "/#organization" -%}
+  {%- assign website_id = site_base | append: "/#website" -%}
+  {%- assign default_image = site.platform.default_social_image_path | default: '/assets/images/logo.svg' -%}
+  {%- assign default_description = site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
+  {%- assign jsonld_kind = include.kind -%}
+  {%- assign is_store_product = false -%}
+  {%- if page.collection == "products" or page.store_product == true -%}
+    {%- assign is_store_product = true -%}
+  {%- endif -%}
+  {%- if jsonld_kind == nil or jsonld_kind == "" -%}
+    {%- if is_store_product -%}
+      {%- assign jsonld_kind = "product" -%}
+    {%- endif -%}
+  {%- endif -%}
+  {%- assign same_as = site.seo.same_as | default: empty -%}
+  {%- capture localized_home_path -%}{% include localized-url.html lang=current_lang translation_key='home' %}{%- endcapture -%}
+  {%- assign available_languages = site.i18n.supported_langs | default: current_lang | split: '|' -%}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {%- if jsonld_kind == "product" -%}
+    {%- assign product_name = page.product_name | default: page.name | default: page.title | default: platform_title -%}
+    {%- assign product_sku = page.sku | default: page.identifier | default: page.slug | default: product_name -%}
+    {%- assign product_price = page.price | default: 0 | plus: 0 -%}
+    {%- assign product_image = page.image | default: default_image -%}
+    {%- assign product_description_source = page.description | default: page.excerpt | default: page.content | default: default_description -%}
+    {%- assign product_description = product_description_source | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
+    {%- assign product_status = page.status | default: "active" -%}
+    {%- assign product_availability = "https://schema.org/InStock" -%}
+    {%- if product_status != "active" -%}
+      {%- assign product_availability = "https://schema.org/OutOfStock" -%}
+    {%- endif -%}
+    {
+      "@type": "Organization",
+      "@id": {{ org_id | jsonify }},
+      "name": {{ platform_title | jsonify }},
+      "url": {{ site_base | jsonify }},
+      "email": {{ site.platform.support_email | default: '' | jsonify }},
+      "logo": {{ site_base | append: default_image | jsonify }}{% if same_as and same_as.size > 0 %},
+      "sameAs": {{ same_as | jsonify }}{% endif %}
+    },
+    {
+      "@type": "Product",
+      "@id": {{ site_base | append: page.url | append: "#product" | jsonify }},
+      "url": {{ site_base | append: page.url | jsonify }},
+      "name": {{ product_name | jsonify }},
+      "description": {{ product_description | jsonify }},
+      "image": {{ site_base | append: product_image | jsonify }},
+      "sku": {{ product_sku | jsonify }},
+      "brand": {
+        "@type": "Brand",
+        "name": {{ site.platform.company_name | default: platform_title | jsonify }}
+      },
+      "offers": {
+        "@type": "Offer",
+        "url": {{ site_base | append: page.url | jsonify }},
+        "priceCurrency": "USD",
+        "price": {{ product_price | jsonify }},
+        "availability": {{ product_availability | jsonify }},
+        "itemCondition": "https://schema.org/NewCondition",
+        "seller": {
+          "@id": {{ org_id | jsonify }}
+        }
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": {{ site_base | append: page.url | append: "#breadcrumbs" | jsonify }},
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": {{ platform_title | jsonify }},
+          "item": {{ site_base | append: localized_home_path | jsonify }}
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": {{ product_name | jsonify }},
+          "item": {{ site_base | append: page.url | jsonify }}
+        }
+      ]
+    }
+    {%- else -%}
+    {
+      "@type": "Organization",
+      "@id": {{ org_id | jsonify }},
+      "name": {{ platform_title | jsonify }},
+      "url": {{ site_base | jsonify }},
+      "email": {{ site.platform.support_email | default: '' | jsonify }},
+      "logo": {{ site_base | append: default_image | jsonify }}{% if same_as and same_as.size > 0 %},
+      "sameAs": {{ same_as | jsonify }}{% endif %}
+    },
+    {
+      "@type": "WebSite",
+      "@id": {{ website_id | jsonify }},
+      "url": {{ site_base | jsonify }},
+      "name": {{ platform_title | jsonify }},
+      "description": {{ default_description | jsonify }},
+      "publisher": {
+        "@id": {{ org_id | jsonify }}
+      },
+      "inLanguage": {{ current_lang | jsonify }},
+      "availableLanguage": {{ available_languages | jsonify }}
+    }
+    {%- if page.translation_key and page.translation_key != "home" -%},
+    {
+      "@type": "BreadcrumbList",
+      "@id": {{ site_base | append: page.url | append: "#breadcrumbs" | jsonify }},
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": {{ platform_title | jsonify }},
+          "item": {{ site_base | append: localized_home_path | jsonify }}
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": {{ page.title | default: platform_title | jsonify }},
+          "item": {{ site_base | append: page.url | jsonify }}
+        }
+      ]
+    }
+    {%- endif -%}
+    {%- endif -%}
+  ]
+}
+</script>
+{%- endunless -%}

@@ -1,0 +1,74 @@
+name: Optimize dashboard media
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Media scope to optimize'
+        required: true
+        default: changed
+        type: choice
+        options:
+          - changed
+          - all
+  push:
+    branches:
+      - main
+    paths:
+      - 'assets/images/**'
+      - 'assets/videos/**'
+      - '_config.yml'
+      - 'scripts/optimize-media.mjs'
+      - '.github/workflows/media-optimization.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: media-optimization-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  optimize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg optipng libjpeg-turbo-progs gifsicle webp
+
+      - name: Optimize media
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.scope }}" = "all" ]; then
+            node ./scripts/optimize-media.mjs --write
+          else
+            node ./scripts/optimize-media.mjs --write --changed
+          fi
+
+      - name: Open media optimization pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            echo "No media optimization changes."
+            exit 0
+          fi
+          branch="bot/media-optimization-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add assets/images assets/videos _config.yml
+          git commit -m "Optimize dashboard media uploads"
+          git push --set-upstream origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Optimize dashboard media uploads" \
+            --body "Automated media optimization output from run ${GITHUB_RUN_ID}. Review the generated Store assets and config reference updates before merging."

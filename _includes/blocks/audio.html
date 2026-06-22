@@ -1,0 +1,16 @@
+{% assign block = include.block %}
+{% assign alignment = block.align | default: 'left' %}
+<figure class="content-block content-block--audio content-block--align-{{ alignment | escape }}">
+  <div class="audio-player">
+    {% if block.title %}
+      <span class="audio-player__title">{{ block.title | safe_rich_text }}</span>
+    {% endif %}
+    <audio controls preload="metadata">
+      <source src="{{ block.src | escape }}" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+  </div>
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
+  {% endif %}
+</figure>

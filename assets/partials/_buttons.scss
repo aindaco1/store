@@ -1,0 +1,111 @@
+// Button styles
+
+.btn {
+  @include btn-core($color--primary);
+  text-decoration: none;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
+  
+  &:before {
+    display: none;
+  }
+  
+  &:hover {
+    background: $surface--base;
+    border-color: $color--primary;
+    color: $color--primary;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba($color--black, 0.08);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+// Button variants
+.btn--small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid $border--default;
+  color: $color--secondary;
+  
+  &:hover {
+    background: $surface--base;
+    border-color: $color--primary;
+    color: $color--primary;
+  }
+}
+
+.btn--block {
+  width: 100%;
+  display: block;
+}
+
+.btn--secondary {
+  background: $surface--base;
+  border: 1px solid $border--strong;
+  color: $color--primary;
+  font-weight: 600;
+  
+  &:hover {
+    background: $surface--subtle;
+    border-color: $color--primary;
+    color: $color--primary;
+    transform: translateY(-1px);
+  }
+}
+
+.btn--danger {
+  background: $color--danger;
+  border-color: $color--danger;
+  color: $color--white;
+  
+  &:before {
+    display: none;
+  }
+  
+  &:hover {
+    background: $color--danger-dark;
+    border-color: $color--danger-dark;
+  }
+}
+
+.btn--danger-outline {
+  background: transparent;
+  border-color: $color--danger;
+  color: $color--danger;
+  
+  &:before {
+    display: none;
+  }
+  
+  &:hover {
+    background: rgba($color--danger, 0.1);
+    border-color: $color--danger-dark;
+    color: $color--danger-dark;
+  }
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  
+  &--danger {
+    color: $color--danger;
+    
+    &:hover {
+      color: $color--danger-dark;
+    }
+  }
+}

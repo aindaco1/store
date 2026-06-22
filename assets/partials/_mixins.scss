@@ -1,0 +1,484 @@
+// Mixins from dust-wave-shop
+
+// Breakpoints
+@mixin xsm {
+  @media (max-width: 724px) { @content; }
+}
+
+@mixin sm {
+  @media (max-width: 1000px) { @content; }
+}
+
+@mixin ms {
+  @media (min-width: 1000px) { @content; }
+}
+
+// Layout
+@mixin fit-to-layout-and-center {
+  box-sizing: border-box;
+  width: calc(100% - clamp(32px, 8vw, 128px));
+  max-width: $layout--max-width;
+  margin-left: auto;
+  margin-right: auto;
+  
+  @include sm {
+    gap: 0px;
+  }
+
+  @include xsm {
+    width: calc(100% - (#{$space-md} * 2));
+  }
+}
+
+// Typography
+@mixin heading-font {
+  font-family: $font-family--display;
+}
+
+@mixin type-page-title {
+  @include heading-font;
+  font-size: $type--page-title;
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+
+@mixin type-section-title {
+  @include heading-font;
+  font-size: $type--section-title;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+}
+
+@mixin type-card-title {
+  font-size: $type--card-title;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: $color--primary;
+}
+
+@mixin type-label {
+  font-size: $type--eyebrow;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $color--secondary;
+}
+
+@mixin type-ui {
+  font-size: $type--ui;
+  line-height: 1.5;
+}
+
+@mixin type-body-copy {
+  font-size: $type--body;
+  line-height: 1.65;
+}
+
+@mixin type-meta {
+  font-size: $type--meta;
+  line-height: 1.5;
+  color: $color--secondary;
+}
+
+@mixin stack($gap, $mobile-gap: null) {
+  display: flex;
+  flex-direction: column;
+  gap: $gap;
+
+  @if $mobile-gap != null {
+    @include xsm {
+      gap: $mobile-gap;
+    }
+  }
+}
+
+@mixin grid-stack($gap, $mobile-gap: null) {
+  display: grid;
+  gap: $gap;
+
+  @if $mobile-gap != null {
+    @include xsm {
+      gap: $mobile-gap;
+    }
+  }
+}
+
+@mixin cluster-between($gap: $space-md, $align: center) {
+  display: flex;
+  justify-content: space-between;
+  align-items: $align;
+  gap: $gap;
+}
+
+@mixin section-spacing($desktop-space, $mobile-space: null, $property: margin-bottom) {
+  #{$property}: $desktop-space;
+
+  @if $mobile-space != null {
+    @include xsm {
+      #{$property}: $mobile-space;
+    }
+  }
+}
+
+// Buttons
+@mixin btn-core($bg) {
+  all: unset;
+  cursor: pointer;
+  color: $color--white;
+  background-color: $bg;
+  border: 1px solid $color--primary-border;
+  border-radius: $radius--md;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: $btn--font-size;
+  letter-spacing: $btn--letter-spacing;
+  padding: $space-sm $space-xl;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-xs;
+  text-align: center;
+  box-sizing: border-box;
+  line-height: 1.1;
+}
+
+@mixin button-hover($color) {
+  position: relative;
+  z-index: 2;
+  
+  &:hover {
+    transition: 0.2s all;
+    background-color: $color--primary-hover;
+    
+    &:before {
+      transform: scale(1.1, 1.5);
+    }
+  }
+  
+  &:before {
+    content: " ";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: $color;
+    opacity: 0.4;
+    z-index: -1;
+    border-radius: $radius--sm;
+    transform: scale(1);
+    transition: all 0.3s cubic-bezier(0.16, 0.8, 0.66, 1.54);
+  }
+}
+
+// Shared surfaces
+@mixin surface-card($padding: null, $background: $surface--base) {
+  background: $background;
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+  box-shadow: 0 1px 0 rgba($color--black, 0.03);
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin surface-panel($padding: null, $background: $surface-tint-soft) {
+  background: $background;
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin surface-elevated($padding: null, $background: $surface--base) {
+  background: $background;
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+  box-shadow: 0 18px 40px rgba($color--black, 0.12);
+
+  @if $padding != null {
+    padding: $padding;
+  }
+}
+
+@mixin panel-stack($padding, $gap, $background: $surface--base, $panel: card) {
+  @if $panel == card {
+    @include surface-card($padding, $background);
+  } @else if $panel == elevated {
+    @include surface-elevated($padding, $background);
+  } @else {
+    @include surface-panel($padding, $background);
+  }
+
+  display: grid;
+  gap: $gap;
+  align-content: start;
+}
+
+@mixin responsive-surface($padding, $mobile-padding: null, $background: $surface--subtle, $surface: panel) {
+  @if $surface == card {
+    @include surface-card($padding, $background);
+  } @else if $surface == elevated {
+    @include surface-elevated($padding, $background);
+  } @else {
+    @include surface-panel($padding, $background);
+  }
+
+  @if $mobile-padding != null {
+    @include xsm {
+      padding: $mobile-padding;
+    }
+  }
+}
+
+@mixin lift-on-hover($translate-y: -1px, $shadow: 0 10px 24px rgba($color--black, 0.06)) {
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+
+  &:hover {
+    box-shadow: $shadow;
+    border-color: $border--strong;
+    transform: translateY($translate-y);
+  }
+}
+
+@mixin field-shell {
+  border: 1px solid $border--default;
+  border-radius: $radius--md;
+  background: $surface--base;
+  color: $color--primary;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: $border--strong;
+    box-shadow: 0 0 0 3px $color--primary-focus-ring;
+  }
+}
+
+// Product image frame
+@mixin product-image-frame {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  max-width: 400px;
+  background-size: cover;
+  border-radius: $radius--md;
+}
+
+@mixin thumb-frame($size, $radius: 14px, $background: $surface--base) {
+  flex: 0 0 $size;
+  width: $size;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid $border--default;
+  border-radius: $radius;
+  background: $background;
+}
+
+@mixin media-object-grid($media-width, $trailing-width: null, $areas: null, $row-gap: 16px, $column-gap: 20px) {
+  display: grid;
+  align-items: start;
+  gap: $row-gap $column-gap;
+
+  @if $trailing-width == null {
+    grid-template-columns: $media-width minmax(0, 1fr);
+  } @else {
+    grid-template-columns: $media-width minmax(0, 1fr) $trailing-width;
+  }
+
+  @if $areas != null {
+    grid-template-areas: $areas;
+  }
+}
+
+@mixin inset-section($padding: 16px 20px, $background: $surface--subtle) {
+  padding: $padding;
+  border-top: 1px solid $border--default;
+  background: $background;
+}
+
+@mixin tab-list-shell($gap: $space-xs, $margin-bottom: $space-xl, $mobile-margin-bottom: $space-md) {
+  display: flex;
+  gap: $gap;
+  flex-wrap: wrap;
+  min-width: 0;
+  width: 100%;
+  padding-bottom: $space-xs;
+  border-bottom: 1px solid $border--default;
+  margin-bottom: $margin-bottom;
+
+  @include xsm {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: $space-sm;
+    margin-bottom: $mobile-margin-bottom;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+@mixin tab-pill($inactive-color: $color--secondary, $inactive-background: transparent) {
+  @include btn-core($color--primary);
+  border: 1px solid $border--default;
+  border-radius: 999px;
+  background: $inactive-background;
+  color: $inactive-color;
+  font-size: $type--ui;
+  padding: $space-xs $space-md;
+
+  @include xsm {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  &[aria-selected="true"] {
+    background: $color--primary;
+    color: $color--white;
+    border-color: $color--primary;
+  }
+
+  &:hover:not([aria-selected="true"]) {
+    background: $surface--subtle;
+  }
+}
+
+@mixin meta-pill($background: $surface-tint-soft, $color: $color--secondary) {
+  font-size: $font-size-xs;
+  color: $color;
+  background: $background;
+  padding: 2px 8px;
+  border-radius: $radius--sm;
+}
+
+@mixin primary-action-button($padding: 8px $space-sm, $font-size: $type--meta) {
+  @include btn-core($color--primary);
+  font-size: $font-size;
+  padding: $padding;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
+
+  &:before {
+    display: none;
+  }
+
+  &:hover {
+    background: $surface--base;
+    border-color: $color--primary;
+    color: $color--primary;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba($color--black, 0.08);
+  }
+
+  &:disabled {
+    background: $surface--soft;
+    border-color: $border--default;
+    color: $ink--soft;
+    cursor: not-allowed;
+
+    &:hover {
+      transform: none;
+      box-shadow: none;
+    }
+  }
+}
+
+@mixin stepper-button($size: 32px, $font-size: 18px) {
+  width: $size;
+  height: $size;
+  @include field-shell;
+  background: $surface--base;
+  cursor: pointer;
+  font-size: $font-size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+
+  &:hover {
+    background: $color--primary;
+    color: $color--white;
+    border-color: $color--primary;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@mixin stepper-input($width: 60px, $height: 32px, $align: center) {
+  @include qty-input-shell($width, $height, $align);
+}
+
+@mixin qty-input-shell($width: 70px, $height: 40px, $align: center) {
+  width: $width;
+  max-width: $width;
+  height: $height;
+  padding: 0 4px;
+  @include field-shell;
+  font-size: $type--ui;
+  text-align: $align;
+  box-sizing: border-box;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@mixin prose-table($margin-bottom: $space-xl) {
+  width: 100%;
+  margin: 0 0 $margin-bottom;
+  border-collapse: collapse;
+  border-spacing: 0;
+
+  @include xsm {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  thead {
+    border-bottom: 1px solid $border--default;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid $border--default;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  th,
+  td {
+    padding: $space-sm $space-md;
+    text-align: left;
+    vertical-align: top;
+
+    @include xsm {
+      padding: $space-xs $space-sm;
+    }
+  }
+
+  th {
+    @include type-label;
+    color: $color--primary;
+  }
+
+  td {
+    color: $color--primary;
+  }
+}

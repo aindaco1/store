@@ -1,0 +1,22 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign date_value = include.date -%}
+{%- assign date_str = date_value | date: "%Y-%m-%dT%H:%M" -%}
+{%- capture localized_date -%}{% include localized-date.html date=date_value lang=current_lang %}{%- endcapture -%}
+{%- if date_str contains "T00:00" -%}
+  {{- localized_date | strip -}}
+{%- else -%}
+  {%- assign hour_24 = date_value | date: "%H" | plus: 0 -%}
+  {%- assign minute = date_value | date: "%M" -%}
+  {%- assign hour_12 = hour_24 | modulo: 12 -%}
+  {%- if hour_12 == 0 -%}{%- assign hour_12 = 12 -%}{%- endif -%}
+  {%- assign meridiem = "AM" -%}
+  {%- if hour_24 >= 12 -%}{%- assign meridiem = "PM" -%}{%- endif -%}
+  {%- if current_lang == 'es' -%}
+    {%- if meridiem == "AM" -%}
+      {%- assign meridiem = "a. m." -%}
+    {%- else -%}
+      {%- assign meridiem = "p. m." -%}
+    {%- endif -%}
+  {%- endif -%}
+  {{- localized_date | strip -}}{{- " · " -}}{{- hour_12 -}}{{- ":" -}}{{- minute -}}{{- " " -}}{{- meridiem -}}
+{%- endif -%}

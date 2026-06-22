@@ -1,0 +1,29 @@
+---
+layout: null
+permalink: /sitemap.xml
+sitemap: false
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{%- assign sitemap_pages = site.pages | where_exp: "item", "item.layout == 'default'" | where_exp: "item", "item.sitemap != false" | where_exp: "item", "item.indexable != false" | where_exp: "item", "item.test_only != true" -%}
+{%- assign sitemap_localized_products = site.pages | where_exp: "item", "item.store_product == true" | where_exp: "item", "item.sitemap != false" | where_exp: "item", "item.indexable != false" | where_exp: "item", "item.test_only != true" -%}
+{%- assign sitemap_products = site.products | where_exp: "item", "item.sitemap != false" | where_exp: "item", "item.indexable != false" | where_exp: "item", "item.test_only != true" -%}
+{%- for item in sitemap_pages -%}
+  <url>
+    <loc>{{ item.url | absolute_url | xml_escape }}</loc>
+    <lastmod>{{ site.time | date_to_xmlschema }}</lastmod>
+  </url>
+{%- endfor -%}
+{%- for item in sitemap_localized_products -%}
+  <url>
+    <loc>{{ item.url | absolute_url | xml_escape }}</loc>
+    <lastmod>{{ site.time | date_to_xmlschema }}</lastmod>
+  </url>
+{%- endfor -%}
+{%- for item in sitemap_products -%}
+  <url>
+    <loc>{{ item.url | absolute_url | xml_escape }}</loc>
+    <lastmod>{{ site.time | date_to_xmlschema }}</lastmod>
+  </url>
+{%- endfor -%}
+</urlset>

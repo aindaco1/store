@@ -1,0 +1,151 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign platform_title = site.platform.name | default: site.title -%}
+{%- assign site_base = site.platform.site_url | default: site.url -%}
+{%- assign is_store_product = false -%}
+{%- if page.collection == "products" or page.store_product == true -%}
+  {%- assign is_store_product = true -%}
+{%- endif -%}
+{%- assign product_display_name = page.product_name | default: page.name | default: page.title -%}
+{%- if include.title -%}
+  {%- assign raw_title = include.title -%}
+{%- elsif is_store_product and product_display_name -%}
+  {%- assign raw_title = product_display_name -%}
+{%- elsif include.translation_key == "home" or page.translation_key == "home" -%}
+  {%- assign raw_title = platform_title -%}
+{%- else -%}
+  {%- assign raw_title = page.title | default: page.name -%}
+{%- endif -%}
+{%- assign indexable = include.indexable -%}
+{%- if indexable == nil -%}{%- assign indexable = true -%}{%- endif -%}
+{%- assign social = include.social -%}
+{%- if social == nil -%}{%- assign social = true -%}{%- endif -%}
+{%- assign og_type = include.og_type | default: "website" -%}
+{%- assign translation_key = include.translation_key | default: page.translation_key -%}
+{%- assign localized_paths = include.localized_paths | default: page.localized_paths -%}
+{%- assign localized_pages = site.i18n.pages -%}
+{%- assign localized_page = nil -%}
+{%- if translation_key and localized_pages -%}
+  {%- assign localized_page = localized_pages[translation_key] -%}
+{%- endif -%}
+{%- assign explicit_path = include.path -%}
+{%- capture canonical_path -%}
+  {%- if translation_key or localized_paths or explicit_path -%}
+    {%- include localized-url.html lang=current_lang translation_key=translation_key localized_paths=localized_paths path=explicit_path -%}
+  {%- elsif page.url -%}
+    {{- page.url -}}
+  {%- else -%}
+    /
+  {%- endif -%}
+{%- endcapture -%}
+{%- assign raw_title_clean = raw_title | default: "" | strip -%}
+{%- assign platform_title_clean = platform_title | default: "" | strip -%}
+{%- capture title_prefix -%}{% if raw_title_clean != "" and raw_title_clean != platform_title_clean %}{{ raw_title | escape }} · {% endif %}{%- endcapture -%}
+{%- assign seo_title = title_prefix | append: platform_title | escape -%}
+{%- capture raw_description -%}{{ include.description | default: page.description | default: page.short_blurb | default: page.excerpt | default: page.content | default: site.description }}{%- endcapture -%}
+{%- assign seo_description = raw_description | strip_html | strip_newlines | replace: '  ', ' ' | strip | truncate: 160 -%}
+{%- assign image_path = include.image | default: page.hero_image | default: page.image | default: site.platform.default_social_image_path | default: '/assets/images/logo.svg' -%}
+{%- assign image_url = image_path -%}
+{%- unless image_url contains '://' or image_url contains 'data:' -%}
+  {%- assign image_url = site_base | append: image_url -%}
+{%- endunless -%}
+{%- if include.image_alt -%}
+  {%- assign image_alt_source = include.image_alt -%}
+{%- elsif page.hero_image_alt -%}
+  {%- assign image_alt_source = page.hero_image_alt -%}
+{%- elsif is_store_product and product_display_name -%}
+  {%- assign image_alt_source = product_display_name -%}
+{%- else -%}
+  {%- assign image_alt_source = site.seo.default_social_image_alt | default: raw_title | default: platform_title -%}
+{%- endif -%}
+{%- assign image_alt = image_alt_source | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
+{%- assign image_width = include.image_width | default: page.social_image_width -%}
+{%- assign image_height = include.image_height | default: page.social_image_height -%}
+{%- assign image_type = include.image_type | default: page.social_image_type -%}
+{%- assign twitter_handle = site.seo.x_handle | default: '' | replace: '@', '' | strip -%}
+{%- assign twitter_card = include.twitter_card -%}
+{%- assign article_published_time = page.date | default: page.start_date -%}
+{%- assign article_modified_time = page.last_modified_at | default: page.date | default: page.start_date -%}
+{%- assign og_locale = current_lang | replace: '-', '_' -%}
+{%- assign locale_override = site.seo.og_locale_overrides[current_lang] -%}
+{%- if locale_override and locale_override != '' -%}
+  {%- assign og_locale = locale_override -%}
+{%- endif -%}
+{%- case og_locale -%}
+  {%- when 'en' -%}{%- assign og_locale = 'en_US' -%}
+  {%- when 'es' -%}{%- assign og_locale = 'es_ES' -%}
+{%- endcase -%}
+{%- if twitter_card == nil or twitter_card == '' -%}
+  {%- if image_path and image_path != '' -%}
+    {%- assign twitter_card = "summary_large_image" -%}
+  {%- else -%}
+    {%- assign twitter_card = "summary" -%}
+  {%- endif -%}
+{%- endif -%}
+<title>{{ seo_title }}</title>
+<meta name="language" content="{{ current_lang }}">
+<meta name="application-name" content="{{ platform_title | escape }}">
+<meta name="apple-mobile-web-app-title" content="{{ platform_title | escape }}">
+<meta name="robots" content="{% if indexable %}index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1{% else %}noindex,nofollow,noarchive{% endif %}">
+{% if seo_description != "" %}<meta name="description" content="{{ seo_description | escape }}">{% endif %}
+{% if canonical_path != "" %}<link rel="canonical" href="{{ site_base }}{{ canonical_path | strip }}">{% endif %}
+{% if indexable and (localized_paths or translation_key and localized_page or explicit_path) %}
+  {% for lang in site.i18n.supported_langs %}
+    {% assign has_alternate_path = false %}
+    {% if localized_paths and localized_paths[lang] %}
+      {% assign has_alternate_path = true %}
+    {% elsif localized_page and localized_page[lang] %}
+      {% assign has_alternate_path = true %}
+    {% elsif explicit_path %}
+      {% assign has_alternate_path = true %}
+    {% endif %}
+    {% if has_alternate_path %}
+      {% capture alternate_path %}{% include localized-url.html lang=lang translation_key=translation_key localized_paths=localized_paths path=explicit_path %}{% endcapture %}
+      <link rel="alternate" hreflang="{{ lang }}" href="{{ site_base }}{{ alternate_path | strip }}">
+    {% endif %}
+  {% endfor %}
+  {% capture default_path %}{% include localized-url.html lang=default_lang translation_key=translation_key localized_paths=localized_paths path=explicit_path %}{% endcapture %}
+  <link rel="alternate" hreflang="x-default" href="{{ site_base }}{{ default_path | strip }}">
+{% endif %}
+{% if social %}
+<meta property="og:title" content="{{ seo_title }}">
+<meta property="og:type" content="{{ og_type }}">
+{% if canonical_path != "" %}<meta property="og:url" content="{{ site_base }}{{ canonical_path | strip }}">{% endif %}
+<meta property="og:site_name" content="{{ platform_title | escape }}">
+<meta property="og:locale" content="{{ og_locale }}">
+{% if indexable and (localized_paths or translation_key and localized_page or explicit_path) %}
+  {% for lang in site.i18n.supported_langs %}
+    {% assign has_alternate_path = false %}
+    {% if localized_paths and localized_paths[lang] %}
+      {% assign has_alternate_path = true %}
+    {% elsif localized_page and localized_page[lang] %}
+      {% assign has_alternate_path = true %}
+    {% elsif explicit_path %}
+      {% assign has_alternate_path = true %}
+    {% endif %}
+    {% if lang != current_lang and has_alternate_path %}
+      {% assign alternate_locale = site.seo.og_locale_overrides[lang] | default: lang | replace: '-', '_' %}
+      {% case alternate_locale %}
+        {% when 'en' %}{% assign alternate_locale = 'en_US' %}
+        {% when 'es' %}{% assign alternate_locale = 'es_ES' %}
+      {% endcase %}
+      <meta property="og:locale:alternate" content="{{ alternate_locale }}">
+    {% endif %}
+  {% endfor %}
+{% endif %}
+{% if seo_description != "" %}<meta property="og:description" content="{{ seo_description | escape }}">{% endif %}
+{% if image_url and image_url != "" %}<meta property="og:image" content="{{ image_url }}">{% endif %}
+{% if image_url and image_url != "" and image_url contains 'https://' %}<meta property="og:image:secure_url" content="{{ image_url }}">{% endif %}
+{% if image_url and image_url != "" and image_alt != "" %}<meta property="og:image:alt" content="{{ image_alt | escape }}">{% endif %}
+{% if image_url and image_url != "" and image_width %}<meta property="og:image:width" content="{{ image_width }}">{% endif %}
+{% if image_url and image_url != "" and image_height %}<meta property="og:image:height" content="{{ image_height }}">{% endif %}
+{% if image_url and image_url != "" and image_type %}<meta property="og:image:type" content="{{ image_type | escape }}">{% endif %}
+{% if og_type == "article" and article_published_time %}<meta property="article:published_time" content="{{ article_published_time | date_to_xmlschema }}">{% endif %}
+{% if og_type == "article" and article_modified_time %}<meta property="article:modified_time" content="{{ article_modified_time | date_to_xmlschema }}">{% endif %}
+<meta name="twitter:card" content="{{ twitter_card }}">
+<meta name="twitter:title" content="{{ seo_title }}">
+{% if seo_description != "" %}<meta name="twitter:description" content="{{ seo_description | escape }}">{% endif %}
+{% if image_url and image_url != "" %}<meta name="twitter:image" content="{{ image_url }}">{% endif %}
+{% if image_url and image_url != "" and image_alt != "" %}<meta name="twitter:image:alt" content="{{ image_alt | escape }}">{% endif %}
+{% if twitter_handle != "" %}<meta name="twitter:site" content="@{{ twitter_handle }}">{% endif %}
+{% endif %}

@@ -1,0 +1,41 @@
+{% assign block = include.block %}
+{% assign provider = block.provider | downcase %}
+{% assign alignment = block.align | default: 'left' %}
+{% assign embed_height = block.height | default: 152 | plus: 0 %}
+{% assign safe_src = block.src | approved_embed_src: provider %}
+<figure class="content-block content-block--embed content-block--align-{{ alignment | escape }}">
+  {% if provider == 'spotify' and safe_src != '' %}
+    <div class="embed-container embed-container--spotify">
+      <iframe
+        src="{{ safe_src | escape }}"
+        width="100%"
+        height="{{ embed_height }}"
+        frameborder="0"
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        title="{{ block.title | default: block.caption | default: 'Embedded content' | escape }}">
+      </iframe>
+    </div>
+  {% elsif provider == 'youtube' and safe_src != '' %}
+    <div class="embed-container embed-container--video">
+      <iframe
+        src="{{ safe_src | escape }}"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+        loading="lazy"
+        title="{{ block.title | default: block.caption | default: 'Embedded video' | escape }}">
+      </iframe>
+    </div>
+  {% elsif provider == 'vimeo' and safe_src != '' %}
+    <div class="embed-container embed-container--video">
+      <iframe
+        src="{{ safe_src | escape }}"
+        allow="autoplay; fullscreen; picture-in-picture"
+        loading="lazy"
+        title="{{ block.title | default: block.caption | default: 'Embedded video' | escape }}">
+      </iframe>
+    </div>
+  {% endif %}
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
+  {% endif %}
+</figure>

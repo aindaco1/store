@@ -1,0 +1,102 @@
+{% comment %}
+  Translation helper - looks up a key from _data/i18n/{lang}.yml
+  
+  Usage:
+    {% include t.html key="buttons.checkout" %}
+    {% include t.html key="states.opens" date="Jan 15" %}
+    {% include t.html key="store.product_title" title="Fronteras T-Shirt" %}
+  
+  The lang defaults to site.lang or "en"
+  Interpolation: %{variable} in the translation string is replaced with the variable passed
+{% endcomment %}
+
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign lang = include.lang | default: page.lang | default: default_lang -%}
+{%- assign translations = site.data.i18n[lang] -%}
+{%- assign fallback_translations = site.data.i18n[default_lang] | default: site.data.i18n.en -%}
+
+{%- comment %} Parse the key path (e.g., "buttons.checkout" -> translations.buttons.checkout) {% endcomment -%}
+{%- assign key_parts = include.key | split: "." -%}
+{%- assign result = translations -%}
+
+{%- for part in key_parts -%}
+  {%- if result -%}
+    {%- assign result = result[part] -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- unless result -%}
+  {%- assign result = fallback_translations -%}
+  {%- for part in key_parts -%}
+    {%- if result -%}
+      {%- assign result = result[part] -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endunless -%}
+
+{%- comment %} Fallback to key if translation not found {% endcomment -%}
+{%- unless result -%}
+  {%- if jekyll.environment == "production" -%}
+    {%- assign result = include.default | default: include.key -%}
+  {%- else -%}
+    {%- assign result = "[missing: " | append: include.key | append: "]" -%}
+  {%- endif -%}
+{%- endunless -%}
+
+{%- comment %} Simple interpolation for common variables {% endcomment -%}
+{%- if include.amount -%}
+  {%- assign result = result | replace: "%{amount}", include.amount -%}
+{%- endif -%}
+{%- if include.date -%}
+  {%- assign result = result | replace: "%{date}", include.date -%}
+{%- endif -%}
+{%- if include.goal -%}
+  {%- assign result = result | replace: "%{goal}", include.goal -%}
+{%- endif -%}
+{%- if include.deadline -%}
+  {%- assign result = result | replace: "%{deadline}", include.deadline -%}
+{%- endif -%}
+{%- if include.percent -%}
+  {%- assign result = result | replace: "%{percent}", include.percent -%}
+{%- endif -%}
+{%- if include.platform -%}
+  {%- assign result = result | replace: "%{platform}", include.platform -%}
+{%- endif -%}
+{%- if include.remaining -%}
+  {%- assign result = result | replace: "%{remaining}", include.remaining -%}
+{%- endif -%}
+{%- if include.milestone -%}
+  {%- assign result = result | replace: "%{milestone}", include.milestone -%}
+{%- endif -%}
+{%- if include.name -%}
+  {%- assign result = result | replace: "%{name}", include.name -%}
+{%- endif -%}
+{%- if include.count -%}
+  {%- assign result = result | replace: "%{count}", include.count -%}
+{%- endif -%}
+{%- if include.title -%}
+  {%- assign result = result | replace: "%{title}", include.title -%}
+{%- endif -%}
+{%- if include.value -%}
+  {%- assign result = result | replace: "%{value}", include.value -%}
+{%- endif -%}
+{%- if include.label -%}
+  {%- assign result = result | replace: "%{label}", include.label -%}
+{%- endif -%}
+{%- if include.email -%}
+  {%- assign result = result | replace: "%{email}", include.email -%}
+{%- endif -%}
+{%- if include.url -%}
+  {%- assign result = result | replace: "%{url}", include.url -%}
+{%- endif -%}
+{%- if include.creator -%}
+  {%- assign result = result | replace: "%{creator}", include.creator -%}
+{%- endif -%}
+{%- if include.category -%}
+  {%- assign result = result | replace: "%{category}", include.category -%}
+{%- endif -%}
+{%- if include.blurb -%}
+  {%- assign result = result | replace: "%{blurb}", include.blurb -%}
+{%- endif -%}
+
+{{ result -}}

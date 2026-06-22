@@ -1,0 +1,51 @@
+{
+  "name": "store",
+  "version": "0.1.0",
+  "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "deploy:worker": "npm --prefix worker run deploy",
+    "test": "vitest run && ./scripts/test-e2e.sh",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:coverage": "vitest run --coverage",
+    "test:content-security": "node ./scripts/audit-product-content.mjs",
+    "test:secrets": "node ./scripts/audit-secrets.mjs",
+    "launch:readiness": "ruby ./scripts/check-launch-readiness.rb",
+    "test:premerge": "./scripts/pre-merge-regression.sh",
+    "test:e2e": "./scripts/test-e2e.sh",
+    "test:e2e:quick": "playwright test --headed",
+    "test:e2e:headless": "CI=1 playwright test",
+    "test:e2e:headless:podman": "CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1",
+    "test:e2e:ui": "playwright test --ui",
+    "sync:worker-config": "ruby ./scripts/sync-worker-config.rb && ruby ./scripts/generate-catalog-snapshot.rb",
+    "catalog:generate": "ruby ./scripts/generate-catalog-snapshot.rb",
+    "secrets:dev": "./scripts/configure-dev-secrets.sh",
+    "setup:deploy": "node ./scripts/setup-deploy.mjs",
+    "podman:doctor": "./scripts/podman-doctor.sh",
+    "podman:self-check": "./scripts/podman-self-check.sh",
+    "test:security": "vitest run --config vitest.security.config.ts",
+    "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.ts",
+    "test:security:staging": "WORKER_URL=https://checkout-staging.dustwave.xyz vitest run --config vitest.security.config.ts",
+    "test:usps": "node ./scripts/usps-smoke.mjs",
+    "assets:minify": "node ./scripts/minify-site-assets.mjs --write",
+    "assets:minify:check": "node ./scripts/minify-site-assets.mjs --check",
+    "media:optimize": "node ./scripts/optimize-media.mjs --write",
+    "media:optimize:check": "node ./scripts/optimize-media.mjs --check",
+    "media:optimize:podman": "./scripts/podman-media-optimize.sh --write",
+    "media:optimize:check:podman": "./scripts/podman-media-optimize.sh --check"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "axe-core": "^4.11.2",
+    "esbuild": "^0.21.5",
+    "jsdom": "^24.0.0",
+    "vitest": "^1.6.0"
+  }
+}

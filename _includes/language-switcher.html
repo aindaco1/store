@@ -1,0 +1,46 @@
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign current_lang = include.lang | default: page.lang | default: default_lang -%}
+{%- assign switcher_position = include.position | default: "header" -%}
+{%- assign supported_langs = site.i18n.supported_langs -%}
+{%- assign localized_pages = site.i18n.pages -%}
+{%- assign localized_page = nil -%}
+{%- assign translation_key = include.translation_key | default: page.translation_key -%}
+{%- assign localized_paths = include.localized_paths | default: page.localized_paths -%}
+{%- if translation_key and localized_pages -%}
+  {%- assign localized_page = localized_pages[translation_key] -%}
+{%- endif -%}
+{%- assign switcher_target_count = 0 -%}
+{%- for lang in supported_langs -%}
+  {%- assign has_lang_target = false -%}
+  {%- if localized_paths and localized_paths[lang] -%}
+    {%- assign has_lang_target = true -%}
+  {%- elsif localized_page and localized_page[lang] -%}
+    {%- assign has_lang_target = true -%}
+  {%- endif -%}
+  {%- if has_lang_target -%}
+    {%- assign switcher_target_count = switcher_target_count | plus: 1 -%}
+  {%- endif -%}
+{%- endfor -%}
+{%- if supported_langs and supported_langs.size > 1 and switcher_target_count > 1 -%}
+  <nav class="{% if switcher_position == 'footer' %}site-footer__lang-switcher{% else %}site-header__lang-switcher{% endif %}" aria-label="{% include t.html key='nav.language_switcher' lang=current_lang %}">
+    {%- for lang in supported_langs -%}
+      {%- assign has_lang_target = false -%}
+      {%- if localized_paths and localized_paths[lang] -%}
+        {%- assign has_lang_target = true -%}
+      {%- elsif localized_page and localized_page[lang] -%}
+        {%- assign has_lang_target = true -%}
+      {%- endif -%}
+      {%- if has_lang_target -%}
+        {%- capture target_url -%}{% include localized-url.html lang=lang translation_key=translation_key localized_paths=localized_paths %}{%- endcapture -%}
+        <a
+          href="{{ target_url | strip }}"
+          data-lang-switcher-link="true"
+          lang="{{ lang }}"
+          hreflang="{{ lang }}"
+          class="{% if switcher_position == 'footer' %}site-footer__lang-link{% else %}site-header__lang-link{% endif %}{% if lang == current_lang %} is-current{% endif %}"
+          {% if lang == current_lang %}aria-current="page"{% endif %}
+        >{{ site.i18n.language_labels[lang] | default: lang }}</a>
+      {%- endif -%}
+    {%- endfor -%}
+  </nav>
+{%- endif -%}

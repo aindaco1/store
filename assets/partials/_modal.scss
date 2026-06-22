@@ -1,0 +1,193 @@
+// Modal styles
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &[hidden] {
+    display: none;
+  }
+  
+  &__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba($color--black, 0.6);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+  }
+  
+  &__content {
+    position: relative;
+    @include surface-elevated($space-2xl, $surface--base);
+    max-width: 480px;
+    width: calc(100% - 48px);
+    max-height: 80vh;
+    overflow-y: auto;
+
+    @include xsm {
+      width: calc(100% - 24px);
+      max-height: calc(100dvh - 24px);
+      padding: 18px 16px;
+    }
+    
+    h2, h3 {
+      margin-bottom: $space-md;
+      @include type-card-title;
+    }
+    
+    p {
+      @include type-ui;
+      color: $color--secondary;
+      margin-bottom: $space-xs;
+    }
+  }
+
+  &__content--wide {
+    max-width: 700px;
+
+    @include xsm {
+      max-width: none;
+    }
+  }
+  
+  &__details {
+    @include surface-panel($space-md, $surface--subtle);
+    margin: $space-md 0;
+    @include type-ui;
+    
+    ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+    
+    li {
+      margin: 4px 0;
+    }
+  }
+  
+  &__subtitle {
+    @include type-ui;
+    color: $color--secondary;
+    margin-bottom: $space-md;
+  }
+
+  &__field {
+    display: grid;
+    gap: 8px;
+    margin-bottom: $space-md;
+  }
+
+  &__label {
+    @include type-label;
+    color: $color--primary;
+  }
+
+  &__required-mark {
+    color: #9f1239;
+  }
+
+  &__field input {
+    width: 100%;
+    min-height: 44px;
+    padding: 11px 14px;
+    @include field-shell;
+    font-family: $font-family--body;
+    font-size: $type--ui;
+    font-weight: 400;
+    line-height: 1.4;
+  }
+
+  &__field input::placeholder {
+    color: $color--secondary;
+  }
+
+  &__field input:focus {
+    outline-offset: 1px;
+  }
+
+  &__mount {
+    min-height: 62px;
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    border: 1px dashed $border--default;
+    border-radius: $radius--md;
+    background: $surface--subtle-overlay;
+    @include type-ui;
+    color: $color--secondary;
+    margin-bottom: $space-md;
+  }
+
+  &__mount--payment {
+    min-height: 0;
+    display: block;
+    width: 100%;
+    padding: 8px 0 0;
+    border: 0;
+    background: transparent;
+    color: $color--default;
+    margin-bottom: 0;
+  }
+
+  &__payment-section {
+    margin-bottom: $space-md;
+    @include surface-panel(14px 18px 12px, $surface--subtle);
+  }
+
+  &__section-label {
+    margin: 0;
+    @include type-label;
+    color: $color--primary;
+  }
+
+  &__section-label--payment {
+    margin: 0 0 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  &__note {
+    margin: 0 0 $space-md;
+    @include type-ui;
+    color: $color--secondary;
+  }
+
+  &__note--payment-consent {
+    color: $color--default;
+  }
+
+  &__error-text {
+    margin: 0 0 $space-md;
+    @include type-meta;
+    color: #9f1239;
+  }
+  
+  &__error {
+    @include surface-panel($space-sm, $color--danger-soft);
+    color: $color--danger;
+    margin-bottom: $space-md;
+    @include type-ui;
+  }
+  
+  &__actions {
+    display: flex;
+    gap: $space-sm;
+    justify-content: flex-end;
+    margin-top: $space-xl;
+
+    @include xsm {
+      flex-direction: column-reverse;
+      align-items: stretch;
+    }
+
+    .btn {
+      white-space: nowrap;
+    }
+  }
+}

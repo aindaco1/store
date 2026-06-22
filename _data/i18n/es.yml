@@ -1,0 +1,213 @@
+# Spanish translations
+nav:
+  home: Inicio
+  terms: Términos
+  orders: Pedidos
+  main_navigation: Navegación principal
+  language_switcher: Selector de idioma
+  open_menu: Abrir menú
+  close_menu: Cerrar menú
+  home_aria: Inicio de %{title}
+admin:
+  page_title: Panel de administración
+  login_title: Iniciar sesión de administración
+  email_label: Correo de administración
+  challenge_aria_label: Comprobación de seguridad para iniciar sesión como administrador
+  send_link: Enviar enlace mágico
+  overview_title: Panel de control
+  overview_help: Usa este panel para administrar la configuracion de Store, analitica, enlaces de marketing, pedidos, productos, inventario y descargas.
+  logout: Cerrar sesión
+  tabs_label: Secciones de administración
+  settings_help_label: Acerca de
+  settings_title: Configuración
+  store_analytics_short_title: Analitica
+  store_marketing_short_title: Marketing
+  store_orders_short_title: Pedidos
+  store_products_short_title: Productos
+  store_downloads_short_title: Descargas
+  settings_intro: Revisa la configuración de %{platform}, checkout, envíos, impuestos, usuarios y operaciones de plataforma disponibles para esta cuenta de administración.
+  settings_publish: Publicar
+  settings_sections_label: Secciones de configuración
+  store_analytics_intro: Revisa ingresos, cumplimiento, boletos, pagos y rendimiento de productos de %{platform} desde los registros de pedidos.
+  store_marketing_intro: Crea enlaces UTM y de referencia para %{platform}, guarda referencias reutilizables y descarga codigos QR para campanas o socios.
+  marketing_destination_label: Ruta de destino
+  marketing_help_destination: Ruta de Store para crear una URL de marketing. Usa "/" para la pagina principal o una ruta de producto para un articulo especifico.
+  marketing_referrer_label: Referente
+  marketing_help_referrer: Persona, socio, campana o ubicacion que este enlace debe identificar.
+  marketing_ref_label: Codigo de referencia
+  marketing_help_ref: Codigo seguro para URL generado desde el referente. Puedes editarlo antes de guardar el enlace.
+  marketing_source_label: Fuente UTM
+  marketing_help_source: Fuente de trafico para analitica, como instagram, newsletter, volante o socio.
+  marketing_medium_label: Medio UTM
+  marketing_help_medium: Canal de marketing para analitica, como social, email, impreso o qr.
+  marketing_campaign_label: Campana UTM
+  marketing_help_campaign: Nombre de campana usado para agrupar enlaces de marketing de Store.
+  marketing_content_label: Contenido UTM
+  marketing_help_content: Etiqueta opcional para comparar ubicaciones, versiones creativas o llamadas a la accion.
+  marketing_url_label: URL generada
+  marketing_help_url: URL de Store de solo lectura creada desde la ruta, valores UTM y codigo de referencia.
+  marketing_copy_url: Copiar URL
+  marketing_qr_title: Codigo QR
+  marketing_qr_help: Previsualiza y descarga un codigo escaneable para el enlace generado.
+  marketing_qr_download_png: Descargar PNG
+  marketing_qr_download_svg: Descargar SVG
+  marketing_save_referral: Guardar referencia
+  marketing_cancel_edit: Cancelar edicion
+  marketing_reset: Restablecer
+  store_orders_intro: Revisa cumplimiento de %{platform}, descargas, boletos, RSVPs y registro de eventos.
+  store_order_status: Estado
+  store_order_fulfillment: Cumplimiento
+  filter_all: Todos
+  search_label: Buscar
+  export_csv: Exportar CSV
+  export_attendees: Exportar asistentes
+  load_more: Cargar más
+  store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
+  store_downloads_intro: Verifica las claves de archivos digitales contra el bucket de descargas de %{platform} y las URL de respaldo configuradas.
+misc:
+  skip_to_main: Saltar al contenido principal
+  video_not_supported: Tu navegador no es compatible con la etiqueta de video.
+storefront:
+  option_label: Opción
+  size_label: Talla
+  quantity_label: Cantidad
+  decrease_quantity: Disminuir cantidad
+  increase_quantity: Aumentar cantidad
+  add_to_cart: Añadir al carrito
+  add_ticket: Añadir boleto
+  add_download: Añadir descarga
+  rsvp: Confirmar asistencia
+  sold_out: Agotado
+  inventory_pending: Inventario pendiente
+  in_stock: Disponible
+  only_left: Solo quedan %{count}
+runtime:
+  cart:
+    cart_button_empty: Abrir carrito. El carrito está vacío.
+    cart_button_summary_one: Abrir carrito. %{count} artículo, %{total} en total.
+    cart_button_summary_other: Abrir carrito. %{count} artículos, %{total} en total.
+    untitled_item: Artículo sin título
+    quantity: Cant. %{count}
+    add_on_quantity_for: Cantidad de %{item}
+    remove: Quitar
+    empty: Tu carrito está vacío.
+    contact: Contacto
+    email_address: Correo electrónico
+    shipping_address: Contacto y dirección de envío
+    full_name: Nombre completo
+    address_line_1: Dirección línea 1
+    address_line_2: Dirección línea 2
+    city: Ciudad
+    state_province: Estado / provincia
+    state_province_optional: Estado / provincia (opcional)
+    postal_code: Código postal
+    country: País
+    tax_location: Ubicación fiscal
+    tax_location_note: Añade tu país y código postal de facturación para que podamos finalizar el impuesto antes de guardar tu método de pago.
+    tax_location_note_nm: Añade tu dirección de facturación de Nuevo México, ciudad, estado y código postal para que podamos finalizar el impuesto antes de guardar tu método de pago.
+    tax_location_required: Introduce tu país y código postal de facturación para finalizar el impuesto antes de continuar.
+    tax_location_required_nm: Introduce tu dirección de facturación, ciudad, estado y código postal para finalizar el impuesto de Nuevo México antes de continuar.
+    payment_method: Método de pago
+    payment_consent: Tu pago se procesa de forma segura con Stripe.
+    tip_label: Propina para %{platform} para el mantenimiento de la plataforma.
+    tip_copy: "Las propinas opcionales ayudan a que %{platform} siga haciendo lo suyo."
+    tip_with_percent: Propina para %{platform} (%{percent}%)
+    estimated_total: Total estimado
+    subtotal: Subtotal
+    sales_tax_label: Impuesto sobre ventas (%{rate}%)
+    tax_label: Impuesto
+    sales_tax_pending_label: Impuesto
+    tax_label_with_rate: Impuesto (%{rate}%)
+    shipping: Envío
+    shipping_estimate: Envío estimado
+    shipping_estimate_postal_code: Código postal para estimar el envío
+    shipping_estimate_postal_help: Ingresa un código postal de EE. UU. para estimar el envío antes de pagar.
+    shipping_calculating: Calculando envío...
+    shipping_option: Opción de entrega
+    shipping_option_standard: Estándar
+    shipping_option_signature_required: Firma requerida
+    shipping_option_adult_signature_required: Firma de adulto requerida
+    platform_add_ons: Complementos
+    platform_add_ons_note: Complementos opcionales para tu pedido.
+    add_on_variant: Variación
+    add_on_low_stock: Solo quedan %{count}
+    add_on_stock: Quedan %{count}
+    add_to_cart: Añadir al carrito
+    remove_add_on: Quitar
+    back_to_cart: Volver al carrito
+    keep_browsing: Seguir explorando
+    checkout: Pagar
+    next_step: Próximo paso
+    hosted_checkout_note: Continúa a la plataforma segura de Stripe para ingresar tu información de pago y finalizar tu pedido.
+    order_total: Total del pedido
+    order_summary: Resumen del pedido
+    store_payment_consent: Tu pago se procesa de forma segura con Stripe.
+    decrease_quantity: Disminuir cantidad
+    increase_quantity: Aumentar cantidad
+    continue_to_payment: Continuar al pago
+    processing_payment: Procesando pago...
+    finishing_order: Finalizando pedido...
+    pay_now: Pagar ahora
+    loading_secure_payment: Cargando pago seguro...
+    payment_processing_still: El pago sigue procesándose. Quédate en esta página un momento e inténtalo de nuevo.
+    save_payment_error: Hubo un error al guardar tu método de pago.
+    payment_confirm_error: Hubo un error al confirmar tu pago.
+    secure_checkout_not_ready: El pago seguro todavía no está listo.
+    secure_checkout_mount_error: No se pudo montar el pago seguro.
+    first_party_disabled: El pago de primera parte no está habilitado para esta compilación.
+    start_order_error: Hubo un error al iniciar tu pedido.
+    email_required: Introduce una dirección de correo para continuar.
+    email_invalid: Introduce una dirección de correo válida para continuar.
+    shipping_address_required: Completa una dirección de envío para continuar.
+    close_cart: Cerrar carrito
+    your_cart: Tu carrito
+    checkout_title: Pagar
+  gallery:
+    image_gallery: Galería de imágenes
+email:
+  subjects:
+    admin_user_created: Acceso de administración agregado
+    store_order_confirmed: Pedido confirmado
+    store_order_lookup: Enlace para buscar pedidos
+  common:
+    questions_prefix: "¿Preguntas? Responde a este correo o visita"
+  store_order:
+    subtotal: Subtotal
+    tip: Propina
+    shipping: Envío
+    tax: Impuesto
+    total_paid: Total pagado
+    fulfillment_digital: Entrega digital
+    fulfillment_ticket: Boleto
+    fulfillment_rsvp: RSVP
+    fulfillment_service: Servicio
+    fulfillment_physical: Artículo físico
+    download_note: La descarga llegará por correo cuando esté lista.
+    ticket_note: El boleto llegará por correo.
+    rsvp_note: Tu RSVP está confirmado.
+    shipping_note: Te enviaremos otro correo cuando haya novedades de cumplimiento o envío.
+    quantity_label: Cant.
+    items_heading: Artículos
+    shipping_heading: Envío
+    heading: Pedido confirmado
+    order_label: Pedido
+    body: Gracias por tu pedido. Guarda este correo para tus registros.
+    cta: Ver estado del pedido
+  store_order_lookup:
+    heading: Busca tu pedido
+    body_one: Usa este enlace dentro de 15 minutos para ver tu pedido de %{platform}.
+    body_other: Usa este enlace dentro de 15 minutos para ver tus pedidos de %{platform}.
+    cta: Ver pedidos
+    expiry: Este enlace caduca después de un uso.
+    ignore: Si no solicitaste este correo, puedes ignorarlo.
+  admin_user_created:
+    heading: Acceso de administración agregado
+    greeting: 'Hola %{name}:'
+    intro: Te agregaron como %{role} de %{platform}.
+    instructions: Usa la página de inicio de sesión de administración e ingresa este correo para recibir un enlace mágico. No hay contraseña que configurar.
+    cta: Abrir inicio de administración
+    role_super_admin: superadministrador
+    role_limited_admin: administrador limitado
+    access_heading: Acceso
+    created_by: Agregado por %{email}
+    footer: Si no esperabas este acceso, ignora este correo o contacta a la persona responsable de la plataforma.

@@ -1,0 +1,29 @@
+// Utility classes and helpers
+
+// Notice/Alert box
+.notice {
+  background: lighten($goback--accent, 35%);
+  padding: 16px;
+  border-radius: $radius--sm;
+  border-left: 4px solid $goback--accent;
+  margin-bottom: 24px;
+  font-size: 16px;
+}
+
+// Empty state
+.empty-state {
+  padding: 32px;
+  text-align: center;
+  color: $color--secondary;
+  font-size: 14px;
+}
+
+@for $i from 0 through 100 {
+  .u-width-pct-#{$i} {
+    width: $i * 1%;
+  }
+
+  .u-left-pct-#{$i} {
+    left: $i * 1%;
+  }
+}

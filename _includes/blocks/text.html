@@ -1,0 +1,4 @@
+{% assign alignment = include.block.align | default: 'left' %}
+<div class="content-block content-block--text content-block--align-{{ alignment | escape }}">
+  {{ include.block.body | safe_markdown_source | markdownify | sanitize_markdown_links: site.url }}
+</div>

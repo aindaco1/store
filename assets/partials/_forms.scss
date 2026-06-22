@@ -1,0 +1,144 @@
+// Form and input styles
+
+// Mobile input fix (prevents zoom on iOS)
+@media screen and (max-width: 767px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"] {
+    font-size: 14px;
+  }
+}
+
+// Custom amount input
+.custom-amount {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  @include surface-card($space-lg);
+  margin-bottom: 24px;
+  
+  @include xsm {
+    display: grid;
+    gap: $space-md;
+    padding: $space-md;
+    margin-bottom: $space-md;
+  }
+  
+  &__info {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    
+    @include xsm {
+      width: 100%;
+    }
+  }
+  
+  h5 {
+    margin: 0 0 4px 0;
+    font-size: $type--ui;
+    font-weight: 600;
+    color: $color--primary;
+    line-height: 1.2;
+    
+    @include xsm {
+      font-size: 14px;
+    }
+  }
+  
+  p {
+    @include type-meta;
+    color: $color--secondary;
+    margin: 0;
+    
+    @include xsm {
+      font-size: 12px;
+      margin: 0 0 12px 0;
+    }
+  }
+  
+  &__actions {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    
+    @include xsm {
+      width: 100%;
+      gap: $space-sm;
+    }
+  }
+  
+  &__input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 0;
+    max-width: 120px;
+    
+    @include xsm {
+      width: 100%;
+      max-width: 100%;
+      margin-bottom: 0;
+    }
+  }
+  
+  &__currency {
+    font-size: $type--body;
+    font-weight: 600;
+    color: $color--primary;
+  }
+  
+  &__input {
+    width: 80px;
+    padding: 8px 12px;
+    font-size: $type--body;
+    @include field-shell;
+
+    @include xsm {
+      width: 100%;
+      min-height: 44px;
+    }
+  }
+  
+  &__btn {
+    @include primary-action-button(8px 12px, 12px);
+    width: 100%;
+
+    @include xsm {
+      min-height: 44px;
+    }
+  }
+  
+  // Compact variant for dense Store forms
+  &--compact {
+    margin-bottom: 0;
+    
+    h5 {
+      font-size: 14px;
+    }
+    
+    p {
+      font-size: 12px;
+    }
+  }
+}
+
+// Quantity Controls
+.tier-option__quantity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  
+  .qty-btn {
+    @include stepper-button(32px, 18px);
+  }
+  
+  .qty-input {
+    @include stepper-input(60px, 32px, center);
+  }
+}

@@ -1,0 +1,8 @@
+{% assign block = include.block %}
+{% assign alignment = block.align | default: 'left' %}
+<blockquote class="content-block content-block--quote content-block--align-{{ alignment | escape }}">
+  <p>{{ block.text | safe_rich_text }}</p>
+  {% if block.author %}
+    <cite>— {{ block.author | safe_rich_text }}</cite>
+  {% endif %}
+</blockquote>

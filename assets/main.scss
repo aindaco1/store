@@ -1,0 +1,29 @@
+---
+---
+
+{% include theme-vars.css %}
+
+// Import partials - foundation
+@import "partials/variables";
+@import "partials/mixins";
+
+// Import partials - base & layout
+@import "partials/base";
+@import "partials/layout";
+
+// Import partials - components
+@import "partials/buttons";
+@import "partials/forms";
+@import "partials/modal";
+
+// Import partials - page-specific
+@import "partials/storefront";
+
+// Import partials - content & utilities
+@import "partials/content-blocks";
+@import "partials/admin";
+@import "partials/utilities";
+@import "partials/accessibility";
+@import "partials/cart-ui";
+
+// Import partials - overrides

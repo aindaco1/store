@@ -1,0 +1,49 @@
+---
+layout: default
+description: Dust Wave merch, prints, tickets, downloads, and event RSVPs.
+translation_key: home
+---
+
+{%- assign products = site.products | sort: "order" -%}
+{%- capture storefront_heading -%}{% include platform-display-title.html %}{%- endcapture -%}
+<section class="storefront">
+  <h1 class="sr-only">{{ storefront_heading | strip }}</h1>
+  <div class="storefront__filters" data-store-product-filters>
+    <div class="storefront__filter-group" role="group" aria-label="Product collections">
+      <span class="storefront__filter-label">Collection</span>
+      <button class="storefront__filter-button is-active" type="button" data-store-filter-group="collection" data-store-filter-value="all" aria-pressed="true">All</button>
+      {%- for collection in site.storefront.collections -%}
+        <button class="storefront__filter-button" type="button" data-store-filter-group="collection" data-store-filter-value="{{ collection.id | slugify }}" aria-pressed="false">{{ collection.label | escape }}</button>
+      {%- endfor -%}
+    </div>
+    <div class="storefront__filter-group" role="group" aria-label="Product categories">
+      <span class="storefront__filter-label">Category</span>
+      {%- for category in site.storefront.categories -%}
+        <button class="storefront__filter-button" type="button" data-store-filter-group="category" data-store-filter-value="{{ category.id | slugify }}" aria-pressed="false">{{ category.label | escape }}</button>
+      {%- endfor -%}
+    </div>
+    <div class="storefront__filter-feedback">
+      <p class="storefront__filter-status" data-store-filter-status role="status" aria-live="polite"></p>
+      <button class="storefront__filter-clear" type="button" data-store-filter-clear hidden>Clear filters</button>
+    </div>
+  </div>
+
+  <div class="storefront__grid">
+    {%- for product in products -%}
+      {%- assign product_status = product.status | default: "active" -%}
+      {%- assign product_public = true -%}
+      {%- if product.public == false -%}
+        {%- assign product_public = false -%}
+      {%- endif -%}
+      {%- unless product.type == "archive" -%}
+        {%- if product_public -%}
+          {%- if product_status == "active" or product_status == "sold_out" -%}
+            {% include product-card.html product=product %}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endunless -%}
+    {%- endfor -%}
+  </div>
+</section>
+
+<script src="/assets/js/store-product-options.js?v={{ site.time | date: '%s' }}" defer></script>

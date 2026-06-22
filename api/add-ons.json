@@ -1,0 +1,5 @@
+---
+layout: null
+permalink: /api/add-ons.json
+---
+{% include add-ons-catalog-json.html %}

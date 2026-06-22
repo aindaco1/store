@@ -1,0 +1,164 @@
+// Design tokens from dust-wave-shop
+
+// Base spacing unit (8px grid system)
+$size--unit: 8px;
+
+// Spacing scale (multiples of $size--unit)
+$space-xxs: $size--unit * 0.5; // 4px
+$space-xs:  $size--unit;       // 8px
+$space-sm:  $size--unit * 1.5; // 12px
+$space-md:  $size--unit * 2;   // 16px
+$space-lg:  $size--unit * 2.5; // 20px
+$space-xl:  $size--unit * 3;   // 24px
+$space-2xl: $size--unit * 4;   // 32px
+$space-3xl: $size--unit * 6;   // 48px
+$space-4xl: $size--unit * 8;   // 64px
+
+// Typography - Font families
+$font-family--body-default: "Inter", sans-serif;
+$font-family--display-default: "gambado-sans", sans-serif;
+$font-family--body: var(--store-font-body, #{$font-family--body-default});
+$font-family--display: var(--store-font-display, #{$font-family--display-default});
+
+// Semantic neutrals
+$ink--strong-default: #101215;
+$ink--default-default: #252930;
+$ink--muted-default: #5d6573;
+$ink--soft-default: #7b8494;
+
+$ink--strong: var(--store-ink-strong, #{$ink--strong-default});
+$ink--default: var(--store-ink-default, #{$ink--default-default});
+$ink--muted: var(--store-ink-muted, #{$ink--muted-default});
+$ink--soft: var(--store-ink-soft, #{$ink--soft-default});
+
+$surface--page-default: #f5f5f2;
+$surface--base-default: #ffffff;
+$surface--subtle-default: #f0f1ed;
+$surface--soft-default: #e8ebe5;
+$surface--strong-default: #d9ddd5;
+
+$surface--page: var(--store-surface-page, #{$surface--page-default});
+$surface--base: var(--store-surface-base, #{$surface--base-default});
+$surface--subtle: var(--store-surface-subtle, #{$surface--subtle-default});
+$surface--soft: var(--store-surface-soft, #{$surface--soft-default});
+$surface--strong: var(--store-surface-strong, #{$surface--strong-default});
+
+$border--default-default: #d2d7df;
+$border--strong-default: #9ea7b5;
+$border--soft-default: #e3e6eb;
+
+$border--default: var(--store-border-default, #{$border--default-default});
+$border--strong: var(--store-border-strong, #{$border--strong-default});
+$border--soft: var(--store-border-soft, #{$border--soft-default});
+
+// Colors - Base
+$color--default: $ink--default;
+$color--light: $border--default;
+$color--primary: $ink--strong;
+$color--secondary: $ink--muted;
+$color--background: $surface--page;
+
+// Colors - Neutrals
+$color--white: #ffffff;
+$color--black: #000000;
+
+// Colors - Success (green)
+$color--success: #28a745;
+$color--success-dark: #155724;
+$color--success-bg: #d4edda;
+$color--success-notice-bg: #f0fdf4;
+$color--success-notice-border: #bbf7d0;
+
+// Colors - Danger (red)
+$color--danger: #dc3545;
+$color--danger-dark: #c82333;
+$color--danger-text: #721c24;
+$color--danger-bg: #f8d7da;
+
+// Colors - Warning (yellow)
+$color--warning-bg: #fff3cd;
+$color--warning-text: #856404;
+$color--warning-border: #ffc107;
+
+// Colors - Info (blue)
+$color--info-bg: #cce5ff;
+$color--info-text: #004085;
+
+// Accent colors
+$goback--bg: #888f91;
+$goback--accent: #f6e770;
+$goback--border: darken($goback--bg, 5%);
+
+// Typography - Font sizes
+$font-size-xs:  12px;
+$font-size-sm:  13px;
+$font-size-md:  14px;
+$font-size-base: 16px;
+$font-size-lg:  18px;
+$font-size-xl:  20px;
+$font-size-2xl: 24px;
+$font-size-3xl: 32px;
+
+// Typography - Role scale
+$type--display-xl: 56px;
+$type--page-title: 40px;
+$type--section-title: 32px;
+$type--card-title: 22px;
+$type--body-lg: 18px;
+$type--body: 16px;
+$type--ui: 14px;
+$type--meta: 12px;
+$type--eyebrow: 11px;
+
+// Typography - Legacy aliases
+$h1--size: $type--display-xl;
+$product-title--size: $type--page-title;
+$body-copy--size: $type--body-lg;
+$body-copy--leading: 1.6;
+$btn--font-size: $font-size-xs;
+$btn--letter-spacing: 0.08em;
+
+// Layout
+$layout--max-width-default: 1000px;
+$layout--max-width: var(--store-layout-max-width, #{$layout--max-width-default});
+$container-vpad: $space-2xl;
+$header--mb: $space-3xl;
+$product-block-gap: 96px;
+
+// Border radius
+$radius--sm-default: 3px;
+$radius--chip-default: 4px;
+$radius--lg-default: 6px;
+$radius--md-default: 10px;
+$radius--xl-default: 14px;
+
+$radius--sm: var(--store-radius-sm, #{$radius--sm-default});
+$radius--chip: var(--store-radius-chip, #{$radius--chip-default});
+$radius--lg: var(--store-radius-lg, #{$radius--lg-default});
+$radius--md: var(--store-radius-md, #{$radius--md-default});
+$radius--xl: var(--store-radius-xl, #{$radius--xl-default});
+
+// Shadows
+$shadow--soft: 0px 0px 10px rgba(58, 58, 58, 0.2);
+$shadow--success-glow: 0 0 8px rgba(40, 167, 69, 0.5);
+
+// Surface tints (subtle backgrounds)
+$color--primary-soft: var(--store-color-primary-soft, #{lighten($ink--strong-default, 48%)});
+$color--primary-focus-ring: var(--store-color-primary-focus-ring, rgba($ink--strong-default, 0.08));
+$surface--page-overlay: var(--store-surface-page-overlay, rgba($surface--page-default, 0.92));
+$surface--base-overlay: var(--store-surface-base-overlay, rgba($surface--base-default, 0.95));
+$surface--subtle-overlay: var(--store-surface-subtle-overlay, rgba($surface--subtle-default, 0.9));
+$color--primary-border: var(--store-color-primary-border, #{darken($ink--strong-default, 4%)});
+$color--primary-hover: var(--store-color-primary-hover, #{darken($ink--strong-default, 10%)});
+$color--danger-soft: var(--store-color-danger-soft, rgba($color--danger, 0.08));
+$color--danger-softer: var(--store-color-danger-softer, rgba($color--danger, 0.1));
+$surface-tint-softer: var(--store-surface-tint-softer, rgba($ink--strong-default, 0.015));
+$surface-tint-soft: var(--store-surface-tint-soft, rgba($ink--strong-default, 0.025));
+$surface-tint-medium: var(--store-surface-tint-medium, rgba($ink--strong-default, 0.04));
+$surface-tint-hover: var(--store-surface-tint-hover, rgba($ink--strong-default, 0.055));
+$surface-tint-strong: var(--store-surface-tint-strong, rgba($ink--strong-default, 0.07));
+
+// Progress bar
+$progress--color-default: #000000;
+$progress--color: var(--store-progress-color, #{$progress--color-default});
+$progress--bg: lightgray;

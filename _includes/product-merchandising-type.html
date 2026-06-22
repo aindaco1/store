@@ -1,0 +1,41 @@
+{%- assign product = include.product -%}
+{%- assign fulfillment_type = product.fulfillment_type | default: product.type | default: "physical" -%}
+{%- assign shipping_preset = product.shipping_preset -%}
+{%- if shipping_preset == nil or shipping_preset == "" -%}
+  {%- case product.type -%}
+    {%- when "shirt" -%}{%- assign shipping_preset = "tshirt" -%}
+    {%- when "sticker", "bumper", "postcard" -%}{%- assign shipping_preset = "sticker" -%}
+    {%- when "poster", "print" -%}{%- assign shipping_preset = "poster" -%}
+    {%- else -%}{%- assign shipping_preset = "parcel" -%}
+  {%- endcase -%}
+{%- endif -%}
+{%- assign product_name = product.name | default: product.title | default: product.product_name | default: "" | downcase | strip -%}
+{%- assign merchandising_type = product.merchandising_type | default: product.product_type | default: product.type | default: "" | downcase | strip -%}
+{%- if merchandising_type == "" or merchandising_type == "physical" -%}
+  {%- if product_name contains "t-shirt" or product_name contains "shirt" or shipping_preset == "tshirt" -%}
+    {%- assign merchandising_type = "shirt" -%}
+  {%- elsif product_name contains "thong" -%}
+    {%- assign merchandising_type = "thong" -%}
+  {%- elsif product_name contains "poster" or shipping_preset == "poster" -%}
+    {%- assign merchandising_type = "poster" -%}
+  {%- elsif product_name contains "print" -%}
+    {%- assign merchandising_type = "print" -%}
+  {%- elsif product_name contains "sticker" -%}
+    {%- assign merchandising_type = "sticker" -%}
+  {%- elsif product_name contains "postcard" -%}
+    {%- assign merchandising_type = "postcard" -%}
+  {%- elsif product_name contains "bumper" -%}
+    {%- assign merchandising_type = "bumper" -%}
+  {%- elsif product_name contains "vhs" -%}
+    {%- assign merchandising_type = "vhs" -%}
+  {%- elsif product_name contains "mug" or shipping_preset == "mug" -%}
+    {%- assign merchandising_type = "mug" -%}
+  {%- elsif product_name contains "condom" -%}
+    {%- assign merchandising_type = "condom" -%}
+  {%- elsif product_name contains "bucket" -%}
+    {%- assign merchandising_type = "bucket" -%}
+  {%- else -%}
+    {%- assign merchandising_type = fulfillment_type -%}
+  {%- endif -%}
+{%- endif -%}
+{{- merchandising_type -}}

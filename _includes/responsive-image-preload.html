@@ -1,0 +1,34 @@
+{%- assign image_src = include.src | default: "" -%}
+{%- assign image_sizes = include.sizes | default: "100vw" -%}
+{%- assign image_fetchpriority = include.fetchpriority | default: "" -%}
+{%- assign image_src_clean = image_src | split: "?" | first -%}
+{%- assign image_first_char = image_src_clean | slice: 0, 1 -%}
+{%- assign image_extension = image_src_clean | split: "." | last | downcase -%}
+{%- assign responsive_srcset = "" -%}
+{%- if image_src != "" and image_first_char == "/" and image_src_clean contains "." -%}
+  {%- if image_extension == "gif" or image_extension == "jpg" or image_extension == "jpeg" or image_extension == "png" -%}
+    {%- assign image_stem_size = image_src_clean.size | minus: image_extension.size | minus: 1 -%}
+    {%- assign image_stem = image_src_clean | slice: 0, image_stem_size -%}
+    {%- assign responsive_widths = include.widths | default: "320,480,640,960,1600" | split: "," -%}
+    {%- for responsive_width_raw in responsive_widths -%}
+      {%- assign responsive_width = responsive_width_raw | strip -%}
+      {%- assign responsive_candidate = image_stem | append: "-" | append: responsive_width | append: ".webp" -%}
+      {%- assign responsive_candidate_exists = false -%}
+      {%- for static_file in site.static_files -%}
+        {%- if static_file.path == responsive_candidate -%}
+          {%- assign responsive_candidate_exists = true -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if responsive_candidate_exists -%}
+        {%- capture responsive_entry -%}{{ responsive_candidate }} {{ responsive_width }}w{%- endcapture -%}
+        {%- if responsive_srcset == "" -%}
+          {%- assign responsive_srcset = responsive_entry -%}
+        {%- else -%}
+          {%- assign responsive_srcset = responsive_srcset | append: ", " | append: responsive_entry -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+{%- endif -%}
+<link rel="preload" as="image" href="{{ image_src | escape }}"{% if responsive_srcset != "" %} imagesrcset="{{ responsive_srcset | escape }}" imagesizes="{{ image_sizes | escape }}"{% endif %}{% if image_fetchpriority != "" %} fetchpriority="{{ image_fetchpriority | escape }}"{% endif %}>

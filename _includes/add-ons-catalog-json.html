@@ -1,0 +1,71 @@
+{%- assign add_ons_config = site.add_ons | default: empty -%}
+{%- assign add_ons_enabled = true -%}
+{%- if add_ons_config.enabled == false -%}
+  {%- assign add_ons_enabled = false -%}
+{%- endif -%}
+{%- assign add_on_product_count = add_ons_config.product_count | default: 3 | plus: 0 -%}
+{%- if add_on_product_count < 1 -%}
+  {%- assign add_on_product_count = 1 -%}
+{%- elsif add_on_product_count > 5 -%}
+  {%- assign add_on_product_count = 5 -%}
+{%- endif -%}
+{
+  "enabled": {{ add_ons_enabled | jsonify }},
+  "product_count": {{ add_on_product_count | jsonify }},
+  "low_stock_threshold": {{ add_ons_config.low_stock_threshold | default: 5 | jsonify }},
+  "products": [
+    {%- assign add_on_comma = false -%}
+    {%- assign products = site.products | sort: "order" -%}
+    {%- for product in products -%}
+      {%- assign product_status = product.status | default: "active" -%}
+      {%- assign product_public = true -%}
+      {%- if product.public == false or product.launch_test == true -%}
+        {%- assign product_public = false -%}
+      {%- endif -%}
+      {%- unless product.type == "archive" -%}
+        {%- if product_public and product_status == "active" -%}
+          {%- assign product_id = product.identifier | default: product.slug | default: product.name | slugify -%}
+          {%- assign fulfillment_type = product.fulfillment_type | default: product.type | default: "physical" -%}
+          {%- assign shipping_preset = product.shipping_preset -%}
+          {%- if shipping_preset == nil or shipping_preset == "" -%}
+            {%- case product.type -%}
+              {%- when "shirt" -%}{%- assign shipping_preset = "tshirt" -%}
+              {%- when "sticker", "bumper", "postcard" -%}{%- assign shipping_preset = "sticker" -%}
+              {%- when "poster", "print" -%}{%- assign shipping_preset = "poster" -%}
+              {%- else -%}{%- assign shipping_preset = "parcel" -%}
+            {%- endcase -%}
+          {%- endif -%}
+          {%- capture merchandising_type -%}{% include product-merchandising-type.html product=product %}{%- endcapture -%}
+          {%- assign merchandising_type = merchandising_type | strip -%}
+          {%- assign resolved_shipping = product.shipping -%}
+          {%- if resolved_shipping == nil and fulfillment_type == "physical" and shipping_preset -%}
+            {%- assign resolved_shipping = site.shipping.presets[shipping_preset] -%}
+          {%- endif -%}
+          {%- if add_on_comma -%},{%- endif -%}
+          {
+            "id": {{ product_id | jsonify }},
+            "sku": {{ product.sku | default: product_id | jsonify }},
+            "name": {{ product.name | jsonify }},
+            "description": {{ product.description | default: product.content | strip_html | strip | jsonify }},
+            "image_url": {{ product.image | jsonify }},
+            "price": {{ product.price | default: 0 | plus: 0 }},
+            "inventory": {{ product.inventory | jsonify }},
+            "inventory_tracking": {{ product.inventory_tracking | default: false | jsonify }},
+            "status": {{ product_status | jsonify }},
+            "type": {{ merchandising_type | jsonify }},
+            "fulfillment_type": {{ fulfillment_type | jsonify }},
+            "category": {{ fulfillment_type | jsonify }},
+            "event": {{ product.event | default: "" | jsonify }},
+            "shipping_preset": {{ shipping_preset | jsonify }},
+            "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %},
+            "source_url": {{ product.url | absolute_url | jsonify }},
+            "variant_option_name": {{ product.variant_option_name | jsonify }},
+            "variants": {{ product.variants | default: empty | jsonify }}
+          }
+          {%- assign add_on_comma = true -%}
+        {%- endif -%}
+      {%- endunless -%}
+    {%- endfor -%}
+  ],
+  "generated_at": {{ site.time | date_to_xmlschema | jsonify }}
+}

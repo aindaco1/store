@@ -1,0 +1,21 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign platform_title = site.platform.name | default: site.title -%}
+{%- assign footer_logo_path = site.platform.footer_logo_path | default: site.platform.logo_path | default: '/assets/images/logo.svg' -%}
+{%- assign footer_logo_alt = site.platform.company_name | default: site.author -%}
+{%- assign current_translation_key = include.translation_key | default: page.translation_key -%}
+{%- assign current_localized_paths = include.localized_paths | default: page.localized_paths -%}
+<footer class="site-footer" role="contentinfo">
+  <div class="site-footer__content">
+    <div class="site-footer__brand">
+      <a href="{% include localized-url.html lang=current_lang translation_key='home' %}" class="site-footer__logo" aria-label="{% include t.html key='nav.home_aria' lang=current_lang title=platform_title %}">
+        {% include responsive-image.html src=footer_logo_path alt=footer_logo_alt loading="lazy" decoding="async" sizes="32px" widths="320,480" %}
+      </a>
+      <div class="site-footer__copyright">
+        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
+      </div>
+    </div>
+    <div class="site-footer__meta">
+      {% include language-switcher.html position="footer" lang=current_lang translation_key=current_translation_key localized_paths=current_localized_paths %}
+    </div>
+  </div>
+</footer>

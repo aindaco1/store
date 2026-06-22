@@ -1,0 +1,39 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture platform_title -%}{% include platform-display-title.html %}{%- endcapture -%}
+{%- assign platform_title = platform_title | strip -%}
+{%- assign header_logo_path = site.platform.logo_path | default: '/assets/images/logo.svg' -%}
+{%- capture home_url -%}{% include localized-url.html lang=current_lang translation_key="home" %}{%- endcapture -%}
+<header class="site-header" role="banner">
+  <div class="site-header__container">
+    <a href="{{ home_url | strip }}" class="site-header__branding" aria-label="{% include t.html key='nav.home_aria' lang=current_lang title=platform_title %}">
+      {% include responsive-image.html src=header_logo_path alt="" class="site-header__logo" decoding="async" sizes="70px" widths="320,480" %}
+      <span class="site-header__title">{{ platform_title }}</span>
+    </a>
+    <div class="site-header__actions">
+      <nav class="site-header__nav" id="mobile-nav" role="navigation" aria-label="{% include t.html key='nav.main_navigation' lang=current_lang %}">
+        <a href="{% include localized-url.html lang=current_lang translation_key='orders' %}">{% include t.html key="nav.orders" lang=current_lang %}</a>
+        <a href="{% include localized-url.html lang=current_lang translation_key='terms' %}">{% include t.html key="nav.terms" lang=current_lang %}</a>
+      </nav>
+      {% unless include.hide_cart %}
+        {% include cart-icon.html %}
+      {% endunless %}
+      <button 
+        class="site-header__menu-toggle" 
+        id="menu-toggle" 
+        aria-label="{% include t.html key='nav.open_menu' lang=current_lang %}"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+        data-open-label="{% include t.html key='nav.open_menu' lang=current_lang %}"
+        data-close-label="{% include t.html key='nav.close_menu' lang=current_lang %}"
+        type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <script src="/assets/js/header-nav.js" defer></script>
+    <script src="/assets/js/a11y-live.js" defer></script>
+  </div>
+</header>

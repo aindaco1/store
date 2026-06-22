@@ -1,0 +1,41 @@
+{% assign block = include.block %}
+{% assign provider = block.provider | downcase %}
+{% assign alignment = block.align | default: 'left' %}
+{% unless provider == 'vimeo' or provider == 'local' %}
+  {% assign provider = 'youtube' %}
+{% endunless %}
+<figure class="content-block content-block--video content-block--align-{{ alignment | escape }}">
+  <div class="video-embed video-embed--{{ provider }}">
+    {% if provider == 'local' and block.src %}
+      {% assign video_type = 'video/webm' %}
+      {% if block.src contains '.mp4' %}
+        {% assign video_type = 'video/mp4' %}
+      {% elsif block.src contains '.mov' %}
+        {% assign video_type = 'video/quicktime' %}
+      {% endif %}
+      <video controls preload="none" playsinline{% if block.poster %} poster="{{ block.poster | escape }}"{% else %} data-first-frame-poster="true"{% endif %}>
+        <source src="{{ block.src | escape }}" type="{{ video_type }}">
+        {% include t.html key="misc.video_not_supported" %}
+      </video>
+    {% elsif provider == 'vimeo' %}
+      <iframe 
+        src="https://player.vimeo.com/video/{{ block.video_id | uri_escape | escape }}?dnt=1"
+        frameborder="0" 
+        allow="autoplay; fullscreen; picture-in-picture"
+        loading="lazy"
+        title="{{ block.caption | default: 'Video' | strip_html | escape }}">
+      </iframe>
+    {% else %}
+      <iframe 
+        src="https://www.youtube-nocookie.com/embed/{{ block.video_id | uri_escape | escape }}"
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+        loading="lazy"
+        title="{{ block.caption | default: 'Video' | strip_html | escape }}">
+      </iframe>
+    {% endif %}
+  </div>
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
+  {% endif %}
+</figure>

@@ -1,0 +1,36 @@
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign target_lang = include.lang | default: page.lang | default: default_lang -%}
+{%- assign translation_key = include.translation_key | default: page.translation_key -%}
+{%- assign localized_pages = site.i18n.pages -%}
+{%- assign localized_page = nil -%}
+{%- assign localized_paths = include.localized_paths -%}
+{%- if localized_paths == nil -%}
+  {%- if include.path -%}
+    {%- assign localized_paths = nil -%}
+  {%- elsif include.translation_key and include.translation_key != page.translation_key -%}
+    {%- assign localized_paths = nil -%}
+  {%- else -%}
+    {%- assign localized_paths = page.localized_paths -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if translation_key and localized_pages -%}
+  {%- assign localized_page = localized_pages[translation_key] -%}
+{%- endif -%}
+
+{%- if localized_paths and localized_paths[target_lang] -%}
+  {{- localized_paths[target_lang] -}}
+{%- elsif localized_page and localized_page[target_lang] -%}
+  {{- localized_page[target_lang] -}}
+{%- elsif localized_page and localized_page[default_lang] -%}
+  {{- localized_page[default_lang] -}}
+{%- elsif include.path -%}
+  {%- if target_lang == default_lang -%}
+    {{- include.path -}}
+  {%- else -%}
+    {{- "/" | append: target_lang | append: include.path -}}
+  {%- endif -%}
+{%- elsif page.url -%}
+  {{- page.url -}}
+{%- else -%}
+  /
+{%- endif -%}

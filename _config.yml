@@ -1,0 +1,255 @@
+title: Shop
+author: Dust Wave
+description: Dust Wave merch, prints, tickets, downloads, and event RSVPs.
+url: https://shop.dustwave.xyz
+markdown: kramdown
+permalink: pretty
+seo:
+  x_handle: ""
+  same_as: []
+  default_social_image_alt: Dust Wave Shop
+  og_locale_overrides:
+    en: en_US
+debug:
+  console_logging_enabled: true
+  verbose_console_logging: false
+exclude:
+  - README.md
+  - LICENSE
+  - worker
+  - scripts
+  - tests
+  - test-results
+  - playwright-report
+  - package.json
+  - package-lock.json
+  - playwright.config.js
+  - vitest.config.ts
+  - vitest.security.config.ts
+  - Containerfile.dev
+  - Containerfile.playwright.dev
+platform:
+  name: Shop
+  version: 0.1.0
+  release_label: v0.1.0
+  company_name: Dust Wave
+  support_email: info@dustwave.xyz
+  orders_email_from: Shop <orders@shop.dustwave.xyz>
+  updates_email_from: Shop <updates@shop.dustwave.xyz>
+  site_url: https://shop.dustwave.xyz
+  worker_url: https://checkout.dustwave.xyz
+  default_creator_name: Dust Wave
+  timezone: America/Denver
+  logo_path: "/assets/images/logo.svg"
+  footer_logo_path: "/assets/images/logo.svg"
+  favicon_path: "/assets/icons/favicon.png"
+  default_social_image_path: "/assets/images/logo.svg"
+admin:
+  production_site_url: https://shop.dustwave.xyz
+  production_worker_url: https://checkout.dustwave.xyz
+  turnstile_site_key: "0x4AAAAAADoTkzxDfszS1_v7"
+  users:
+    - name: Alonso
+      email: alonso@dustwave.xyz
+      role: super_admin
+admin_production_site_url: https://shop.dustwave.xyz
+admin_production_worker_url: https://checkout.dustwave.xyz
+pricing:
+  sales_tax_rate: 0.07625
+  flat_shipping_rate: 3.0
+  default_tip_percent: 5
+  max_tip_percent: 15
+tax:
+  provider: nm_grt
+  origin_country: US
+  use_regional_origin: true
+  nm_grt_api_base: https://grt.edacnm.org
+  zip_tax_api_base: https://api.zip-tax.com
+shipping:
+  origin_zip: "87120"
+  origin_country: US
+  fallback_flat_rate: 3.0
+  free_shipping_default: false
+  default_option: standard
+  usps:
+    enabled: true
+    client_id: oRhAt2qaXL4xbqmM4PTlHeXmimAZGK7mfz068oqVwnVlrrlR
+    api_base: ""
+    timeout_ms: 5000
+    quote_cache_ttl_seconds: 600
+    failure_cooldown_seconds: 300
+    rate_limit_cooldown_seconds: 1800
+  presets:
+    tshirt:
+      weight_oz: 6.5
+      packaging_weight_oz: 1
+      length_in: 12
+      width_in: 10
+      height_in: 1.5
+      stack_height_in: 0.5
+    sticker:
+      weight_oz: 1
+      packaging_weight_oz: 0.5
+      length_in: 11.5
+      width_in: 6.125
+      height_in: 0.2
+      stack_height_in: 0.05
+      manual_domestic_rate: FIRST_CLASS_FLAT
+      usps_domestic:
+        processing_category: NON_MACHINABLE
+        rate_indicator: SP
+        mail_classes:
+          - USPS_GROUND_ADVANTAGE
+          - PRIORITY_MAIL
+    poster:
+      weight_oz: 5
+      packaging_weight_oz: 3
+      length_in: 18
+      width_in: 3
+      height_in: 3
+      stack_height_in: 0.5
+    parcel:
+      weight_oz: 12
+      packaging_weight_oz: 4
+      length_in: 12
+      width_in: 9
+      height_in: 4
+      stack_height_in: 1
+    mug:
+      weight_oz: 16
+      packaging_weight_oz: 6
+      length_in: 6
+      width_in: 6
+      height_in: 6
+      stack_height_in: 6
+    ticket:
+      weight_oz: 0
+      packaging_weight_oz: 0
+      length_in: 0
+      width_in: 0
+      height_in: 0
+      stack_height_in: 0
+checkout:
+  stripe_publishable_key: pk_live_51N48NKK9nUOzi4tvVuw9UdqVYGLyre50ex4s4giogLQDgUfejp0lfSxV6ZXRdiqN8RY7t0IDIRjiWQ192hcXWVSl00Htn02Ci3
+analytics:
+  provider: none
+  measurement_id: ""
+  dashboard_url: ""
+  report_timezone: America/Denver
+  include_test_orders: false
+  export_product_rows: true
+marketing:
+  default_utm_source: dustwave
+  default_utm_medium: social
+  default_utm_campaign: shop
+  default_utm_content: ""
+  default_ref: ""
+  landing_page_path: "/"
+  share_title: Dust Wave Shop
+  share_text: Dust Wave merch, prints, tickets, downloads, and event RSVPs.
+add_ons:
+  enabled: true
+  product_count: 3
+  low_stock_threshold: 5
+cache:
+  live_inventory_cache_ttl_seconds: 300
+  live_inventory_ttl_seconds: 300
+performance:
+  intent_prefetch_enabled: true
+  intent_prefetch_delay_ms: 90
+  intent_prefetch_limit: 3
+storefront:
+  collections:
+    - id: dustwave
+      label: DUST WAVE
+    - id: fronteras
+      label: Fronteras
+  categories:
+    - id: apparel
+      label: Apparel
+    - id: prints
+      label: Prints
+    - id: stickers
+      label: Stickers
+    - id: event-access
+      label: Tickets & RSVPs
+    - id: downloads
+      label: Downloads
+    - id: media
+      label: Media
+    - id: objects
+      label: Objects
+i18n:
+  default_lang: en
+  supported_langs:
+    - en
+    - es
+  language_labels:
+    en: English
+    es: Español
+  product_path_prefixes:
+    en: "/products/"
+    es: "/es/products/"
+  pages:
+    home:
+      en: "/"
+    orders:
+      en: "/orders/"
+    terms:
+      en: "/terms/"
+    admin:
+      en: "/admin/"
+      es: "/es/admin/"
+design:
+  font_body: '"Inter", sans-serif'
+  font_display: '"gambado-sans", sans-serif'
+  layout_max_width: 1000px
+  radius_sm: 3px
+  radius_chip: 4px
+  radius_lg: 6px
+  radius_md: 8px
+  radius_xl: 10px
+  color_text: "#252930"
+  color_text_strong: "#101215"
+  color_text_muted: "#5d6573"
+  color_text_soft: "#7b8494"
+  color_page_background: "#f7f7f4"
+  color_surface_base: "#ffffff"
+  color_surface_subtle: "#f0f1ed"
+  color_surface_soft: "#e8ebe5"
+  color_surface_strong: "#d9ddd5"
+  color_border: "#d2d7df"
+  color_border_strong: "#9ea7b5"
+  color_border_soft: "#e3e6eb"
+  color_primary: "#101215"
+  color_primary_soft: "#858e99"
+  color_primary_border: "#07080a"
+  color_primary_hover: "#000000"
+  color_primary_focus_ring: rgba(16, 18, 21, 0.08)
+  color_page_background_overlay: rgba(247, 247, 244, 0.92)
+  color_surface_base_overlay: rgba(255, 255, 255, 0.95)
+  color_surface_subtle_overlay: rgba(240, 241, 237, 0.9)
+  color_success: "#28a745"
+  color_danger_soft: rgba(220, 53, 69, 0.08)
+  color_danger_softer: rgba(220, 53, 69, 0.1)
+  color_progress: "#000000"
+  surface_tint_softer: rgba(16, 18, 21, 0.015)
+  surface_tint_soft: rgba(16, 18, 21, 0.025)
+  surface_tint_medium: rgba(16, 18, 21, 0.04)
+  surface_tint_hover: rgba(16, 18, 21, 0.055)
+  surface_tint_strong: rgba(16, 18, 21, 0.07)
+sass:
+  sass_dir: assets/partials
+  style: compressed
+collections:
+  products:
+    output: true
+    permalink: "/products/:path/"
+defaults:
+  - scope:
+      path: ""
+      type: products
+    values:
+      layout: product-preview
+      fulfillment_type: physical
+      status: active

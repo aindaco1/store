@@ -1,0 +1,16 @@
+---
+layout: null
+permalink: /robots.txt
+---
+User-agent: *
+Allow: /
+
+Disallow: /admin/
+Disallow: /es/admin/
+Disallow: /orders/
+Disallow: /es/orders/
+Disallow: /order-success/
+Disallow: /es/order-success/
+Disallow: /api/
+
+Sitemap: {{ site.platform.site_url | default: site.url }}/sitemap.xml

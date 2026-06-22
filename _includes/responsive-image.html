@@ -1,0 +1,58 @@
+{%- assign image_src = include.src | default: "" -%}
+{%- assign image_alt = include.alt | default: "" -%}
+{%- assign image_class = include.class | default: "" -%}
+{%- assign image_picture_class = include.picture_class | default: "" -%}
+{%- assign image_loading = include.loading | default: "" -%}
+{%- assign image_decoding = include.decoding | default: "async" -%}
+{%- assign image_fetchpriority = include.fetchpriority | default: "" -%}
+{%- assign image_sizes = include.sizes | default: "100vw" -%}
+{%- assign image_width = include.width | default: 0 | plus: 0 -%}
+{%- assign image_height = include.height | default: 0 | plus: 0 -%}
+{%- if image_width <= 0 or image_height <= 0 -%}
+  {%- assign image_dimensions = image_src | local_image_dimensions -%}
+  {%- if image_width <= 0 -%}
+    {%- assign image_width = image_dimensions.width | default: 0 | plus: 0 -%}
+  {%- endif -%}
+  {%- if image_height <= 0 -%}
+    {%- assign image_height = image_dimensions.height | default: 0 | plus: 0 -%}
+  {%- endif -%}
+{%- endif -%}
+{%- capture image_dimension_attrs -%}{% if image_width > 0 %} width="{{ image_width }}"{% endif %}{% if image_height > 0 %} height="{{ image_height }}"{% endif %}{%- endcapture -%}
+{%- assign image_src_clean = image_src | split: "?" | first -%}
+{%- assign image_first_char = image_src_clean | slice: 0, 1 -%}
+{%- assign image_extension = image_src_clean | split: "." | last | downcase -%}
+{%- assign responsive_srcset = "" -%}
+{%- if image_src != "" and image_first_char == "/" and image_src_clean contains "." -%}
+  {%- if image_extension == "gif" or image_extension == "jpg" or image_extension == "jpeg" or image_extension == "png" -%}
+    {%- assign image_stem_size = image_src_clean.size | minus: image_extension.size | minus: 1 -%}
+    {%- assign image_stem = image_src_clean | slice: 0, image_stem_size -%}
+    {%- assign responsive_widths = include.widths | default: "320,480,640,960,1600" | split: "," -%}
+    {%- for responsive_width_raw in responsive_widths -%}
+      {%- assign responsive_width = responsive_width_raw | strip -%}
+      {%- assign responsive_candidate = image_stem | append: "-" | append: responsive_width | append: ".webp" -%}
+      {%- assign responsive_candidate_exists = false -%}
+      {%- for static_file in site.static_files -%}
+        {%- if static_file.path == responsive_candidate -%}
+          {%- assign responsive_candidate_exists = true -%}
+          {%- break -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if responsive_candidate_exists -%}
+        {%- capture responsive_entry -%}{{ responsive_candidate }} {{ responsive_width }}w{%- endcapture -%}
+        {%- if responsive_srcset == "" -%}
+          {%- assign responsive_srcset = responsive_entry -%}
+        {%- else -%}
+          {%- assign responsive_srcset = responsive_srcset | append: ", " | append: responsive_entry -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+{%- endif -%}
+{%- if responsive_srcset != "" -%}
+<picture{% if image_picture_class != "" %} class="{{ image_picture_class | escape }}"{% endif %}>
+  <source type="image/webp" srcset="{{ responsive_srcset | escape }}" sizes="{{ image_sizes | escape }}">
+  <img src="{{ image_src | escape }}" alt="{{ image_alt | escape }}"{% if image_class != "" %} class="{{ image_class | escape }}"{% endif %}{% if include.aria_hidden %} aria-hidden="true"{% endif %}{% if image_loading != "" %} loading="{{ image_loading | escape }}"{% endif %} decoding="{{ image_decoding | escape }}"{% if image_fetchpriority != "" %} fetchpriority="{{ image_fetchpriority | escape }}"{% endif %}{{ image_dimension_attrs }}>
+</picture>
+{%- else -%}
+<img src="{{ image_src | escape }}" alt="{{ image_alt | escape }}"{% if image_class != "" %} class="{{ image_class | escape }}"{% endif %}{% if include.aria_hidden %} aria-hidden="true"{% endif %}{% if image_loading != "" %} loading="{{ image_loading | escape }}"{% endif %} decoding="{{ image_decoding | escape }}"{% if image_fetchpriority != "" %} fetchpriority="{{ image_fetchpriority | escape }}"{% endif %}{{ image_dimension_attrs }}>
+{%- endif -%}

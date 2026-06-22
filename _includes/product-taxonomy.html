@@ -1,0 +1,83 @@
+{%- assign product = include.product -%}
+{%- assign mode = include.mode | default: "category" -%}
+{%- assign raw_type = product.type | default: "" | downcase | strip -%}
+{%- assign fulfillment_type = product.fulfillment_type | default: raw_type | default: "physical" | downcase | strip -%}
+{%- assign product_name = product.product_name | default: product.name | default: product.title | default: "" | downcase | strip -%}
+{%- assign shipping_preset = product.shipping_preset | default: "" | downcase | strip -%}
+{%- if shipping_preset == "" -%}
+  {%- case raw_type -%}
+    {%- when "shirt" -%}{%- assign shipping_preset = "tshirt" -%}
+    {%- when "sticker", "bumper", "postcard" -%}{%- assign shipping_preset = "sticker" -%}
+    {%- when "poster", "print" -%}{%- assign shipping_preset = "poster" -%}
+    {%- else -%}{%- assign shipping_preset = "parcel" -%}
+  {%- endcase -%}
+{%- endif -%}
+
+{%- assign explicit_collection = product.store_collection | default: product.product_collection | default: "" | strip -%}
+{%- assign event_collection = product.event | default: "" | strip -%}
+{%- if explicit_collection != "" -%}
+  {%- assign collection_id = explicit_collection | slugify -%}
+{%- elsif event_collection != "" -%}
+  {%- assign collection_id = event_collection | slugify -%}
+{%- else -%}
+  {%- assign collection_id = "dustwave" -%}
+{%- endif -%}
+{%- assign collection_label = product.collection_label | default: "" | strip -%}
+{%- if collection_label == "" -%}
+  {%- for collection in site.storefront.collections -%}
+    {%- assign configured_collection_id = collection.id | slugify -%}
+    {%- if configured_collection_id == collection_id -%}
+      {%- assign collection_label = collection.label -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- if collection_label == "" -%}
+  {%- assign collection_label = collection_id | replace: "-", " " | capitalize -%}
+{%- endif -%}
+
+{%- assign explicit_category = product.category | default: "" | strip -%}
+{%- assign category_id = "" -%}
+{%- if explicit_category != "" -%}
+  {%- assign category_id = explicit_category | slugify -%}
+{%- endif -%}
+{%- if category_id == "" -%}
+  {%- if fulfillment_type == "digital" -%}
+    {%- assign category_id = "downloads" -%}
+  {%- elsif fulfillment_type == "ticket" or fulfillment_type == "rsvp" -%}
+    {%- assign category_id = "event-access" -%}
+  {%- elsif raw_type == "shirt" or raw_type == "thong" -%}
+    {%- assign category_id = "apparel" -%}
+  {%- elsif raw_type == "poster" or raw_type == "print" or shipping_preset == "poster" or product_name contains "poster" or product_name contains "print" -%}
+    {%- assign category_id = "prints" -%}
+  {%- elsif raw_type == "sticker" or raw_type == "bumper" or raw_type == "postcard" -%}
+    {%- assign category_id = "stickers" -%}
+  {%- elsif raw_type == "vhs" or product_name contains "vhs" -%}
+    {%- assign category_id = "media" -%}
+  {%- else -%}
+    {%- assign category_id = "objects" -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- assign category_label = product.category_label | default: "" | strip -%}
+{%- if category_label == "" -%}
+  {%- for category in site.storefront.categories -%}
+    {%- assign configured_category_id = category.id | slugify -%}
+    {%- if configured_category_id == category_id -%}
+      {%- assign category_label = category.label -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- if category_label == "" -%}
+  {%- assign category_label = category_id | replace: "-", " " | capitalize -%}
+{%- endif -%}
+
+{%- case mode -%}
+  {%- when "collection" -%}{{ collection_id }}
+  {%- when "collection_label" -%}{{ collection_label }}
+  {%- when "category" -%}{{ category_id }}
+  {%- when "category_label" -%}{{ category_label }}
+  {%- when "eyebrow" -%}{{ collection_label }}
+  {%- else -%}{{ category_id }}
+{%- endcase -%}

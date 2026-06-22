@@ -1,0 +1,288 @@
+{%- assign product = include.product -%}
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign product_display_name = product.product_name | default: product.name | default: product.title -%}
+{%- assign product_id = product.identifier | default: product.slug | default: product_display_name | slugify -%}
+{%- assign product_type = product.fulfillment_type | default: product.type | default: "physical" -%}
+{%- assign product_status = product.status | default: product.type -%}
+{%- assign product_price = product.price | plus: 0 -%}
+{%- assign product_inventory = product.inventory | default: 0 | plus: 0 -%}
+{%- assign tracks_inventory = false -%}
+{%- if product.inventory_tracking == true -%}
+  {%- assign tracks_inventory = true -%}
+{%- endif -%}
+{%- assign low_stock_threshold = site.inventory.low_stock_threshold | default: site.add_ons.low_stock_threshold | default: 5 | plus: 0 -%}
+{%- assign variants = product.variants -%}
+{%- assign has_variants = variants and variants != "" and variants.size > 0 -%}
+{%- assign sizes = product.sizes -%}
+{%- assign has_sizes = sizes and sizes != "" and sizes.size > 0 -%}
+{%- assign shipping_preset = product.shipping_preset -%}
+{%- if shipping_preset == nil or shipping_preset == "" -%}
+  {%- case product.type -%}
+    {%- when "shirt" -%}{%- assign shipping_preset = "tshirt" -%}
+    {%- when "sticker", "bumper", "postcard" -%}{%- assign shipping_preset = "sticker" -%}
+    {%- when "poster", "print" -%}{%- assign shipping_preset = "poster" -%}
+    {%- else -%}{%- assign shipping_preset = "parcel" -%}
+  {%- endcase -%}
+{%- endif -%}
+{%- assign resolved_shipping = product.shipping -%}
+{%- if resolved_shipping == nil and shipping_preset -%}
+  {%- assign resolved_shipping = site.shipping.presets[shipping_preset] -%}
+{%- endif -%}
+{%- assign is_nonshippable = false -%}
+{%- if product_type == "digital" or product_type == "ticket" or product_type == "rsvp" -%}
+  {%- assign is_nonshippable = true -%}
+{%- endif -%}
+{%- assign selected_product_item_id = product_id -%}
+{%- assign selected_product_price = product_price -%}
+{%- assign selected_product_inventory = product_inventory -%}
+{%- assign selected_product_status = product_status -%}
+{%- assign selected_product_inventory_configured = false -%}
+{%- if product.inventory != nil -%}
+  {%- assign selected_product_inventory_configured = true -%}
+{%- endif -%}
+{%- assign selected_variant_id = "" -%}
+{%- assign selected_variant_label = "" -%}
+{%- assign selected_variant_unavailable = false -%}
+{%- assign default_variant_id = "" -%}
+{%- if has_variants -%}
+  {%- for variant in variants -%}
+    {%- assign candidate_variant_id = variant.id | default: variant.sku | default: variant.name | slugify -%}
+    {%- assign candidate_variant_inventory = variant.inventory | default: product_inventory | default: 0 | plus: 0 -%}
+    {%- assign candidate_variant_status = variant.status | default: product_status -%}
+    {%- assign candidate_variant_available = true -%}
+    {%- if candidate_variant_status == "sold_out" or candidate_variant_status == "sold-out" or candidate_variant_status == "unavailable" -%}
+      {%- assign candidate_variant_available = false -%}
+    {%- elsif tracks_inventory and variant.inventory != nil and candidate_variant_inventory <= 0 -%}
+      {%- assign candidate_variant_available = false -%}
+    {%- endif -%}
+    {%- if default_variant_id == "" and candidate_variant_available -%}
+      {%- assign default_variant_id = candidate_variant_id -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if default_variant_id == "" -%}
+    {%- assign default_variant = variants | first -%}
+    {%- assign default_variant_id = default_variant.id | default: default_variant.sku | default: default_variant.name | slugify -%}
+  {%- endif -%}
+  {%- for variant in variants -%}
+    {%- assign candidate_variant_id = variant.id | default: variant.sku | default: variant.name | slugify -%}
+    {%- if candidate_variant_id == default_variant_id -%}
+      {%- assign selected_variant_id = candidate_variant_id -%}
+      {%- assign selected_variant_label = variant.label | default: variant.name | default: candidate_variant_id -%}
+      {%- assign selected_product_item_id = product_id | append: "__" | append: candidate_variant_id -%}
+      {%- assign selected_product_price = variant.price | default: product_price | plus: 0 -%}
+      {%- assign selected_product_inventory = variant.inventory | default: product_inventory | default: 0 | plus: 0 -%}
+      {%- assign selected_product_status = variant.status | default: product_status -%}
+      {%- assign selected_product_inventory_configured = false -%}
+      {%- if variant.inventory != nil -%}
+        {%- assign selected_product_inventory_configured = true -%}
+      {%- endif -%}
+      {%- if selected_product_status == "sold_out" or selected_product_status == "sold-out" or selected_product_status == "unavailable" -%}
+        {%- assign selected_variant_unavailable = true -%}
+      {%- elsif tracks_inventory and selected_product_inventory_configured and selected_product_inventory <= 0 -%}
+        {%- assign selected_variant_unavailable = true -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- assign is_free = false -%}
+{%- if product_price <= 0 -%}
+  {%- assign is_free = true -%}
+{%- endif -%}
+{%- assign selected_is_free = false -%}
+{%- if selected_product_price <= 0 -%}
+  {%- assign selected_is_free = true -%}
+{%- endif -%}
+{%- assign product_url = product.url | absolute_url -%}
+{%- assign desc_text = product.description | default: product.content | strip_html | strip -%}
+{%- capture product_collection -%}{% include product-taxonomy.html product=product mode="collection" %}{%- endcapture -%}
+{%- assign product_collection = product_collection | strip -%}
+{%- capture product_collection_label -%}{% include product-taxonomy.html product=product mode="collection_label" %}{%- endcapture -%}
+{%- assign product_collection_label = product_collection_label | strip -%}
+{%- capture product_category -%}{% include product-taxonomy.html product=product mode="category" %}{%- endcapture -%}
+{%- assign product_category = product_category | strip -%}
+{%- capture product_category_label -%}{% include product-taxonomy.html product=product mode="category_label" %}{%- endcapture -%}
+{%- assign product_category_label = product_category_label | strip -%}
+{%- capture product_merchandising_type -%}{% include product-merchandising-type.html product=product %}{%- endcapture -%}
+{%- assign product_merchandising_type = product_merchandising_type | strip -%}
+{%- capture button_label -%}{% include t.html key="storefront.add_to_cart" lang=current_lang %}{%- endcapture -%}
+{%- assign button_label = button_label | strip -%}
+{%- if product_type == "rsvp" -%}
+  {%- capture button_label -%}{% include t.html key="storefront.rsvp" lang=current_lang %}{%- endcapture -%}
+  {%- assign button_label = button_label | strip -%}
+{%- elsif product_type == "ticket" and is_free -%}
+  {%- capture button_label -%}{% include t.html key="storefront.rsvp" lang=current_lang %}{%- endcapture -%}
+  {%- assign button_label = button_label | strip -%}
+{%- elsif product_type == "ticket" -%}
+  {%- capture button_label -%}{% include t.html key="storefront.add_ticket" lang=current_lang %}{%- endcapture -%}
+  {%- assign button_label = button_label | strip -%}
+{%- elsif product_type == "digital" -%}
+  {%- capture button_label -%}{% include t.html key="storefront.add_download" lang=current_lang %}{%- endcapture -%}
+  {%- assign button_label = button_label | strip -%}
+{%- endif -%}
+{%- capture sold_out_label -%}{% include t.html key="storefront.sold_out" lang=current_lang %}{%- endcapture -%}
+{%- assign sold_out_label = sold_out_label | strip -%}
+{%- capture inventory_pending_label -%}{% include t.html key="storefront.inventory_pending" lang=current_lang %}{%- endcapture -%}
+{%- assign inventory_pending_label = inventory_pending_label | strip -%}
+{%- capture in_stock_label -%}{% include t.html key="storefront.in_stock" lang=current_lang %}{%- endcapture -%}
+{%- assign in_stock_label = in_stock_label | strip -%}
+{%- capture low_stock_template -%}{% include t.html key="storefront.only_left" lang=current_lang count="%{count}" %}{%- endcapture -%}
+{%- assign low_stock_template = low_stock_template | strip -%}
+
+<article
+  class="store-product-card"
+  id="{{ product_id | slugify }}"
+          data-store-product-card
+  data-store-collection="{{ product_collection | escape }}"
+  data-store-collection-label="{{ product_collection_label | escape }}"
+  data-store-category="{{ product_category | escape }}"
+  data-store-category-label="{{ product_category_label | escape }}">
+  <a class="store-product-card__media" href="{{ product.url }}">
+    {% include responsive-image.html src=product.image alt=product_display_name class="store-product-card__image" loading="lazy" decoding="async" sizes="(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" %}
+  </a>
+  <div class="store-product-card__body">
+    <div class="store-product-card__header">
+      <p class="store-product-card__eyebrow">{{ product_collection_label | escape }}</p>
+      <h2 class="store-product-card__title"><a href="{{ product.url }}">{{ product_display_name | escape }}</a></h2>
+    </div>
+    <p class="store-product-card__description">{{ desc_text | truncate: 170 | escape }}</p>
+    <div class="store-product-card__purchase">
+      <p class="store-product-card__price" data-store-price>{% if selected_is_free %}Free{% else %}{{ selected_product_price | money }}{% endif %}</p>
+      <p
+        class="store-product-card__availability"
+        data-store-availability
+        data-store-inventory-state="{% if tracks_inventory %}{% if product_status == 'sold_out' %}unavailable{% elsif product_inventory > 0 and product_inventory <= low_stock_threshold %}low{% elsif product_inventory > low_stock_threshold %}in-stock{% else %}pending{% endif %}{% else %}none{% endif %}"
+        data-store-tracks-inventory="{{ tracks_inventory }}"
+        data-store-low-stock-threshold="{{ low_stock_threshold }}"
+        data-store-sold-out-label="{{ sold_out_label | escape }}"
+        data-store-inventory-pending-label="{{ inventory_pending_label | escape }}"
+        data-store-in-stock-label="{{ in_stock_label | escape }}"
+        data-store-low-stock-template="{{ low_stock_template | escape }}"
+        aria-live="polite">
+        {%- if tracks_inventory -%}
+          {%- if product_status == "sold_out" -%}
+            {{ sold_out_label }}
+          {%- elsif product_inventory > 0 and product_inventory <= low_stock_threshold -%}
+            {% include t.html key="storefront.only_left" lang=current_lang count=product_inventory %}
+          {%- elsif product_inventory > low_stock_threshold -%}
+            {{ in_stock_label }}
+          {%- else -%}
+            {{ inventory_pending_label }}
+          {%- endif -%}
+        {%- endif -%}
+      </p>
+
+      <div class="store-product-card__controls{% if has_variants or product.type == 'shirt' %} store-product-card__controls--with-option{% else %} store-product-card__controls--simple{% endif %}" data-store-product-controls>
+        {%- if has_variants -%}
+        <div class="store-product-card__field store-product-card__field--option">
+          {%- assign variant_option_name = product.variant_option_name | default: "" | strip -%}
+          {%- assign variant_option_token = variant_option_name | downcase -%}
+          <label class="store-product-card__label" for="{{ product_id }}-variant">{% if variant_option_token == "size" %}{% include t.html key="storefront.size_label" lang=current_lang %}{% elsif variant_option_name != "" %}{{ variant_option_name | escape }}{% else %}{% include t.html key="storefront.option_label" lang=current_lang %}{% endif %}</label>
+          <select class="store-product-card__select" id="{{ product_id }}-variant" data-store-variant-select>
+            {%- for variant in variants -%}
+              {%- assign variant_id = variant.id | default: variant.sku | default: variant.name | slugify -%}
+              {%- assign variant_price = variant.price | default: product_price | plus: 0 -%}
+              {%- assign variant_inventory = variant.inventory | default: product_inventory | default: 0 | plus: 0 -%}
+              {%- assign variant_status = variant.status | default: product_status -%}
+              {%- assign variant_inventory_configured = false -%}
+              {%- if variant.inventory != nil -%}
+                {%- assign variant_inventory_configured = true -%}
+              {%- endif -%}
+              {%- assign variant_unavailable = false -%}
+              {%- if variant_status == "sold_out" or variant_status == "sold-out" or variant_status == "unavailable" -%}
+                {%- assign variant_unavailable = true -%}
+              {%- elsif tracks_inventory and variant_inventory_configured and variant_inventory <= 0 -%}
+                {%- assign variant_unavailable = true -%}
+              {%- endif -%}
+              <option
+                value="{{ variant_id | escape }}"
+                data-label="{{ variant.label | default: variant.name | escape }}"
+                data-price="{{ variant_price }}"
+                data-inventory="{{ variant_inventory }}"
+                data-inventory-configured="{{ variant_inventory_configured }}"
+                data-status="{{ variant_status | escape }}"
+                {% if variant_id == selected_variant_id %}selected{% endif %}
+                {% if variant_unavailable %}disabled{% endif %}>
+                {{ variant.label | default: variant.name | escape }}{% unless variant_price == product_price %} - {{ variant_price | money }}{% endunless %}{% if variant_unavailable %} (Sold out){% endif %}
+              </option>
+            {%- endfor -%}
+          </select>
+        </div>
+        {%- elsif product.type == "shirt" -%}
+        <div class="store-product-card__field store-product-card__field--option">
+          <label class="store-product-card__label" for="{{ product_id }}-size">{% include t.html key="storefront.size_label" lang=current_lang %}</label>
+          <select class="store-product-card__select" id="{{ product_id }}-size" data-store-variant-select>
+            {%- assign size_options = sizes -%}
+            {%- unless has_sizes -%}
+              {%- assign size_options = "XS,S,M,L,XL,2XL,3XL" | split: "," -%}
+            {%- endunless -%}
+            {%- for size in size_options -%}
+              <option value="{{ size | slugify }}" data-label="{{ size | escape }}" data-price="{{ product_price }}" data-inventory="{{ product_inventory }}" data-status="{{ product_status | escape }}">{{ size | escape }}</option>
+            {%- endfor -%}
+          </select>
+        </div>
+        {%- endif -%}
+
+        <div class="store-product-card__field store-product-card__field--quantity">
+          <label class="store-product-card__label" for="{{ product_id }}-qty">{% include t.html key="storefront.quantity_label" lang=current_lang %}</label>
+          <div class="store-product-card__stepper">
+            <button class="store-product-card__stepper-button" type="button" aria-label="{% include t.html key='storefront.decrease_quantity' lang=current_lang %}" data-store-quantity-step="-1">-</button>
+            <input class="store-product-card__qty" id="{{ product_id }}-qty" type="number" inputmode="numeric" min="1" value="1" data-store-quantity>
+            <button class="store-product-card__stepper-button" type="button" aria-label="{% include t.html key='storefront.increase_quantity' lang=current_lang %}" data-store-quantity-step="1">+</button>
+          </div>
+        </div>
+
+        <button
+          class="store-add-item store-product-card__button"
+          data-item-id="{{ selected_product_item_id }}"
+          data-item-name="{{ product_display_name | escape }}"
+          data-item-price="{{ selected_product_price }}"
+          data-store-base-price="{{ product_price }}"
+          data-item-quantity="1"
+          data-item-url="{{ product_url }}"
+          data-item-image="{{ product.image }}"
+          data-item-description="{{ desc_text | escape }}"
+          data-item-stackable="always"
+          data-item-shippable="{% if is_nonshippable %}false{% else %}true{% endif %}"
+          data-product-type="{{ product_type }}"
+          data-product-merchandising-type="{{ product_merchandising_type | escape }}"
+          data-product-status="{{ product_status }}"
+          data-product-base-status="{{ product_status }}"
+          data-product-sku="{{ product.sku | default: product_id }}"
+          data-product-inventory="{{ selected_product_inventory }}"
+          data-product-inventory-configured="{{ selected_product_inventory_configured }}"
+          data-product-inventory-tracking="{{ tracks_inventory }}"
+          data-product-low-stock-threshold="{{ low_stock_threshold }}"
+          data-store-sold-out-label="{{ sold_out_label | escape }}"
+          {% if product_status == "sold_out" or selected_variant_unavailable %}disabled aria-disabled="true"{% endif %}
+          {% if resolved_shipping and resolved_shipping.manual_domestic_rate %}data-item-manual-domestic-rate="{{ resolved_shipping.manual_domestic_rate }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.weight_oz != nil %}data-item-shipping-weight-oz="{{ resolved_shipping.weight_oz }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.packaging_weight_oz != nil %}data-item-shipping-packaging-weight-oz="{{ resolved_shipping.packaging_weight_oz }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.length_in != nil %}data-item-shipping-length-in="{{ resolved_shipping.length_in }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.width_in != nil %}data-item-shipping-width-in="{{ resolved_shipping.width_in }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.height_in != nil %}data-item-shipping-height-in="{{ resolved_shipping.height_in }}"{% endif %}
+          {% if resolved_shipping and resolved_shipping.stack_height_in != nil %}data-item-shipping-stack-height-in="{{ resolved_shipping.stack_height_in }}"{% endif %}
+          data-item-custom1-name="_product_type"
+          data-item-custom1-type="hidden"
+          data-item-custom1-value="{{ product_type }}"
+          data-item-custom2-name="_sku"
+          data-item-custom2-type="hidden"
+          data-item-custom2-value="{{ product.sku | default: product_id }}"
+          data-item-custom3-name="_variant"
+          data-item-custom3-type="hidden"
+          data-item-custom3-value="{{ selected_variant_label | escape }}"
+          data-item-custom4-name="_merchandising_type"
+          data-item-custom4-type="hidden"
+          data-item-custom4-value="{{ product_merchandising_type | escape }}"
+          data-item-custom5-name="_variant_id"
+          data-item-custom5-type="hidden"
+          data-item-custom5-value="{{ selected_variant_id | escape }}"
+          data-item-custom6-name="_product_id"
+          data-item-custom6-type="hidden"
+          data-item-custom6-value="{{ product_id | escape }}"
+          data-store-button-label="{{ button_label | escape }}">
+          {%- if product_status == "sold_out" or selected_variant_unavailable -%}{{ sold_out_label }}{%- else -%}{{ button_label }}{% unless selected_is_free %} - {{ selected_product_price | money }}{% endunless %}{%- endif -%}
+        </button>
+      </div>
+    </div>
+  </div>
+</article>

@@ -1,0 +1,45 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
+{%- capture add_ons_catalog_json -%}{% include add-ons-catalog-json.html %}{%- endcapture -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+<script
+  src="/assets/js/store-config.js?v={{ asset_version }}"
+  defer
+  data-store-config-script="true"
+  data-current-lang="{{ current_lang }}"
+  data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
+  data-site-url="{{ site.platform.site_url | default: site.url }}"
+  data-worker-base="{{ site.platform.worker_url }}"
+  data-platform-name="{{ site.platform.name | default: site.title | escape }}"
+  data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+  data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
+  data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
+  data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+  data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"
+  data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
+  data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
+    data-shipping-origin-zip="{{ site.shipping.origin_zip | default: '' }}"
+  data-shipping-origin-country="{{ site.shipping.origin_country | default: 'US' }}"
+  data-shipping-fallback-flat-rate="{{ site.shipping.fallback_flat_rate | default: 3.00 }}"
+  data-shipping-free-shipping-default="{{ site.shipping.free_shipping_default | default: false }}"
+  data-shipping-countries="{{ site.data.shipping_countries | jsonify | escape }}"
+  data-shipping-presets="{{ site.shipping.presets | jsonify | escape }}"
+  data-add-ons="{{ add_ons_catalog_json | strip | escape }}"
+  data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
+  data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
+  data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+  data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
+  data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+  data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
+  data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
+<script src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
+<script src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
+{%- comment -%}Keep checkout domains discoverable without opening Stripe connections before cart intent.{%- endcomment -%}
+<link rel="dns-prefetch" href="//js.stripe.com">
+<link rel="dns-prefetch" href="//api.stripe.com">
+<div hidden data-store-cart-root="true"></div>
+<script
+  src="/assets/js/cart-runtime-loader.js?v={{ asset_version }}"
+  defer
+  data-store-cart-runtime-loader="true"
+  data-asset-version="{{ asset_version }}"></script>

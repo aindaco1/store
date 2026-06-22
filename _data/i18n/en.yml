@@ -1,0 +1,213 @@
+# English translations
+nav:
+  home: Home
+  terms: Terms
+  orders: Orders
+  main_navigation: Main navigation
+  language_switcher: Language switcher
+  open_menu: Open menu
+  close_menu: Close menu
+  home_aria: "%{title} home"
+admin:
+  page_title: Admin Dashboard
+  login_title: Admin sign-in
+  email_label: Admin email
+  challenge_aria_label: Admin sign-in security check
+  send_link: Send magic link
+  overview_title: Dashboard
+  overview_help: Use this dashboard to manage Store settings, analytics, marketing links, orders, products, inventory, and downloads.
+  logout: Log out
+  tabs_label: Admin sections
+  settings_help_label: About
+  settings_title: Settings
+  store_analytics_short_title: Analytics
+  store_marketing_short_title: Marketing
+  store_orders_short_title: Orders
+  store_products_short_title: Products
+  store_downloads_short_title: Downloads
+  settings_intro: Review %{platform} configuration, checkout settings, shipping, tax, users, and platform operations available to this admin account.
+  settings_publish: Publish
+  settings_sections_label: Settings sections
+  store_analytics_intro: Review %{platform} revenue, fulfillment, ticket, payment, and product performance from Store order records.
+  store_marketing_intro: Build %{platform} UTM and referral links, save reusable referrals, and download QR codes for campaigns or partners.
+  marketing_destination_label: Destination path
+  marketing_help_destination: Store path to build a marketing URL for. Use "/" for the homepage or a product path for a specific item.
+  marketing_referrer_label: Referrer
+  marketing_help_referrer: Person, partner, campaign, or placement this link should identify.
+  marketing_ref_label: Referral code
+  marketing_help_ref: URL-safe code generated from the referrer. You can edit it before saving the referral link.
+  marketing_source_label: UTM source
+  marketing_help_source: Traffic source for analytics, such as instagram, newsletter, flyer, or partner.
+  marketing_medium_label: UTM medium
+  marketing_help_medium: Marketing channel for analytics, such as social, email, print, or qr.
+  marketing_campaign_label: UTM campaign
+  marketing_help_campaign: Campaign name used to group related Store marketing links.
+  marketing_content_label: UTM content
+  marketing_help_content: Optional content label for comparing placements, creative versions, or calls to action.
+  marketing_url_label: Generated URL
+  marketing_help_url: Read-only Store URL built from the destination, UTM values, and referral code.
+  marketing_copy_url: Copy URL
+  marketing_qr_title: QR code
+  marketing_qr_help: Preview and download a scannable code for the generated link.
+  marketing_qr_download_png: Download PNG
+  marketing_qr_download_svg: Download SVG
+  marketing_save_referral: Save referral
+  marketing_cancel_edit: Cancel edit
+  marketing_reset: Reset
+  store_orders_intro: Review %{platform} fulfillment, downloads, tickets, RSVPs, and event check-in.
+  store_order_status: Status
+  store_order_fulfillment: Fulfillment
+  filter_all: All
+  search_label: Search
+  export_csv: Export CSV
+  export_attendees: Export attendees
+  load_more: Load more
+  store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
+  store_downloads_intro: Verify digital download file keys against the %{platform} downloads bucket and configured fallback URLs.
+misc:
+  skip_to_main: Skip to main content
+  video_not_supported: Your browser does not support the video tag.
+storefront:
+  option_label: Option
+  size_label: Size
+  quantity_label: Quantity
+  decrease_quantity: Decrease quantity
+  increase_quantity: Increase quantity
+  add_to_cart: Add to Cart
+  add_ticket: Add Ticket
+  add_download: Add Download
+  rsvp: RSVP
+  sold_out: Sold out
+  inventory_pending: Inventory pending
+  in_stock: In stock
+  only_left: Only %{count} left
+runtime:
+  cart:
+    cart_button_empty: Open cart. Cart is empty.
+    cart_button_summary_one: Open cart. %{count} item, %{total} total.
+    cart_button_summary_other: Open cart. %{count} items, %{total} total.
+    untitled_item: Untitled item
+    quantity: Qty %{count}
+    add_on_quantity_for: Quantity for %{item}
+    remove: Remove
+    empty: Your cart is empty.
+    contact: Contact
+    email_address: Email address
+    shipping_address: Contact & Shipping address
+    full_name: Full name
+    address_line_1: Address line 1
+    address_line_2: Address line 2
+    city: City
+    state_province: State / Province
+    state_province_optional: State / Province (optional)
+    postal_code: Postal code
+    country: Country
+    tax_location: Tax location
+    tax_location_note: Add your billing country and postal code so we can finalize tax before you save your payment method.
+    tax_location_note_nm: Add your New Mexico billing street address, city, state, and postal code so we can finalize tax before you save your payment method.
+    tax_location_required: Enter your billing country and postal code to finalize tax before continuing.
+    tax_location_required_nm: Enter your billing street address, city, state, and postal code to finalize New Mexico tax before continuing.
+    payment_method: Payment method
+    payment_consent: Your payment is processed securely by Stripe.
+    tip_label: Tip %{platform} for platform maintenance.
+    tip_copy: "Optional tips help keep %{platform} doing its thing."
+    tip_with_percent: "%{platform} tip (%{percent}%)"
+    estimated_total: Estimated total
+    subtotal: Subtotal
+    sales_tax_label: Sales tax (%{rate}%)
+    tax_label: Tax
+    sales_tax_pending_label: Tax
+    tax_label_with_rate: Tax (%{rate}%)
+    shipping: Shipping
+    shipping_estimate: Estimated shipping
+    shipping_estimate_postal_code: ZIP for shipping estimate
+    shipping_estimate_postal_help: Enter a U.S. ZIP code to estimate shipping before checkout.
+    shipping_calculating: Calculating shipping...
+    shipping_option: Delivery option
+    shipping_option_standard: Standard
+    shipping_option_signature_required: Signature required
+    shipping_option_adult_signature_required: Adult signature required
+    platform_add_ons: Add-ons
+    platform_add_ons_note: Optional add-ons for your order.
+    add_on_variant: Variation
+    add_on_low_stock: Only %{count} left
+    add_on_stock: "%{count} left"
+    add_to_cart: Add to cart
+    remove_add_on: Remove
+    back_to_cart: Back to cart
+    keep_browsing: Keep browsing
+    checkout: Checkout
+    next_step: Next step
+    hosted_checkout_note: Continue to Stripe's secure payment platform to enter your payment information and finish your order.
+    order_total: Order total
+    order_summary: Order summary
+    store_payment_consent: Your payment is processed securely by Stripe.
+    decrease_quantity: Decrease quantity
+    increase_quantity: Increase quantity
+    continue_to_payment: Continue to payment
+    processing_payment: Processing payment...
+    finishing_order: Finishing order...
+    pay_now: Pay now
+    loading_secure_payment: Loading secure payment...
+    payment_processing_still: Payment is still processing. Please stay on this page a moment and try again.
+    save_payment_error: There was an error saving your payment method.
+    payment_confirm_error: There was an error confirming your payment.
+    secure_checkout_not_ready: Secure checkout is not ready yet.
+    secure_checkout_mount_error: Secure checkout could not be mounted.
+    first_party_disabled: First-party checkout is not enabled for this build.
+    start_order_error: There was an error starting your order.
+    email_required: Enter an email address to continue.
+    email_invalid: Enter a valid email address to continue.
+    shipping_address_required: Enter a complete shipping address to continue.
+    close_cart: Close cart
+    your_cart: Your cart
+    checkout_title: Checkout
+  gallery:
+    image_gallery: Image gallery
+email:
+  subjects:
+    admin_user_created: Admin access added
+    store_order_confirmed: Order confirmed
+    store_order_lookup: Order lookup link
+  common:
+    questions_prefix: Questions? Reply to this email or visit
+  store_order:
+    subtotal: Subtotal
+    tip: Tip
+    shipping: Shipping
+    tax: Tax
+    total_paid: Total paid
+    fulfillment_digital: Digital delivery
+    fulfillment_ticket: Ticket
+    fulfillment_rsvp: RSVP
+    fulfillment_service: Service
+    fulfillment_physical: Physical item
+    download_note: Download delivery will arrive by email when fulfillment is ready.
+    ticket_note: Ticket delivery will arrive by email.
+    rsvp_note: Your RSVP is confirmed.
+    shipping_note: We will email again when fulfillment or shipping updates are available.
+    quantity_label: Qty
+    items_heading: Items
+    shipping_heading: Shipping
+    heading: Order confirmed
+    order_label: Order
+    body: Thanks for your order. Save this email for your records.
+    cta: View order status
+  store_order_lookup:
+    heading: Find your order
+    body_one: Use this link within 15 minutes to view your %{platform} order.
+    body_other: Use this link within 15 minutes to view your %{platform} orders.
+    cta: View orders
+    expiry: This link expires after one use.
+    ignore: If you did not request this email, you can ignore it.
+  admin_user_created:
+    heading: Admin access added
+    greeting: Hi %{name},
+    intro: You have been added as a %{role} for %{platform}.
+    instructions: Use the admin sign-in page and enter this email address to receive a magic link. There is no password to set.
+    cta: Open admin sign-in
+    role_super_admin: super admin
+    role_limited_admin: limited admin
+    access_heading: Access
+    created_by: Added by %{email}
+    footer: If you were not expecting this access, ignore this email or contact the platform owner.

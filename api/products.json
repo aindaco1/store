@@ -1,0 +1,62 @@
+---
+layout: null
+permalink: /api/products.json
+---
+{
+  "products": [
+    {%- assign products = site.products | sort: "order" -%}
+    {%- assign emitted_products = 0 -%}
+    {%- for product in products -%}
+      {%- assign product_status = product.status | default: "active" -%}
+      {%- assign product_public = true -%}
+      {%- if product.public == false -%}
+        {%- assign product_public = false -%}
+      {%- endif -%}
+      {%- unless product.type == "archive" -%}
+        {%- if product_public -%}
+        {%- if product_status == "active" or product_status == "sold_out" -%}
+        {%- if emitted_products > 0 -%},{%- endif -%}
+        {%- assign product_id = product.identifier | default: product.slug | default: product.name | slugify -%}
+        {%- assign product_type = product.fulfillment_type | default: product.type | default: "physical" -%}
+        {%- capture product_collection -%}{% include product-taxonomy.html product=product mode="collection" %}{%- endcapture -%}
+        {%- assign product_collection = product_collection | strip -%}
+        {%- capture product_category -%}{% include product-taxonomy.html product=product mode="category" %}{%- endcapture -%}
+        {%- assign product_category = product_category | strip -%}
+        {%- assign product_localized_paths = product.localized_paths | default: empty -%}
+        {%- assign shipping_preset = product.shipping_preset -%}
+        {%- if shipping_preset == nil or shipping_preset == "" -%}
+          {%- case product.type -%}
+            {%- when "shirt" -%}{%- assign shipping_preset = "tshirt" -%}
+            {%- when "sticker", "bumper", "postcard" -%}{%- assign shipping_preset = "sticker" -%}
+            {%- when "poster", "print" -%}{%- assign shipping_preset = "poster" -%}
+            {%- else -%}{%- assign shipping_preset = "parcel" -%}
+          {%- endcase -%}
+        {%- endif -%}
+        {
+          "id": {{ product_id | jsonify }},
+          "slug": {{ product.slug | jsonify }},
+          "name": {{ product.name | jsonify }},
+          "description": {{ product.description | default: product.content | strip_html | strip | jsonify }},
+          "price": {{ product.price | default: 0 | plus: 0 }},
+          "currency": {{ product.currency | default: "USD" | jsonify }},
+          "image": {{ product.image | jsonify }},
+          "url": {{ product.url | absolute_url | jsonify }},
+          "type": {{ product_type | jsonify }},
+          "event": {{ product.event | default: "" | jsonify }},
+          "collection": {{ product_collection | jsonify }},
+          "category": {{ product_category | jsonify }},
+          "localized_paths": {{ product_localized_paths | jsonify }},
+          "status": {{ product.status | default: "active" | jsonify }},
+          "sku": {{ product.sku | default: product_id | jsonify }},
+          "inventory": {{ product.inventory | default: 0 | jsonify }},
+          "variants": {{ product.variants | default: empty | jsonify }},
+          "shipping_preset": {{ shipping_preset | jsonify }},
+          "tax_category": {{ product.tax_category | default: "standard" | jsonify }}
+        }{%- assign emitted_products = emitted_products | plus: 1 -%}
+        {%- endif -%}
+        {%- endif -%}
+      {%- endunless -%}
+    {%- endfor -%}
+  ],
+  "generated_at": {{ site.time | date_to_xmlschema | jsonify }}
+}

@@ -1,0 +1,252 @@
+name = "store-worker"
+main = "src/index.js"
+compatibility_date = "2026-05-03"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+routes = [
+  { pattern = "checkout.dustwave.xyz/*", zone_name = "dustwave.xyz" }
+]
+
+# Cron trigger:
+# - `* * * * *`: timezone-aware platform scheduler. Individual tasks gate on
+#   the configured platform timezone and idempotency markers.
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+SITE_BASE = "https://shop.dustwave.xyz"
+WORKER_BASE = "https://checkout.dustwave.xyz"
+CANONICAL_SITE_BASE = "https://shop.dustwave.xyz"
+CANONICAL_WORKER_BASE = "https://checkout.dustwave.xyz"
+CORS_ALLOWED_ORIGIN = "https://shop.dustwave.xyz"
+APP_MODE = "live"
+ADMIN_USERS_JSON = "[{\"name\":\"Alonso\",\"email\":\"alonso@dustwave.xyz\",\"role\":\"super_admin\",\"accessScopes\":[]}]"
+SITE_TITLE = "Shop"
+SITE_DESCRIPTION = "Dust Wave merch, prints, tickets, downloads, and event RSVPs."
+PLATFORM_NAME = "Shop"
+PLATFORM_COMPANY_NAME = "Dust Wave"
+PLATFORM_AUTHOR = "Dust Wave"
+PLATFORM_DEFAULT_CREATOR_NAME = "Dust Wave"
+PLATFORM_TIMEZONE = "America/Denver"
+SUPPORT_EMAIL = "info@dustwave.xyz"
+ORDERS_EMAIL_FROM = "Shop <orders@shop.dustwave.xyz>"
+UPDATES_EMAIL_FROM = "Shop <updates@shop.dustwave.xyz>"
+PLATFORM_FOOTER_LOGO_PATH = "/assets/images/logo.svg"
+PLATFORM_FAVICON_PATH = "/assets/icons/favicon.png"
+PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/logo.svg"
+SEO_DEFAULT_SOCIAL_IMAGE_ALT = "Dust Wave Shop"
+SEO_X_HANDLE = ""
+SEO_SAME_AS = ""
+STRIPE_PUBLISHABLE_KEY = "pk_live_51N48NKK9nUOzi4tvVuw9UdqVYGLyre50ex4s4giogLQDgUfejp0lfSxV6ZXRdiqN8RY7t0IDIRjiWQ192hcXWVSl00Htn02Ci3"
+EMAIL_LOGO_PATH = "/assets/images/logo.svg"
+DESIGN_LAYOUT_MAX_WIDTH = "1000px"
+EMAIL_FONT_FAMILY = "\"Inter\", sans-serif"
+EMAIL_HEADING_FONT_FAMILY = "\"gambado-sans\", sans-serif"
+EMAIL_COLOR_TEXT = "#252930"
+EMAIL_COLOR_MUTED = "#5d6573"
+EMAIL_COLOR_SURFACE = "#f0f1ed"
+EMAIL_COLOR_BORDER = "#d2d7df"
+EMAIL_COLOR_PRIMARY = "#101215"
+EMAIL_BUTTON_RADIUS = "6px"
+SALES_TAX_RATE = "0.07625"
+TAX_PROVIDER = "nm_grt"
+TAX_ORIGIN_COUNTRY = "US"
+TAX_USE_REGIONAL_ORIGIN = "true"
+NM_GRT_API_BASE = "https://grt.edacnm.org"
+ZIP_TAX_API_BASE = "https://api.zip-tax.com"
+FLAT_SHIPPING_RATE = "3.00"
+SHIPPING_ORIGIN_ZIP = "87120"
+SHIPPING_ORIGIN_COUNTRY = "US"
+SHIPPING_FALLBACK_FLAT_RATE = "3.00"
+FREE_SHIPPING_DEFAULT = "false"
+SHIPPING_DEFAULT_OPTION = "standard"
+USPS_ENABLED = "true"
+USPS_CLIENT_ID = "oRhAt2qaXL4xbqmM4PTlHeXmimAZGK7mfz068oqVwnVlrrlR"
+USPS_API_BASE = ""
+USPS_TIMEOUT_MS = "5000"
+USPS_QUOTE_CACHE_TTL_SECONDS = "600"
+USPS_FAILURE_COOLDOWN_SECONDS = "300"
+USPS_RATE_LIMIT_COOLDOWN_SECONDS = "1800"
+ANALYTICS_PROVIDER = "none"
+ANALYTICS_MEASUREMENT_ID = ""
+ANALYTICS_DASHBOARD_URL = ""
+ANALYTICS_REPORT_TIMEZONE = "America/Denver"
+ANALYTICS_INCLUDE_TEST_ORDERS = "false"
+ANALYTICS_EXPORT_PRODUCT_ROWS = "true"
+MARKETING_DEFAULT_UTM_SOURCE = "dustwave"
+MARKETING_DEFAULT_UTM_MEDIUM = "social"
+MARKETING_DEFAULT_UTM_CAMPAIGN = "shop"
+MARKETING_DEFAULT_UTM_CONTENT = ""
+MARKETING_DEFAULT_REF = ""
+MARKETING_LANDING_PAGE_PATH = "/"
+MARKETING_SHARE_TITLE = "Dust Wave Shop"
+MARKETING_SHARE_TEXT = "Dust Wave merch, prints, tickets, downloads, and event RSVPs."
+ADD_ONS_ENABLED = "true"
+ADD_ON_PRODUCT_COUNT = "3"
+DEBUG_CONSOLE_LOGGING_ENABLED = "true"
+DEBUG_VERBOSE_CONSOLE_LOGGING = "false"
+INTENT_PREFETCH_ENABLED = "true"
+INTENT_PREFETCH_DELAY_MS = "90"
+INTENT_PREFETCH_LIMIT = "3"
+LIVE_INVENTORY_CACHE_TTL_SECONDS = "300"
+DEFAULT_PLATFORM_TIP_PERCENT = "5"
+MAX_PLATFORM_TIP_PERCENT = "15"
+
+[[durable_objects.bindings]]
+name = "STORE_INVENTORY_COORDINATOR"
+class_name = "StoreInventoryCoordinator"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StoreInventoryCoordinator"]
+
+[[r2_buckets]]
+binding = "STORE_DOWNLOADS"
+bucket_name = "store-downloads"
+preview_bucket_name = "store-downloads-preview"
+
+# KV Namespaces - update IDs after running:
+#   wrangler kv:namespace create "STORE_STATE"
+#   wrangler kv:namespace create "STORE_STATE" --preview
+#   wrangler kv:namespace create "RATELIMIT"
+#   wrangler kv:namespace create "RATELIMIT" --preview
+
+[[kv_namespaces]]
+binding = "STORE_STATE"
+id = "2a2935911eef4a3d8e64ad83d7f7b1ee"
+preview_id = "384641ed237c465ca55eeba08f163d38"
+
+# SEC-005: Rate limiting KV (required - the Worker fails closed if not configured)
+[[kv_namespaces]]
+binding = "RATELIMIT"
+id = "c55b47f5699244c5ac723018019e61e1"
+preview_id = "68f522d8316c49b6b2922767d67c9d8a"
+
+# Secrets (set via `wrangler secret put <NAME>`):
+# Required:
+# - STRIPE_SECRET_KEY          (Stripe secret key - used if _TEST/_LIVE not set)
+# - MAGIC_LINK_SECRET          (HMAC secret for token signing)
+# - RESEND_API_KEY             (Resend email API key)
+# - ADMIN_SECRET               (Admin API key for recovery/rebuild endpoints and scoped-secret fallback)
+# - TURNSTILE_SECRET_KEY       (shared Cloudflare Turnstile secret for admin sign-in)
+#
+# Optional (for separate test/live keys):
+# - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
+# - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
+# - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
+# - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
+# - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
+# - STORE_DOWNLOAD_SECRET      (optional dedicated HMAC secret for signed download/fulfillment links)
+#
+# Optional (for GitHub rebuild trigger):
+# - GITHUB_TOKEN               (GitHub PAT with workflow scope)
+# - GITHUB_OWNER               (defaults to 'aindaco1')
+# - GITHUB_REPO                (defaults to 'store')
+# - GITHUB_WORKFLOW            (defaults to 'deploy.yml')
+# - ADMIN_TURNSTILE_REQUIRED   (set true to fail closed when Turnstile is expected)
+# - ADMIN_TURNSTILE_BYPASS     (local/test-only bypass for automated admin auth tests)
+
+# Development overrides
+# Keep local Worker defaults aligned with `_config.local.yml` so local
+# checkout exercises the first-party path end to end without changing
+# production defaults.
+[env.dev]
+
+[env.dev.vars]
+SITE_BASE = "http://127.0.0.1:4002"
+WORKER_BASE = "http://127.0.0.1:8989"
+CANONICAL_SITE_BASE = "https://shop.dustwave.xyz"
+CANONICAL_WORKER_BASE = "https://checkout.dustwave.xyz"
+CORS_ALLOWED_ORIGIN = "http://127.0.0.1:4002"
+APP_MODE = "test"
+ADMIN_USERS_JSON = "[{\"name\":\"Alonso\",\"email\":\"alonso@dustwave.xyz\",\"role\":\"super_admin\",\"accessScopes\":[]}]"
+SITE_TITLE = "Shop"
+SITE_DESCRIPTION = "Dust Wave merch, prints, tickets, downloads, and event RSVPs."
+PLATFORM_NAME = "Shop"
+PLATFORM_COMPANY_NAME = "Dust Wave"
+PLATFORM_AUTHOR = "Dust Wave"
+PLATFORM_DEFAULT_CREATOR_NAME = "Dust Wave"
+PLATFORM_TIMEZONE = "America/Denver"
+SUPPORT_EMAIL = "info@dustwave.xyz"
+ORDERS_EMAIL_FROM = "Shop <orders@shop.dustwave.xyz>"
+UPDATES_EMAIL_FROM = "Shop <updates@shop.dustwave.xyz>"
+PLATFORM_FOOTER_LOGO_PATH = "/assets/images/logo.svg"
+PLATFORM_FAVICON_PATH = "/assets/icons/favicon.png"
+PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/logo.svg"
+SEO_DEFAULT_SOCIAL_IMAGE_ALT = "Dust Wave Shop"
+SEO_X_HANDLE = ""
+SEO_SAME_AS = ""
+STRIPE_PUBLISHABLE_KEY = "pk_live_51N48NKK9nUOzi4tvVuw9UdqVYGLyre50ex4s4giogLQDgUfejp0lfSxV6ZXRdiqN8RY7t0IDIRjiWQ192hcXWVSl00Htn02Ci3"
+EMAIL_LOGO_PATH = "/assets/images/logo.svg"
+DESIGN_LAYOUT_MAX_WIDTH = "1000px"
+EMAIL_FONT_FAMILY = "\"Inter\", sans-serif"
+EMAIL_HEADING_FONT_FAMILY = "\"gambado-sans\", sans-serif"
+EMAIL_COLOR_TEXT = "#252930"
+EMAIL_COLOR_MUTED = "#5d6573"
+EMAIL_COLOR_SURFACE = "#f0f1ed"
+EMAIL_COLOR_BORDER = "#d2d7df"
+EMAIL_COLOR_PRIMARY = "#101215"
+EMAIL_BUTTON_RADIUS = "6px"
+SALES_TAX_RATE = "0.07625"
+TAX_PROVIDER = "nm_grt"
+TAX_ORIGIN_COUNTRY = "US"
+TAX_USE_REGIONAL_ORIGIN = "true"
+NM_GRT_API_BASE = "https://grt.edacnm.org"
+ZIP_TAX_API_BASE = "https://api.zip-tax.com"
+FLAT_SHIPPING_RATE = "3.00"
+SHIPPING_ORIGIN_ZIP = "87120"
+SHIPPING_ORIGIN_COUNTRY = "US"
+SHIPPING_FALLBACK_FLAT_RATE = "3.00"
+FREE_SHIPPING_DEFAULT = "false"
+SHIPPING_DEFAULT_OPTION = "standard"
+USPS_ENABLED = "true"
+USPS_CLIENT_ID = "oRhAt2qaXL4xbqmM4PTlHeXmimAZGK7mfz068oqVwnVlrrlR"
+USPS_API_BASE = ""
+USPS_TIMEOUT_MS = "5000"
+USPS_QUOTE_CACHE_TTL_SECONDS = "600"
+USPS_FAILURE_COOLDOWN_SECONDS = "300"
+USPS_RATE_LIMIT_COOLDOWN_SECONDS = "1800"
+ANALYTICS_PROVIDER = "none"
+ANALYTICS_MEASUREMENT_ID = ""
+ANALYTICS_DASHBOARD_URL = ""
+ANALYTICS_REPORT_TIMEZONE = "America/Denver"
+ANALYTICS_INCLUDE_TEST_ORDERS = "false"
+ANALYTICS_EXPORT_PRODUCT_ROWS = "true"
+MARKETING_DEFAULT_UTM_SOURCE = "dustwave"
+MARKETING_DEFAULT_UTM_MEDIUM = "social"
+MARKETING_DEFAULT_UTM_CAMPAIGN = "shop"
+MARKETING_DEFAULT_UTM_CONTENT = ""
+MARKETING_DEFAULT_REF = ""
+MARKETING_LANDING_PAGE_PATH = "/"
+MARKETING_SHARE_TITLE = "Dust Wave Shop"
+MARKETING_SHARE_TEXT = "Dust Wave merch, prints, tickets, downloads, and event RSVPs."
+ADD_ONS_ENABLED = "true"
+ADD_ON_PRODUCT_COUNT = "3"
+DEBUG_CONSOLE_LOGGING_ENABLED = "true"
+DEBUG_VERBOSE_CONSOLE_LOGGING = "false"
+INTENT_PREFETCH_ENABLED = "true"
+INTENT_PREFETCH_DELAY_MS = "90"
+INTENT_PREFETCH_LIMIT = "3"
+LIVE_INVENTORY_CACHE_TTL_SECONDS = "300"
+DEFAULT_PLATFORM_TIP_PERCENT = "5"
+MAX_PLATFORM_TIP_PERCENT = "15"
+
+[[env.dev.durable_objects.bindings]]
+name = "STORE_INVENTORY_COORDINATOR"
+class_name = "StoreInventoryCoordinator"
+
+[[env.dev.r2_buckets]]
+binding = "STORE_DOWNLOADS"
+bucket_name = "store-downloads-preview"
+preview_bucket_name = "store-downloads-preview"
+
+[[env.dev.kv_namespaces]]
+binding = "STORE_STATE"
+id = "2a2935911eef4a3d8e64ad83d7f7b1ee"
+preview_id = "384641ed237c465ca55eeba08f163d38"
+
+[[env.dev.kv_namespaces]]
+binding = "RATELIMIT"
+id = "c55b47f5699244c5ac723018019e61e1"
+preview_id = "68f522d8316c49b6b2922767d67c9d8a"

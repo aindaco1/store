@@ -1,0 +1,374 @@
+// Layout - header, main, footer
+
+// Header
+.site-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding-top: $container-vpad;
+  padding-bottom: $container-vpad;
+  margin-bottom: calc($header--mb / 2);
+  border-bottom: 1px solid $border--default;
+  background: $surface--page-overlay;
+  
+  @include xsm {
+    padding-top: $space-md;
+    padding-bottom: $space-md;
+    margin-bottom: 10px;
+  }
+  
+  &__container {
+    @include cluster-between($space-md);
+    @include fit-to-layout-and-center;
+  }
+  
+  &__branding {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: $space-md;
+    flex-shrink: 0;
+    min-width: 0;
+
+    @include xsm {
+      gap: $space-sm;
+      flex: 1 1 auto;
+    }
+  }
+  
+  &__logo {
+    width: auto;
+    height: auto;
+    max-height: 4rem;
+    margin-right: 0;
+    
+    @include xsm {
+      max-height: 3rem;
+    }
+  }
+  
+  &__title {
+    @include type-page-title;
+    font-weight: 700;
+    white-space: nowrap;
+    position: relative;
+    padding: 0.08em 0;
+    color: $color--primary;
+    letter-spacing: 0;
+    background: linear-gradient(
+      90deg,
+      $color--primary 0%,
+      $color--primary-soft 24%,
+      $color--primary 50%,
+      $color--primary-soft 76%,
+      $color--primary 100%
+    );
+    background-size: 220% 100%;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: store-brand-shimmer 5.2s ease-in-out infinite;
+    
+    @include xsm {
+      font-size: clamp(22px, 7vw, 30px);
+      line-height: 0.94;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      max-width: 12ch;
+    }
+  }
+
+  @keyframes store-brand-shimmer {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2xl;
+
+    @include xsm {
+      gap: $space-md;
+    }
+  }
+
+  &__nav {
+    display: flex;
+    gap: $space-2xl;
+    align-items: center;
+    
+    @include xsm {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: $color--background;
+      flex-direction: column;
+      justify-content: center;
+      gap: $space-2xl;
+      padding: max(24px, env(safe-area-inset-top)) $space-lg max(24px, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+      
+      &.is-open {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
+    
+    a {
+      @include type-label;
+      text-decoration: none;
+      color: $color--secondary;
+      transition: color 0.2s ease, opacity 0.2s ease;
+      
+      @include xsm {
+        font-size: $type--card-title;
+        line-height: 1.1;
+      }
+      
+      &:hover {
+        color: $color--primary;
+        opacity: 1;
+      }
+    }
+  }
+  
+  &__menu-toggle {
+    display: none;
+    
+    @include xsm {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: $space-xs;
+      position: relative;
+      
+      svg {
+        width: $space-xl;
+        height: $space-xl;
+        transition: transform 0.3s;
+      }
+      
+      // Transform hamburger to X when menu is open
+      line {
+        transition: transform 0.3s, opacity 0.3s;
+        transform-origin: center;
+      }
+    }
+  }
+  
+  // When menu is open, transform hamburger to X and raise above nav overlay
+  &__menu-toggle.is-open {
+    z-index: 101;
+    svg line:nth-child(1) {
+      transform: translateY(6px) rotate(45deg);
+    }
+    svg line:nth-child(2) {
+      opacity: 0;
+    }
+    svg line:nth-child(3) {
+      transform: translateY(-6px) rotate(-45deg);
+    }
+  }
+  
+  &__cart {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    @include type-label;
+    color: $color--primary;
+    
+    svg {
+      margin-right: $space-xs;
+      
+      @include xsm {
+        margin-right: 0;
+      }
+    }
+
+    @include xsm {
+      flex-shrink: 0;
+    }
+  }
+  
+  &__cart-icon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+  
+  &__cart-count {
+    display: none;
+    
+    @include xsm {
+      display: block;
+      position: absolute;
+      top: -$space-xs;
+      right: -$space-xs;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      font-size: 11px;
+      font-weight: bold;
+      line-height: 18px;
+      text-align: center;
+      color: $color--white;
+      background: $color--primary;
+      border-radius: 9px;
+      
+      &:empty {
+        display: none;
+      }
+    }
+  }
+  
+  &__cart-price {
+    opacity: 0.4;
+    transition: opacity 0.2s;
+    
+    @include xsm {
+      display: none;
+    }
+  }
+  
+  &__cart.is-loaded &__cart-price {
+    opacity: 1;
+  }
+  
+  &__cart-fill {
+    fill: $color--primary;
+  }
+}
+
+// Main content
+main {
+  @include fit-to-layout-and-center;
+  padding-top: $container-vpad;
+  padding-bottom: $container-vpad;
+  
+  @include xsm {
+    padding-top: $space-md;
+    padding-bottom: $space-md;
+  }
+}
+
+// Footer
+.site-footer {
+  border-top: 1px solid $border--default;
+  margin-top: $product-block-gap;
+  @include type-meta;
+  
+  @include xsm {
+    margin-top: 0;
+  }
+  
+  &__content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-md;
+    @include fit-to-layout-and-center;
+    padding-top: $container-vpad;
+    padding-bottom: $container-vpad;
+    
+    @include xsm {
+      align-items: center;
+      padding-top: $space-md;
+      padding-bottom: $space-md;
+    }
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: $space-md;
+
+    @include xsm {
+      align-items: center;
+      flex-wrap: nowrap;
+      min-width: 0;
+      gap: $space-sm;
+    }
+  }
+  
+  &__logo {
+    display: block;
+    
+    img {
+      width: auto;
+      height: auto;
+      max-height: $space-2xl;
+      margin-right: 0;
+    }
+  }
+  
+  &__copyright {
+    color: $color--secondary;
+    font-size: $font-size-xs;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: $space-lg;
+    margin-left: auto;
+
+    @include xsm {
+      align-items: center;
+      flex-direction: row;
+      flex-shrink: 0;
+      gap: $space-xs;
+      margin-left: auto;
+    }
+  }
+
+  &__lang-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-sm;
+    color: $color--secondary;
+    flex-wrap: wrap;
+
+    @include xsm {
+      gap: $space-xs;
+      flex-wrap: nowrap;
+    }
+  }
+
+  &__lang-link {
+    @include type-meta;
+    text-decoration: none;
+    color: $color--secondary;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, color 0.2s ease;
+
+    &:hover {
+      color: $color--primary;
+      opacity: 1;
+    }
+
+    &.is-current {
+      color: $color--primary;
+      opacity: 1;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{% comment %}
+  Renders an array of content blocks.
+  Usage: {% include long-content.html blocks=page.long_content %}
+  
+  Supported block types:
+  - text: { type: text, body: "Markdown content" }
+  - video: { type: video, provider: youtube|vimeo, video_id: "...", caption: "..." }
+  - video: { type: video, provider: local, src: "/assets/videos/example.webm", poster: "/assets/images/poster.jpg", caption: "..." } (poster optional; missing posters use the video's first frame)
+  - image: { type: image, src: "...", alt: "...", caption: "..." }
+  - gallery: { type: gallery, layout: grid|carousel, images: [...], caption: "..." }
+  - audio: { type: audio, src: "...", title: "...", caption: "..." }
+  - embed: { type: embed, provider: spotify|youtube|vimeo, src: "https://...", height: 152, title: "...", caption: "..." }
+  - divider: { type: divider }
+  - quote: { type: quote, text: "...", author: "..." }
+{% endcomment %}
+
+<div class="long-content">
+  {% for block in include.blocks %}
+    {% case block.type %}
+      {% when 'text' %}
+        {% include blocks/text.html block=block %}
+      {% when 'video' %}
+        {% include blocks/video.html block=block %}
+      {% when 'image' %}
+        {% include blocks/image.html block=block %}
+      {% when 'gallery' %}
+        {% include blocks/gallery.html block=block %}
+      {% when 'audio' %}
+        {% include blocks/audio.html block=block %}
+      {% when 'embed' %}
+        {% include blocks/embed.html block=block %}
+      {% when 'divider' %}
+        {% include blocks/divider.html block=block %}
+      {% when 'quote' %}
+        {% include blocks/quote.html block=block %}
+    {% endcase %}
+  {% endfor %}
+</div>

@@ -1,0 +1,618 @@
+import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.js';
+import { sendAdminLoginEmail } from './email.js';
+import { getTurnstileSecret, shouldBypassTurnstile, verifyTurnstile } from './turnstile.js';
+
+export const ADMIN_SESSION_COOKIE = 'store_admin_session';
+export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
+const ADMIN_CORS_ALLOWED_HEADERS = 'Content-Type, Authorization, x-admin-key, x-store-admin-csrf';
+
+const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
+const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
+const ADMIN_TURNSTILE_ACTION = 'admin_login';
+
+function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders = {}) {
+  const origin = getAllowedOrigin(env, false);
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': ADMIN_CORS_ALLOWED_HEADERS,
+      'Cache-Control': 'private, no-store, max-age=0',
+      ...extraHeaders,
+      ...SECURITY_HEADERS
+    }
+  });
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function normalizeLang(lang) {
+  const value = String(lang || '').trim().toLowerCase();
+  return value === 'es' ? 'es' : 'en';
+}
+
+export function getAdminBootstrapEmails(env) {
+  return String(env?.ADMIN_BOOTSTRAP_EMAILS || '')
+    .split(',')
+    .map(normalizeEmail)
+    .filter(Boolean);
+}
+
+function normalizeAdminAccessScopes(value) {
+  const source = Array.isArray(value)
+    ? value
+    : String(value || '').split(',');
+  return Array.from(new Set(source
+    .map((scope) => String(scope || '').trim())
+    .filter(Boolean)));
+}
+
+function normalizeConfiguredAdminUser(user, source = 'config') {
+  if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
+  const email = normalizeEmail(user.email);
+  if (!isValidEmail(email)) return null;
+  const role = String(user.role || '').trim() === 'super_admin' ? 'super_admin' : 'limited_admin';
+  const scopeSource = user.accessScopes ?? user.access_scopes ?? [];
+  return {
+    name: String(user.name || '').trim(),
+    email,
+    role,
+    accessScopes: role === 'super_admin' ? [] : normalizeAdminAccessScopes(scopeSource),
+    source
+  };
+}
+
+export function getConfiguredAdminUsers(env) {
+  const raw = String(env?.ADMIN_USERS_JSON || '').trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeConfiguredAdminUser).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+export async function getStoredAdminUsers(env) {
+  if (!env?.STORE_STATE) return null;
+  const stored = await env.STORE_STATE.get(ADMIN_USERS_KV_KEY, { type: 'json' });
+  if (!stored) return null;
+  const users = Array.isArray(stored) ? stored : stored.users;
+  if (!Array.isArray(users)) return null;
+  const normalized = users.map((user) => normalizeConfiguredAdminUser(user, 'kv')).filter(Boolean);
+  return normalized.length ? normalized : null;
+}
+
+export async function getEffectiveAdminUsers(env) {
+  const storedUsers = await getStoredAdminUsers(env);
+  if (storedUsers?.length) return storedUsers;
+
+  const configuredUsers = getConfiguredAdminUsers(env);
+  if (configuredUsers.length) return configuredUsers;
+
+  return getAdminBootstrapEmails(env).map((email) => ({
+    name: '',
+    email,
+    role: 'super_admin',
+    accessScopes: [],
+    source: 'bootstrap'
+  }));
+}
+
+export async function saveStoredAdminUsers(env, users = [], meta = {}) {
+  if (!env?.STORE_STATE) {
+    return { ok: false, status: 503, error: 'Admin user storage unavailable' };
+  }
+  const normalized = (Array.isArray(users) ? users : [])
+    .map((user) => normalizeConfiguredAdminUser(user, 'kv'))
+    .filter(Boolean)
+    .map((user) => ({
+      name: user.name || '',
+      email: user.email,
+      role: user.role,
+      accessScopes: user.role === 'super_admin' ? [] : user.accessScopes
+    }));
+  await env.STORE_STATE.put(ADMIN_USERS_KV_KEY, JSON.stringify({
+    users: normalized,
+    updatedAt: new Date().toISOString(),
+    updatedBy: normalizeEmail(meta.updatedBy)
+  }));
+  return { ok: true, users: normalized };
+}
+
+function getAdminSecret(env) {
+  return env?.ADMIN_SESSION_SECRET || env?.MAGIC_LINK_SECRET || env?.ADMIN_SECRET || '';
+}
+
+async function sha256Hex(value) {
+  const data = new TextEncoder().encode(String(value || ''));
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function randomToken(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64urlEncode(bytes);
+}
+
+function base64urlEncode(bytes) {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function hmacSign(secret, data) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
+  return base64urlEncode(new Uint8Array(signature));
+}
+
+async function signLoginToken(env, nonce, email) {
+  const payload = {
+    nonce,
+    email,
+    exp: Math.floor(Date.now() / 1000) + ADMIN_LOGIN_TTL_SECONDS
+  };
+  const payloadJson = JSON.stringify(payload);
+  const payloadB64 = btoa(payloadJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const signature = await hmacSign(getAdminSecret(env), payloadB64);
+  return `${payloadB64}.${signature}`;
+}
+
+async function verifyLoginToken(env, token) {
+  if (!getAdminSecret(env)) return null;
+  const [payloadB64, signature] = String(token || '').split('.');
+  if (!payloadB64 || !signature) return null;
+  const expected = await hmacSign(getAdminSecret(env), payloadB64);
+  if (signature.length !== expected.length) return null;
+  let result = 0;
+  for (let index = 0; index < signature.length; index += 1) {
+    result |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
+  }
+  if (result !== 0) return null;
+
+  try {
+    const normalized = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
+    const payload = JSON.parse(atob(padded));
+    if (!payload?.nonce || !payload?.email) return null;
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function getCookie(request, name) {
+  const cookieHeader = request.headers.get('Cookie') || '';
+  for (const part of cookieHeader.split(';')) {
+    const [rawName, ...rawValue] = part.trim().split('=');
+    if (rawName === name) {
+      return decodeURIComponent(rawValue.join('=') || '');
+    }
+  }
+  return '';
+}
+
+function getAdminCsrfHeader(request) {
+  return String(request.headers.get('x-store-admin-csrf') || '').trim();
+}
+
+function timingSafeEqual(a, b) {
+  const left = String(a || '');
+  const right = String(b || '');
+  if (!left || !right || left.length !== right.length) return false;
+  let result = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    result |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return result === 0;
+}
+
+function getAdminSiteOrigin(env) {
+  const configured = String(env?.CORS_ALLOWED_ORIGIN || env?.SITE_BASE || '').trim();
+  if (!configured || configured === '*') return '';
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return '';
+  }
+}
+
+function isTrustedAdminOriginRequest(request, env) {
+  const expectedOrigin = getAdminSiteOrigin(env);
+  if (!expectedOrigin) return true;
+
+  const secFetchSite = String(request.headers.get('Sec-Fetch-Site') || '').trim().toLowerCase();
+  if (secFetchSite === 'cross-site') {
+    return false;
+  }
+
+  const origin = String(request.headers.get('Origin') || '').trim();
+  if (origin) {
+    return timingSafeEqual(origin, expectedOrigin);
+  }
+
+  const referer = String(request.headers.get('Referer') || '').trim();
+  if (!referer) return true;
+
+  try {
+    return timingSafeEqual(new URL(referer).origin, expectedOrigin);
+  } catch {
+    return false;
+  }
+}
+
+function getSiteAdminPath(lang) {
+  return normalizeLang(lang) === 'es' ? '/es/admin/' : '/admin/';
+}
+
+function buildAdminUrl(env, token, lang) {
+  const base = String(env?.SITE_BASE || '').replace(/\/$/, '');
+  const url = new URL(`${base}${getSiteAdminPath(lang)}`);
+  url.searchParams.set('admin_login', token);
+  return url.toString();
+}
+
+function isTruthyAdminEnv(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isLocalAdminUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  try {
+    const hostname = new URL(text).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function shouldExposeAdminLoginUrl(env) {
+  if (isTruthyAdminEnv(env?.ADMIN_EXPOSE_LOGIN_LINK) || isTruthyAdminEnv(env?.ADMIN_DEV_LOGIN_LINKS)) {
+    return true;
+  }
+  if (String(env?.APP_MODE || '').trim().toLowerCase() !== 'test') return false;
+  return isLocalAdminUrl(env?.SITE_BASE) || isLocalAdminUrl(env?.WORKER_BASE) || isLocalAdminUrl(env?.CORS_ALLOWED_ORIGIN);
+}
+
+function getAdminTurnstileSecret(env) {
+  return getTurnstileSecret(env, ['TURNSTILE_SECRET_KEY', 'ADMIN_TURNSTILE_SECRET_KEY']);
+}
+
+function shouldBypassAdminTurnstile(env) {
+  return shouldBypassTurnstile(env, 'ADMIN_TURNSTILE_BYPASS');
+}
+
+function isAdminTurnstileRequired(env) {
+  if (shouldBypassAdminTurnstile(env)) return false;
+  return Boolean(getAdminTurnstileSecret(env)) || isTruthyAdminEnv(env?.ADMIN_TURNSTILE_REQUIRED);
+}
+
+function adminChallengeErrorResponse(error, status, env) {
+  return privateAdminJsonResponse({ error, code: 'admin_challenge_failed' }, status, env);
+}
+
+async function verifyAdminTurnstile(request, env, token) {
+  if (!isAdminTurnstileRequired(env)) return { ok: true };
+
+  const result = await verifyTurnstile(request, env, token, {
+    action: ADMIN_TURNSTILE_ACTION,
+    secretEnvNames: ['TURNSTILE_SECRET_KEY', 'ADMIN_TURNSTILE_SECRET_KEY'],
+    requiredEnvName: 'ADMIN_TURNSTILE_REQUIRED',
+    bypassEnvName: 'ADMIN_TURNSTILE_BYPASS'
+  });
+
+  if (result.ok) return { ok: true };
+
+  if (result.code === 'challenge_not_configured') {
+    return {
+      ok: false,
+      response: privateAdminJsonResponse({
+        error: 'Admin challenge is not configured',
+        code: 'admin_challenge_not_configured'
+      }, 503, env)
+    };
+  }
+
+  if (result.code === 'challenge_required') {
+    return {
+      ok: false,
+      response: privateAdminJsonResponse({
+        error: 'Admin challenge required',
+        code: 'admin_challenge_required'
+      }, 400, env)
+    };
+  }
+
+  const errorMessage = result.code === 'challenge_unavailable'
+    ? 'Admin challenge verification unavailable'
+    : 'Admin challenge verification failed';
+  return {
+    ok: false,
+    response: adminChallengeErrorResponse(errorMessage, result.status || 400, env)
+  };
+}
+
+export async function verifyAdminAuthStartChallenge(request, env, body = {}) {
+  const challenge = await verifyAdminTurnstile(request, env, body.turnstileToken || body['cf-turnstile-response']);
+  return challenge.ok ? null : challenge.response;
+}
+
+function getSessionCookie(token, request, maxAge = ADMIN_SESSION_TTL_SECONDS) {
+  const secure = new URL(request.url).protocol === 'https:';
+  const parts = [
+    `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    'Path=/admin',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${Math.max(0, maxAge)}`
+  ];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+function clearSessionCookie(request) {
+  return getSessionCookie('', request, 0);
+}
+
+async function getStoredAdminUser(env, email) {
+  if (!env?.STORE_STATE) return null;
+  const key = `admin-user:${await sha256Hex(email)}`;
+  return env.STORE_STATE.get(key, { type: 'json' });
+}
+
+async function resolveAdminUser(env, email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) return null;
+
+  const storedUsers = await getStoredAdminUsers(env);
+  if (storedUsers?.length) {
+    const storedUser = storedUsers.find((user) => user.email === normalizedEmail);
+    if (storedUser) return storedUser;
+    if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
+      return {
+        email: normalizedEmail,
+        role: 'super_admin',
+        accessScopes: [],
+        source: 'bootstrap'
+      };
+    }
+    return null;
+  }
+
+  const configuredUsers = getConfiguredAdminUsers(env);
+  if (configuredUsers.length) {
+    const configuredUser = configuredUsers.find((user) => user.email === normalizedEmail);
+    if (configuredUser) return configuredUser;
+    if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
+      return {
+        email: normalizedEmail,
+        role: 'super_admin',
+        accessScopes: [],
+        source: 'bootstrap'
+      };
+    }
+    return null;
+  }
+
+  const storedUser = await getStoredAdminUser(env, normalizedEmail);
+  if (storedUser?.email) {
+    return {
+      email: normalizeEmail(storedUser.email),
+      role: storedUser.role === 'super_admin' ? 'super_admin' : 'limited_admin',
+      accessScopes: Array.isArray(storedUser.accessScopes) ? storedUser.accessScopes.map(String) : [],
+      source: 'kv'
+    };
+  }
+
+  if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
+    return {
+      email: normalizedEmail,
+      role: 'super_admin',
+      accessScopes: [],
+      source: 'bootstrap'
+    };
+  }
+
+  return null;
+}
+
+function publicUser(user) {
+  return {
+    email: user.email,
+    role: user.role,
+    accessScopes: user.role === 'super_admin' ? [] : (user.accessScopes || [])
+  };
+}
+
+export async function handleAdminAuthStart(request, env, body = {}) {
+  const email = normalizeEmail(body.email);
+  const preferredLang = normalizeLang(body.preferredLang);
+
+  if (!isValidEmail(email)) {
+    return privateAdminJsonResponse({ error: 'Invalid email' }, 400, env);
+  }
+
+  const user = await resolveAdminUser(env, email);
+  if (!user) {
+    return privateAdminJsonResponse({ success: true, sent: true }, 200, env);
+  }
+
+  if (!env?.STORE_STATE || !getAdminSecret(env)) {
+    return privateAdminJsonResponse({ error: 'Admin auth not configured' }, 503, env);
+  }
+
+  const nonce = randomToken(24);
+  const token = await signLoginToken(env, nonce, email);
+  const loginUrl = buildAdminUrl(env, token, preferredLang);
+  await env.STORE_STATE.put(`admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
+    email,
+    role: user.role,
+    accessScopes: user.accessScopes || [],
+    preferredLang,
+    createdAt: new Date().toISOString()
+  }), { expirationTtl: ADMIN_LOGIN_TTL_SECONDS });
+
+  const exposeLoginUrl = shouldExposeAdminLoginUrl(env);
+  const emailResult = exposeLoginUrl
+    ? { sent: false, reason: 'development login link exposed' }
+    : await sendAdminLoginEmail(env, { email, loginUrl, lang: preferredLang });
+
+  return privateAdminJsonResponse({
+    success: true,
+    sent: emailResult.sent !== false,
+    loginUrl: exposeLoginUrl ? loginUrl : undefined
+  }, 200, env);
+}
+
+export async function handleAdminAuthExchange(request, env, body = {}) {
+  const payload = await verifyLoginToken(env, body.token);
+  if (!payload || !env?.STORE_STATE) {
+    return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
+  }
+
+  const nonceKey = `admin-login:${await sha256Hex(payload.nonce)}`;
+  const loginRecord = await env.STORE_STATE.get(nonceKey, { type: 'json' });
+  if (!loginRecord || normalizeEmail(loginRecord.email) !== normalizeEmail(payload.email)) {
+    return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
+  }
+
+  const user = await resolveAdminUser(env, loginRecord.email);
+  if (!user) {
+    return privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env);
+  }
+
+  const sessionToken = randomToken(32);
+  const csrfToken = randomToken(24);
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000).toISOString();
+  await env.STORE_STATE.delete(nonceKey);
+  await env.STORE_STATE.put(`admin-session:${await sha256Hex(sessionToken)}`, JSON.stringify({
+    email: user.email,
+    role: user.role,
+    accessScopes: user.accessScopes || [],
+    csrfToken,
+    preferredLang: normalizeLang(loginRecord.preferredLang),
+    createdAt: new Date().toISOString(),
+    expiresAt
+  }), { expirationTtl: ADMIN_SESSION_TTL_SECONDS });
+
+  return privateAdminJsonResponse({
+    success: true,
+    user: publicUser(user),
+    csrfToken,
+    expiresAt
+  }, 200, env, {
+    'Set-Cookie': getSessionCookie(sessionToken, request)
+  });
+}
+
+export async function requireAdminSession(request, env, permission = 'store:read', options = {}) {
+  const sessionToken = getCookie(request, ADMIN_SESSION_COOKIE);
+  if (!sessionToken || !env?.STORE_STATE) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
+  }
+
+  const session = await env.STORE_STATE.get(`admin-session:${await sha256Hex(sessionToken)}`, { type: 'json' });
+  if (!session?.email || !session?.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
+  }
+
+  if (options.requireCsrf === true) {
+    if (!isTrustedAdminOriginRequest(request, env)) {
+      return { ok: false, response: privateAdminJsonResponse({ error: 'Origin not allowed' }, 403, env) };
+    }
+    if (!timingSafeEqual(getAdminCsrfHeader(request), session.csrfToken)) {
+      return { ok: false, response: privateAdminJsonResponse({ error: 'Invalid CSRF token' }, 403, env) };
+    }
+  }
+
+  const user = await resolveAdminUser(env, session.email);
+  if (!user) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
+  }
+
+  const accessScope = options.accessScope ? String(options.accessScope) : '';
+  const allowedScope = user.role === 'super_admin' || !accessScope || user.accessScopes.includes(accessScope);
+  const allowed = user.role === 'super_admin' || (
+    allowedScope &&
+    ['store:read', 'settings:publish', 'fulfillment:manage'].includes(permission)
+  );
+
+  if (!allowed) {
+    return { ok: false, response: privateAdminJsonResponse({ error: 'Forbidden' }, 403, env) };
+  }
+
+  return {
+    ok: true,
+    user: publicUser(user),
+    session,
+    csrfToken: session.csrfToken
+  };
+}
+
+export async function handleAdminSession(request, env) {
+  const auth = await requireAdminSession(request, env, 'store:read');
+  if (!auth.ok) return auth.response;
+  return privateAdminJsonResponse({
+    user: auth.user,
+    csrfToken: auth.csrfToken,
+    expiresAt: auth.session.expiresAt
+  }, 200, env);
+}
+
+export async function handleAdminLogout(request, env) {
+  const sessionToken = getCookie(request, ADMIN_SESSION_COOKIE);
+  if (!sessionToken) {
+    return privateAdminJsonResponse({ success: true }, 200, env, {
+      'Set-Cookie': clearSessionCookie(request)
+    });
+  }
+
+  if (sessionToken && env?.STORE_STATE) {
+    const sessionKey = `admin-session:${await sha256Hex(sessionToken)}`;
+    const session = await env.STORE_STATE.get(sessionKey, { type: 'json' });
+    if (session?.csrfToken && !isTrustedAdminOriginRequest(request, env)) {
+      return privateAdminJsonResponse({ error: 'Origin not allowed' }, 403, env);
+    }
+    if (session?.csrfToken && !timingSafeEqual(getAdminCsrfHeader(request), session.csrfToken)) {
+      return privateAdminJsonResponse({ error: 'Invalid CSRF token' }, 403, env);
+    }
+    await env.STORE_STATE.delete(sessionKey);
+  }
+  return privateAdminJsonResponse({ success: true }, 200, env, {
+    'Set-Cookie': clearSessionCookie(request)
+  });
+}
+
+export function adminCorsResponse(env = null) {
+  const origin = getAllowedOrigin(env, false);
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': ADMIN_CORS_ALLOWED_HEADERS,
+      ...SECURITY_HEADERS
+    }
+  });
+}

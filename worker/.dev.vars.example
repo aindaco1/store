@@ -1,0 +1,60 @@
+# Local Worker defaults and machine-specific secrets.
+# Copy this file to worker/.dev.vars, or run `npm run secrets:dev`.
+# The dev helpers can generate required local signing secrets.
+#
+# Keep this file aligned with local development needs, but never put real
+# secret values here. worker/.dev.vars is ignored by git and should stay local.
+
+# Local routing and mode.
+APP_MODE=test
+SITE_BASE=http://127.0.0.1:4002
+WORKER_BASE=http://127.0.0.1:8989
+CANONICAL_SITE_BASE=http://127.0.0.1:4002
+CANONICAL_WORKER_BASE=http://127.0.0.1:8989
+CORS_ALLOWED_ORIGIN=http://127.0.0.1:4002
+
+# Local admin access.
+# Replace with the email address you want to use for local admin sign-in.
+# Multiple local bootstrap super admins may be comma-separated.
+ADMIN_BOOTSTRAP_EMAILS=admin@example.com
+ADMIN_TEST_CAMPAIGNS=hand-relations,smoke-editable
+
+# Local signing and session secrets.
+ADMIN_SECRET=
+# Optional scoped admin endpoint secrets. When set, settlement or broadcast
+# routes require these narrower values instead of ADMIN_SECRET.
+ADMIN_SETTLEMENT_SECRET=
+ADMIN_BROADCAST_SECRET=
+ADMIN_SESSION_SECRET=
+CHECKOUT_INTENT_SECRET=
+MAGIC_LINK_SECRET=
+TURNSTILE_SECRET_KEY=
+ADMIN_TURNSTILE_REQUIRED=false
+ADMIN_TURNSTILE_BYPASS=false
+
+# Stripe checkout and webhooks.
+# Prefer the *_TEST variables for local development. STRIPE_SECRET_KEY and
+# STRIPE_WEBHOOK_SECRET remain supported fallback names.
+STRIPE_SECRET_KEY=
+STRIPE_SECRET_KEY_TEST=
+STRIPE_PUBLISHABLE_KEY_TEST=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_WEBHOOK_SECRET_TEST=
+
+# Email delivery.
+RESEND_API_KEY=
+
+# Dashboard publish and report helpers.
+GITHUB_TOKEN=
+# Local remote-report/export scripts can use a read-only Cloudflare user API
+# token with Account / Workers KV Storage / Read scoped to this account.
+# GitHub Actions deploys need a separate user API token created from the
+# "Edit Cloudflare Workers" template and stored as a repository secret.
+CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ACCOUNT_ID=
+
+# Shipping and tax provider credentials.
+USPS_ENABLED=false
+USPS_CLIENT_ID=
+USPS_CLIENT_SECRET=
+ZIP_TAX_API_KEY=

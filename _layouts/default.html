@@ -1,0 +1,51 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+{%- assign page_indexable = page.indexable -%}
+{%- assign is_store_product = false -%}
+{%- if page.collection == "products" or page.store_product == true -%}
+  {%- assign is_store_product = true -%}
+{%- endif -%}
+{%- if is_store_product -%}
+  {%- assign product_status = page.status | default: "active" -%}
+  {%- assign product_public = true -%}
+  {%- if page.public == false -%}
+    {%- assign product_public = false -%}
+  {%- endif -%}
+  {%- unless product_status == "active" or product_status == "sold_out" -%}
+    {%- assign page_indexable = false -%}
+  {%- endunless -%}
+  {%- unless product_public -%}
+    {%- assign page_indexable = false -%}
+  {%- endunless -%}
+{%- endif -%}
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
+  {% include cart-head.html %}
+  {% include seo-meta.html lang=current_lang indexable=page_indexable translation_key=page.translation_key localized_paths=page.localized_paths %}
+  {% include seo-json-ld.html lang=current_lang indexable=page_indexable translation_key=page.translation_key localized_paths=page.localized_paths %}
+</head>
+<body>
+  <!-- Skip link for keyboard navigation -->
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
+  
+  {% include header.html %}
+
+  <main id="main-content" role="main" tabindex="-1">
+    <div class="page-content">
+      {{ content }}
+    </div>
+  </main>
+
+  {% include site-footer.html lang=current_lang %}
+
+  <!-- Live region for dynamic announcements -->
+  <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
+
+  {% include cart-foot.html %}
+  {% include page-prefetch.html %}
+</body>
+</html>

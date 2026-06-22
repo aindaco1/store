@@ -1,0 +1,265 @@
+{%- assign current_lang = page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture runtime_messages_json -%}{% include runtime-messages-json.html lang=current_lang %}{%- endcapture -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+{%- assign admin_config = site["admin"] | default: empty -%}
+{%- assign admin_turnstile_site_key = admin_config.turnstile_site_key | default: "" | strip -%}
+{%- assign admin_platform_name = site.platform.name | default: site.title | default: "Store" | strip -%}
+<!doctype html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
+  {% include first-party-admin-csp.html %}
+  {% include cart-head.html %}
+  {% capture admin_title %}{% include t.html key="admin.page_title" lang=current_lang %}{% endcapture %}
+  {% include seo-meta.html lang=current_lang title=admin_title indexable=false social=false translation_key=page.translation_key %}
+</head>
+<body>
+  <a href="#main-content" class="skip-link">{% include t.html key="misc.skip_to_main" lang=current_lang %}</a>
+  {% include header.html hide_cart=true %}
+
+  <main id="main-content" class="admin-dashboard" role="main" tabindex="-1">
+    <div class="admin-dashboard__container">
+      <section id="admin-auth-panel" class="admin-auth admin-auth--plain" aria-labelledby="admin-auth-title">
+        <h1 id="admin-auth-title" class="admin-auth__title">{% include t.html key="admin.login_title" lang=current_lang %}</h1>
+        <form id="admin-login-form" class="admin-auth__form"{% if admin_turnstile_site_key != "" %} data-admin-turnstile-site-key="{{ admin_turnstile_site_key | escape }}"{% endif %}>
+          <label for="admin-email" class="sr-only">{% include t.html key="admin.email_label" lang=current_lang %}</label>
+          <div class="admin-auth__row">
+            <input id="admin-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+            <button class="btn" type="submit">{% include t.html key="admin.send_link" lang=current_lang %}</button>
+          </div>
+          {% if admin_turnstile_site_key != "" %}
+          <div class="admin-auth__challenge" role="group" aria-label="{% include t.html key='admin.challenge_aria_label' lang=current_lang %}">
+            <div id="admin-turnstile" class="admin-auth__turnstile" data-admin-turnstile-widget></div>
+          </div>
+          {% endif %}
+        </form>
+        <p id="admin-auth-status" class="admin-dashboard__status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="admin-app" class="admin-app" hidden aria-labelledby="admin-overview-title">
+        <div class="admin-app__toolbar">
+          <h1 id="admin-overview-title">{% include t.html key="admin.overview_title" lang=current_lang %}</h1>
+          <div class="admin-app__toolbar-actions">
+            <button id="admin-logout" class="btn btn--secondary admin-dashboard__logout" hidden>{% include t.html key="admin.logout" lang=current_lang %}</button>
+          </div>
+        </div>
+        <p id="admin-session-summary" class="admin-app__muted admin-app__session-summary"></p>
+
+        <div class="admin-tabs" data-admin-tabs>
+          <div class="admin-tabs__list" role="tablist" aria-label="{% include t.html key='admin.tabs_label' lang=current_lang %}">
+            <button id="admin-tab-settings" class="admin-tabs__tab" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-settings" data-admin-tab="settings">{% include t.html key="admin.settings_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-analytics" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-analytics" data-admin-tab="store-analytics" tabindex="-1">{% include t.html key="admin.store_analytics_short_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-marketing" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-marketing" data-admin-tab="store-marketing" tabindex="-1">{% include t.html key="admin.store_marketing_short_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-orders" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-orders" data-admin-tab="store-orders" tabindex="-1">{% include t.html key="admin.store_orders_short_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-products" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-products" data-admin-tab="store-products" tabindex="-1">{% include t.html key="admin.store_products_short_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-downloads" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-downloads" data-admin-tab="store-downloads" tabindex="-1">{% include t.html key="admin.store_downloads_short_title" lang=current_lang %}</button>
+          </div>
+
+          <section id="admin-panel-settings" class="admin-settings admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-settings" data-admin-tab-panel="settings">
+            <div class="admin-settings__header">
+              <div>
+                <p class="admin-app__muted">{% include t.html key="admin.settings_intro" lang=current_lang platform=admin_platform_name %}</p>
+              </div>
+              <div class="admin-settings__actions">
+                <button id="admin-settings-publish" class="btn" type="button" disabled>{% include t.html key="admin.settings_publish" lang=current_lang %}</button>
+              </div>
+            </div>
+            <div id="admin-settings-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+            <div id="admin-settings-section-tabs" class="admin-settings-tabs admin-settings-section-tabs" role="tablist" aria-label="{% include t.html key='admin.settings_sections_label' lang=current_lang %}"></div>
+            <div id="admin-settings-results" class="admin-settings__results"></div>
+          </section>
+
+        <section id="admin-panel-store-analytics" class="admin-store-analytics admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-analytics" data-admin-tab-panel="store-analytics" hidden>
+          <div class="admin-store-analytics__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.store_analytics_intro" lang=current_lang platform=admin_platform_name %}</p>
+            </div>
+          </div>
+          <div id="admin-store-analytics-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-store-analytics-results" class="admin-store-analytics__results"></div>
+        </section>
+
+        <section id="admin-panel-store-marketing" class="admin-store-marketing admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-marketing" data-admin-tab-panel="store-marketing" hidden>
+          <div>
+            <p class="admin-app__muted">{% include t.html key="admin.store_marketing_intro" lang=current_lang platform=admin_platform_name %}</p>
+          </div>
+          <form id="admin-store-marketing-builder" class="admin-store-marketing__form">
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-path" label_key="admin.marketing_destination_label" help_key="admin.marketing_help_destination" help_id="admin-store-marketing-help-destination" lang=current_lang %}
+              <input id="admin-store-marketing-path" class="admin-settings__input" name="path" type="text" autocomplete="off" value="/" aria-describedby="admin-store-marketing-help-destination">
+            </div>
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-referrer" label_key="admin.marketing_referrer_label" help_key="admin.marketing_help_referrer" help_id="admin-store-marketing-help-referrer" lang=current_lang %}
+              <input id="admin-store-marketing-referrer" class="admin-settings__input" name="referrer" type="text" autocomplete="name" inputmode="text" aria-describedby="admin-store-marketing-help-referrer">
+            </div>
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-ref" label_key="admin.marketing_ref_label" help_key="admin.marketing_help_ref" help_id="admin-store-marketing-help-ref" lang=current_lang %}
+              <input id="admin-store-marketing-ref" class="admin-settings__input admin-settings__input--readonly" name="ref" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-store-marketing-help-ref">
+            </div>
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-source" label_key="admin.marketing_source_label" help_key="admin.marketing_help_source" help_id="admin-store-marketing-help-source" lang=current_lang %}
+              <input id="admin-store-marketing-source" class="admin-settings__input" name="utmSource" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-store-marketing-help-source">
+            </div>
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-medium" label_key="admin.marketing_medium_label" help_key="admin.marketing_help_medium" help_id="admin-store-marketing-help-medium" lang=current_lang %}
+              <input id="admin-store-marketing-medium" class="admin-settings__input" name="utmMedium" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-store-marketing-help-medium">
+            </div>
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-campaign" label_key="admin.marketing_campaign_label" help_key="admin.marketing_help_campaign" help_id="admin-store-marketing-help-campaign" lang=current_lang %}
+              <input id="admin-store-marketing-campaign" class="admin-settings__input" name="utmCampaign" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-store-marketing-help-campaign">
+            </div>
+            <div class="admin-store-marketing__field">
+              {% include admin-field-label.html for="admin-store-marketing-content" label_key="admin.marketing_content_label" help_key="admin.marketing_help_content" help_id="admin-store-marketing-help-content" lang=current_lang %}
+              <input id="admin-store-marketing-content" class="admin-settings__input" name="utmContent" type="text" autocomplete="off" inputmode="text" aria-describedby="admin-store-marketing-help-content">
+            </div>
+            <div class="admin-store-marketing__url-row admin-store-marketing__field--full">
+              <div class="admin-store-marketing__field">
+                {% include admin-field-label.html for="admin-store-marketing-url" label_key="admin.marketing_url_label" help_key="admin.marketing_help_url" help_id="admin-store-marketing-help-url" lang=current_lang %}
+                <textarea id="admin-store-marketing-url" class="admin-settings__input admin-settings__input--readonly" rows="3" readonly aria-describedby="admin-store-marketing-help-url"></textarea>
+              </div>
+              <section class="admin-store-marketing__qr" aria-labelledby="admin-store-marketing-qr-title">
+                {% include admin-field-label.html label_key="admin.marketing_qr_title" help_key="admin.marketing_qr_help" help_id="admin-store-marketing-help-qr" lang=current_lang heading_tag="h3" heading_id="admin-store-marketing-qr-title" wrap_class="admin-heading-with-help admin-store-marketing__qr-heading" %}
+                <div class="admin-store-marketing__qr-grid">
+                  <div id="admin-store-marketing-qr-preview" class="admin-store-marketing__qr-preview" aria-live="polite"></div>
+                  <div class="admin-store-marketing__qr-actions">
+                    <button id="admin-store-marketing-qr-download-png" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_qr_download_png" lang=current_lang %}</button>
+                    <button id="admin-store-marketing-qr-download-svg" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_qr_download_svg" lang=current_lang %}</button>
+                    <div id="admin-store-marketing-qr-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <div class="admin-store-marketing__actions">
+              <button id="admin-store-marketing-copy-url" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_copy_url" lang=current_lang %}</button>
+              <button id="admin-store-marketing-save-referral" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_save_referral" lang=current_lang %}</button>
+              <button id="admin-store-marketing-cancel-edit" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.marketing_cancel_edit" lang=current_lang %}</button>
+              <button id="admin-store-marketing-reset" class="btn btn--secondary" type="button">{% include t.html key="admin.marketing_reset" lang=current_lang %}</button>
+            </div>
+            <div id="admin-store-marketing-status" class="admin-dashboard__status admin-store-marketing__status" role="status" aria-live="polite"></div>
+          </form>
+          <div class="admin-store-marketing__sections admin-section-stack">
+            <div id="admin-store-marketing-referrals" class="admin-store-marketing__referrals admin-section-panel" aria-live="polite"></div>
+            <div id="admin-store-marketing-abandoned-health" class="admin-store-marketing__abandoned-health admin-section-panel" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section id="admin-panel-store-orders" class="admin-store-orders admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-orders" data-admin-tab-panel="store-orders" hidden>
+          <div class="admin-store-orders__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.store_orders_intro" lang=current_lang platform=admin_platform_name %}</p>
+            </div>
+          </div>
+          <form id="admin-store-order-filters" class="admin-store-orders__filters">
+            <div class="admin-store-orders__field">
+              <label for="admin-store-order-status">{% include t.html key="admin.store_order_status" lang=current_lang %}</label>
+              <select id="admin-store-order-status" class="admin-settings__input" name="status">
+                <option value="all">{% include t.html key="admin.filter_all" lang=current_lang %}</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="payment_pending">Payment pending</option>
+                <option value="payment_failed">Payment failed</option>
+                <option value="draft">Draft</option>
+              </select>
+            </div>
+
+            <div class="admin-store-orders__field">
+              <label for="admin-store-order-fulfillment">{% include t.html key="admin.store_order_fulfillment" lang=current_lang %}</label>
+              <select id="admin-store-order-fulfillment" class="admin-settings__input" name="fulfillment">
+                <option value="all">{% include t.html key="admin.filter_all" lang=current_lang %}</option>
+                <option value="physical">Physical</option>
+                <option value="digital">Digital</option>
+                <option value="ticket">Ticket</option>
+                <option value="rsvp">RSVP</option>
+                <option value="unchecked">Not checked in</option>
+                <option value="checked_in">Checked in</option>
+              </select>
+            </div>
+
+            <div class="admin-store-orders__field">
+              <label for="admin-store-order-query">{% include t.html key="admin.search_label" lang=current_lang %}</label>
+              <input id="admin-store-order-query" class="admin-settings__input" name="q" type="search" autocomplete="off">
+            </div>
+
+            <div class="admin-store-orders__export-group">
+              <button id="admin-store-orders-export" class="btn btn--secondary admin-store-orders__export" type="button">{% include t.html key="admin.export_csv" lang=current_lang %}</button>
+              <button id="admin-store-attendees-export" class="btn btn--secondary admin-store-orders__export" type="button">{% include t.html key="admin.export_attendees" lang=current_lang %}</button>
+            </div>
+          </form>
+          <div id="admin-store-orders-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-store-orders-summary" class="admin-store-orders__summary" aria-live="polite"></div>
+          <div id="admin-store-orders-attendance" class="admin-store-orders__attendance" hidden></div>
+          <div id="admin-store-orders-results" class="admin-store-orders__results"></div>
+          <button id="admin-store-orders-next" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.load_more" lang=current_lang %}</button>
+        </section>
+
+        <section id="admin-panel-store-products" class="admin-store-products admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-products" data-admin-tab-panel="store-products" hidden>
+          <div class="admin-store-products__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.store_products_intro" lang=current_lang platform=admin_platform_name %}</p>
+            </div>
+          </div>
+          <div id="admin-store-products-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-store-products-summary" class="admin-store-products__summary" aria-live="polite"></div>
+          <div id="admin-store-products-results" class="admin-store-products__results"></div>
+        </section>
+
+        <section id="admin-panel-store-downloads" class="admin-store-downloads admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-downloads" data-admin-tab-panel="store-downloads" hidden>
+          <div class="admin-store-downloads__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.store_downloads_intro" lang=current_lang platform=admin_platform_name %}</p>
+            </div>
+          </div>
+          <div id="admin-store-downloads-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-store-downloads-results" class="admin-store-downloads__results"></div>
+        </section>
+
+        </div>
+      </section>
+    </div>
+  </main>
+
+  {% include site-footer.html lang=current_lang translation_key=page.translation_key %}
+  <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
+  <script
+    src="/assets/js/store-config.js?v={{ asset_version }}"
+    defer
+    data-store-config-script="true"
+    data-current-lang="{{ current_lang }}"
+    data-runtime-messages="{{ runtime_messages_json | strip | escape }}"
+    data-site-url="{{ site.platform.site_url | default: site.url }}"
+    data-worker-base="{{ site.platform.worker_url }}"
+    data-platform-name="{{ site.platform.name | default: site.title | escape }}"
+    data-platform-company-name="{{ site.platform.company_name | default: site.author | escape }}"
+    data-platform-author="{{ site.author | default: site.platform.company_name | escape }}"
+    data-platform-support-email="{{ site.platform.support_email | default: '' | escape }}"
+    data-default-creator-name="{{ site.platform.default_creator_name | default: site.platform.company_name | default: site.author | escape }}"
+    data-platform-timezone="{{ site.platform.timezone | default: 'America/Denver' | escape }}"
+    data-sales-tax-rate="{{ site.pricing.sales_tax_rate | default: 0.07875 }}"
+    data-flat-shipping-rate="{{ site.pricing.flat_shipping_rate | default: 3.00 }}"
+    data-default-tip-percent="{{ site.pricing.default_tip_percent | default: 5 }}"
+    data-max-tip-percent="{{ site.pricing.max_tip_percent | default: 15 }}"
+    data-live-inventory-cache-ttl-seconds="{{ site.cache.live_inventory_ttl_seconds | default: 300 }}"
+    data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
+    data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
+    data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
+  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
+  <script src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
+  <script src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
+  <script src="/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
+  <script
+    src="/assets/js/admin-dashboard.js?v={{ asset_version }}"
+    defer
+    data-admin-dashboard-script="true"
+    data-canonical-site-url="{{ site.admin_production_site_url | default: admin_config.production_site_url | default: site.platform.site_url | default: site.url | escape }}"
+    data-canonical-worker-base="{{ site.admin_production_worker_url | default: admin_config.production_worker_url | default: site.platform.worker_url | escape }}"
+    data-marketing-default-utm-source="{{ site.marketing.default_utm_source | default: 'dustwave' | escape }}"
+    data-marketing-default-utm-medium="{{ site.marketing.default_utm_medium | default: 'social' | escape }}"
+    data-marketing-default-utm-campaign="{{ site.marketing.default_utm_campaign | default: 'shop' | escape }}"
+    data-marketing-default-utm-content="{{ site.marketing.default_utm_content | default: '' | escape }}"
+    data-marketing-default-ref="{{ site.marketing.default_ref | default: '' | escape }}"
+    data-marketing-landing-page-path="{{ site.marketing.landing_page_path | default: '/' | escape }}"
+    data-marketing-share-title="{{ site.marketing.share_title | default: admin_platform_name | escape }}"
+    data-marketing-share-text="{{ site.marketing.share_text | default: site.description | escape }}"></script>
+</body>
+</html>

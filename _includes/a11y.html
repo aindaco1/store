@@ -1,0 +1,39 @@
+{% comment %}
+  Accessibility helper - generates accessible patterns
+  
+  Usage:
+    {% include a11y.html type="sr-text" text="Opens in new tab" %}
+    {% include a11y.html type="live-announce" text="Item added to cart" %}
+    {% include a11y.html type="loading" text="Loading..." %}
+{% endcomment %}
+
+{%- case include.type -%}
+
+{%- when "sr-text" -%}
+{%- comment %} Screen reader only text {% endcomment -%}
+<span class="sr-only">{{ include.text }}</span>
+
+{%- when "live-announce" -%}
+{%- comment %} Announce to screen readers via live region (requires JS) {% endcomment -%}
+<span class="sr-only" data-live-announce="{{ include.text | escape }}"></span>
+
+{%- when "loading" -%}
+{%- comment %} Accessible loading indicator {% endcomment -%}
+<div class="loading" role="status" aria-live="polite">
+  <span class="sr-only">{{ include.text | default: "Loading..." }}</span>
+  <span class="loading__spinner" aria-hidden="true"></span>
+</div>
+
+{%- when "icon-button" -%}
+{%- comment %} Icon-only button with accessible label {% endcomment -%}
+<button type="button" aria-label="{{ include.label }}" class="{{ include.class }}">
+  {{ include.icon }}
+</button>
+
+{%- when "external-link" -%}
+{%- comment %} External link with screen reader announcement {% endcomment -%}
+<a href="{{ include.href }}" target="_blank" rel="noopener noreferrer" class="{{ include.class }}">
+  {{ include.text }}<span class="sr-only"> (opens in new tab)</span>
+</a>
+
+{%- endcase -%}

@@ -1,0 +1,10 @@
+{% assign block = include.block %}
+{% assign alignment = block.align | default: 'left' %}
+{% assign image_width = block.width | plus: 0 %}
+{% assign image_height = block.height | plus: 0 %}
+<figure class="content-block content-block--image content-block--align-{{ alignment | escape }}">
+  {% include responsive-image.html src=block.src alt=block.alt loading="lazy" decoding="async" width=image_width height=image_height sizes="(min-width: 900px) 760px, calc(100vw - 88px)" %}
+  {% if block.caption %}
+    <figcaption class="content-block__caption">{{ block.caption | safe_rich_text }}</figcaption>
+  {% endif %}
+</figure>

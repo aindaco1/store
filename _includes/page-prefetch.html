@@ -1,0 +1,9 @@
+{%- if site.performance.intent_prefetch_enabled == true -%}
+{%- assign asset_version = site.time | date: "%s" -%}
+<script
+  src="/assets/js/page-prefetch.js?v={{ asset_version }}"
+  defer
+  data-store-page-prefetch="true"
+  data-prefetch-delay-ms="{{ site.performance.intent_prefetch_delay_ms | default: 90 }}"
+  data-prefetch-limit="{{ site.performance.intent_prefetch_limit | default: 3 }}"></script>
+{%- endif -%}
