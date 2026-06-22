@@ -5605,6 +5605,87 @@ function formatAdminStorePreviewPrice(cents, currency = 'USD') {
   }
 }
 
+function adminStorePreviewFontHead() {
+  return `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://use.typekit.net" crossorigin>
+  <link rel="dns-prefetch" href="https://p.typekit.net">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:400,700">
+  <link rel="stylesheet" href="https://use.typekit.net/hoj2yet.css">`;
+}
+
+function adminStorePreviewSlug(value, fallback = 'preview-product') {
+  const slug = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || fallback;
+}
+
+function adminStorePreviewPlainText(value) {
+  return String(value ?? '')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/[*_`~]/g, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function adminStorePreviewTruncate(value, maxLength = 170) {
+  const text = adminStorePreviewPlainText(value);
+  const max = Math.max(20, Number(maxLength) || 170);
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 3).trimEnd()}...`;
+}
+
+function adminStorePreviewSelectedVariant(product = {}) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  return variants.find((variant) => !variant?.status || variant.status === 'active') || variants[0] || null;
+}
+
+function adminStorePreviewSelectedPriceCents(product = {}, selectedVariant = null) {
+  const basePrice = adminStoreProductPriceCents(product);
+  if (!selectedVariant) return basePrice;
+  if (selectedVariant.price_cents !== undefined || selectedVariant.price !== undefined) {
+    return adminStoreProductPriceCents(selectedVariant);
+  }
+  return basePrice;
+}
+
+function adminStorePreviewButtonLabel(product = {}, priceCents = 0) {
+  const type = String(product.fulfillment_type || product.type || 'physical').trim().toLowerCase();
+  if (type === 'rsvp') return 'RSVP';
+  if (type === 'ticket' && priceCents <= 0) return 'RSVP';
+  if (type === 'ticket') return 'Add ticket';
+  if (type === 'digital') return 'Add download';
+  return 'Add to cart';
+}
+
+function buildAdminStoreProductPreviewVariantOptions(product = {}, selectedVariant = null) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  const basePrice = adminStoreProductPriceCents(product);
+  return variants.map((variant, index) => {
+    const id = String(variant?.id || variant?.sku || variant?.label || `variant-${index + 1}`).trim();
+    const label = String(variant?.label || variant?.name || id).trim();
+    const variantPrice = variant?.price_cents !== undefined || variant?.price !== undefined
+      ? adminStoreProductPriceCents(variant)
+      : basePrice;
+    const priceLabel = variantPrice !== basePrice
+      ? ` - ${formatAdminStorePreviewPrice(variantPrice, product.currency || 'USD')}`
+      : '';
+    const disabled = variant?.status && variant.status !== 'active' ? ' disabled' : '';
+    const selected = selectedVariant && String(selectedVariant.id || selectedVariant.sku || selectedVariant.label || '') === id
+      ? ' selected'
+      : '';
+    return `<option value="${escapeAdminStorePreviewAttribute(id)}"${selected}${disabled}>${escapeAdminStorePreviewHtml(label)}${escapeAdminStorePreviewHtml(priceLabel)}</option>`;
+  }).join('');
+}
+
 function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
   const fields = body?.fields && typeof body.fields === 'object' ? body.fields : {};
   const preview = { ...product };
@@ -5647,27 +5728,38 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
   return preview;
 }
 
-function adminStoreProductPreviewPriceCents(product = {}) {
-  const variants = Array.isArray(product?.variants) ? product.variants : [];
-  const activeVariants = variants
-    .filter((variant) => !variant.status || variant.status === 'active')
-    .map((variant) => adminStoreProductPriceCents(variant))
-    .filter((price) => price > 0);
-  if (activeVariants.length) return Math.min(...activeVariants);
-  return adminStoreProductPriceCents(product);
-}
-
 function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const siteBase = adminStorePreviewSiteBase(env);
   const stylesheet = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
   const name = String(product.name || product.id || 'Untitled product').trim();
   const category = String(product.collection_label || product.collection || product.category || product.fulfillment_type || 'Product').trim();
   const image = adminStorePreviewUrl(product.image || '', env);
-  const price = formatAdminStorePreviewPrice(adminStoreProductPreviewPriceCents(product), product.currency || 'USD');
-  const description = renderAdminStoreProductMarkdown(product.description || '', env);
+  const productId = adminStorePreviewSlug(product.id || product.slug || name);
+  const selectedVariant = adminStorePreviewSelectedVariant(product);
+  const selectedVariantLabel = selectedVariant ? String(selectedVariant.label || selectedVariant.name || selectedVariant.id || '').trim() : '';
+  const selectedPriceCents = adminStorePreviewSelectedPriceCents(product, selectedVariant);
+  const price = formatAdminStorePreviewPrice(selectedPriceCents, product.currency || 'USD');
+  const isFree = selectedPriceCents <= 0;
+  const descriptionSource = product.description || '';
+  const description = renderAdminStoreProductMarkdown(descriptionSource, env);
+  const cardDescription = adminStorePreviewTruncate(descriptionSource);
+  const buttonLabel = adminStorePreviewButtonLabel(product, selectedPriceCents);
+  const buttonText = isFree ? buttonLabel : `${buttonLabel} - ${price}`;
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const hasVariants = variants.length > 0;
+  const controlsClass = hasVariants ? 'store-product-card__controls--with-option' : 'store-product-card__controls--simple';
+  const optionLabel = String(product.variant_option_name || 'Option').trim();
   const imageHtml = image
-    ? `<img src="${escapeAdminStorePreviewAttribute(image)}" alt="${escapeAdminStorePreviewAttribute(name)}">`
+    ? `<img class="store-product-card__image" src="${escapeAdminStorePreviewAttribute(image)}" alt="${escapeAdminStorePreviewAttribute(name)}" loading="lazy" decoding="async">`
     : '<div class="admin-store-product-preview__image-placeholder">No image selected</div>';
+  const optionHtml = hasVariants
+    ? `<div class="store-product-card__field store-product-card__field--option">
+          <label class="store-product-card__label" for="${escapeAdminStorePreviewAttribute(productId)}-variant">${escapeAdminStorePreviewHtml(optionLabel)}</label>
+          <select class="store-product-card__select" id="${escapeAdminStorePreviewAttribute(productId)}-variant" disabled aria-disabled="true">
+            ${buildAdminStoreProductPreviewVariantOptions(product, selectedVariant)}
+          </select>
+        </div>`
+    : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -5675,23 +5767,48 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   ${siteBase ? `<base href="${escapeAdminStorePreviewAttribute(`${siteBase}/`)}">` : ''}
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://use.typekit.net" crossorigin>
-  <link rel="dns-prefetch" href="https://p.typekit.net">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:400,700">
-  <link rel="stylesheet" href="https://use.typekit.net/hoj2yet.css">
+  ${adminStorePreviewFontHead()}
   <link rel="stylesheet" href="${escapeAdminStorePreviewAttribute(stylesheet)}">
 </head>
-	<body class="admin-store-product-preview-body">
-  <main class="admin-store-product-preview">
-    <figure class="admin-store-product-preview__image">${imageHtml}</figure>
-    <section class="admin-store-product-preview__content" aria-label="Product preview">
-      <p class="admin-store-product-preview__eyebrow">${escapeAdminStorePreviewHtml(category)}</p>
-      <h1 class="admin-store-product-preview__title">${escapeAdminStorePreviewHtml(name)}</h1>
-      <div class="admin-store-product-preview__copy">${description}</div>
-      <p class="admin-store-product-preview__price">${escapeAdminStorePreviewHtml(price)}</p>
-    </section>
-  </main>
+<body class="admin-store-product-preview-body">
+  <section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview>
+    <div class="storefront__header storefront__header--compact">
+      <p class="storefront__eyebrow">${escapeAdminStorePreviewHtml(category)}</p>
+      <h1>${escapeAdminStorePreviewHtml(name)}</h1>
+    </div>
+    <div class="storefront__product-detail">
+      <article class="store-product-card" id="${escapeAdminStorePreviewAttribute(productId)}" data-store-product-card>
+        <a class="store-product-card__media" href="#" tabindex="-1" aria-disabled="true">${imageHtml}</a>
+        <div class="store-product-card__body">
+          <div class="store-product-card__header">
+            <p class="store-product-card__eyebrow">${escapeAdminStorePreviewHtml(category)}</p>
+            <h2 class="store-product-card__title"><a href="#" tabindex="-1">${escapeAdminStorePreviewHtml(name)}</a></h2>
+          </div>
+          <p class="store-product-card__description">${escapeAdminStorePreviewHtml(cardDescription)}</p>
+          <div class="store-product-card__purchase">
+            <p class="store-product-card__price" data-store-price>${isFree ? 'Free' : escapeAdminStorePreviewHtml(price)}</p>
+            <p class="store-product-card__availability" data-store-availability data-store-inventory-state="none"></p>
+            <div class="store-product-card__controls ${controlsClass}" data-store-product-controls>
+              ${optionHtml}
+              <div class="store-product-card__field store-product-card__field--quantity">
+                <label class="store-product-card__label" for="${escapeAdminStorePreviewAttribute(productId)}-qty">Quantity</label>
+                <div class="store-product-card__stepper">
+                  <button class="store-product-card__stepper-button" type="button" disabled aria-disabled="true" aria-label="Decrease quantity">-</button>
+                  <input class="store-product-card__qty" id="${escapeAdminStorePreviewAttribute(productId)}-qty" type="number" min="1" value="1" disabled aria-disabled="true">
+                  <button class="store-product-card__stepper-button" type="button" disabled aria-disabled="true" aria-label="Increase quantity">+</button>
+                </div>
+              </div>
+              <button class="store-add-item store-product-card__button" type="button" disabled aria-disabled="true" data-store-button-label="${escapeAdminStorePreviewAttribute(buttonLabel)}">${escapeAdminStorePreviewHtml(buttonText)}</button>
+            </div>
+          </div>
+        </div>
+      </article>
+      <div class="storefront__product-copy">
+        ${description}
+        ${selectedVariantLabel ? `<p><strong>Selected option:</strong> ${escapeAdminStorePreviewHtml(selectedVariantLabel)}</p>` : ''}
+      </div>
+    </div>
+  </section>
 </body>
 </html>`;
 }

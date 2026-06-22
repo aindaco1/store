@@ -444,12 +444,14 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       calls.storeProductPreviews.push(body);
       const image = body.fields?.image || '/assets/images/fronteras-poster.png';
       const previewImage = String(image).startsWith('/') ? `https://shop.dustwave.xyz${image}` : image;
+      const previewName = body.fields?.name || 'Preview';
+      const previewDescription = body.fields?.description || '';
       return fulfillJson({
         success: true,
         scope: 'store',
         productId: body.productId,
         preview: {
-          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"></head><body class="admin-store-product-preview-body"><main class="admin-store-product-preview"><figure class="admin-store-product-preview__image"><img src="${previewImage}" alt="${body.fields?.name || 'Preview'}"></figure><section class="admin-store-product-preview__content"><h1 class="admin-store-product-preview__title">${body.fields?.name || 'Preview'}</h1><p>${body.fields?.description || ''}</p></section></main></body></html>`,
+          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview><div class="storefront__header storefront__header--compact"><p class="storefront__eyebrow">FRONTERAS</p><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card" data-store-product-card><a class="store-product-card__media" href="#" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}"></a><div class="store-product-card__body"><div class="store-product-card__header"><p class="store-product-card__eyebrow">FRONTERAS</p><h2 class="store-product-card__title"><a href="#" tabindex="-1">${previewName}</a></h2></div><p class="store-product-card__description">${previewDescription}</p><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Pool preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section></body></html>`,
           generatedAt: '2026-06-11T12:00:00.000Z'
         },
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
@@ -1769,9 +1771,17 @@ test.describe('Admin Dashboard', () => {
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('img')).toHaveAttribute('src', /fronteras-poster\.png$/);
     await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.src)).toBe(`${SITE_BASE}/assets/images/fronteras-poster.png`);
     await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront--product.admin-store-product-preview')).toBeVisible();
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront__product-detail')).toBeVisible();
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card')).toBeVisible();
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__button')).toContainText('Add to cart');
     await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('body').evaluate(() => {
       return document.documentElement.scrollWidth <= window.innerWidth + 1 && document.body.scrollWidth <= window.innerWidth + 1;
     })).toBe(true);
+    await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('body').evaluate(() => {
+      return getComputedStyle(document.body).overflowY;
+    })).toBe('auto');
+    expect(await productEditor.locator('[data-store-product-preview-frame]').evaluate((frame: HTMLIFrameElement) => Math.round(frame.getBoundingClientRect().height))).toBeGreaterThanOrEqual(360);
     const fulfillmentSelect = productEditor.locator('select[data-store-product-field="fulfillmentType"]');
     const taxCategory = productEditor.locator('select[data-store-product-field="taxCategory"]');
     await expect(taxCategory).toHaveValue('standard');
@@ -1847,6 +1857,15 @@ test.describe('Admin Dashboard', () => {
     await productEditor.locator('[data-store-product-field="price"]').fill('36');
     await expect(productEditor.locator('[data-store-product-variants-enabled]')).toHaveValue('false');
     await productEditor.locator('[data-store-product-variants-enabled]').selectOption('true');
+    await expect(productEditor.locator('.admin-store-products__variants-table th')).toHaveText([
+      'Label',
+      'ID',
+      'SKU',
+      'Price (USD)',
+      'Inventory',
+      'Status',
+      ''
+    ]);
     await expect(productEditor.locator('[data-store-product-variant]')).toHaveCount(1);
     const generatedVariant = productEditor.locator('[data-store-product-variant]').first();
     await generatedVariant.locator('[data-store-variant-field="label"]').fill('Standard');

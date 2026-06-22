@@ -5614,7 +5614,7 @@
     table.hidden = !variants.length;
     var thead = document.createElement('thead');
     var header = document.createElement('tr');
-    ['Label', 'ID', 'SKU', 'Price', 'Inventory', 'Status', ''].forEach(function(text) {
+    ['Label', 'ID', 'SKU', 'Price (USD)', 'Inventory', 'Status', ''].forEach(function(text) {
       var th = createElement('th', '', text);
       if (text === 'Inventory') th.dataset.storeProductVariantInventoryCell = 'true';
       header.appendChild(th);
