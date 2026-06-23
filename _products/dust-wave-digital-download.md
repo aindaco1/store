@@ -9,7 +9,7 @@ fulfillment_type: digital
 status: active
 public: false
 launch_test: true
-event: dustwave
+category: dustwave
 order: 900
 shipping_preset: ticket
 tax_category: digital

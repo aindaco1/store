@@ -90,11 +90,11 @@ test.describe('Public Page Accessibility', () => {
   test('terms page has no obvious axe violations', async ({ page }) => {
     await page.goto('/terms/');
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('h1')).toContainText('Shop Terms & Privacy');
+    await expect(page.locator('h1')).toContainText('Terms & Privacy');
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
-      'heading "Shop Terms & Privacy"',
-      'paragraph: Effective June 20, 2026. These terms cover purchases, shipping, refunds, tickets, downloads, and privacy for Dust Wave Shop.'
+      'heading "Terms & Privacy"',
+      'paragraph: Effective June 20, 2026.'
     ]);
   });
 

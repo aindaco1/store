@@ -7,7 +7,7 @@ image: "/assets/images/froggy-sticker.png"
 type: sticker
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 150
 shipping_preset: sticker
 tax_category: standard

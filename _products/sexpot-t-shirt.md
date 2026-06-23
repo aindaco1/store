@@ -7,7 +7,7 @@ image: "/assets/images/sexpot-t-shirt.png"
 type: shirt
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 100
 shipping_preset: tshirt
 tax_category: standard

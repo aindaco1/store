@@ -45,7 +45,11 @@ STRIPE_WEBHOOK_SECRET_TEST=
 RESEND_API_KEY=
 
 # Dashboard publish and report helpers.
+# Local admin publishes use the local repo sidecar started by ./scripts/dev.sh.
+# GITHUB_TOKEN is only needed when publishing through GitHub in deployed envs.
 GITHUB_TOKEN=
+ADMIN_LOCAL_REPO_TOKEN=
+ADMIN_LOCAL_REPO_SERVICE_PORT=8799
 # Local remote-report/export scripts can use a read-only Cloudflare user API
 # token with Account / Workers KV Storage / Read scoped to this account.
 # GitHub Actions deploys need a separate user API token created from the

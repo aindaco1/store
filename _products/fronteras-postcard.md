@@ -7,7 +7,7 @@ image: "/assets/images/print.jpg"
 type: postcard
 fulfillment_type: physical
 status: active
-event: fronteras
+category: fronteras
 order: 380
 shipping_preset: sticker
 tax_category: standard

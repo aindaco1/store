@@ -7,7 +7,7 @@ image: "/assets/images/sexpot-condom-pack.png"
 type: physical
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 80
 shipping_preset: parcel
 tax_category: standard

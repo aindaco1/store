@@ -7,7 +7,7 @@ image: "/assets/images/fronteras-sticker.png"
 type: sticker
 fulfillment_type: physical
 status: active
-event: fronteras
+category: fronteras
 order: 340
 shipping_preset: sticker
 tax_category: standard

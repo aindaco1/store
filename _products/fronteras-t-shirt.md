@@ -7,7 +7,7 @@ image: "/assets/images/fronteras-tshirt.png"
 type: shirt
 fulfillment_type: physical
 status: active
-event: fronteras
+category: fronteras
 order: 300
 shipping_preset: tshirt
 tax_category: standard

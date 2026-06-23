@@ -94,8 +94,10 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeProductPreviews: [],
     storeProductPublishes: [],
     storeProductBulkPublishes: [],
+    storeProductOrders: [],
     storeDownloads: [],
     storeDownloadUploads: [],
+    storeDownloadCreates: [],
     storeInventoryWrites: []
   };
   const user = {
@@ -451,7 +453,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         scope: 'store',
         productId: body.productId,
         preview: {
-          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview><div class="storefront__header storefront__header--compact"><p class="storefront__eyebrow">FRONTERAS</p><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card" data-store-product-card><a class="store-product-card__media" href="#" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}"></a><div class="store-product-card__body"><div class="store-product-card__header"><p class="store-product-card__eyebrow">FRONTERAS</p><h2 class="store-product-card__title"><a href="#" tabindex="-1">${previewName}</a></h2></div><p class="store-product-card__description">${previewDescription}</p><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Pool preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section></body></html>`,
+          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"><script>window.__storePreviewHeadScriptRan = true;</script></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview onclick="window.__storePreviewInlineHandlerRan = true"><div class="storefront__header storefront__header--compact"><p class="storefront__eyebrow">FRONTERAS</p><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card" data-store-product-card><a class="store-product-card__media" href="javascript:window.__storePreviewHrefRan=true" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}"></a><div class="store-product-card__body"><div class="store-product-card__header"><p class="store-product-card__eyebrow">FRONTERAS</p><h2 class="store-product-card__title"><a href="#" tabindex="-1">${previewName}</a></h2></div><p class="store-product-card__description">${previewDescription}</p><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Pool preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section><script>window.__storePreviewBodyScriptRan = true;</script></body></html>`,
           generatedAt: '2026-06-11T12:00:00.000Z'
         },
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
@@ -462,8 +464,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       return fulfillJson({
         success: true,
         published: true,
+        created: body.createProduct === true,
         productId: body.productId,
-        deployNotice: 'Product published. Deploy started.',
+        deployNotice: body.createProduct === true ? 'Product created. Deploy started.' : 'Product published. Deploy started.',
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
       });
     }
@@ -476,6 +479,21 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         skipped: 0,
         productIds: body.productIds || [],
         deployNotice: 'Bulk product publish committed changes to GitHub and started a deploy.',
+        writeBudget: { readOnly: false, kvWritesExpected: 1 }
+      });
+    }
+    if (url.pathname === '/admin/store/products/order' && method === 'POST') {
+      calls.storeProductOrders.push(body);
+      return fulfillJson({
+        success: true,
+        published: true,
+        updated: body.productIds?.length || 0,
+        productIds: body.productIds || [],
+        order: (body.productIds || []).map((productId: string, index: number) => ({
+          productId,
+          order: (index + 1) * 10
+        })),
+        deployNotice: 'Product order saved in GitHub and deploy started.',
         writeBudget: { readOnly: false, kvWritesExpected: 1 }
       });
     }
@@ -493,6 +511,22 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         filename: body.filename,
         size: 24,
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/store/downloads/create' && method === 'POST') {
+      calls.storeDownloadCreates.push(body);
+      const fileKey = body.fileKey || String(body.filename || 'store-download')
+        .toLowerCase()
+        .replace(/\.[a-z0-9]+$/i, '')
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'store-download';
+      return fulfillJson({
+        success: true,
+        uploaded: true,
+        fileKey,
+        filename: body.filename,
+        writeBudget: { readOnly: false, kvWritesExpected: 1, r2WritesExpected: 1 }
       });
     }
     if (url.pathname === '/admin/store/inventory' && method === 'POST') {
@@ -958,6 +992,25 @@ function planUsagePayload() {
   };
 }
 
+function storeDownloadFilesPayload() {
+  return [{
+    fileKey: DIGITAL_ITEM_ID,
+    filename: 'fronteras-download.pdf',
+    contentType: 'application/pdf',
+    source: 'r2',
+    status: 'r2_ready',
+    ready: true,
+    size: 2048,
+    uploadedAt: '2026-06-10T12:00:00.000Z',
+    attachedTo: [{
+      productId: DIGITAL_ITEM_ID,
+      variantId: '',
+      label: 'DUST WAVE Digital Download',
+      sku: DIGITAL_ITEM_ID
+    }]
+  }];
+}
+
 function storeProductsPayload() {
   return {
     scope: 'store',
@@ -973,12 +1026,21 @@ function storeProductsPayload() {
       trackingInventory: 3,
       withOverrides: 0
     },
+    downloads: {
+      bucketConfigured: true,
+      totals: { count: 1, ready: 1, missing: 0, r2Ready: 1, files: 1 },
+      files: storeDownloadFilesPayload(),
+      updatedAt: '2026-06-10T12:00:00.000Z'
+    },
     rows: [{
       productId: 'fronteras-poster-big',
       variantId: '',
       sku: 'fronteras-poster-big',
       label: 'Fronteras Poster (Big)',
       fulfillmentType: 'physical',
+      order: 10,
+      collection: 'fronteras',
+      storefrontCategory: 'prints',
       priceCents: 3500,
       status: 'active',
       image: '/assets/images/fronteras-poster.png',
@@ -995,6 +1057,9 @@ function storeProductsPayload() {
       sku: DIGITAL_ITEM_ID,
       label: 'DUST WAVE Digital Download',
       fulfillmentType: 'digital',
+      order: 20,
+      collection: 'dustwave',
+      storefrontCategory: 'downloads',
       priceCents: 500,
       status: 'active',
       public: false,
@@ -1005,13 +1070,18 @@ function storeProductsPayload() {
       sold: 0,
       remaining: null,
       hasOverride: false,
-      shippingPreset: 'ticket'
+      shippingPreset: 'ticket',
+      downloadFileKey: DIGITAL_ITEM_ID,
+      downloadFilename: 'fronteras-download.pdf'
     }, {
       productId: 'ticket-1',
       variantId: '',
       sku: 'ticket-1',
       label: 'DUST WAVE Event Ticket',
       fulfillmentType: 'ticket',
+      order: 30,
+      collection: 'dustwave',
+      storefrontCategory: 'event-access',
       priceCents: 1200,
       priceMinCents: 1200,
       priceMaxCents: 2000,
@@ -1032,6 +1102,9 @@ function storeProductsPayload() {
       sku: RSVP_ITEM_ID,
       label: 'DUST WAVE Free RSVP',
       fulfillmentType: 'rsvp',
+      order: 40,
+      collection: 'dustwave',
+      storefrontCategory: 'event-access',
       priceCents: 0,
       status: 'active',
       public: false,
@@ -1046,6 +1119,7 @@ function storeProductsPayload() {
     }],
     products: [{
       productId: 'fronteras-poster-big',
+      sku: 'poster-1',
       name: 'Fronteras Poster (Big)',
       description: '18" X 24" super heavyweight matte poster. Butterflies are cool.',
       longContent: [{
@@ -1055,10 +1129,13 @@ function storeProductsPayload() {
       }],
       slug: 'fronteras-poster-big',
       sourcePath: '_products/fronteras-poster-big.md',
+      order: 10,
       priceCents: 3500,
       status: 'active',
       fulfillmentType: 'physical',
       image: '/assets/images/fronteras-poster.png',
+      collection: 'fronteras',
+      storefrontCategory: 'prints',
       shippingPreset: 'poster',
       inventoryTracking: true,
       inventory: 12,
@@ -1070,15 +1147,20 @@ function storeProductsPayload() {
       longContent: [],
       slug: 'dust-wave-digital-download',
       sourcePath: '_products/dust-wave-digital-download.md',
+      order: 20,
       priceCents: 500,
       status: 'active',
       public: false,
       launchTest: true,
       fulfillmentType: 'digital',
       image: '/assets/images/default.png',
+      collection: 'dustwave',
+      storefrontCategory: 'downloads',
       shippingPreset: 'ticket',
       inventoryTracking: false,
       inventory: 0,
+      downloadFileKey: DIGITAL_ITEM_ID,
+      downloadFilename: 'fronteras-download.pdf',
       variants: []
     }, {
       productId: 'ticket-1',
@@ -1087,12 +1169,15 @@ function storeProductsPayload() {
       longContent: [],
       slug: 'dust-wave-event-ticket',
       sourcePath: '_products/dust-wave-event-ticket.md',
+      order: 30,
       priceCents: 1200,
       status: 'active',
       public: false,
       launchTest: true,
       fulfillmentType: 'ticket',
       image: '/assets/images/dancewave.png',
+      collection: 'dustwave',
+      storefrontCategory: 'event-access',
       shippingPreset: 'ticket',
       inventoryTracking: true,
       inventory: 0,
@@ -1119,12 +1204,15 @@ function storeProductsPayload() {
       longContent: [],
       slug: 'dust-wave-free-rsvp',
       sourcePath: '_products/dust-wave-free-rsvp.md',
+      order: 40,
       priceCents: 0,
       status: 'active',
       public: false,
       launchTest: true,
       fulfillmentType: 'rsvp',
       image: '/assets/images/calendar-2026.png',
+      collection: 'dustwave',
+      storefrontCategory: 'event-access',
       shippingPreset: 'ticket',
       inventoryTracking: true,
       inventory: 0,
@@ -1138,12 +1226,12 @@ function storeDownloadsPayload() {
   return {
     scope: 'store',
     bucketConfigured: true,
-    totals: { count: 1, ready: 1, missing: 0 },
+    totals: { count: 1, ready: 1, missing: 0, files: 1 },
     rows: [{
       productId: DIGITAL_ITEM_ID,
       variantId: '',
       sku: DIGITAL_ITEM_ID,
-      label: 'Fronteras Download',
+      label: 'DUST WAVE Digital Download',
       fileKey: DIGITAL_ITEM_ID,
       filename: 'fronteras-download.pdf',
       source: 'product',
@@ -1152,6 +1240,7 @@ function storeDownloadsPayload() {
       size: 2048,
       uploadedAt: '2026-06-10T12:00:00.000Z'
     }],
+    files: storeDownloadFilesPayload(),
     writeBudget: { readOnly: true, kvWritesExpected: 0 }
   };
 }
@@ -1179,6 +1268,11 @@ async function selectAdminSection(page: any, name: string) {
 test.describe('Admin Dashboard', () => {
   test('covers Store admin login, settings, readiness, plan usage, analytics, marketing, orders, products, downloads, and inventory', async ({ page }) => {
     const calls = await routeAdminWorker(page);
+    const sandboxScriptErrors: string[] = [];
+    page.on('console', (message) => {
+      const text = message.text();
+      if (text.includes('Blocked script execution')) sandboxScriptErrors.push(text);
+    });
     page.on('dialog', async (dialog) => {
       await dialog.accept();
     });
@@ -1200,11 +1294,11 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByText(`Signed in as ${SUPER_ADMIN_EMAIL}`)).toBeVisible();
 	    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab')).toHaveText([
 	      'Settings',
-	      'Analytics',
-	      'Marketing',
-	      'Orders',
 	      'Products',
-	      'Downloads'
+	      'Downloads',
+	      'Orders',
+	      'Analytics',
+	      'Marketing'
 	    ]);
 	    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
 	    await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
@@ -1537,7 +1631,29 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-store-products-summary')).not.toContainText('Rows');
     await expect(productsResults.getByText('Set status', { exact: true })).toHaveCount(0);
     await expect(productsResults.getByRole('button', { name: 'Clear' })).toHaveCount(0);
+    await expect(productsResults.locator('thead')).not.toContainText('Order');
     await expect(productsResults.getByLabel('Bulk product status')).toBeVisible();
+    await expect(page.locator('.admin-store-products__header #admin-store-product-create')).toHaveCount(0);
+    await expect(productsResults.locator('.admin-store-products__bulk-actions #admin-store-product-create')).toBeVisible();
+    expect(await productsResults.locator('.admin-store-products__bulk-actions').evaluate((row) => {
+      const apply = row.querySelector('[data-store-products-bulk-apply]');
+      const save = row.querySelector('[data-store-products-order-save]');
+      const create = row.querySelector('[data-store-product-create]');
+      if (!(apply instanceof HTMLElement) || !(save instanceof HTMLElement) || !(create instanceof HTMLElement)) return false;
+      const applyRect = apply.getBoundingClientRect();
+      const saveRect = save.getBoundingClientRect();
+      const createRect = create.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const leftGap = saveRect.left - applyRect.right;
+      const rightGap = createRect.left - saveRect.right;
+      const createRightInset = rowRect.right - createRect.right;
+      return leftGap >= 16
+        && rightGap >= 16
+        && Math.abs(leftGap - rightGap) <= 2
+        && createRightInset >= 0
+        && createRightInset <= 14
+        && rowRect.height <= 72;
+    })).toBe(true);
     const productListRows = productsResults.locator('tbody > tr:not(.admin-store-products__editor-row)');
     const posterRow = productListRows.filter({ hasText: 'Fronteras Poster (Big)' });
     const digitalProductRow = productListRows.filter({ hasText: 'DUST WAVE Digital Download' });
@@ -1547,12 +1663,48 @@ test.describe('Admin Dashboard', () => {
     await expect(ticketProductRow).toContainText('2 variants');
     await expect(ticketProductRow).toContainText('$12-$20');
     await expect(ticketProductRow.locator('[data-store-product-inventory-controls]')).toHaveCount(0);
-    await expect(ticketProductRow).toContainText('Edit variants to manage inventory.');
+    await expect(ticketProductRow).not.toContainText('Edit variants to manage inventory.');
     await expect(posterRow.locator('.admin-store-products__thumb img')).toHaveAttribute('src', /fronteras-poster\.png$/);
     await expect(rsvpProductRow.locator('.admin-store-products__thumb img')).toHaveAttribute('src', /calendar-2026\.png$/);
     await expect(digitalProductRow.locator('.admin-store-products__status')).toContainText('Test fixture');
     await expect(digitalProductRow.locator('.admin-store-products__status')).toContainText('not public');
     await expect(productsResults.getByRole('button', { name: 'Restock', exact: true })).toHaveCount(0);
+    const currentProductOrder = async () => productsResults.evaluate(() => {
+      return Array.from(document.querySelectorAll('#admin-store-products-results tbody > tr[data-store-product-order-row]'))
+        .map((row) => row.getAttribute('data-store-product-order-row') || '');
+    });
+    const saveOrder = productsResults.locator('[data-store-products-order-save]');
+    await expect(saveOrder).toBeDisabled();
+    await expect(posterRow).toHaveAttribute('draggable', 'true');
+    await posterRow.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(saveOrder).toBeEnabled();
+    expect(calls.storeProductOrders).toHaveLength(0);
+    expect(await currentProductOrder()).toEqual([
+      DIGITAL_ITEM_ID,
+      'fronteras-poster-big',
+      'ticket-1',
+      RSVP_ITEM_ID
+    ]);
+    await saveOrder.click();
+    await expect.poll(() => calls.storeProductOrders.length).toBe(1);
+    expect(calls.storeProductOrders[0]).toEqual({
+      intent: 'order_publish',
+      productIds: [
+        DIGITAL_ITEM_ID,
+        'fronteras-poster-big',
+        'ticket-1',
+        RSVP_ITEM_ID
+      ]
+    });
+    await expect(page.locator('#admin-store-products-status')).toContainText('Product order saved in GitHub and deploy started.');
+    await expect(saveOrder).toBeDisabled();
+    expect(await currentProductOrder()).toEqual([
+      'fronteras-poster-big',
+      DIGITAL_ITEM_ID,
+      'ticket-1',
+      RSVP_ITEM_ID
+    ]);
     await page.evaluate(() => {
       const original = Element.prototype.scrollIntoView;
       (window as any).__storeProductOriginalScrollIntoView = original;
@@ -1570,7 +1722,28 @@ test.describe('Admin Dashboard', () => {
     await digitalProductRow.getByRole('button', { name: 'Edit' }).click();
     const digitalEditor = page.locator(`[data-store-product-editor="${DIGITAL_ITEM_ID}"]`);
     await expect(digitalEditor).toBeVisible();
+    await expect(digitalEditor.locator('[data-store-product-field="downloadFileKey"]')).toBeVisible();
+    await expect(digitalEditor.locator('[data-store-product-field="downloadFileKey"]')).toHaveValue(DIGITAL_ITEM_ID);
+    await expect(digitalEditor.locator('[data-store-product-field="downloadFileKey"] option')).toContainText([
+      'No file selected',
+      `fronteras-download.pdf (${DIGITAL_ITEM_ID})`
+    ]);
+    await expect(digitalEditor.locator('[data-store-product-field-wrapper="shippingPreset"]')).toBeHidden();
     await expect(digitalEditor.locator('[data-store-product-variants]')).toBeHidden();
+    await digitalEditor.locator('[data-store-product-variants-enabled]').selectOption('true');
+    await expect(digitalEditor.locator('[data-store-product-field="downloadFileKey"]')).toBeHidden();
+    await expect(digitalEditor.locator('[data-store-product-variants]')).toBeVisible();
+    await expect(digitalEditor.locator('[data-store-product-variant]')).toHaveCount(1);
+    await expect(digitalEditor.locator('.admin-store-products__variants-table th:not([hidden])')).toHaveText([
+      'Label',
+      'ID',
+      'SKU',
+      'File',
+      'Price (USD)',
+      'Status',
+      ''
+    ]);
+    await expect(digitalEditor.locator('[data-store-variant-field="downloadFileKey"]')).toBeVisible();
     await expect.poll(async () => page.evaluate((productId) => {
       return ((window as any).__storeProductScrollCalls || []).some((call: { editor: string; block: string }) => {
         return call.editor === productId && call.block === 'start';
@@ -1583,7 +1756,7 @@ test.describe('Admin Dashboard', () => {
     });
     await expect(productsResults.locator('.admin-store-products__editor-row')).toHaveAttribute('data-store-product-editor-row', DIGITAL_ITEM_ID);
     expect(await productsResults.evaluate(() => {
-      return Array.from(document.querySelectorAll('#admin-store-products-results tbody > tr')).map((row) => {
+      return Array.from(document.querySelectorAll('#admin-store-products-results .admin-store-products__table > tbody > tr')).map((row) => {
         if (row.classList.contains('admin-store-products__editor-row')) {
           return `editor:${row.getAttribute('data-store-product-editor-row') || ''}`;
         }
@@ -1653,6 +1826,15 @@ test.describe('Admin Dashboard', () => {
     await expect(productEditor).toBeVisible();
     await expect(productEditor.getByRole('button', { name: 'About Fronteras Poster (Big)' })).toHaveCount(0);
     await expect(productEditor.getByRole('button', { name: 'About Name' })).toHaveCount(0);
+    await expect(productEditor.locator('[data-store-product-readonly-field="sku"]')).toHaveValue('poster-1');
+    await expect(productEditor.locator('[data-store-product-readonly-field="sku"]')).toHaveAttribute('readonly', '');
+    await expect(productEditor.getByRole('button', { name: 'About SKU' })).toBeVisible();
+    expect(await productEditor.evaluate((editor) => {
+      const sku = editor.querySelector('[data-store-product-field-wrapper="sku"]');
+      const shipping = editor.querySelector('[data-store-product-field-wrapper="shippingPreset"]');
+      if (!sku || !shipping) return false;
+      return Boolean(sku.compareDocumentPosition(shipping) & Node.DOCUMENT_POSITION_FOLLOWING);
+    })).toBe(true);
     await expect(productEditor.locator('.admin-store-products__field-label').filter({ hasText: 'Price (USD)' })).toBeVisible();
     await expect(productEditor.locator('[data-store-product-field="price"]')).toHaveAttribute('type', 'number');
     await expect(productEditor.getByRole('button', { name: 'About Price (USD)' })).toBeVisible();
@@ -1712,6 +1894,13 @@ test.describe('Admin Dashboard', () => {
       const inventoryRect = inventory.getBoundingClientRect();
       return Math.round(inventoryRect.left - trackerRect.right);
     })).toBeGreaterThanOrEqual(8);
+    expect(await productEditor.evaluate((editor) => {
+      const inventory = editor.querySelector('[data-store-product-field-wrapper="inventory"]');
+      if (!(inventory instanceof HTMLElement) || inventory.hidden) return false;
+      const editorRect = editor.getBoundingClientRect();
+      const inventoryRect = inventory.getBoundingClientRect();
+      return inventoryRect.left >= editorRect.left && inventoryRect.right <= editorRect.right;
+    })).toBe(true);
     await expect(productEditor.getByRole('button', { name: 'Refresh preview' })).toHaveCount(0);
     await expect(productEditor.locator('[data-store-product-field="image"]')).toHaveValue('/assets/images/fronteras-poster.png');
     const productPublish = productEditor.getByRole('button', { name: 'Publish product' });
@@ -1771,6 +1960,21 @@ test.describe('Admin Dashboard', () => {
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('img')).toHaveAttribute('src', /fronteras-poster\.png$/);
     await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.src)).toBe(`${SITE_BASE}/assets/images/fronteras-poster.png`);
     await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('script')).toHaveCount(0);
+    await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('[data-admin-store-product-preview]').evaluate((section: HTMLElement) => {
+      return {
+        inlineHandler: section.getAttribute('onclick'),
+        headScriptRan: (section.ownerDocument.defaultView as any).__storePreviewHeadScriptRan === true,
+        bodyScriptRan: (section.ownerDocument.defaultView as any).__storePreviewBodyScriptRan === true,
+        javascriptHref: section.querySelector('.store-product-card__media')?.getAttribute('href') || ''
+      };
+    })).toEqual({
+      inlineHandler: null,
+      headScriptRan: false,
+      bodyScriptRan: false,
+      javascriptHref: ''
+    });
+    expect(sandboxScriptErrors).toEqual([]);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront--product.admin-store-product-preview')).toBeVisible();
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront__product-detail')).toBeVisible();
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card')).toBeVisible();
@@ -1786,7 +1990,7 @@ test.describe('Admin Dashboard', () => {
     const taxCategory = productEditor.locator('select[data-store-product-field="taxCategory"]');
     await expect(taxCategory).toHaveValue('standard');
     await expect(taxCategory.locator('option')).toHaveText([
-      'Standard taxable item',
+      'Standard',
       'Digital download',
       'Ticket / admission',
       'Tax exempt'
@@ -1857,7 +2061,7 @@ test.describe('Admin Dashboard', () => {
     await productEditor.locator('[data-store-product-field="price"]').fill('36');
     await expect(productEditor.locator('[data-store-product-variants-enabled]')).toHaveValue('false');
     await productEditor.locator('[data-store-product-variants-enabled]').selectOption('true');
-    await expect(productEditor.locator('.admin-store-products__variants-table th')).toHaveText([
+    await expect(productEditor.locator('.admin-store-products__variants-table th:not([hidden])')).toHaveText([
       'Label',
       'ID',
       'SKU',
@@ -1901,6 +2105,7 @@ test.describe('Admin Dashboard', () => {
         status: 'active'
       }]
     });
+    expect(calls.storeProductPublishes[1].fields).not.toHaveProperty('sku');
     expect(calls.storeProductPublishes[1].fields.longContent).toEqual(expect.arrayContaining([
       expect.objectContaining({
         type: 'text',
@@ -1913,6 +2118,73 @@ test.describe('Admin Dashboard', () => {
       })
     ]));
     await expect(page.locator('#admin-store-products-status')).toContainText('Product published. Deploy started.');
+
+    await page.locator('#admin-store-product-create').click();
+    await expect(productsResults.locator('.admin-store-products__editor-row').first()).toHaveAttribute('data-store-product-editor-row', '__new_store_product__');
+    const createEditor = page.locator('[data-store-product-editor="__new_store_product__"]');
+    await expect(createEditor).toBeVisible();
+    await expect(createEditor.locator('.admin-store-products__editor-title')).toHaveText('Create product');
+    await expect(createEditor.locator('[data-store-product-field="status"]')).toHaveValue('draft');
+    await expect(createEditor.locator('[data-store-product-readonly-field="sku"]')).toHaveValue('new-product');
+    await expect(createEditor.locator('.admin-store-products__preview-header .admin-store-products__preview-status')).toHaveCount(0);
+    await expect(createEditor.locator('.admin-store-products__preview > .admin-store-products__preview-status')).toHaveCount(1);
+    await expect(createEditor.locator('.admin-store-products__preview-header')).not.toContainText('Request failed.');
+    await expect(createEditor.getByRole('button', { name: 'Create product' })).toBeEnabled();
+    await createEditor.locator('[data-store-product-field="inventoryTracking"]').selectOption('true');
+    await expect(createEditor.locator('[data-store-product-field-wrapper="inventory"]')).toBeVisible();
+    expect(await createEditor.evaluate((editor) => {
+      const inventory = editor.querySelector('[data-store-product-field-wrapper="inventory"]');
+      if (!(inventory instanceof HTMLElement) || inventory.hidden) return false;
+      const editorRect = editor.getBoundingClientRect();
+      const inventoryRect = inventory.getBoundingClientRect();
+      return inventoryRect.left >= editorRect.left && inventoryRect.right <= editorRect.right;
+    })).toBe(true);
+    await createEditor.locator('[data-store-product-field="name"]').fill('DUST WAVE New Zine');
+    await expect(createEditor.locator('[data-store-product-readonly-field="sku"]')).toHaveValue('dust-wave-new-zine');
+    await createEditor.locator('[data-store-product-field="price"]').fill('8');
+    await createEditor.locator('[data-store-product-field="shippingPreset"]').selectOption('sticker');
+    await createEditor.locator('[data-store-product-image-upload="true"]').setInputFiles({
+      name: 'zine-e2e.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('zine image e2e')
+    });
+    await expect.poll(() => calls.imageUploads.length).toBe(2);
+    expect(calls.imageUploads[1]).toMatchObject({
+      filename: 'zine-e2e.png',
+      contentType: 'image/png',
+      kind: 'store-product',
+      productId: 'dust-wave-new-zine',
+      filenameBase: 'DUST WAVE New Zine',
+      createProduct: true
+    });
+    await createEditor.locator('[data-store-product-variants-enabled]').selectOption('true');
+    const createVariant = createEditor.locator('[data-store-product-variant]').first();
+    await createVariant.locator('[data-store-variant-field="label"]').fill('Signed');
+    await expect(createVariant.locator('[data-store-variant-field="id"]')).toHaveValue('signed');
+    await expect(createVariant.locator('[data-store-variant-field="sku"]')).toHaveValue('dust-wave-new-zine-signed');
+    await createVariant.locator('[data-store-variant-field="price"]').fill('10');
+    await createEditor.getByRole('button', { name: 'Create product' }).click();
+    await expect.poll(() => calls.storeProductPublishes.length).toBe(3);
+    expect(calls.storeProductPublishes[2]).toMatchObject({
+      intent: 'publish',
+      createProduct: true,
+      productId: 'dust-wave-new-zine',
+      fields: {
+        name: 'DUST WAVE New Zine',
+        price: 8,
+        status: 'draft',
+        image: '/assets/images/products/product-fronteras-poster-big-e2e.png',
+        shippingPreset: 'sticker'
+      },
+      variants: [{
+        id: 'signed',
+        label: 'Signed',
+        sku: 'dust-wave-new-zine-signed',
+        price: 10,
+        status: 'active'
+      }]
+    });
+    await expect(page.locator('#admin-store-products-status')).toContainText('Product created. Deploy started.');
 
     const bulkApply = page.locator('[data-store-products-bulk-apply]');
     const bulkStatus = page.locator('[data-store-products-bulk-status]');
@@ -1943,21 +2215,43 @@ test.describe('Admin Dashboard', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from('%PDF-1.4\n% Store E2E download\n')
     });
-    await expect.poll(() => calls.storeDownloadUploads.length).toBe(1);
-    expect(calls.storeDownloadUploads[0]).toMatchObject({
-      productId: DIGITAL_ITEM_ID,
-      variantId: '',
+    await expect.poll(() => calls.storeDownloadCreates.length).toBe(1);
+    expect(calls.storeDownloadCreates[0]).toMatchObject({
+      fileKey: DIGITAL_ITEM_ID,
       filename: 'fronteras-download-updated.pdf',
       contentType: 'application/pdf'
     });
-    expect(calls.storeDownloadUploads[0].content).toMatch(/^data:application\/pdf;base64,/);
+    expect(calls.storeDownloadCreates[0].content).toMatch(/^data:application\/pdf;base64,/);
     await expect(page.locator('#admin-store-downloads-status')).toContainText('fronteras-download-updated.pdf uploaded.');
+
+    const createDownloadForm = page.locator('[data-store-download-create]');
+    await expect(createDownloadForm.locator('[data-store-download-create-field="name"]')).toHaveCount(0);
+    await expect(createDownloadForm.locator('[data-store-download-create-field="productId"]')).toHaveCount(0);
+    await expect(createDownloadForm.locator('[data-store-download-create-field="price"]')).toHaveCount(0);
+    await expect(createDownloadForm.locator('[data-store-download-create-field="description"]')).toHaveCount(0);
+    await createDownloadForm.locator('[data-store-download-create-field="file"]').setInputFiles({
+      name: 'dust-wave-new-download.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% Store new download\n')
+    });
+    await createDownloadForm.getByRole('button', { name: 'Upload file', exact: true }).click();
+    await expect.poll(() => calls.storeDownloadCreates.length).toBe(2);
+    expect(calls.storeDownloadCreates[1]).toMatchObject({
+      filename: 'dust-wave-new-download.pdf',
+      contentType: 'application/pdf'
+    });
+    expect(calls.storeDownloadCreates[1]).not.toHaveProperty('productId');
+    expect(calls.storeDownloadCreates[1]).not.toHaveProperty('price');
+    expect(calls.storeDownloadCreates[1]).not.toHaveProperty('status');
+    expect(calls.storeDownloadCreates[1]).not.toHaveProperty('description');
+    expect(calls.storeDownloadCreates[1].content).toMatch(/^data:application\/pdf;base64,/);
+    await expect(page.locator('#admin-store-downloads-status')).toContainText('dust-wave-new-download.pdf uploaded.');
 
 	    await page.locator('#admin-tab-settings').focus();
 	    await page.keyboard.press('ArrowRight');
-	    await expect(page.getByRole('tab', { name: 'Analytics', exact: true })).toHaveAttribute('aria-selected', 'true');
+	    await expect(page.getByRole('tab', { name: 'Products', exact: true })).toHaveAttribute('aria-selected', 'true');
 	    await page.keyboard.press('ArrowRight');
-    await expect(page.getByRole('tab', { name: 'Marketing', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Downloads', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Orders', exact: true })).toHaveAttribute('aria-selected', 'true');
   });
@@ -2000,16 +2294,149 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-tab-campaigns')).toHaveCount(0);
 	    const expectedCompactLabels = [
 	      ['#admin-tab-settings', 'Config.'],
-	      ['#admin-tab-store-analytics', 'Datos'],
-	      ['#admin-tab-store-marketing', 'Mktg'],
-	      ['#admin-tab-store-orders', 'Pedidos'],
 	      ['#admin-tab-store-products', 'Productos'],
-	      ['#admin-tab-store-downloads', 'Descargas']
+	      ['#admin-tab-store-downloads', 'Descargas'],
+	      ['#admin-tab-store-orders', 'Pedidos'],
+	      ['#admin-tab-store-analytics', 'Datos'],
+	      ['#admin-tab-store-marketing', 'Mktg']
 	    ];
     for (const [selector, label] of expectedCompactLabels) {
       await expect.poll(() => page.locator(selector).evaluate((element: HTMLElement) => {
         return window.getComputedStyle(element, '::after').content.replace(/^"|"$/g, '');
       })).toBe(label);
     }
+  });
+
+  test('keeps Store products admin usable on mobile viewports', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto('/admin/?admin_login=admin-token-products-mobile');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+
+    await selectAdminSection(page, 'Products');
+    await expect.poll(() => calls.storeProducts.length).toBe(1);
+    const productsResults = page.locator('#admin-store-products-results');
+    await expect(productsResults).toContainText('Fronteras Poster (Big)');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expect.poll(() => productsResults.locator('.admin-store-products__table').evaluate((table: HTMLElement) => {
+      return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
+    })).toBe(true);
+    await expect.poll(() => productsResults.locator('.admin-store-products__table thead').evaluate((thead: HTMLElement) => {
+      return getComputedStyle(thead).display;
+    })).toBe('none');
+
+    const productListRows = productsResults.locator('tbody > tr[data-store-product-order-row]');
+    await expect(productListRows).toHaveCount(4);
+    await expect.poll(() => productListRows.first().evaluate((row: HTMLElement) => {
+      return getComputedStyle(row).display === 'grid' && row.getBoundingClientRect().right <= window.innerWidth + 1;
+    })).toBe(true);
+    await expect.poll(() => productsResults.locator('[data-store-products-bulk-status]').evaluate((select: HTMLSelectElement) => {
+      const styles = getComputedStyle(select);
+      return styles.appearance === 'none' && styles.backgroundImage !== 'none' && select.getBoundingClientRect().right <= window.innerWidth + 1;
+    })).toBe(true);
+
+    const ticketProductRow = productListRows.filter({ hasText: 'DUST WAVE Event Ticket' });
+    await ticketProductRow.getByRole('button', { name: 'Edit' }).click();
+    const ticketEditor = page.locator('[data-store-product-editor="ticket-1"]');
+    await expect(ticketEditor).toBeVisible();
+    await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expect.poll(() => ticketEditor.locator('select[data-store-product-field="taxCategory"]').evaluate((select: HTMLSelectElement) => {
+      const styles = getComputedStyle(select);
+      return styles.appearance === 'none' && styles.backgroundImage !== 'none' && select.getBoundingClientRect().right <= window.innerWidth + 1;
+    })).toBe(true);
+  });
+
+  test('keeps Store orders admin rows usable on mobile viewports', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto('/admin/?admin_login=admin-token-orders-mobile');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+
+    await selectAdminSection(page, 'Orders');
+    await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
+    const ordersResults = page.locator('#admin-store-orders-results');
+    await expect(ordersResults).toContainText(TICKET_ORDER_TOKEN);
+    await expect(ordersResults).toContainText('Fronteras Download');
+    await expect(page.locator('#admin-store-orders-attendance')).toContainText('Attendance');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+
+    await expect.poll(() => ordersResults.locator('.admin-store-orders__table').evaluate((table: HTMLElement) => {
+      return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
+    })).toBe(true);
+    await expect.poll(() => ordersResults.locator('.admin-store-orders__table thead').evaluate((thead: HTMLElement) => {
+      return getComputedStyle(thead).display;
+    })).toBe('none');
+
+    const orderRows = ordersResults.locator('tbody > tr');
+    await expect(orderRows).toHaveCount(2);
+    await expect.poll(() => orderRows.first().evaluate((row: HTMLElement) => {
+      return getComputedStyle(row).display === 'grid' && row.getBoundingClientRect().right <= window.innerWidth + 1;
+    })).toBe(true);
+    await expect.poll(() => orderRows.first().evaluate((row: HTMLElement) => {
+      return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
+    })).toEqual(['Order', 'Customer', 'Item', 'Status', 'Total', 'Actions']);
+
+    const attendance = page.locator('#admin-store-orders-attendance');
+    await expect.poll(() => attendance.locator('.admin-store-orders__attendance-table').evaluate((table: HTMLElement) => {
+      return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
+    })).toBe(true);
+    await expect.poll(() => attendance.locator('.admin-store-orders__attendance-table thead').evaluate((thead: HTMLElement) => {
+      return getComputedStyle(thead).display;
+    })).toBe('none');
+    await expect.poll(() => attendance.locator('tbody > tr').first().evaluate((row: HTMLElement) => {
+      return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
+    })).toEqual(['Event', 'Venue', 'Orders', 'Checked in', 'Rate']);
+
+    await ordersResults.getByRole('button', { name: 'Check in' }).click();
+    await expect.poll(() => calls.storeOrderCheckIns.length).toBe(1);
+    await expect(page.locator('#admin-store-orders-status')).toContainText('Check-in saved.');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+  });
+
+  test('keeps Store downloads admin usable on mobile viewports', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto('/admin/?admin_login=admin-token-downloads-mobile');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+
+    await selectAdminSection(page, 'Downloads');
+    await expect.poll(() => calls.storeDownloads.length).toBe(1);
+    const downloadsResults = page.locator('#admin-store-downloads-results');
+    await expect(downloadsResults).toContainText('fronteras-download.pdf');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expect.poll(() => downloadsResults.locator('.admin-store-downloads__table').evaluate((table: HTMLElement) => {
+      return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
+    })).toBe(true);
+    await expect.poll(() => downloadsResults.locator('.admin-store-downloads__table thead').evaluate((thead: HTMLElement) => {
+      return getComputedStyle(thead).display;
+    })).toBe('none');
+
+    const downloadRows = downloadsResults.locator('tbody > tr');
+    await expect(downloadRows).toHaveCount(1);
+    await expect.poll(() => downloadRows.first().evaluate((row: HTMLElement) => {
+      return getComputedStyle(row).display === 'grid' && row.getBoundingClientRect().right <= window.innerWidth + 1;
+    })).toBe(true);
+    await expect.poll(() => downloadRows.first().evaluate((row: HTMLElement) => {
+      return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
+    })).toEqual(['File', 'Status', 'Attached to', 'Uploaded', 'Replace']);
+    await expect.poll(() => downloadsResults.locator('[data-store-download-upload="true"]').evaluate((input: HTMLInputElement) => {
+      return input.getBoundingClientRect().right <= window.innerWidth + 1 && getComputedStyle(input).width !== 'auto';
+    })).toBe(true);
+
+    await downloadsResults.locator('[data-store-download-upload="true"]').setInputFiles({
+      name: 'fronteras-download-mobile.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% Store mobile download\n')
+    });
+    await expect.poll(() => calls.storeDownloadCreates.length).toBe(1);
+    await expect(page.locator('#admin-store-downloads-status')).toContainText('fronteras-download-mobile.pdf uploaded.');
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
   });
 });

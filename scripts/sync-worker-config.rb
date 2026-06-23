@@ -166,7 +166,9 @@ DEV_ENV_ORDER = [
   'INTENT_PREFETCH_LIMIT',
   'LIVE_INVENTORY_CACHE_TTL_SECONDS',
   'DEFAULT_PLATFORM_TIP_PERCENT',
-  'MAX_PLATFORM_TIP_PERCENT'
+  'MAX_PLATFORM_TIP_PERCENT',
+  'ADMIN_LOCAL_REPO_WRITES_ENABLED',
+  'ADMIN_LOCAL_REPO_SERVICE'
 ].freeze
 
 def deep_merge(base, override)
@@ -448,7 +450,9 @@ def build_mirror_values(config, existing)
     'INTENT_PREFETCH_LIMIT' => performance.key?('intent_prefetch_limit') ? format_int(performance['intent_prefetch_limit']) : existing['INTENT_PREFETCH_LIMIT'],
     'LIVE_INVENTORY_CACHE_TTL_SECONDS' => cache.key?('live_inventory_ttl_seconds') ? format_int(cache['live_inventory_ttl_seconds']) : existing['LIVE_INVENTORY_CACHE_TTL_SECONDS'],
     'DEFAULT_PLATFORM_TIP_PERCENT' => pricing.key?('default_tip_percent') ? format_int(pricing['default_tip_percent']) : existing['DEFAULT_PLATFORM_TIP_PERCENT'],
-    'MAX_PLATFORM_TIP_PERCENT' => pricing.key?('max_tip_percent') ? format_int(pricing['max_tip_percent']) : existing['MAX_PLATFORM_TIP_PERCENT']
+    'MAX_PLATFORM_TIP_PERCENT' => pricing.key?('max_tip_percent') ? format_int(pricing['max_tip_percent']) : existing['MAX_PLATFORM_TIP_PERCENT'],
+    'ADMIN_LOCAL_REPO_WRITES_ENABLED' => existing['ADMIN_LOCAL_REPO_WRITES_ENABLED'],
+    'ADMIN_LOCAL_REPO_SERVICE' => existing['ADMIN_LOCAL_REPO_SERVICE']
   }.compact
 end
 
@@ -467,6 +471,8 @@ top_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
 top_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']
 dev_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
 dev_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']
+dev_values['ADMIN_LOCAL_REPO_WRITES_ENABLED'] ||= 'true'
+dev_values['ADMIN_LOCAL_REPO_SERVICE'] ||= 'http://127.0.0.1:8799'
 
 updated = content.dup
 

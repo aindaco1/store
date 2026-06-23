@@ -7,7 +7,7 @@ image: "/assets/images/butterfingers-tshirt.png"
 type: shirt
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 40
 shipping_preset: tshirt
 tax_category: standard

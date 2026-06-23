@@ -9,7 +9,7 @@ fulfillment_type: rsvp
 status: active
 public: false
 launch_test: true
-event: dustwave
+category: dustwave
 order: 920
 shipping_preset: ticket
 tax_category: admission

@@ -7,7 +7,7 @@ image: "/assets/images/attack-poster.png"
 type: physical
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 50
 shipping_preset: poster
 tax_category: standard

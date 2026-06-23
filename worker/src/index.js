@@ -34,8 +34,10 @@
  *   POST /admin/store/products/preview - Render a Store product editor preview
  *   POST /admin/store/products/publish - Publish Store product catalog edits
  *   POST /admin/store/products/bulk-publish - Publish bulk Store product catalog edits
+ *   POST /admin/store/products/order - Publish Store product display order
  *   GET  /admin/store/downloads  - Verify Store digital download readiness
  *   POST /admin/store/downloads/upload - Upload or replace Store download R2 objects
+ *   POST /admin/store/downloads/create - Upload a Store download library file
  *   GET  /admin/store/inventory  - Read Store catalog inventory
  *   POST /admin/store/inventory  - Override or reset Store inventory baselines
  *   GET  /admin/add-ons/inventory - Read platform add-on inventory
@@ -85,6 +87,126 @@ let console = globalThis.console;
 
 function configureWorkerLogging(env) {
   console = getScopedConsole(env, 'index');
+}
+
+function isTruthyWorkerEnv(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isLocalAdminRepoWritesEnabled(env = {}) {
+  return String(env.APP_MODE || '').trim().toLowerCase() === 'test' &&
+    isTruthyWorkerEnv(env.ADMIN_LOCAL_REPO_WRITES_ENABLED);
+}
+
+function adminRepoMode(env = {}) {
+  return isLocalAdminRepoWritesEnabled(env) ? 'local' : 'github';
+}
+
+function localAdminRepoServiceBase(env = {}) {
+  if (!isLocalAdminRepoWritesEnabled(env)) return '';
+  const raw = String(env.ADMIN_LOCAL_REPO_SERVICE || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    const hostname = url.hostname.toLowerCase();
+    if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(hostname)) return '';
+    return url.toString().replace(/\/$/, '');
+  } catch (_error) {
+    return '';
+  }
+}
+
+async function callLocalAdminRepoService(env, pathname, body = {}) {
+  const base = localAdminRepoServiceBase(env);
+  if (!base) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'Local repository service is not configured. Start dev with ./scripts/dev.sh so local admin edits can write to this checkout.',
+      code: 'local_repo_service_not_configured'
+    };
+  }
+  const token = String(env.ADMIN_LOCAL_REPO_TOKEN || env.ADMIN_SECRET || '').trim();
+  if (!token) {
+    return { ok: false, status: 503, error: 'Local repository token is not configured.', code: 'local_repo_token_missing' };
+  }
+  let response = null;
+  try {
+    response = await fetch(`${base}${pathname}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      error: error?.message || 'Local repository service is unreachable.',
+      code: 'local_repo_service_unreachable'
+    };
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok === false) {
+    return {
+      ok: false,
+      status: response.status,
+      error: data?.error || `Local repository service error: ${response.status}`,
+      code: data?.code || 'local_repo_service_failed'
+    };
+  }
+  return { ok: true, ...data };
+}
+
+async function readAdminRepoTextFile(env, filePath) {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    return callLocalAdminRepoService(env, '/read', { path: filePath });
+  }
+  return getGitHubTextFile(env, filePath);
+}
+
+async function putAdminRepoTextFile(env, filePath, content, message, sha, options = {}) {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    return callLocalAdminRepoService(env, '/write', {
+      path: filePath,
+      content,
+      message,
+      overwrite: options.overwrite === true || Boolean(sha)
+    });
+  }
+  return putGitHubTextFile(env, filePath, content, message, sha);
+}
+
+async function putAdminRepoBase64File(env, filePath, base64Content, message, sha = undefined, options = {}) {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    return callLocalAdminRepoService(env, '/write-base64', {
+      path: filePath,
+      content: base64Content,
+      message,
+      overwrite: options.overwrite === true || Boolean(sha)
+    });
+  }
+  return putGitHubBase64File(env, filePath, base64Content, message, sha);
+}
+
+async function triggerAdminRepoRebuild(env, reason = 'manual') {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    return { triggered: false, mode: 'local', reason: 'Local repository write saved. Jekyll will rebuild in local dev.' };
+  }
+  return triggerSiteRebuild(env, reason);
+}
+
+async function triggerAdminMediaOptimization(env, options = {}) {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    return { triggered: false, mode: 'local', reason: 'Local media upload saved. Media optimization runs in the repository workflow.' };
+  }
+  return triggerMediaOptimization(env, options);
+}
+
+function adminRepoDeployNotice(env, githubNotice, localNotice) {
+  return isLocalAdminRepoWritesEnabled(env) ? localNotice : githubNotice;
 }
 
 const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
@@ -1659,6 +1781,12 @@ export default {
         return handleAdminStoreProductBulkPublish(request, env);
       }
 
+      if (path === '/admin/store/products/order' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreProductOrderPublish(request, env);
+      }
+
       if (path === '/admin/store/downloads' && method === 'GET') {
         return handleAdminStoreDownloads(request, env);
       }
@@ -1667,6 +1795,12 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreDownloadUpload(request, env);
+      }
+
+      if (path === '/admin/store/downloads/create' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreDownloadCreate(request, env);
       }
 
       if (path === '/admin/store/inventory' && method === 'GET') {
@@ -3392,6 +3526,16 @@ function sanitizeDownloadFilename(value) {
     .slice(0, 120) || 'store-download';
 }
 
+function downloadFilenameToFileKey(value) {
+  return sanitizeDownloadFilename(value)
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100) || 'store-download';
+}
+
 function getStoreDownloadUrlMap(env = {}) {
   const raw = String(env.STORE_DOWNLOAD_URLS_JSON || '').trim();
   if (!raw) return {};
@@ -3880,6 +4024,40 @@ async function buildAdminStoreDownloadRow(env, product = {}, variant = null) {
   };
 }
 
+async function listAdminStoreDownloadLibraryFiles(env) {
+  if (!env.STORE_DOWNLOADS || typeof env.STORE_DOWNLOADS.list !== 'function') return [];
+  const files = [];
+  let cursor = undefined;
+  let truncated = true;
+  while (truncated && files.length < 500) {
+    const page = await env.STORE_DOWNLOADS.list({
+      cursor,
+      limit: Math.min(100, 500 - files.length)
+    });
+    for (const object of page.objects || []) {
+      const key = String(object.key || '').trim();
+      if (!key) continue;
+      files.push({
+        fileKey: key,
+        filename: sanitizeDownloadFilename(object.customMetadata?.filename || key),
+        contentType: readR2ObjectContentType(object),
+        size: Number.isFinite(Number(object.size)) ? Number(object.size) : null,
+        uploadedAt: object.uploaded instanceof Date
+          ? object.uploaded.toISOString()
+          : String(object.uploaded || object.customMetadata?.uploaded_at || ''),
+        uploadedBy: String(object.customMetadata?.uploaded_by || '').trim(),
+        source: 'r2',
+        ready: true,
+        status: 'r2_ready'
+      });
+    }
+    truncated = page.truncated === true;
+    cursor = page.cursor;
+  }
+  files.sort((a, b) => a.filename.localeCompare(b.filename) || a.fileKey.localeCompare(b.fileKey));
+  return files;
+}
+
 async function buildAdminStoreDownloadsSnapshot(env) {
   const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
   const rows = [];
@@ -3896,8 +4074,43 @@ async function buildAdminStoreDownloadsSnapshot(env) {
     rows.push(await buildAdminStoreDownloadRow(env, product));
   }
 
+  const libraryFiles = await listAdminStoreDownloadLibraryFiles(env);
+  const attachedByFileKey = new Map();
+  for (const row of rows) {
+    if (!row.fileKey) continue;
+    const attached = attachedByFileKey.get(row.fileKey) || [];
+    attached.push({
+      productId: row.productId,
+      variantId: row.variantId,
+      label: row.label,
+      sku: row.sku
+    });
+    attachedByFileKey.set(row.fileKey, attached);
+  }
+  const libraryByFileKey = new Map(libraryFiles.map((file) => [file.fileKey, file]));
+  for (const row of rows) {
+    if (!row.fileKey || libraryByFileKey.has(row.fileKey)) continue;
+    libraryFiles.push({
+      fileKey: row.fileKey,
+      filename: row.filename || row.fileKey,
+      contentType: row.r2?.contentType || '',
+      size: row.r2?.size ?? null,
+      uploadedAt: row.r2?.uploaded || '',
+      uploadedBy: '',
+      source: row.source || 'catalog',
+      ready: row.ready,
+      status: row.status
+    });
+    libraryByFileKey.set(row.fileKey, libraryFiles[libraryFiles.length - 1]);
+  }
+  const files = libraryFiles.map((file) => ({
+    ...file,
+    attachedTo: attachedByFileKey.get(file.fileKey) || []
+  })).sort((a, b) => a.filename.localeCompare(b.filename) || a.fileKey.localeCompare(b.fileKey));
+
   return {
     rows,
+    files,
     bucketConfigured: Boolean(env.STORE_DOWNLOADS),
     r2Checks: rows.filter((row) => row.r2?.checked).length,
     totals: {
@@ -3905,7 +4118,8 @@ async function buildAdminStoreDownloadsSnapshot(env) {
       ready: rows.filter((row) => row.ready).length,
       missing: rows.filter((row) => !row.ready).length,
       r2Ready: rows.filter((row) => row.status === 'r2_ready').length,
-      urlReady: rows.filter((row) => row.status === 'url_ready').length
+      urlReady: rows.filter((row) => row.status === 'url_ready').length,
+      files: files.length
     },
     updatedAt: new Date().toISOString()
   };
@@ -3946,6 +4160,17 @@ function decodeAdminStoreDownloadBase64(base64 = '') {
   return bytes;
 }
 
+function normalizeAdminStoreDownloadFileKey(value, label = 'Store download file key') {
+  const fileKey = String(value || '').trim();
+  if (!fileKey) {
+    return { ok: false, status: 400, error: `${label} is required.` };
+  }
+  if (fileKey.length > 512 || /[\x00-\x1F\x7F]/.test(fileKey)) {
+    return { ok: false, status: 400, error: `${label} is invalid.` };
+  }
+  return { ok: true, value: fileKey };
+}
+
 function findAdminStoreDownloadUploadTarget(env, body = {}) {
   const productId = String(body.productId || body.product_id || '').trim();
   const variantId = String(body.variantId || body.variant_id || '').trim();
@@ -3982,9 +4207,8 @@ function findAdminStoreDownloadUploadTarget(env, body = {}) {
   if (!fileKey) {
     return { ok: false, status: 400, error: 'Store download upload target has no file key.' };
   }
-  if (fileKey.length > 512 || /[\x00-\x1F\x7F]/.test(fileKey)) {
-    return { ok: false, status: 400, error: 'Store download upload target has an invalid file key.' };
-  }
+  const normalizedFileKey = normalizeAdminStoreDownloadFileKey(fileKey, 'Store download upload target file key');
+  if (!normalizedFileKey.ok) return normalizedFileKey;
 
   return {
     ok: true,
@@ -3999,10 +4223,7 @@ function findAdminStoreDownloadUploadTarget(env, body = {}) {
   };
 }
 
-function normalizeAdminStoreDownloadUploadBody(body = {}, env) {
-  const target = findAdminStoreDownloadUploadTarget(env, body);
-  if (!target.ok) return target;
-
+function normalizeAdminStoreDownloadFilePayload(body = {}, fallbackFilename = 'store-download') {
   const content = String(body.content || body.dataBase64 || '').trim();
   const dataUrlMatch = content.match(/^data:([^;]*);base64,/i);
   const dataUrlContentType = dataUrlMatch ? dataUrlMatch[1].trim().toLowerCase() : '';
@@ -4029,14 +4250,59 @@ function normalizeAdminStoreDownloadUploadBody(body = {}, env) {
     return { ok: false, status: 413, error: 'Store download upload must be 100 MB or smaller.' };
   }
 
-  const filename = sanitizeDownloadFilename(body.filename || target.configuredFilename || target.fileKey);
+  const filename = sanitizeDownloadFilename(body.filename || fallbackFilename);
   return {
     ok: true,
-    ...target,
     base64,
     estimatedBytes,
     filename,
     contentType
+  };
+}
+
+function normalizeAdminStoreDownloadUploadBody(body = {}, env) {
+  const target = findAdminStoreDownloadUploadTarget(env, body);
+  if (!target.ok) return target;
+
+  const payload = normalizeAdminStoreDownloadFilePayload(
+    body,
+    target.configuredFilename || target.fileKey
+  );
+  if (!payload.ok) return payload;
+
+  return {
+    ok: true,
+    ...target,
+    ...payload
+  };
+}
+
+function normalizeAdminStoreDownloadCreateBody(body = {}) {
+  const payloadResult = normalizeAdminStoreDownloadFilePayload(
+    body,
+    body.filename || 'store-download'
+  );
+  if (!payloadResult.ok) {
+    return { ok: false, status: payloadResult.status || 422, errors: [payloadResult.error] };
+  }
+  const fileKeyResult = normalizeAdminStoreDownloadFileKey(
+    body.fileKey || body.file_key || downloadFilenameToFileKey(payloadResult.filename),
+    'Download file key'
+  );
+  if (fileKeyResult.ok && !isValidSlug(fileKeyResult.value)) {
+    return { ok: false, status: 422, errors: ['Download file key must be a URL-safe lowercase slug.'] };
+  }
+  if (!fileKeyResult.ok) {
+    return { ok: false, status: fileKeyResult.status || 422, errors: [fileKeyResult.error] };
+  }
+
+  return {
+    ok: true,
+    fileKey: fileKeyResult.value,
+    filename: payloadResult.filename,
+    contentType: payloadResult.contentType,
+    base64: payloadResult.base64,
+    estimatedBytes: payloadResult.estimatedBytes
   };
 }
 
@@ -4049,6 +4315,7 @@ async function handleAdminStoreDownloads(request, env) {
     scope: STORE_ADMIN_SCOPE,
     bucketConfigured: snapshot.bucketConfigured,
     rows: snapshot.rows,
+    files: snapshot.files,
     totals: snapshot.totals,
     updatedAt: snapshot.updatedAt,
     page: {
@@ -4142,6 +4409,99 @@ async function handleAdminStoreDownloadUpload(request, env) {
     productId: normalized.productId,
     variantId: normalized.variantId,
     sku: normalized.sku,
+    fileKey: normalized.fileKey,
+    filename: normalized.filename,
+    contentType: normalized.contentType,
+    bytes: bytes.byteLength,
+    uploadedAt,
+    auditKey,
+    writeBudget: adminWriteBudget({
+      readOnly: false,
+      kvWritesExpected: 1,
+      kvListExpected: 0,
+      r2WritesExpected: 1
+    })
+  }, 200, env);
+}
+
+async function handleAdminStoreDownloadCreate(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_ADMIN_STORE_DOWNLOAD_UPLOAD_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  if (!env.STORE_DOWNLOADS || typeof env.STORE_DOWNLOADS.put !== 'function') {
+    return privateJsonResponse({
+      error: 'Store downloads bucket is not configured for uploads.',
+      code: 'store_downloads_bucket_missing',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, 503, env);
+  }
+
+  const normalized = normalizeAdminStoreDownloadCreateBody(parsedBody.body || {});
+  if (!normalized.ok) {
+    return privateJsonResponse({
+      success: false,
+      errors: normalized.errors || ['Invalid Store download.'],
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, normalized.status || 422, env);
+  }
+
+  let bytes;
+  try {
+    bytes = decodeAdminStoreDownloadBase64(normalized.base64);
+  } catch {
+    return privateJsonResponse({
+      error: 'Store download content must be base64 encoded.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, 400, env);
+  }
+
+  if (bytes.byteLength <= 0 || bytes.byteLength > MAX_ADMIN_STORE_DOWNLOAD_FILE_BYTES) {
+    return privateJsonResponse({
+      error: bytes.byteLength > MAX_ADMIN_STORE_DOWNLOAD_FILE_BYTES
+        ? 'Store download upload must be 100 MB or smaller.'
+        : 'Store download upload is empty.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, bytes.byteLength > MAX_ADMIN_STORE_DOWNLOAD_FILE_BYTES ? 413 : 400, env);
+  }
+
+  const uploadedAt = new Date().toISOString();
+  await env.STORE_DOWNLOADS.put(normalized.fileKey, bytes, {
+    httpMetadata: {
+      contentType: normalized.contentType,
+      contentDisposition: `attachment; filename="${normalized.filename}"`
+    },
+    customMetadata: {
+      file_key: normalized.fileKey,
+      filename: normalized.filename,
+      uploaded_by: String(auth.user.email || ''),
+      uploaded_at: uploadedAt
+    }
+  });
+
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_download:create',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    fileKey: normalized.fileKey,
+    filename: normalized.filename,
+    contentType: normalized.contentType,
+    bytes: bytes.byteLength
+  });
+
+  return privateJsonResponse({
+    success: true,
+    scope: STORE_ADMIN_SCOPE,
+    uploaded: true,
     fileKey: normalized.fileKey,
     filename: normalized.filename,
     contentType: normalized.contentType,
@@ -4846,6 +5206,9 @@ function buildAdminStoreProductRow({
     public: product.public !== false,
     launchTest: product.launch_test === true,
     fulfillmentType,
+    order: Number.isFinite(Number(product.order)) ? Number(product.order) : null,
+    collection: String(product.collection || product.event || '').trim(),
+    storefrontCategory: String(product.category || '').trim(),
     priceCents,
     priceMinCents: priceCents,
     priceMaxCents,
@@ -4859,7 +5222,6 @@ function buildAdminStoreProductRow({
     variantCount,
     shippingPreset: fulfillmentType === 'physical' ? String(product.shipping_preset || '').trim() : '',
     taxCategory: String(product.tax_category || '').trim(),
-    event: String(product.event || '').trim(),
     variantOptionName: String(product.variant_option_name || '').trim(),
     image,
     url,
@@ -4887,8 +5249,22 @@ function adminStoreProductPriceCents(value = {}) {
   return 0;
 }
 
+function adminStoreDownloadSummary(source = {}) {
+  const download = source?.download && typeof source.download === 'object' ? source.download : {};
+  const fileKey = String(download.file_key || download.fileKey || download.key || '').trim();
+  return {
+    fileKey,
+    filename: fileKey ? getStoreDownloadFilename({ ...source, download }) : '',
+    delivery: String(download.delivery || 'signed_link').trim() || 'signed_link',
+    expiresHours: Number.isFinite(Number(download.expires_hours ?? download.expiresHours))
+      ? Math.max(0, Number(download.expires_hours ?? download.expiresHours))
+      : 72
+  };
+}
+
 function buildAdminStoreEditableVariant(variant = {}, overrides = {}, productId = '') {
   const variantId = String(variant?.id || '').trim();
+  const download = adminStoreDownloadSummary(variant);
   return {
     id: variantId,
     label: String(variant?.label || variantId).trim(),
@@ -4896,7 +5272,9 @@ function buildAdminStoreEditableVariant(variant = {}, overrides = {}, productId 
     priceCents: adminStoreProductPriceCents(variant),
     inventory: getConfiguredStoreInventory(variant?.inventory),
     overrideInventory: getStoreInventoryOverrideValue(overrides, productId, variantId),
-    status: String(variant?.status || '').trim()
+    status: String(variant?.status || '').trim(),
+    downloadFileKey: download.fileKey,
+    downloadFilename: download.filename
   };
 }
 
@@ -4904,6 +5282,7 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
   const productId = String(product?.id || '').trim();
   const slug = String(product?.slug || '').trim();
   const variants = Array.isArray(product?.variants) ? product.variants : [];
+  const download = adminStoreDownloadSummary(product);
   return {
     productId,
     slug,
@@ -4925,7 +5304,9 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     status: String(product?.status || 'active').trim() || 'active',
     public: product?.public !== false,
     launchTest: product?.launch_test === true,
-    event: String(product?.event || '').trim(),
+    order: Number.isFinite(Number(product?.order)) ? Number(product.order) : null,
+    collection: String(product?.collection || product?.event || '').trim(),
+    storefrontCategory: String(product?.category || '').trim(),
     shippingPreset: String(product?.shipping_preset || '').trim(),
     taxCategory: String(product?.tax_category || '').trim(),
     inventoryTracking: product?.inventory_tracking === true,
@@ -4934,9 +5315,22 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     variantOptionName: String(product?.variant_option_name || '').trim(),
     variants: variants.map((variant) => buildAdminStoreEditableVariant(variant, overrides, productId)),
     hasDownload: Boolean(product?.download),
+    downloadFileKey: download.fileKey,
+    downloadFilename: download.filename,
     hasEventDetails: Boolean(product?.event_details),
     turnstileRequired: product?.turnstile_required === true
   };
+}
+
+function adminStoreProductSortOrder(product = {}) {
+  const order = Number(product?.order);
+  return Number.isFinite(order) ? order : 1_000_000;
+}
+
+function compareAdminStoreProducts(a = {}, b = {}) {
+  const orderDelta = adminStoreProductSortOrder(a) - adminStoreProductSortOrder(b);
+  if (orderDelta !== 0) return orderDelta;
+  return String(a?.name || a?.id || '').localeCompare(String(b?.name || b?.id || ''));
 }
 
 function hasAdminStoreProductPatchField(fields, key) {
@@ -5030,6 +5424,12 @@ function adminStoreProductScalarLine(key, value, type = 'string') {
   return `${key}: ${yamlAdminValue(value, type)}`;
 }
 
+function defaultAdminStoreProductType(fulfillmentType = 'physical') {
+  const type = String(fulfillmentType || '').trim().toLowerCase();
+  if (type === 'digital' || type === 'ticket' || type === 'rsvp') return type;
+  return 'product';
+}
+
 function yamlBlockAdminString(value, indent = '  ') {
   const text = String(value ?? '');
   if (!text) return '""';
@@ -5108,18 +5508,57 @@ function serializeAdminStoreProductVariantsYaml(variants = []) {
     lines.push(`  price: ${formatAdminStorePriceYaml(variant.priceCents)}`);
     yamlAdminMaybeLine(lines, 'inventory', variant.inventory, '  ');
     yamlAdminMaybeLine(lines, 'status', variant.status || '', '  ');
+    if (variant.downloadFileKey) {
+      lines.push('  download:');
+      lines.push(`    file_key: ${yamlAdminValue(variant.downloadFileKey, 'string')}`);
+      lines.push(`    filename: ${yamlAdminValue(variant.downloadFilename || variant.downloadFileKey, 'string')}`);
+      lines.push('    delivery: "signed_link"');
+      lines.push('    expires_hours: 72');
+    }
   }
   return lines.join('\n');
 }
 
+function serializeAdminStoreDownloadYaml(fileKey = '', filename = '') {
+  const normalizedFileKey = String(fileKey || '').trim();
+  if (!normalizedFileKey) return 'download: {}';
+  return [
+    'download:',
+    `  file_key: ${yamlAdminValue(normalizedFileKey, 'string')}`,
+    `  filename: ${yamlAdminValue(filename || normalizedFileKey, 'string')}`,
+    '  delivery: "signed_link"',
+    '  expires_hours: 72'
+  ].join('\n');
+}
+
+function normalizeAdminStoreDownloadSelection(fileKey, filename, label, { required = false } = {}) {
+  const rawFileKey = String(fileKey || '').trim();
+  if (!rawFileKey) {
+    return required
+      ? { ok: false, error: `${label} file is required.` }
+      : { ok: true, value: '', filename: '' };
+  }
+  const normalizedFileKey = normalizeAdminStoreDownloadFileKey(rawFileKey, `${label} file`);
+  if (!normalizedFileKey.ok) return { ok: false, error: normalizedFileKey.error };
+  const normalizedFilename = sanitizeDownloadFilename(filename || rawFileKey);
+  return {
+    ok: true,
+    value: normalizedFileKey.value,
+    filename: normalizedFilename
+  };
+}
+
 function normalizeAdminStoreSubmittedVariant(baseVariant = {}, submitted = {}, errors = [], index = 0) {
+  const baseDownload = adminStoreDownloadSummary(baseVariant);
   const variant = {
     id: String(baseVariant?.id || '').trim(),
     label: String(baseVariant?.label || baseVariant?.id || '').trim(),
     sku: String(baseVariant?.sku || '').trim(),
     priceCents: adminStoreProductPriceCents(baseVariant),
     inventory: getConfiguredStoreInventory(baseVariant?.inventory),
-    status: String(baseVariant?.status || '').trim()
+    status: String(baseVariant?.status || '').trim(),
+    downloadFileKey: baseDownload.fileKey,
+    downloadFilename: baseDownload.filename
   };
   const labelPrefix = `Variant ${index + 1}`;
 
@@ -5152,6 +5591,20 @@ function normalizeAdminStoreSubmittedVariant(baseVariant = {}, submitted = {}, e
     if (normalized.ok) variant.status = normalized.value;
     else errors.push(normalized.error);
   }
+  if (hasAdminStoreProductPatchField(submitted, 'downloadFileKey') || hasAdminStoreProductPatchField(submitted, 'download_file_key')) {
+    const normalized = normalizeAdminStoreDownloadSelection(
+      hasAdminStoreProductPatchField(submitted, 'downloadFileKey') ? submitted.downloadFileKey : submitted.download_file_key,
+      submitted.downloadFilename || submitted.download_filename,
+      labelPrefix,
+      { required: false }
+    );
+    if (normalized.ok) {
+      variant.downloadFileKey = normalized.value;
+      variant.downloadFilename = normalized.filename;
+    } else {
+      errors.push(normalized.error);
+    }
+  }
 
   return variant;
 }
@@ -5160,19 +5613,53 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
   const errors = [];
   const intent = options.intent || 'publish';
   if (body?.intent !== intent) errors.push(`Missing ${intent} intent.`);
+  const createProduct = body?.createProduct === true || body?.create_product === true;
   const productId = String(body?.productId || body?.product_id || '').trim();
   if (!productId) errors.push('Product ID is required.');
-
-  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
-  const product = productId ? catalog.productById.get(productId) : null;
-  if (productId && !product) {
-    return { ok: false, status: 404, errors: ['Store product not found.'] };
+  const normalizedProductId = normalizeAdminStoreTokenField(productId, 'Product SKU', { required: true, max: 100 });
+  if (productId && (!normalizedProductId.ok || !isValidSlug(normalizedProductId.value))) {
+    errors.push('Product SKU must be a URL-safe lowercase slug.');
   }
 
-  const sourcePath = getAdminStoreProductMarkdownPath(product || {});
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  let product = productId ? catalog.productById.get(productId) : null;
+  if (productId && !product && !createProduct) {
+    return { ok: false, status: 404, errors: ['Store product not found.'] };
+  }
+  if (createProduct && productId && (catalog.productById.has(productId) || catalog.productBySku.has(productId))) {
+    return { ok: false, status: 409, errors: ['Store product SKU already exists.'] };
+  }
+  if (createProduct && normalizedProductId.ok && isValidSlug(normalizedProductId.value)) {
+    product = {
+      id: normalizedProductId.value,
+      slug: normalizedProductId.value,
+      sku: normalizedProductId.value,
+      name: '',
+      description: '',
+      long_content: [],
+      price_cents: 0,
+      currency: 'USD',
+      image: '',
+      fulfillment_type: 'physical',
+      type: 'product',
+      status: 'draft',
+      shipping_preset: '',
+      tax_category: 'standard',
+      inventory_tracking: false,
+      inventory: 0,
+      variants: []
+    };
+  }
+
+  const sourcePath = createProduct && normalizedProductId.ok
+    ? `_products/${normalizedProductId.value}.md`
+    : getAdminStoreProductMarkdownPath(product || {});
   if (product && !sourcePath) errors.push('Store product source path is invalid.');
 
   const fields = body?.fields && typeof body.fields === 'object' ? body.fields : {};
+  if (createProduct && !hasAdminStoreProductPatchField(fields, 'name')) {
+    errors.push('Product name is required.');
+  }
   const frontMatter = [];
   const changedFields = [];
   let descriptionChanged = false;
@@ -5231,6 +5718,21 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
   addTaxCategoryField('tax_category');
   addScalarField('variantOptionName', 'variant_option_name', 'Variant option name', { required: false, max: 80 });
   addScalarField('variant_option_name', 'variant_option_name', 'Variant option name', { required: false, max: 80 });
+  if (createProduct) {
+    const fulfillmentType = hasAdminStoreProductPatchField(fields, 'fulfillmentType')
+      ? fields.fulfillmentType
+      : hasAdminStoreProductPatchField(fields, 'fulfillment_type')
+        ? fields.fulfillment_type
+        : 'physical';
+    const normalizedType = normalizeAdminStoreTokenField(defaultAdminStoreProductType(fulfillmentType), 'Product type', { required: true, max: 40 });
+    if (normalizedType.ok) {
+      frontMatter.push({
+        key: 'type',
+        replacement: adminStoreProductScalarLine('type', normalizedType.value, 'string')
+      });
+      changedFields.push('type');
+    }
+  }
 
   if (hasAdminStoreProductPatchField(fields, 'description')) {
     const normalized = normalizeAdminStoreStringField(fields.description, 'Description', { required: false, max: 8000 });
@@ -5309,6 +5811,52 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     : Array.isArray(fields?.variants)
       ? fields.variants
       : null;
+  const nextFulfillmentType = String(
+    hasAdminStoreProductPatchField(fields, 'fulfillmentType')
+      ? fields.fulfillmentType
+      : hasAdminStoreProductPatchField(fields, 'fulfillment_type')
+        ? fields.fulfillment_type
+        : product?.fulfillment_type || product?.type || 'physical'
+  ).trim().toLowerCase();
+  const digitalProduct = nextFulfillmentType === 'digital';
+  const variantBased = hasAdminStoreProductPatchField(fields, 'variantBased')
+    ? fields.variantBased === true || String(fields.variantBased || '').trim().toLowerCase() === 'true'
+    : submittedVariants
+      ? submittedVariants.length > 0
+      : (Array.isArray(product?.variants) && product.variants.length > 0);
+  const productDownloadSubmitted = hasAdminStoreProductPatchField(fields, 'downloadFileKey')
+    || hasAdminStoreProductPatchField(fields, 'download_file_key');
+
+  if (!digitalProduct) {
+    if (product?.download) {
+      frontMatter.push({ key: 'download', remove: true });
+      changedFields.push('download');
+    }
+  } else if (variantBased) {
+    if (product?.download || productDownloadSubmitted) {
+      frontMatter.push({ key: 'download', remove: true });
+      changedFields.push('download');
+    }
+  } else if (productDownloadSubmitted) {
+    const normalized = normalizeAdminStoreDownloadSelection(
+      hasAdminStoreProductPatchField(fields, 'downloadFileKey') ? fields.downloadFileKey : fields.download_file_key,
+      fields.downloadFilename || fields.download_filename,
+      'Product',
+      { required: intent !== 'preview' }
+    );
+    if (normalized.ok) {
+      frontMatter.push({
+        key: 'download',
+        replacement: serializeAdminStoreDownloadYaml(normalized.value, normalized.filename)
+      });
+      changedFields.push('download');
+    } else {
+      errors.push(normalized.error);
+    }
+  } else if (digitalProduct && !variantBased && intent !== 'preview' && !adminStoreDownloadSummary(product).fileKey) {
+    errors.push('Product file is required for digital products.');
+  }
+
   if (submittedVariants) {
     const baseVariants = Array.isArray(product?.variants) ? product.variants : [];
     const baseById = new Map(baseVariants.map((variant) => [String(variant?.id || '').trim(), variant]));
@@ -5326,8 +5874,18 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
       }
       seenIds.add(idResult.value);
       const baseVariant = baseById.get(idResult.value) || { id: idResult.value };
-      normalizedVariants.push(normalizeAdminStoreSubmittedVariant(baseVariant, { ...(submitted || {}), id: idResult.value }, errors, index));
+      const normalizedVariant = normalizeAdminStoreSubmittedVariant(baseVariant, { ...(submitted || {}), id: idResult.value }, errors, index);
+      if (!digitalProduct) {
+        normalizedVariant.downloadFileKey = '';
+        normalizedVariant.downloadFilename = '';
+      } else if (submittedVariants.length > 0 && intent !== 'preview' && !normalizedVariant.downloadFileKey) {
+        errors.push(`Variant ${index + 1} file is required for digital products.`);
+      }
+      normalizedVariants.push(normalizedVariant);
     });
+    if (digitalProduct && variantBased && !submittedVariants.length && intent !== 'preview') {
+      errors.push('Add at least one variant file for digital variant-based products.');
+    }
     frontMatter.push({
       key: 'variants',
       replacement: serializeAdminStoreProductVariantsYaml(normalizedVariants)
@@ -5343,10 +5901,23 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     return { ok: false, status: 422, errors };
   }
 
+  if (createProduct && normalizedProductId.ok) {
+    frontMatter.unshift({
+      key: 'sku',
+      replacement: adminStoreProductScalarLine('sku', normalizedProductId.value, 'string')
+    });
+    frontMatter.unshift({
+      key: 'identifier',
+      replacement: adminStoreProductScalarLine('identifier', normalizedProductId.value, 'string')
+    });
+    changedFields.push('identifier', 'sku');
+  }
+
   return {
     ok: true,
     product,
     sourcePath,
+    createProduct,
     patch: {
       frontMatter,
       descriptionChanged,
@@ -5430,6 +6001,73 @@ function normalizeAdminStoreProductBulkPublishBody(body = {}, env = {}) {
   };
 }
 
+function normalizeAdminStoreProductOrderBody(body = {}, env = {}) {
+  const errors = [];
+  if (body?.intent !== 'order_publish') errors.push('Missing order publish intent.');
+
+  const rawProductIds = Array.isArray(body?.productIds)
+    ? body.productIds
+    : Array.isArray(body?.product_ids)
+      ? body.product_ids
+      : [];
+  const seen = new Set();
+  const productIds = [];
+  for (const rawId of rawProductIds) {
+    const productId = String(rawId || '').trim();
+    if (!productId) continue;
+    if (seen.has(productId)) {
+      errors.push(`Store product ${productId} was submitted more than once.`);
+      continue;
+    }
+    seen.add(productId);
+    productIds.push(productId);
+  }
+
+  if (!productIds.length) errors.push('Product order must include at least one Store product.');
+  if (productIds.length > 200) errors.push('Product order can include at most 200 products.');
+
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  const catalogProducts = [...(catalog.products || [])].sort(compareAdminStoreProducts);
+  const catalogIds = catalogProducts.map((product) => String(product?.id || '').trim()).filter(Boolean);
+  const submitted = new Set(productIds);
+  const missing = catalogIds.filter((productId) => !submitted.has(productId));
+  const unknown = productIds.filter((productId) => !catalog.productById.has(productId));
+  if (missing.length) errors.push(`Product order is missing ${missing.length} Store product${missing.length === 1 ? '' : 's'}.`);
+  if (unknown.length) errors.push(`Product order includes unknown Store product${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')}.`);
+
+  const targets = productIds.map((productId, index) => {
+    const product = catalog.productById.get(productId);
+    const sourcePath = getAdminStoreProductMarkdownPath(product);
+    if (product && !sourcePath) errors.push(`Store product ${productId} source path is invalid.`);
+    return {
+      product,
+      productId,
+      sourcePath,
+      order: (index + 1) * 10
+    };
+  }).filter((target) => target.product && target.sourcePath);
+
+  if (errors.length) {
+    return { ok: false, status: unknown.length ? 404 : 422, errors };
+  }
+
+  return {
+    ok: true,
+    targets,
+    patchForTarget(target) {
+      return {
+        frontMatter: [{
+          key: 'order',
+          replacement: adminStoreProductScalarLine('order', target.order, 'number')
+        }],
+        descriptionChanged: false,
+        description: '',
+        changedFields: ['order']
+      };
+    }
+  };
+}
+
 function applyAdminStoreProductPatchToMarkdown(source, patch = {}) {
   const match = String(source || '').match(/^---\r?\n([\s\S]*?)\r?\n---(\r?\n[\s\S]*)?$/);
   if (!match) {
@@ -5438,7 +6076,9 @@ function applyAdminStoreProductPatchToMarkdown(source, patch = {}) {
 
   let frontMatter = match[1];
   for (const change of patch.frontMatter || []) {
-    frontMatter = replaceAdminFrontMatterBlock(frontMatter, change.key, change.replacement);
+    frontMatter = change.remove === true
+      ? removeAdminFrontMatterBlock(frontMatter, change.key)
+      : replaceAdminFrontMatterBlock(frontMatter, change.key, change.replacement);
   }
 
   const body = patch.descriptionChanged
@@ -5449,6 +6089,28 @@ function applyAdminStoreProductPatchToMarkdown(source, patch = {}) {
     ok: true,
     content: `---\n${frontMatter.replace(/\s*$/, '')}\n---${body}`
   };
+}
+
+function buildAdminStoreNewProductMarkdown(productId, patch = {}) {
+  const source = `---
+identifier: ${yamlAdminValue(productId, 'string')}
+sku: ${yamlAdminValue(productId, 'string')}
+name: ""
+price: 0
+image: ""
+type: "product"
+fulfillment_type: "physical"
+status: "draft"
+category: "dustwave"
+order: 1000
+shipping_preset: ""
+tax_category: "standard"
+inventory_tracking: false
+inventory: 0
+variants: []
+---
+`;
+  return applyAdminStoreProductPatchToMarkdown(source, patch);
 }
 
 function escapeAdminStorePreviewHtml(value) {
@@ -5846,16 +6508,20 @@ function collectAdminStoreProductMedia(env = {}, currentProductId = '') {
 
 async function buildAdminStoreProductsSnapshot(env) {
   const baseSnapshot = getStoreCatalogSnapshot(env);
-  const overrides = await getStoreInventoryOverrides(env);
+  const [overrides, downloads] = await Promise.all([
+    getStoreInventoryOverrides(env),
+    buildAdminStoreDownloadsSnapshot(env)
+  ]);
   const effectiveSnapshot = applyStoreInventoryOverridesToSnapshot(baseSnapshot, overrides);
   const baseCatalog = normalizeStoreCatalogSnapshot(baseSnapshot);
   const effectiveCatalog = normalizeStoreCatalogSnapshot(effectiveSnapshot);
+  const catalogProducts = [...(baseCatalog.products || [])].sort(compareAdminStoreProducts);
   const rows = [];
-  const products = (baseCatalog.products || []).map((product) => buildAdminStoreEditableProduct(product, overrides));
-  const productCount = (baseCatalog.products || []).length;
+  const products = catalogProducts.map((product) => buildAdminStoreEditableProduct(product, overrides));
+  const productCount = catalogProducts.length;
   let variantRowCount = 0;
 
-  for (const product of baseCatalog.products || []) {
+  for (const product of catalogProducts) {
     const productId = String(product.id || '').trim();
     const effectiveProduct = effectiveCatalog.productById.get(productId) || {};
     const variants = Array.isArray(product.variants) ? product.variants : [];
@@ -5892,6 +6558,11 @@ async function buildAdminStoreProductsSnapshot(env) {
       fulfillment: fulfillmentCounts,
       status: statusCounts
     },
+    downloads: {
+      files: downloads.files || [],
+      totals: downloads.totals || null,
+      updatedAt: downloads.updatedAt || null
+    },
     catalog: {
       version: baseCatalog.version,
       source: baseCatalog.source,
@@ -5914,6 +6585,7 @@ async function handleAdminStoreProducts(request, env) {
     rows: snapshot.rows,
     totals: snapshot.totals,
     counts: snapshot.counts,
+    downloads: snapshot.downloads,
     catalog: snapshot.catalog,
     overridesUpdatedAt: snapshot.overridesUpdatedAt,
     updatedAt: snapshot.updatedAt,
@@ -6000,20 +6672,25 @@ async function handleAdminStoreProductPublish(request, env) {
     }, normalized.status || 422, env);
   }
 
-  const existing = await getGitHubTextFile(env, normalized.sourcePath);
-  if (!existing.ok) {
-    return privateJsonResponse({
-      error: existing.error || 'Unable to load product Markdown from GitHub',
-      code: existing.code || 'github_load_failed'
-    }, existing.status || 502, env);
+  let existing = null;
+  if (!normalized.createProduct) {
+    existing = await readAdminRepoTextFile(env, normalized.sourcePath);
+    if (!existing.ok) {
+      return privateJsonResponse({
+        error: existing.error || 'Unable to load product Markdown from repository',
+        code: existing.code || 'repo_load_failed'
+      }, existing.status || 502, env);
+    }
   }
 
-  const nextMarkdown = applyAdminStoreProductPatchToMarkdown(existing.content, normalized.patch);
+  const nextMarkdown = normalized.createProduct
+    ? buildAdminStoreNewProductMarkdown(normalized.product.id, normalized.patch)
+    : applyAdminStoreProductPatchToMarkdown(existing.content, normalized.patch);
   if (!nextMarkdown.ok) {
     return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
   }
 
-  if (nextMarkdown.content === existing.content) {
+  if (!normalized.createProduct && nextMarkdown.content === existing.content) {
     return privateJsonResponse({
       success: true,
       published: false,
@@ -6027,23 +6704,27 @@ async function handleAdminStoreProductPublish(request, env) {
   }
 
   const commitMessage = String(parsedBody.body?.message || '').trim()
-    || `Update Store product ${normalized.product.id}`;
-  const committed = await putGitHubTextFile(env, normalized.sourcePath, nextMarkdown.content, commitMessage, existing.sha);
+    || `${normalized.createProduct ? 'Create' : 'Update'} Store product ${normalized.product.id}`;
+  const committed = await putAdminRepoTextFile(env, normalized.sourcePath, nextMarkdown.content, commitMessage, existing?.sha, {
+    overwrite: !normalized.createProduct
+  });
   if (!committed.ok) {
     return privateJsonResponse({
       error: committed.error || 'Unable to publish Store product',
-      code: committed.code || 'github_commit_failed'
+      code: committed.code || 'repo_write_failed'
     }, committed.status || 502, env);
   }
 
-  const rebuild = await triggerSiteRebuild(env, `admin-store-product-publish:${normalized.product.id}`);
+  const rebuild = await triggerAdminRepoRebuild(env, `${normalized.createProduct ? 'admin-store-product-create' : 'admin-store-product-publish'}:${normalized.product.id}`);
   const auditKey = await recordAdminAuditEvent(env, {
-    action: 'store_product:publish',
+    action: normalized.createProduct ? 'store_product:create' : 'store_product:publish',
     adminEmail: auth.user.email,
     adminRole: auth.user.role,
     productId: normalized.product.id,
+    sku: normalized.product.sku || normalized.product.id,
     githubPath: normalized.sourcePath,
     commitSha: committed.commitSha,
+    repositoryMode: adminRepoMode(env),
     changedFields: normalized.patch.changedFields,
     rebuildTriggered: rebuild.triggered === true
   });
@@ -6051,14 +6732,26 @@ async function handleAdminStoreProductPublish(request, env) {
   return privateJsonResponse({
     success: true,
     published: true,
+    created: normalized.createProduct === true,
     productId: normalized.product.id,
     githubPath: normalized.sourcePath,
     commitSha: committed.commitSha,
     commitUrl: committed.commitUrl,
+    repositoryMode: adminRepoMode(env),
     rebuild,
     auditKey,
     changedFields: normalized.patch.changedFields,
-    deployNotice: 'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
+    deployNotice: normalized.createProduct
+      ? adminRepoDeployNotice(
+        env,
+        'Product created in GitHub and deploy started. Changes may take a few minutes to appear.',
+        'Product created locally. Jekyll will rebuild in local dev.'
+      )
+      : adminRepoDeployNotice(
+        env,
+        'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
+        'Product saved locally. Jekyll will rebuild in local dev.'
+      ),
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 1, kvListExpected: 0 })
   }, 200, env);
 }
@@ -6092,11 +6785,11 @@ async function handleAdminStoreProductBulkPublish(request, env) {
     || `Bulk update Store products (${normalized.targets.length})`;
 
   for (const target of normalized.targets) {
-    const existing = await getGitHubTextFile(env, target.sourcePath);
+    const existing = await readAdminRepoTextFile(env, target.sourcePath);
     if (!existing.ok) {
       return privateJsonResponse({
-        error: existing.error || `Unable to load ${target.sourcePath} from GitHub`,
-        code: existing.code || 'github_load_failed',
+        error: existing.error || `Unable to load ${target.sourcePath} from repository`,
+        code: existing.code || 'repo_load_failed',
         productId: target.productId,
         results
       }, existing.status || 502, env);
@@ -6121,11 +6814,13 @@ async function handleAdminStoreProductBulkPublish(request, env) {
       continue;
     }
 
-    const committed = await putGitHubTextFile(env, target.sourcePath, nextMarkdown.content, commitMessage, existing.sha);
+    const committed = await putAdminRepoTextFile(env, target.sourcePath, nextMarkdown.content, commitMessage, existing.sha, {
+      overwrite: true
+    });
     if (!committed.ok) {
       return privateJsonResponse({
         error: committed.error || `Unable to publish ${target.sourcePath}`,
-        code: committed.code || 'github_commit_failed',
+        code: committed.code || 'repo_write_failed',
         productId: target.productId,
         results
       }, committed.status || 502, env);
@@ -6143,7 +6838,7 @@ async function handleAdminStoreProductBulkPublish(request, env) {
   }
 
   const rebuild = committedProducts.length > 0
-    ? await triggerSiteRebuild(env, `admin-store-products-bulk-publish:${committedProducts.length}`)
+    ? await triggerAdminRepoRebuild(env, `admin-store-products-bulk-publish:${committedProducts.length}`)
     : { triggered: false, reason: 'No changes' };
   const auditKey = committedProducts.length > 0
     ? await recordAdminAuditEvent(env, {
@@ -6153,6 +6848,7 @@ async function handleAdminStoreProductBulkPublish(request, env) {
       productIds: committedProducts.map((product) => product.productId),
       githubPaths: committedProducts.map((product) => product.githubPath),
       changedFields: normalized.patch.changedFields,
+      repositoryMode: adminRepoMode(env),
       rebuildTriggered: rebuild.triggered === true
     })
     : null;
@@ -6166,10 +6862,144 @@ async function handleAdminStoreProductBulkPublish(request, env) {
     results,
     rebuild,
     auditKey,
+    repositoryMode: adminRepoMode(env),
     changedFields: normalized.patch.changedFields,
     deployNotice: committedProducts.length > 0
-      ? 'Bulk product publish committed changes to GitHub and started a deploy. Changes may take a few minutes to appear.'
+      ? adminRepoDeployNotice(
+        env,
+        'Bulk product publish committed changes to GitHub and started a deploy. Changes may take a few minutes to appear.',
+        'Bulk product edits saved locally. Jekyll will rebuild in local dev.'
+      )
       : 'No product changes to publish.',
+    writeBudget: adminWriteBudget({
+      readOnly: false,
+      kvWritesExpected: committedProducts.length > 0 ? 1 : 0,
+      kvListExpected: 0
+    })
+  }, 200, env);
+}
+
+async function handleAdminStoreProductOrderPublish(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  const normalized = normalizeAdminStoreProductOrderBody(parsedBody.body || {}, env);
+  if (!normalized.ok) {
+    return privateJsonResponse({
+      success: false,
+      errors: normalized.errors || ['Invalid Store product order.'],
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0 })
+    }, normalized.status || 422, env);
+  }
+
+  const results = [];
+  const committedProducts = [];
+  const commitMessage = String(parsedBody.body?.message || '').trim()
+    || 'Update Store product display order';
+
+  for (const target of normalized.targets) {
+    const existing = await readAdminRepoTextFile(env, target.sourcePath);
+    if (!existing.ok) {
+      return privateJsonResponse({
+        error: existing.error || `Unable to load ${target.sourcePath} from repository`,
+        code: existing.code || 'repo_load_failed',
+        productId: target.productId,
+        results
+      }, existing.status || 502, env);
+    }
+
+    const nextMarkdown = applyAdminStoreProductPatchToMarkdown(existing.content, normalized.patchForTarget(target));
+    if (!nextMarkdown.ok) {
+      return privateJsonResponse({
+        error: nextMarkdown.error,
+        productId: target.productId,
+        results
+      }, 422, env);
+    }
+
+    if (nextMarkdown.content === existing.content) {
+      results.push({
+        productId: target.productId,
+        githubPath: target.sourcePath,
+        order: target.order,
+        published: false,
+        reason: 'No changes'
+      });
+      continue;
+    }
+
+    const committed = await putAdminRepoTextFile(env, target.sourcePath, nextMarkdown.content, commitMessage, existing.sha, {
+      overwrite: true
+    });
+    if (!committed.ok) {
+      return privateJsonResponse({
+        error: committed.error || `Unable to publish ${target.sourcePath}`,
+        code: committed.code || 'repo_write_failed',
+        productId: target.productId,
+        results
+      }, committed.status || 502, env);
+    }
+
+    const result = {
+      productId: target.productId,
+      githubPath: target.sourcePath,
+      order: target.order,
+      published: true,
+      commitSha: committed.commitSha,
+      commitUrl: committed.commitUrl
+    };
+    results.push(result);
+    committedProducts.push(result);
+  }
+
+  const rebuild = committedProducts.length > 0
+    ? await triggerAdminRepoRebuild(env, `admin-store-products-order:${committedProducts.length}`)
+    : { triggered: false, reason: 'No changes' };
+  const auditKey = committedProducts.length > 0
+    ? await recordAdminAuditEvent(env, {
+      action: 'store_product:order_publish',
+      adminEmail: auth.user.email,
+      adminRole: auth.user.role,
+      productIds: normalized.targets.map((target) => target.productId),
+      githubPaths: committedProducts.map((product) => product.githubPath),
+      changedFields: ['order'],
+      repositoryMode: adminRepoMode(env),
+      rebuildTriggered: rebuild.triggered === true
+    })
+    : null;
+
+  return privateJsonResponse({
+    success: true,
+    published: committedProducts.length > 0,
+    updated: committedProducts.length,
+    skipped: results.length - committedProducts.length,
+    productIds: normalized.targets.map((target) => target.productId),
+    order: normalized.targets.map((target) => ({
+      productId: target.productId,
+      order: target.order
+    })),
+    results,
+    rebuild,
+    auditKey,
+    repositoryMode: adminRepoMode(env),
+    changedFields: ['order'],
+    deployNotice: committedProducts.length > 0
+      ? adminRepoDeployNotice(
+        env,
+        'Product order saved in GitHub and deploy started. Changes may take a few minutes to appear.',
+        'Product order saved locally. Jekyll will rebuild in local dev.'
+      )
+      : 'Product order already matches the saved order.',
     writeBudget: adminWriteBudget({
       readOnly: false,
       kvWritesExpected: committedProducts.length > 0 ? 1 : 0,
@@ -8601,10 +9431,14 @@ async function handleAdminRebuild(request, env) {
   const body = parsedBody.body || {};
   if (body.reason) reason = body.reason;
 
-  const result = await triggerSiteRebuild(env, reason);
+  const result = await triggerAdminRepoRebuild(env, reason);
   
-  if (result.triggered) {
-    return jsonResponse({ success: true, message: 'Site rebuild triggered' });
+  if (result.triggered || result.mode === 'local') {
+    return jsonResponse({
+      success: true,
+      message: result.mode === 'local' ? 'Local dev rebuild is handled by Jekyll.' : 'Site rebuild triggered',
+      rebuild: result
+    });
   }
   
   return jsonResponse({ 
@@ -11273,7 +12107,11 @@ async function handleAdminMediaUpload(request, env, options = {}) {
   }
   if (uploadScope.scope === 'store') {
     const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
-    if (!catalog.productById.has(uploadScope.productId)) {
+    const creatingProduct = body.createProduct === true || body.create_product === true;
+    if (creatingProduct && !isValidSlug(uploadScope.productId)) {
+      return privateJsonResponse({ error: 'Store product media upload uses an invalid product ID.' }, 422, env);
+    }
+    if (!creatingProduct && !catalog.productById.has(uploadScope.productId)) {
       return privateJsonResponse({ error: 'Store product media upload references an unknown product.' }, 404, env);
     }
   }
@@ -11283,7 +12121,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     return privateJsonResponse({ error: normalized.error }, 400, env);
   }
 
-  const uploaded = await putGitHubBase64File(
+  const uploaded = await putAdminRepoBase64File(
     env,
     normalized.filePath,
     normalized.base64,
@@ -11292,12 +12130,12 @@ async function handleAdminMediaUpload(request, env, options = {}) {
   if (!uploaded.ok) {
     return privateJsonResponse({
       error: uploaded.error || 'Unable to upload media',
-      code: uploaded.code || 'github_upload_failed'
+      code: uploaded.code || 'repo_upload_failed'
     }, uploaded.status || 502, env);
   }
 
   const mediaOptimization = shouldTriggerAdminMediaOptimization(normalized.filePath, normalized.contentType)
-    ? await triggerMediaOptimization(env, { scope: 'changed' })
+    ? await triggerAdminMediaOptimization(env, { scope: 'changed' })
     : { triggered: false, reason: 'Media optimization is not configured for this upload type.' };
 
   return privateJsonResponse({
@@ -11306,6 +12144,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     githubPath: normalized.filePath,
     commitSha: uploaded.commitSha,
     commitUrl: uploaded.commitUrl,
+    repositoryMode: adminRepoMode(env),
     contentType: normalized.contentType,
     bytes: normalized.estimatedBytes,
     processing: normalized.processing,
@@ -11424,11 +12263,11 @@ async function handleAdminSettingsPublish(request, env) {
   const commits = [];
   const platformChanges = result.changes;
   if (platformChanges.length) {
-    const githubFile = await getGitHubTextFile(env, '_config.yml');
-    if (!githubFile.ok) {
-      return privateJsonResponse({ error: githubFile.error, code: githubFile.code || 'github_error' }, githubFile.status || 502, env);
+    const repoFile = await readAdminRepoTextFile(env, '_config.yml');
+    if (!repoFile.ok) {
+      return privateJsonResponse({ error: repoFile.error, code: repoFile.code || 'repo_error' }, repoFile.status || 502, env);
     }
-    let content = githubFile.content;
+    let content = repoFile.content;
     for (const change of platformChanges) {
       const applied = change.type === 'add_on_products'
         ? replaceYamlBlockAtPath(content, change.path, serializeAdminAddOnProductsYaml(change.value, ''))
@@ -11438,19 +12277,26 @@ async function handleAdminSettingsPublish(request, env) {
       if (!applied.ok) return privateJsonResponse({ error: applied.error }, 422, env);
       content = applied.content;
     }
-    const saved = await putGitHubTextFile(env, '_config.yml', content, `Update admin platform settings (${platformChanges.length})`, githubFile.sha);
-    if (!saved.ok) return privateJsonResponse({ error: saved.error, code: saved.code || 'github_error' }, saved.status || 502, env);
+    const saved = await putAdminRepoTextFile(env, '_config.yml', content, `Update admin platform settings (${platformChanges.length})`, repoFile.sha, {
+      overwrite: true
+    });
+    if (!saved.ok) return privateJsonResponse({ error: saved.error, code: saved.code || 'repo_error' }, saved.status || 502, env);
     commits.push(saved);
   }
 
-  const rebuild = await triggerSiteRebuild(env, 'admin-settings-publish');
+  const rebuild = await triggerAdminRepoRebuild(env, 'admin-settings-publish');
   return privateJsonResponse({
     success: true,
     published: true,
     changeCount: result.changes.length,
     commits,
     rebuild,
-    deployNotice: 'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
+    repositoryMode: adminRepoMode(env),
+    deployNotice: adminRepoDeployNotice(
+      env,
+      'Publishing commits changes to GitHub and starts a deploy. Changes may take a few minutes to appear.',
+      'Settings saved locally. Jekyll will rebuild in local dev.'
+    ),
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
   }, 200, env);
 }
@@ -11523,6 +12369,18 @@ function replaceAdminFrontMatterBlock(frontMatter, key, replacement) {
   }
   lines.splice(start, end - start, ...replacement.split('\n'));
   return lines.join('\n');
+}
+
+function removeAdminFrontMatterBlock(frontMatter, key) {
+  const lines = String(frontMatter || '').split(/\r?\n/);
+  const start = lines.findIndex((line) => new RegExp(`^${key}:`).test(line));
+  if (start < 0) return frontMatter;
+  let end = start + 1;
+  while (end < lines.length && !/^[A-Za-z0-9_-]+:/.test(lines[end])) {
+    end += 1;
+  }
+  lines.splice(start, end - start);
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
 function csvResponse(csv, filename, env = null) {

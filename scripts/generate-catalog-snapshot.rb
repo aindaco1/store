@@ -77,12 +77,39 @@ def default_shipping_preset(product)
   end
 end
 
-def default_collection(product)
-  slugify(present_string(product['store_collection']) || present_string(product['event']) || 'dustwave')
+def configured_collection_ids(config)
+  collections = config.dig('storefront', 'collections')
+  return [] unless collections.is_a?(Array)
+
+  collections.filter_map do |collection|
+    next unless collection.is_a?(Hash)
+
+    id = slugify(collection['id'])
+    id.empty? ? nil : id
+  end
 end
 
-def default_storefront_category(product)
-  explicit = present_string(product['category'])
+def category_is_collection?(product, config)
+  category = present_string(product['category'])
+  return false unless category
+
+  configured_collection_ids(config).include?(slugify(category))
+end
+
+def default_collection(product, config)
+  category_collection = category_is_collection?(product, config) ? present_string(product['category']) : nil
+  slugify(
+    present_string(product['store_collection']) ||
+      present_string(product['product_collection']) ||
+      category_collection ||
+      present_string(product['event']) ||
+      'dustwave'
+  )
+end
+
+def default_storefront_category(product, config)
+  explicit = present_string(product['storefront_category']) || present_string(product['product_category'])
+  explicit ||= present_string(product['category']) unless category_is_collection?(product, config)
   return slugify(explicit) if explicit
 
   raw_type = String(present_string(product['type']) || '').strip.downcase
@@ -207,9 +234,9 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
     'status' => status,
     'public' => product.fetch('public', true) != false,
     'launch_test' => product.fetch('launch_test', false) == true,
-    'event' => present_string(product['event']),
-    'collection' => default_collection(product),
-    'category' => default_storefront_category(product),
+    'order' => numeric(product['order'], 1_000_000),
+    'collection' => default_collection(product, config),
+    'category' => default_storefront_category(product, config),
     'localized_paths' => product_localized_paths(config, product, slug),
     'variant_option_name' => present_string(product['variant_option_name']),
     'variants' => variants,
@@ -222,6 +249,11 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
     'download' => product['download'].is_a?(Hash) ? product['download'] : nil,
     'turnstile_required' => product.fetch('turnstile_required', false) == true
   )
+end.sort_by do |product|
+  [
+    numeric(product['order'], 1_000_000),
+    String(product['name'] || product['id'] || '')
+  ]
 end
 
 snapshot_body = {

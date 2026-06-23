@@ -7,7 +7,7 @@ image: "/assets/images/dustwave-mug.png"
 type: physical
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 30
 shipping_preset: mug
 tax_category: standard

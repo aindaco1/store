@@ -24,11 +24,18 @@
   var storeProductsLoaded = false;
   var storeDownloadsLoaded = false;
   var currentStoreProducts = [];
+  var currentStoreDownloadFiles = [];
   var currentStoreProductRows = [];
   var currentStoreProductTotals = {};
   var currentStoreShippingPresets = [];
   var selectedStoreProductIds = new Set();
   var editingProductId = '';
+  var STORE_PRODUCT_CREATE_ID = '__new_store_product__';
+  var storeProductsSavedOrderIds = [];
+  var storeProductDraggingId = '';
+  var storeProductTouchDrag = null;
+  var STORE_PRODUCT_TOUCH_DRAG_DELAY = 350;
+  var STORE_PRODUCT_TOUCH_DRAG_SLOP = 8;
   var storeProductPreviewTimers = new Map();
   var storeProductPreviewRequestCounter = 0;
   var storeProductMediaCache = new Map();
@@ -47,37 +54,37 @@
   var labels = {
 	    en: {
 	      settings: 'Settings',
-	      'store-analytics': 'Analytics',
-      'store-marketing': 'Marketing',
-      'store-orders': 'Orders',
       'store-products': 'Products',
-      'store-downloads': 'Downloads'
+      'store-downloads': 'Downloads',
+      'store-orders': 'Orders',
+      'store-analytics': 'Analytics',
+      'store-marketing': 'Marketing'
     },
 	    es: {
 	      settings: 'Configuracion',
-	      'store-analytics': 'Analitica',
-      'store-marketing': 'Marketing',
-      'store-orders': 'Pedidos',
       'store-products': 'Productos',
-      'store-downloads': 'Descargas'
+      'store-downloads': 'Descargas',
+      'store-orders': 'Pedidos',
+      'store-analytics': 'Analitica',
+      'store-marketing': 'Marketing'
     }
   };
   var compactLabels = {
 	    en: {
 	      settings: 'Settings',
-	      'store-analytics': 'Stats',
-      'store-marketing': 'Mktg',
-      'store-orders': 'Orders',
       'store-products': 'Products',
-      'store-downloads': 'Downloads'
+      'store-downloads': 'Downloads',
+      'store-orders': 'Orders',
+      'store-analytics': 'Stats',
+      'store-marketing': 'Mktg'
     },
 	    es: {
 	      settings: 'Config.',
-	      'store-analytics': 'Datos',
-      'store-marketing': 'Mktg',
-      'store-orders': 'Pedidos',
       'store-products': 'Productos',
-      'store-downloads': 'Descargas'
+      'store-downloads': 'Descargas',
+      'store-orders': 'Pedidos',
+      'store-analytics': 'Datos',
+      'store-marketing': 'Mktg'
     }
   };
   var headingHelpText = {
@@ -298,6 +305,18 @@
     if (className) element.className = className;
     if (text !== undefined && text !== null) element.textContent = String(text);
     return element;
+  }
+
+  function createLabeledTableCell(label, content, className) {
+    var cell = document.createElement('td');
+    cell.dataset.label = label;
+    if (className) cell.className = className;
+    if (typeof Node !== 'undefined' && content instanceof Node) {
+      cell.appendChild(content);
+    } else if (content !== undefined && content !== null) {
+      cell.textContent = String(content);
+    }
+    return cell;
   }
 
   function imageUploadOptions(row) {
@@ -2843,17 +2862,17 @@
     var tbody = document.createElement('tbody');
     events.forEach(function(event) {
       var tr = document.createElement('tr');
-      var eventCell = document.createElement('td');
+      var eventCell = createLabeledTableCell('Event');
       eventCell.appendChild(document.createTextNode([event.itemName, event.variantLabel].filter(Boolean).join(' - ')));
       if (event.eventStartsAt) eventCell.appendChild(createElement('span', 'admin-store-orders__meta', formatDate(event.eventStartsAt)));
       tr.appendChild(eventCell);
-      var venueCell = document.createElement('td');
+      var venueCell = createLabeledTableCell('Venue');
       venueCell.appendChild(document.createTextNode(event.eventVenue || ''));
       if (event.eventAddress) venueCell.appendChild(createElement('span', 'admin-store-orders__meta', event.eventAddress));
       tr.appendChild(venueCell);
-      tr.appendChild(createElement('td', '', String(event.orderCount || 0)));
-      tr.appendChild(createElement('td', '', String(event.checkedInQuantity || 0) + ' / ' + String(event.quantity || 0)));
-      tr.appendChild(createElement('td', '', String(event.checkedInRate || 0) + '%'));
+      tr.appendChild(createLabeledTableCell('Orders', String(event.orderCount || 0)));
+      tr.appendChild(createLabeledTableCell('Checked in', String(event.checkedInQuantity || 0) + ' / ' + String(event.quantity || 0)));
+      tr.appendChild(createLabeledTableCell('Rate', String(event.checkedInRate || 0) + '%'));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -2924,12 +2943,12 @@
     var tbody = $('tbody', table);
     rows.forEach(function(row) {
       var tr = document.createElement('tr');
-      tr.appendChild(createElement('td', '', row.orderToken || ''));
-      tr.appendChild(createElement('td', '', [row.customerName, row.customerEmail].filter(Boolean).join(' / ')));
-      tr.appendChild(createElement('td', '', [row.itemName, row.variantLabel].filter(Boolean).join(' - ')));
-      tr.appendChild(createElement('td', '', [row.status, row.paymentStatus, row.fulfillmentType].filter(Boolean).join(' / ')));
-      tr.appendChild(createElement('td', '', moneyFromCents(row.totalCents)));
-      var action = createElement('td', 'admin-store-orders__actions');
+      tr.appendChild(createLabeledTableCell('Order', row.orderToken || ''));
+      tr.appendChild(createLabeledTableCell('Customer', [row.customerName, row.customerEmail].filter(Boolean).join(' / ')));
+      tr.appendChild(createLabeledTableCell('Item', [row.itemName, row.variantLabel].filter(Boolean).join(' - ')));
+      tr.appendChild(createLabeledTableCell('Status', [row.status, row.paymentStatus, row.fulfillmentType].filter(Boolean).join(' / ')));
+      tr.appendChild(createLabeledTableCell('Total', moneyFromCents(row.totalCents)));
+      var action = createLabeledTableCell('Actions', null, 'admin-store-orders__actions');
       if (row.checkInAvailable) {
         var button = createElement('button', 'btn btn--secondary', row.checkedIn ? 'Undo check-in' : 'Check in');
         button.type = 'button';
@@ -3091,16 +3110,164 @@
     });
   }
 
+  function storeProductOrderIds(products) {
+    return (products || currentStoreProducts || []).map(function(product) {
+      return String(product && product.productId || '').trim();
+    }).filter(Boolean);
+  }
+
+  function storeProductsOrderIsDirty() {
+    var current = storeProductOrderIds(currentStoreProducts);
+    if (current.length !== storeProductsSavedOrderIds.length) return false;
+    return current.some(function(productId, index) {
+      return productId !== storeProductsSavedOrderIds[index];
+    });
+  }
+
+  function syncStoreProductsOrderControls(root) {
+    var scope = root || $('#admin-store-products-results');
+    var save = scope ? $('[data-store-products-order-save]', scope) : null;
+    if (!save) return;
+    var dirty = storeProductsOrderIsDirty();
+    save.disabled = !dirty;
+    save.classList.toggle('is-dirty', dirty);
+    save.dataset.dirtyState = dirty ? 'dirty' : 'clean';
+  }
+
+  function syncStoreProductsControls(root) {
+    syncStoreProductsBulkControls(root);
+    syncStoreProductsOrderControls(root);
+  }
+
+  function moveStoreProductById(items, draggedId, targetId, beforeTarget) {
+    var list = (items || []).slice();
+    var from = list.findIndex(function(item) { return String(item && item.productId || '') === draggedId; });
+    var to = list.findIndex(function(item) { return String(item && item.productId || '') === targetId; });
+    if (from < 0 || to < 0 || from === to) return list;
+    var moved = list.splice(from, 1)[0];
+    if (from < to) to -= 1;
+    if (!beforeTarget) to += 1;
+    to = Math.max(0, Math.min(to, list.length));
+    list.splice(to, 0, moved);
+    return list;
+  }
+
+  function reorderStoreProducts(draggedId, targetId, beforeTarget) {
+    var source = String(draggedId || '').trim();
+    var target = String(targetId || '').trim();
+    if (!source || !target || source === target) return;
+    currentStoreProducts = moveStoreProductById(currentStoreProducts, source, target, beforeTarget);
+    currentStoreProductRows = moveStoreProductById(currentStoreProductRows, source, target, beforeTarget);
+    renderStoreProducts({
+      products: currentStoreProducts,
+      rows: currentStoreProductRows,
+      totals: currentStoreProductTotals,
+      catalog: { shippingPresets: currentStoreShippingPresets }
+    }, { preserveOrderBaseline: true });
+    setStatus($('#admin-store-products-status'), 'Product order changed. Save order to publish it.');
+  }
+
+  function moveStoreProductOneStep(productId, direction) {
+    var ids = storeProductOrderIds(currentStoreProducts);
+    var index = ids.indexOf(String(productId || '').trim());
+    var targetIndex = index + direction;
+    if (index < 0 || targetIndex < 0 || targetIndex >= ids.length) return;
+    reorderStoreProducts(ids[index], ids[targetIndex], direction < 0);
+  }
+
+  function isStoreProductControlTarget(target) {
+    return Boolean(target && target.closest && target.closest(
+      'a, button, input, select, textarea, label, summary, [contenteditable="true"], [data-admin-info-toggle]'
+    ));
+  }
+
+  function storeProductRowDropBefore(row, clientY) {
+    var rect = row.getBoundingClientRect();
+    return clientY < rect.top + rect.height / 2;
+  }
+
+  function clearStoreProductDropIndicators(root) {
+    $all('[data-store-product-order-row]', root || document).forEach(function(row) {
+      row.classList.remove('is-drop-before', 'is-drop-after');
+    });
+  }
+
+  function markStoreProductDropTarget(root, row, beforeTarget) {
+    clearStoreProductDropIndicators(root);
+    if (!row) return;
+    row.classList.toggle('is-drop-before', beforeTarget);
+    row.classList.toggle('is-drop-after', !beforeTarget);
+  }
+
+  function storeProductOrderRowFromPoint(clientX, clientY) {
+    var element = document.elementFromPoint(clientX, clientY);
+    return element && element.closest ? element.closest('[data-store-product-order-row]') : null;
+  }
+
+  function resetStoreProductTouchDrag(root) {
+    if (storeProductTouchDrag && storeProductTouchDrag.timer) {
+      window.clearTimeout(storeProductTouchDrag.timer);
+    }
+    if (storeProductTouchDrag && storeProductTouchDrag.row) {
+      storeProductTouchDrag.row.classList.remove('is-dragging', 'is-touch-pending');
+    }
+    storeProductTouchDrag = null;
+    storeProductDraggingId = '';
+    clearStoreProductDropIndicators(root || $('#admin-store-products-results'));
+  }
+
+  function updateStoreProductTouchTarget(root, touch) {
+    if (!storeProductTouchDrag || !storeProductTouchDrag.active) return;
+    var row = storeProductOrderRowFromPoint(touch.clientX, touch.clientY);
+    if (!row || row.dataset.storeProductOrderRow === storeProductTouchDrag.sourceId) {
+      clearStoreProductDropIndicators(root);
+      storeProductTouchDrag.targetId = '';
+      return;
+    }
+    var beforeTarget = storeProductRowDropBefore(row, touch.clientY);
+    storeProductTouchDrag.targetId = String(row.dataset.storeProductOrderRow || '').trim();
+    storeProductTouchDrag.beforeTarget = beforeTarget;
+    markStoreProductDropTarget(root, row, beforeTarget);
+  }
+
+  function saveStoreProductOrder(button) {
+    var orderIds = storeProductOrderIds(currentStoreProducts);
+    if (!storeProductsOrderIsDirty()) {
+      setStatus($('#admin-store-products-status'), 'Product order has no changes to save.');
+      syncStoreProductsOrderControls($('#admin-store-products-results'));
+      return;
+    }
+    if (button) button.disabled = true;
+    setStatus($('#admin-store-products-status'), 'Saving product order...');
+    requestJson('/admin/store/products/order', {
+      method: 'POST',
+      body: {
+        intent: 'order_publish',
+        productIds: orderIds
+      }
+    }).then(function(data) {
+      var message = data.deployNotice || 'Product order saved.';
+      storeProductsSavedOrderIds = orderIds.slice();
+      return loadStoreProducts().finally(function() {
+        setStatus($('#admin-store-products-status'), message);
+      });
+    }).catch(function(error) {
+      setStatus($('#admin-store-products-status'), formatError(error), true);
+      syncStoreProductsOrderControls($('#admin-store-products-results'));
+    });
+  }
+
   function renderStoreProductsBulkActions() {
     var wrapper = createElement('div', 'admin-store-products__bulk-actions');
     var selectedCount = selectedStoreProductIds.size;
+    var statusGroup = createElement('div', 'admin-store-products__bulk-group admin-store-products__bulk-group--status');
 
     var count = createElement(
       'span',
       'admin-store-products__bulk-count',
       selectedCount === 1 ? '1 selected' : selectedCount + ' selected'
     );
-    wrapper.appendChild(count);
+    statusGroup.appendChild(count);
 
     var statusLabel = createElement('label', 'admin-store-products__bulk-field');
     var statusSelect = document.createElement('select');
@@ -3120,13 +3287,30 @@
       statusSelect.appendChild(option);
     });
     statusLabel.appendChild(statusSelect);
-    wrapper.appendChild(statusLabel);
+    statusGroup.appendChild(statusLabel);
 
     var apply = createElement('button', 'btn btn--secondary', 'Apply to selected');
     apply.type = 'button';
     apply.dataset.storeProductsBulkApply = 'true';
     apply.disabled = selectedCount === 0;
-    wrapper.appendChild(apply);
+    statusGroup.appendChild(apply);
+    wrapper.appendChild(statusGroup);
+
+    var orderGroup = createElement('div', 'admin-store-products__bulk-group admin-store-products__bulk-group--order');
+    var saveOrder = createElement('button', 'btn btn--secondary admin-store-products__order-save', 'Save order');
+    saveOrder.type = 'button';
+    saveOrder.dataset.storeProductsOrderSave = 'true';
+    saveOrder.disabled = !storeProductsOrderIsDirty();
+    orderGroup.appendChild(saveOrder);
+    wrapper.appendChild(orderGroup);
+
+    var createGroup = createElement('div', 'admin-store-products__bulk-group admin-store-products__bulk-group--create');
+    var create = createElement('button', 'btn btn--secondary admin-store-products__create', 'Create product');
+    create.id = 'admin-store-product-create';
+    create.type = 'button';
+    create.dataset.storeProductCreate = 'true';
+    createGroup.appendChild(create);
+    wrapper.appendChild(createGroup);
 
     return wrapper;
   }
@@ -3159,14 +3343,16 @@
 
   var storeProductFieldHelpText = {
     name: 'Public product name shown on product cards, checkout, receipts, and admin lists.',
+    sku: 'Legacy product SKU used for historical orders and grandfathered product IDs. Read-only.',
     price: 'Base product price in US dollars. Variants can override this when Variant Based is Yes.',
     status: 'Controls whether the product is public, draft-only, archived, or sold out.',
     fulfillmentType: 'Determines whether this product ships, unlocks a download, creates a ticket, or records an RSVP.',
     shippingPreset: 'Package type used for shipping estimates. Hidden when the product does not ship.',
-    taxCategory: 'Tax treatment used when checkout estimates or submits sales tax.',
+    taxCategory: 'Standard is taxable merchandise. Digital is downloads/files. Ticket / admission is event access or RSVPs. Tax exempt skips sales tax.',
     variantBased: 'Turns variant rows on or off for sizes, formats, ticket tiers, or other product options.',
     inventoryTracking: 'Turns live inventory counts on or off for this product and its variants.',
     inventory: 'Available quantity for non-variant products. Variant quantities are managed in the Variants section.',
+    downloadFileKey: 'Existing download file delivered after checkout for digital products.',
     image: 'Primary product image used on public product cards, cart rows, receipts, and previews.',
     preview: 'Live product-card preview generated from the current editor values.',
     description: 'Public product copy. Use the block editor for text, media, embeds, and galleries.'
@@ -3182,6 +3368,84 @@
       .replace(/&/g, ' and ')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || fallback || 'new-variant';
+  }
+
+  function storeProductReservedSkus() {
+    var values = new Set();
+    currentStoreProducts.forEach(function(product) {
+      [product.productId, product.sku, product.slug].forEach(function(value) {
+        var normalized = String(value || '').trim();
+        if (normalized) values.add(normalized);
+      });
+    });
+    return values;
+  }
+
+  function uniqueStoreProductSku(value, fallback) {
+    var base = slugifyStoreProductValue(value, fallback || 'new-product');
+    var reserved = storeProductReservedSkus();
+    var candidate = base;
+    var index = 2;
+    while (reserved.has(candidate)) {
+      candidate = base + '-' + index;
+      index += 1;
+    }
+    return candidate;
+  }
+
+  function defaultStoreProductShippingPreset() {
+    return currentStoreShippingPresets.indexOf('parcel') >= 0
+      ? 'parcel'
+      : currentStoreShippingPresets[0] || '';
+  }
+
+  function createStoreProductDraft() {
+    var name = 'New Product';
+    var sku = uniqueStoreProductSku(name, 'new-product');
+    return {
+      productId: STORE_PRODUCT_CREATE_ID,
+      sku: sku,
+      name: name,
+      description: '',
+      longContent: [],
+      priceCents: 0,
+      status: 'draft',
+      fulfillmentType: 'physical',
+      image: '',
+      shippingPreset: defaultStoreProductShippingPreset(),
+      taxCategory: 'standard',
+      inventoryTracking: false,
+      inventory: '',
+      variants: [],
+      isNew: true
+    };
+  }
+
+  function storeProductIsCreateForm(form) {
+    return Boolean(form && form.dataset.storeProductNew === 'true');
+  }
+
+  function currentStoreProductEditorProduct(form, fallbackProduct) {
+    if (!storeProductIsCreateForm(form)) return fallbackProduct || {};
+    var name = $('[data-store-product-field="name"]', form);
+    var sku = $('[data-store-product-readonly-field="sku"]', form);
+    return {
+      productId: sku ? sku.value : '',
+      sku: sku ? sku.value : '',
+      name: name ? name.value : ''
+    };
+  }
+
+  function syncStoreProductDerivedSku(form) {
+    if (!storeProductIsCreateForm(form)) return '';
+    var name = $('[data-store-product-field="name"]', form);
+    var sku = $('[data-store-product-readonly-field="sku"]', form);
+    var next = uniqueStoreProductSku(name ? name.value : '', 'new-product');
+    if (sku) sku.value = next;
+    $all('[data-store-product-variant]', form).forEach(function(row) {
+      updateStoreProductVariantDerivedFields(row, currentStoreProductEditorProduct(form));
+    });
+    return next;
   }
 
   function derivedStoreVariantId(label, fallback) {
@@ -3209,12 +3473,27 @@
   }
 
   function storeProductFieldHelpClass(field) {
-    var edgeStartFields = ['shippingPreset', 'image'];
+    var edgeStartFields = ['sku', 'shippingPreset', 'image'];
     var edgeEndFields = ['fulfillmentType', 'inventoryTracking', 'inventory', 'preview'];
     var key = String(field || '');
     if (edgeStartFields.indexOf(key) >= 0) return 'admin-settings__help--edge-start';
     if (edgeEndFields.indexOf(key) >= 0) return 'admin-settings__help--edge-end';
     return '';
+  }
+
+  function createStoreProductReadonlyField(labelText, field, value) {
+    var label = createElement('label', 'admin-store-products__field admin-store-products__field--readonly');
+    label.dataset.storeProductFieldWrapper = field;
+    var input = document.createElement('input');
+    input.className = 'admin-settings__input admin-settings__input--readonly';
+    input.type = 'text';
+    input.value = String(value || '');
+    input.readOnly = true;
+    input.dataset.storeProductReadonlyField = field;
+    input.setAttribute('aria-readonly', 'true');
+    label.appendChild(createStoreProductFieldLabel(labelText, field, input));
+    label.appendChild(input);
+    return label;
   }
 
   function shippingPresetLabel(value) {
@@ -3243,6 +3522,42 @@
     });
   }
 
+  function downloadFileLabel(file) {
+    var filename = String(file && file.filename || '').trim();
+    var fileKey = String(file && file.fileKey || '').trim();
+    if (!filename && !fileKey) return 'No file selected';
+    if (filename && fileKey && filename !== fileKey) return filename + ' (' + fileKey + ')';
+    return filename || fileKey;
+  }
+
+  function downloadFileOptions(currentFileKey, currentFilename) {
+    var current = String(currentFileKey || '').trim();
+    var seen = new Set(['']);
+    var options = [{
+      value: '',
+      label: 'No file selected',
+      filename: ''
+    }];
+    (currentStoreDownloadFiles || []).forEach(function(file) {
+      var fileKey = String(file && file.fileKey || '').trim();
+      if (!fileKey || seen.has(fileKey)) return;
+      seen.add(fileKey);
+      options.push({
+        value: fileKey,
+        label: downloadFileLabel(file),
+        filename: String(file.filename || fileKey).trim()
+      });
+    });
+    if (current && !seen.has(current)) {
+      options.push({
+        value: current,
+        label: (currentFilename || current) + ' (missing from library)',
+        filename: currentFilename || current
+      });
+    }
+    return options;
+  }
+
   function defaultTaxCategoryForFulfillment(fulfillmentType) {
     var type = String(fulfillmentType || '').trim().toLowerCase();
     if (type === 'digital') return 'digital';
@@ -3260,7 +3575,7 @@
 
   function taxCategoryLabel(value) {
     var labels = {
-      standard: 'Standard taxable item',
+      standard: 'Standard',
       digital: 'Digital download',
       admission: 'Ticket / admission',
       exempt: 'Tax exempt'
@@ -3367,7 +3682,6 @@
           : 'Override';
         variantSummary.appendChild(createElement('span', 'admin-store-products__inventory-flag', overrideLabel));
       }
-      variantSummary.appendChild(createElement('span', 'admin-store-products__meta', 'Edit variants to manage inventory.'));
       cell.appendChild(variantSummary);
       return cell;
     }
@@ -3440,7 +3754,8 @@
     });
   }
 
-  function renderStoreProducts(data) {
+  function renderStoreProducts(data, options) {
+    var opts = options || {};
     var root = $('#admin-store-products-results');
     if (!root) return;
     clear(root);
@@ -3448,9 +3763,15 @@
     var rows = Array.isArray(data.rows) ? data.rows : [];
     currentStoreProductRows = rows;
     currentStoreProductTotals = data.totals || {};
+    currentStoreDownloadFiles = data && data.downloads && Array.isArray(data.downloads.files)
+      ? data.downloads.files
+      : currentStoreDownloadFiles;
     currentStoreShippingPresets = data && data.catalog && Array.isArray(data.catalog.shippingPresets)
       ? data.catalog.shippingPresets.map(function(value) { return String(value || '').trim(); }).filter(Boolean)
       : currentStoreShippingPresets;
+    if (!opts.preserveOrderBaseline) {
+      storeProductsSavedOrderIds = storeProductOrderIds(currentStoreProducts);
+    }
     pruneSelectedStoreProducts(currentStoreProducts);
     renderStoreProductsSummary(data);
     root.appendChild(renderStoreProductsBulkActions());
@@ -3473,8 +3794,23 @@
     table.appendChild(thead);
     var tbody = document.createElement('tbody');
     var columnCount = header.children.length;
+    if (editingProductId === STORE_PRODUCT_CREATE_ID) {
+      var createRow = document.createElement('tr');
+      createRow.className = 'admin-store-products__editor-row admin-store-products__editor-row--create';
+      createRow.dataset.storeProductEditorRow = STORE_PRODUCT_CREATE_ID;
+      var createCell = document.createElement('td');
+      createCell.colSpan = columnCount;
+      createCell.appendChild(renderStoreProductEditor(createStoreProductDraft()));
+      createRow.appendChild(createCell);
+      tbody.appendChild(createRow);
+    }
     rows.forEach(function(row) {
       var tr = document.createElement('tr');
+      tr.dataset.storeProductOrderRow = row.productId || '';
+      tr.draggable = true;
+      tr.tabIndex = 0;
+      tr.setAttribute('aria-label', 'Product row for ' + (row.productName || row.label || row.productId || 'product') + '. Drag to reorder. Use Arrow Up or Arrow Down to move while focused.');
+      tr.setAttribute('title', 'Drag row to reorder. On touch, hold briefly before dragging.');
       if (row.productId === editingProductId) tr.classList.add('is-editing');
       var selectCell = document.createElement('td');
       var select = document.createElement('input');
@@ -3571,7 +3907,8 @@
           content: content,
           kind: 'store-product',
           productId: product.productId || '',
-          filenameBase: product.name || product.productId || file.name
+          filenameBase: product.name || product.productId || file.name,
+          createProduct: product.isNew === true
         }
       });
     }).then(function(data) {
@@ -3678,7 +4015,10 @@
     uploadInput.addEventListener('change', function() {
       var file = uploadInput.files && uploadInput.files[0];
       if (!file) return;
-      uploadStoreProductImage(product, file, status).then(setImage).catch(function(error) {
+      var form = uploadInput.closest('[data-store-product-editor]');
+      var uploadProduct = currentStoreProductEditorProduct(form, product);
+      if (storeProductIsCreateForm(form)) uploadProduct.isNew = true;
+      uploadStoreProductImage(uploadProduct, file, status).then(setImage).catch(function(error) {
         logger.error('Failed to upload Store product image', error);
         productUploadStatus(status, formatError(error), true);
       }).finally(function() {
@@ -5338,14 +5678,14 @@
       repairStoreProductPreviewFrameImages(frame);
     });
     previewHeader.appendChild(createStoreProductFieldLabel('Preview', 'preview', frame));
-    previewHeader.appendChild(previewStatus);
     preview.appendChild(previewHeader);
+    preview.appendChild(previewStatus);
     preview.appendChild(frame);
     return preview;
   }
 
   function storeProductPreviewHtmlWithBase(html) {
-    var markup = String(html || '');
+    var markup = sanitizeStoreProductPreviewHtml(html);
     if (!markup) return markup;
     var base = storeProductPreviewBaseUrl();
     var previewOrigin = storeProductPreviewOrigin(base);
@@ -5365,6 +5705,29 @@
       return markup.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
     }
     return baseTag + markup;
+  }
+
+  function sanitizeStoreProductPreviewHtml(html) {
+    var markup = String(html || '');
+    if (!markup) return '';
+    if (typeof DOMParser === 'undefined') {
+      return markup.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+    }
+    var document = new DOMParser().parseFromString(markup, 'text/html');
+    document.querySelectorAll('script').forEach(function(node) {
+      node.remove();
+    });
+    document.querySelectorAll('*').forEach(function(node) {
+      Array.from(node.attributes || []).forEach(function(attribute) {
+        var name = String(attribute.name || '').toLowerCase();
+        var value = String(attribute.value || '').trim().toLowerCase();
+        var scriptUrlAttribute = ['href', 'src', 'xlink:href', 'action', 'formaction'].indexOf(name) >= 0;
+        if (name.indexOf('on') === 0 || (scriptUrlAttribute && value.indexOf('javascript:') === 0)) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+    });
+    return '<!doctype html>\n' + document.documentElement.outerHTML;
   }
 
   function refreshStoreProductPreview(form) {
@@ -5407,21 +5770,28 @@
   }
 
   function renderStoreProductEditor(product) {
+    var isNewProduct = product && product.isNew === true;
     var form = createElement('form', 'admin-store-products__editor');
     form.dataset.storeProductEditor = product.productId || '';
-    form.appendChild(createElement('h3', 'admin-store-products__editor-title', product.name || product.productId || 'Product'));
+    if (isNewProduct) form.dataset.storeProductNew = 'true';
+    form.dataset.storeProductActionLabel = isNewProduct ? 'Create product' : 'Publish product';
+    form.appendChild(createElement('h3', 'admin-store-products__editor-title', isNewProduct ? 'Create product' : product.name || product.productId || 'Product'));
     var fields = createElement('div', 'admin-store-products__editor-fields');
     var fulfillmentValue = product.fulfillmentType || 'physical';
     var basics = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--basics');
     var commerce = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--commerce');
     var mediaDescription = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--media-description');
-    basics.appendChild(productField('Name', 'name', product.name || '', 'text', { noHelp: true }));
+    basics.appendChild(productField('Name', 'name', product.name || '', 'text', { noHelp: true, required: true }));
     basics.appendChild(productField('Price (USD)', 'price', productPrice(product), 'number', { step: '0.01', min: '0' }));
     basics.appendChild(productField('Status', 'status', product.status || 'active', 'select', {
       options: [['active', 'Active'], ['draft', 'Draft'], ['archived', 'Archived'], ['sold_out', 'Sold out']]
     }));
     basics.appendChild(productField('Fulfillment', 'fulfillmentType', fulfillmentValue, 'select', {
       options: [['physical', 'Physical'], ['digital', 'Digital'], ['ticket', 'Ticket'], ['rsvp', 'RSVP']]
+    }));
+    commerce.appendChild(createStoreProductReadonlyField('SKU', 'sku', product.sku || product.productId || ''));
+    commerce.appendChild(productField('File', 'downloadFileKey', product.downloadFileKey || '', 'select', {
+      options: downloadFileOptions(product.downloadFileKey, product.downloadFilename)
     }));
     commerce.appendChild(productField('Shipping preset', 'shippingPreset', product.shippingPreset || '', 'select', {
       options: shippingPresetOptions(product.shippingPreset || '')
@@ -5447,7 +5817,7 @@
     syncStoreProductFulfillmentDependentFields(form);
     syncStoreProductVariantsSection($('[data-store-product-variants]', form));
     var actions = createElement('div', 'admin-store-products__editor-actions');
-    var publish = createElement('button', 'btn', 'Publish product');
+    var publish = createElement('button', 'btn', form.dataset.storeProductActionLabel);
     publish.type = 'submit';
     publish.dataset.storeProductPublish = 'true';
     publish.disabled = true;
@@ -5457,9 +5827,13 @@
     actions.appendChild(publish);
     actions.appendChild(cancel);
     form.appendChild(actions);
+    if (isNewProduct) syncStoreProductDerivedSku(form);
     form.addEventListener('input', function(event) {
       if (event.target && event.target.dataset && event.target.dataset.storeVariantField === 'label') {
-        updateStoreProductVariantDerivedFields(event.target.closest('[data-store-product-variant]'), product);
+        updateStoreProductVariantDerivedFields(event.target.closest('[data-store-product-variant]'), currentStoreProductEditorProduct(form, product));
+      }
+      if (event.target && event.target.dataset && event.target.dataset.storeProductField === 'name') {
+        syncStoreProductDerivedSku(form);
       }
       if (event.target.closest('[data-store-product-field], [data-store-variant-field]')) {
         scheduleStoreProductPreview(form);
@@ -5482,7 +5856,8 @@
       }
       updateStoreProductEditorDirtyState(form);
     });
-    resetStoreProductEditorDirtyBaseline(form);
+    if (isNewProduct) updateStoreProductEditorDirtyState(form);
+    else resetStoreProductEditorDirtyBaseline(form);
     window.setTimeout(function() {
       scheduleStoreProductPreview(form, 0);
     }, 0);
@@ -5517,6 +5892,15 @@
     });
   }
 
+  function syncStoreProductVariantDownloadVisible(form, visible) {
+    $all('[data-store-product-variant-download-cell]', form).forEach(function(cell) {
+      cell.hidden = !visible;
+    });
+    $all('[data-store-variant-field="downloadFileKey"]', form).forEach(function(input) {
+      input.disabled = !visible;
+    });
+  }
+
   function syncStoreProductEditorSections(form) {
     $all('.admin-store-products__editor-section', form).forEach(function(section) {
       var hasVisibleFields = $all('[data-store-product-field-wrapper]', section).some(function(field) {
@@ -5536,9 +5920,11 @@
     var inventoryTracking = $('[data-store-product-field="inventoryTracking"]', form);
     var tracksInventory = !digital && (!inventoryTracking || inventoryTracking.value === 'true');
     setStoreProductFieldVisible(form, 'shippingPreset', physical);
+    setStoreProductFieldVisible(form, 'downloadFileKey', digital && !variantBased);
     setStoreProductFieldVisible(form, 'inventoryTracking', !digital);
     setStoreProductFieldVisible(form, 'inventory', tracksInventory && !variantBased);
     syncStoreProductVariantInventoryVisible(form, tracksInventory);
+    syncStoreProductVariantDownloadVisible(form, digital && variantBased);
     syncStoreProductEditorSections(form);
   }
 
@@ -5551,8 +5937,10 @@
       input = document.createElement('select');
       (opts.options || []).forEach(function(pair) {
         var option = document.createElement('option');
-        option.value = pair[0];
-        option.textContent = pair[1];
+        var optionValue = Array.isArray(pair) ? pair[0] : pair.value;
+        option.value = optionValue;
+        option.textContent = Array.isArray(pair) ? pair[1] : pair.label;
+        if (!Array.isArray(pair) && pair.filename !== undefined) option.dataset.filename = pair.filename;
         input.appendChild(option);
       });
       input.value = String(value);
@@ -5567,6 +5955,7 @@
       if (opts.step) input.step = opts.step;
       if (opts.min) input.min = opts.min;
     }
+    if (opts.required) input.required = true;
     input.className = 'admin-settings__input';
     input.dataset.storeProductField = field;
     label.appendChild(createStoreProductFieldLabel(labelText, field, input, opts.noHelp ? false : opts.help));
@@ -5614,9 +6003,21 @@
     table.hidden = !variants.length;
     var thead = document.createElement('thead');
     var header = document.createElement('tr');
-    ['Label', 'ID', 'SKU', 'Price (USD)', 'Inventory', 'Status', ''].forEach(function(text) {
+    [
+      ['label', 'Label'],
+      ['id', 'ID'],
+      ['sku', 'SKU'],
+      ['downloadFileKey', 'File'],
+      ['price', 'Price (USD)'],
+      ['inventory', 'Inventory'],
+      ['status', 'Status'],
+      ['actions', '']
+    ].forEach(function(pair) {
+      var text = pair[1];
       var th = createElement('th', '', text);
+      th.dataset.storeVariantColumn = pair[0];
       if (text === 'Inventory') th.dataset.storeProductVariantInventoryCell = 'true';
+      if (text === 'File') th.dataset.storeProductVariantDownloadCell = 'true';
       header.appendChild(th);
     });
     thead.appendChild(header);
@@ -5642,12 +6043,15 @@
       ['label', labelValue, 'text'],
       ['id', source.id || '', 'derived'],
       ['sku', source.sku || '', 'derived'],
+      ['downloadFileKey', source.downloadFileKey || '', 'download'],
       ['price', productPrice(source.priceCents !== undefined || source.price !== undefined ? source : product), 'number'],
       ['inventory', source.inventory ?? '', 'number'],
       ['status', source.status || 'active', 'select']
     ].forEach(function(field) {
       var td = document.createElement('td');
+      td.dataset.storeVariantColumn = field[0];
       if (field[0] === 'inventory') td.dataset.storeProductVariantInventoryCell = 'true';
+      if (field[0] === 'downloadFileKey') td.dataset.storeProductVariantDownloadCell = 'true';
       var input;
       if (field[2] === 'derived') {
         var derived = createStoreProductVariantDerivedField(field[0], field[1]);
@@ -5655,6 +6059,16 @@
         td.appendChild(derived.hidden);
         tr.appendChild(td);
         return;
+      } else if (field[2] === 'download') {
+        input = document.createElement('select');
+        downloadFileOptions(field[1], source.downloadFilename).forEach(function(optionData) {
+          var option = document.createElement('option');
+          option.value = optionData.value;
+          option.textContent = optionData.label;
+          option.dataset.filename = optionData.filename || '';
+          input.appendChild(option);
+        });
+        input.value = field[1];
       } else if (field[2] === 'select') {
         input = document.createElement('select');
         [['active', 'Active'], ['draft', 'Draft'], ['archived', 'Archived'], ['sold_out', 'Sold out']].forEach(function(pair) {
@@ -5677,6 +6091,7 @@
       tr.appendChild(td);
     });
     var actionCell = document.createElement('td');
+    actionCell.dataset.storeVariantColumn = 'actions';
     var remove = createElement('button', 'btn btn--secondary btn--small', 'Remove');
     remove.type = 'button';
     remove.dataset.storeProductVariantRemove = 'true';
@@ -5751,6 +6166,7 @@
   }
 
   function readStoreProductEditor(form, intent) {
+    if (storeProductIsCreateForm(form)) syncStoreProductDerivedSku(form);
     var fields = {};
     $all('[data-store-product-field]', form).forEach(function(input) {
       if (input.disabled) return;
@@ -5758,6 +6174,12 @@
       if (key === 'price') fields[key] = Number(input.value || 0);
       else if (key === 'inventory') fields[key] = input.value === '' ? '' : Number(input.value);
       else if (key === 'inventoryTracking') fields[key] = input.value === 'true';
+      else if (key === 'downloadFileKey') {
+        fields[key] = input.value;
+        fields.downloadFilename = input.options && input.selectedIndex >= 0
+          ? (input.options[input.selectedIndex].dataset.filename || input.options[input.selectedIndex].textContent || '')
+          : '';
+      }
       else if (key === 'longContent') {
         try {
           var parsedLongContent = JSON.parse(input.value || '[]');
@@ -5772,6 +6194,7 @@
     if (!isPhysicalFulfillment(fulfillmentType)) fields.shippingPreset = '';
     if (isDigitalFulfillment(fulfillmentType)) fields.inventoryTracking = false;
     var variantsEnabled = $('[data-store-product-variants-enabled]', form);
+    fields.variantBased = Boolean(variantsEnabled && variantsEnabled.value === 'true');
     var variants = variantsEnabled && variantsEnabled.value !== 'true' ? [] : $all('[data-store-product-variant]', form).map(function(row) {
       var variant = {};
       $all('[data-store-variant-field]', row).forEach(function(input) {
@@ -5779,16 +6202,26 @@
         var key = input.dataset.storeVariantField;
         if (key === 'price') variant[key] = Number(input.value || 0);
         else if (key === 'inventory') variant[key] = input.value === '' ? '' : Number(input.value);
+        else if (key === 'downloadFileKey') {
+          variant[key] = input.value;
+          variant.downloadFilename = input.options && input.selectedIndex >= 0
+            ? (input.options[input.selectedIndex].dataset.filename || input.options[input.selectedIndex].textContent || '')
+            : '';
+        }
         else variant[key] = input.value;
       });
       return variant;
     });
-    return {
+    var body = {
       intent: intent || 'publish',
-      productId: form.dataset.storeProductEditor,
+      productId: storeProductIsCreateForm(form)
+        ? (($('[data-store-product-readonly-field="sku"]', form) || {}).value || form.dataset.storeProductEditor)
+        : form.dataset.storeProductEditor,
       fields: fields,
       variants: variants
     };
+    if (storeProductIsCreateForm(form)) body.createProduct = true;
+    return body;
   }
 
   function storeProductEditorSnapshot(form) {
@@ -5798,13 +6231,15 @@
 
   function storeProductEditorHasUnsavedChanges(form) {
     if (!form) return false;
+    if (storeProductIsCreateForm(form)) return true;
     return storeProductEditorSnapshot(form) !== String(form.dataset.storeProductSavedSnapshot || '');
   }
 
   function updateStoreProductEditorDirtyState(form) {
     if (!form) return;
     var publish = $('[data-store-product-publish]', form);
-    setDirtyButtonState(publish, storeProductEditorHasUnsavedChanges(form), 'Publish product', 'Publish product');
+    var label = form.dataset.storeProductActionLabel || 'Publish product';
+    setDirtyButtonState(publish, storeProductEditorHasUnsavedChanges(form), label, label);
   }
 
   function resetStoreProductEditorDirtyBaseline(form) {
@@ -5834,7 +6269,7 @@
         var productId = productSelect.dataset.storeProductSelect;
         if (productSelect.checked) selectedStoreProductIds.add(productId);
         else selectedStoreProductIds.delete(productId);
-        syncStoreProductsBulkControls(root);
+        syncStoreProductsControls(root);
         return;
       }
 
@@ -5846,12 +6281,12 @@
             if (product.productId) selectedStoreProductIds.add(product.productId);
           });
         }
-        syncStoreProductsBulkControls(root);
+        syncStoreProductsControls(root);
       }
 
       var bulkStatus = event.target.closest('[data-store-products-bulk-status]');
       if (bulkStatus) {
-        syncStoreProductsBulkControls(root);
+        syncStoreProductsControls(root);
       }
 
       var variantsEnabled = event.target.closest('[data-store-product-variants-enabled]');
@@ -5861,6 +6296,7 @@
         var product = currentStoreProducts.find(function(item) {
           return item.productId === (form ? form.dataset.storeProductEditor : '');
         }) || {};
+        product = currentStoreProductEditorProduct(form, product);
         var tbody = wrapper ? $('tbody', wrapper) : null;
         if (variantsEnabled.value === 'true' && tbody && tbody.children.length === 0) {
           tbody.appendChild(createStoreProductVariantRow(product, nextStoreProductVariant(product, form)));
@@ -5878,6 +6314,26 @@
         return;
       }
 
+      var orderSave = event.target.closest('[data-store-products-order-save]');
+      if (orderSave) {
+        saveStoreProductOrder(orderSave);
+        return;
+      }
+
+      var createProduct = event.target.closest('[data-store-product-create]');
+      if (createProduct) {
+        editingProductId = STORE_PRODUCT_CREATE_ID;
+        selectedStoreProductIds.clear();
+        renderStoreProducts({
+          products: currentStoreProducts,
+          rows: currentStoreProductRows,
+          totals: currentStoreProductTotals,
+          catalog: { shippingPresets: currentStoreShippingPresets }
+        }, { preserveOrderBaseline: true });
+        scrollStoreProductEditorIntoView(STORE_PRODUCT_CREATE_ID);
+        return;
+      }
+
       var variantAdd = event.target.closest('[data-store-product-variant-add]');
       if (variantAdd) {
         var addForm = variantAdd.closest('[data-store-product-editor]');
@@ -5886,6 +6342,7 @@
         var addProduct = currentStoreProducts.find(function(item) {
           return item.productId === (addForm ? addForm.dataset.storeProductEditor : '');
         }) || {};
+        addProduct = currentStoreProductEditorProduct(addForm, addProduct);
         if (addTbody) {
           addTbody.appendChild(createStoreProductVariantRow(addProduct, nextStoreProductVariant(addProduct, addForm)));
           syncStoreProductVariantsSection(addWrapper);
@@ -5950,7 +6407,7 @@
           rows: currentStoreProductRows,
           totals: currentStoreProductTotals,
           catalog: { shippingPresets: currentStoreShippingPresets }
-        });
+        }, { preserveOrderBaseline: true });
         scrollStoreProductEditorIntoView(editingProductId);
         return;
       }
@@ -5959,6 +6416,103 @@
         editingProductId = '';
         loadStoreProducts();
       }
+    });
+    root.addEventListener('dragstart', function(event) {
+      var row = event.target.closest('[data-store-product-order-row]');
+      if (!row || isStoreProductControlTarget(event.target)) {
+        event.preventDefault();
+        return;
+      }
+      storeProductDraggingId = String(row.dataset.storeProductOrderRow || '').trim();
+      row.classList.add('is-dragging');
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', storeProductDraggingId);
+      }
+    });
+    root.addEventListener('dragover', function(event) {
+      var row = event.target.closest('[data-store-product-order-row]');
+      if (!row || !storeProductDraggingId || row.dataset.storeProductOrderRow === storeProductDraggingId) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      markStoreProductDropTarget(root, row, storeProductRowDropBefore(row, event.clientY));
+    });
+    root.addEventListener('dragleave', function(event) {
+      var row = event.target.closest('[data-store-product-order-row]');
+      if (!row) return;
+      row.classList.remove('is-drop-before', 'is-drop-after');
+    });
+    root.addEventListener('drop', function(event) {
+      var row = event.target.closest('[data-store-product-order-row]');
+      if (!row) return;
+      var targetId = String(row.dataset.storeProductOrderRow || '').trim();
+      var sourceId = storeProductDraggingId || (event.dataTransfer ? event.dataTransfer.getData('text/plain') : '');
+      row.classList.remove('is-drop-before', 'is-drop-after');
+      if (!sourceId || !targetId || sourceId === targetId) return;
+      event.preventDefault();
+      reorderStoreProducts(sourceId, targetId, storeProductRowDropBefore(row, event.clientY));
+    });
+    root.addEventListener('dragend', function() {
+      storeProductDraggingId = '';
+      $all('[data-store-product-order-row]', root).forEach(function(row) {
+        row.classList.remove('is-dragging', 'is-drop-before', 'is-drop-after');
+      });
+    });
+    root.addEventListener('keydown', function(event) {
+      var row = event.target.closest('[data-store-product-order-row]');
+      if (!row || event.target !== row || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+      event.preventDefault();
+      moveStoreProductOneStep(row.dataset.storeProductOrderRow, event.key === 'ArrowUp' ? -1 : 1);
+    });
+    root.addEventListener('touchstart', function(event) {
+      if (event.touches.length !== 1 || isStoreProductControlTarget(event.target)) return;
+      var row = event.target.closest('[data-store-product-order-row]');
+      if (!row) return;
+      resetStoreProductTouchDrag(root);
+      var touch = event.touches[0];
+      var sourceId = String(row.dataset.storeProductOrderRow || '').trim();
+      storeProductTouchDrag = {
+        active: false,
+        beforeTarget: true,
+        row: row,
+        sourceId: sourceId,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        targetId: '',
+        timer: window.setTimeout(function() {
+          if (!storeProductTouchDrag || storeProductTouchDrag.sourceId !== sourceId) return;
+          storeProductTouchDrag.active = true;
+          storeProductDraggingId = sourceId;
+          row.classList.remove('is-touch-pending');
+          row.classList.add('is-dragging');
+        }, STORE_PRODUCT_TOUCH_DRAG_DELAY)
+      };
+      row.classList.add('is-touch-pending');
+    }, { passive: true });
+    root.addEventListener('touchmove', function(event) {
+      if (!storeProductTouchDrag || event.touches.length !== 1) return;
+      var touch = event.touches[0];
+      var deltaX = Math.abs(touch.clientX - storeProductTouchDrag.startX);
+      var deltaY = Math.abs(touch.clientY - storeProductTouchDrag.startY);
+      if (!storeProductTouchDrag.active && Math.max(deltaX, deltaY) > STORE_PRODUCT_TOUCH_DRAG_SLOP) {
+        resetStoreProductTouchDrag(root);
+        return;
+      }
+      if (!storeProductTouchDrag.active) return;
+      event.preventDefault();
+      updateStoreProductTouchTarget(root, touch);
+    }, { passive: false });
+    root.addEventListener('touchend', function() {
+      if (!storeProductTouchDrag) return;
+      var sourceId = storeProductTouchDrag.sourceId;
+      var targetId = storeProductTouchDrag.targetId;
+      var beforeTarget = storeProductTouchDrag.beforeTarget;
+      var shouldReorder = storeProductTouchDrag.active && sourceId && targetId && sourceId !== targetId;
+      resetStoreProductTouchDrag(root);
+      if (shouldReorder) reorderStoreProducts(sourceId, targetId, beforeTarget);
+    });
+    root.addEventListener('touchcancel', function() {
+      resetStoreProductTouchDrag(root);
     });
     root.addEventListener('submit', function(event) {
       var form = event.target.closest('[data-store-product-editor]');
@@ -5972,7 +6526,7 @@
       }
       var publish = $('[data-store-product-publish]', form);
       if (publish) publish.disabled = true;
-      setStatus($('#admin-store-products-status'), 'Publishing product...');
+      setStatus($('#admin-store-products-status'), storeProductIsCreateForm(form) ? 'Creating product...' : 'Publishing product...');
       requestJson('/admin/store/products/publish', {
         method: 'POST',
         body: body
@@ -5989,38 +6543,92 @@
     });
   }
 
+  function createStoreDownloadCreateField(labelText, field, control, helpText) {
+    var label = createElement('label', 'admin-store-downloads__field');
+    label.dataset.storeDownloadCreateFieldWrapper = field;
+    var labelRow = createElement('span', 'admin-store-downloads__field-label', labelText);
+    var help = createHelp({
+      label: labelText,
+      path: 'store-download-create-' + field,
+      help: helpText
+    }, control);
+    if (help) labelRow.appendChild(help);
+    control.classList.add('admin-settings__input');
+    control.dataset.storeDownloadCreateField = field;
+    label.appendChild(labelRow);
+    label.appendChild(control);
+    return label;
+  }
+
+  function createStoreDownloadCreateForm() {
+    var form = createElement('form', 'admin-store-downloads__create');
+    form.dataset.storeDownloadCreate = 'true';
+    var fields = createElement('div', 'admin-store-downloads__create-fields');
+    var file = document.createElement('input');
+    file.type = 'file';
+    file.required = true;
+
+    fields.appendChild(createStoreDownloadCreateField(
+      'File',
+      'file',
+      file,
+      'Upload a reusable download file, then select it from a digital product or variant.'
+    ));
+    form.appendChild(fields);
+    var actions = createElement('div', 'admin-store-downloads__create-actions');
+    var submit = createElement('button', 'btn', 'Upload file');
+    submit.type = 'submit';
+    submit.dataset.storeDownloadCreateSubmit = 'true';
+    actions.appendChild(submit);
+    form.appendChild(actions);
+    return form;
+  }
+
+  function readStoreDownloadCreateForm(form, file, content) {
+    return {
+      filename: file.name,
+      contentType: file.type || 'application/octet-stream',
+      content: content
+    };
+  }
+
   function renderStoreDownloads(data) {
     var root = $('#admin-store-downloads-results');
     if (!root) return;
     clear(root);
-    var rows = Array.isArray(data.rows) ? data.rows : [];
-    if (!rows.length) {
+    var files = Array.isArray(data.files) ? data.files : [];
+    currentStoreDownloadFiles = files.length ? files : currentStoreDownloadFiles;
+    root.appendChild(createStoreDownloadCreateForm());
+    if (!files.length) {
       root.appendChild(createElement('p', 'admin-app__muted', 'No Store downloads are configured.'));
       return;
     }
     var table = createElement('table', 'admin-store-downloads__table');
     var thead = document.createElement('thead');
     var header = document.createElement('tr');
-    ['Download', 'Status', 'File', 'Uploaded', 'Replace'].forEach(function(text) {
+    var columns = ['File', 'Status', 'Attached to', 'Uploaded', 'Replace'];
+    columns.forEach(function(text) {
       header.appendChild(createElement('th', '', text));
     });
     thead.appendChild(header);
     table.appendChild(thead);
     var tbody = document.createElement('tbody');
-    rows.forEach(function(row) {
+    files.forEach(function(row) {
       var tr = document.createElement('tr');
-      tr.appendChild(createElement('td', '', row.label || row.productId || ''));
-      tr.appendChild(createElement('td', '', row.status || (row.ready ? 'ready' : 'missing')));
-      tr.appendChild(createElement('td', '', row.filename || row.fileKey || ''));
-      tr.appendChild(createElement('td', '', formatDate(row.uploadedAt)));
-      var uploadCell = document.createElement('td');
       var input = document.createElement('input');
       input.type = 'file';
       input.dataset.storeDownloadUpload = 'true';
       input.dataset.productId = row.productId || '';
       input.dataset.variantId = row.variantId || '';
-      uploadCell.appendChild(input);
-      tr.appendChild(uploadCell);
+      input.dataset.fileKey = row.fileKey || '';
+      var attachedTo = Array.isArray(row.attachedTo) && row.attachedTo.length
+        ? row.attachedTo.map(function(item) { return item.label || item.productId || item.sku || ''; }).filter(Boolean).join(', ')
+        : 'Not attached';
+      tr.appendChild(createLabeledTableCell('File', row.filename || row.fileKey || '', 'admin-store-downloads__download'));
+      tr.appendChild(createLabeledTableCell('Status', row.status || (row.ready ? 'ready' : 'missing'), 'admin-store-downloads__status-cell'));
+      tr.appendChild(createLabeledTableCell('Attached to', attachedTo, 'admin-store-downloads__file'));
+      tr.appendChild(createLabeledTableCell('Uploaded', formatDate(row.uploadedAt), 'admin-store-downloads__uploaded'));
+      tr.appendChild(createLabeledTableCell('Replace', input, 'admin-store-downloads__upload'));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -6051,12 +6659,53 @@
   function setupStoreDownloadsEvents() {
     var root = $('#admin-store-downloads-results');
     if (!root) return;
+    root.addEventListener('submit', function(event) {
+      var form = event.target.closest('[data-store-download-create]');
+      if (!form) return;
+      event.preventDefault();
+      var fileInput = $('[data-store-download-create-field="file"]', form);
+      var file = fileInput && fileInput.files ? fileInput.files[0] : null;
+      if (!file) {
+        setStatus($('#admin-store-downloads-status'), 'Choose a file before uploading.', true);
+        return;
+      }
+      var submit = $('[data-store-download-create-submit]', form);
+      if (submit) submit.disabled = true;
+      setStatus($('#admin-store-downloads-status'), 'Uploading file...');
+      fileToDataUrl(file).then(function(content) {
+        return requestJson('/admin/store/downloads/create', {
+          method: 'POST',
+          body: readStoreDownloadCreateForm(form, file, content)
+        });
+      }).then(function(data) {
+        storeProductsLoaded = false;
+        var message = (data.filename || file.name) + ' uploaded.';
+        return loadStoreDownloads().finally(function() {
+          setStatus($('#admin-store-downloads-status'), message);
+        });
+      }).catch(function(error) {
+        if (submit) submit.disabled = false;
+        setStatus($('#admin-store-downloads-status'), formatError(error), true);
+      });
+    });
     root.addEventListener('change', function(event) {
       var input = event.target.closest('[data-store-download-upload]');
       if (!input || !input.files || !input.files[0]) return;
       var file = input.files[0];
       setStatus($('#admin-store-downloads-status'), 'Uploading ' + file.name + '...');
       fileToDataUrl(file).then(function(content) {
+        var fileKey = input.dataset.fileKey || '';
+        if (fileKey) {
+          return requestJson('/admin/store/downloads/create', {
+            method: 'POST',
+            body: {
+              fileKey: fileKey,
+              filename: file.name,
+              contentType: file.type || 'application/octet-stream',
+              content: content
+            }
+          });
+        }
         return requestJson('/admin/store/downloads/upload', {
           method: 'POST',
           body: {

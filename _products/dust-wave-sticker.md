@@ -7,7 +7,7 @@ image: "/assets/images/sticker-glove.png"
 type: sticker
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 20
 shipping_preset: sticker
 tax_category: standard

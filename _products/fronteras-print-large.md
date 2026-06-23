@@ -7,7 +7,7 @@ image: "/assets/images/print.jpg"
 type: print
 fulfillment_type: physical
 status: active
-event: fronteras
+category: fronteras
 order: 350
 shipping_preset: poster
 tax_category: standard

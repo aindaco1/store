@@ -68,6 +68,47 @@ Store is not deployed yet. The roadmap is focused on reaching a clean first prod
 
 - None before first production launch.
 
+## Cross-Cutting Roadmap
+
+These features are not separate product surfaces. They should land as part of normal Store hardening and be kept DRY with the existing docs:
+
+- [Performance](PERFORMANCE.md)
+- [Security](SECURITY.md)
+- [Accessibility](ACCESSIBILITY.md)
+- [I18N](I18N.md)
+
+### Performance
+
+- Add a lightweight performance budget for storefront, cart, checkout, and admin routes, with tracked limits for JavaScript size, CSS size, image weight, and Worker response time.
+- Add a repeatable Lighthouse/PageSpeed check for core public routes before production deploys.
+- Surface basic Worker timing percentiles in admin Plan Usage or a dedicated diagnostics view, using existing performance observation data.
+- Expand media optimization reporting so product image uploads clearly show original size, generated derivative size, and expected storefront dimensions.
+- Add cache-status checks for static assets, catalog JSON, and private/no-store routes to catch accidental caching regressions.
+
+### Security
+
+- Add a pre-launch security checklist view in admin that mirrors the security guide: secrets, webhook signatures, R2, CSP, admin users, Turnstile, and production mode.
+- Add an admin session/device review screen with recent login metadata and explicit session revocation.
+- Expand audit events into a searchable admin audit view, not just CSV export.
+- Add signed-download abuse controls: per-order attempt counts, soft lockouts, and clearer admin reissue history.
+- Add scheduled secret/config posture checks that warn when production-required secrets, webhook endpoints, or allowed origins drift.
+
+### Accessibility
+
+- Add an admin accessibility smoke-test checklist for keyboard, screen reader, reduced motion, focus order, and mobile overflow.
+- Add visible status summaries for async admin actions that are consistently announced to assistive technology.
+- Expand automated axe coverage to checkout, cart, order lookup, Order Success, product editing, and download creation.
+- Add regression fixtures for large text, long product names, long filenames, and high-zoom/tablet admin layouts.
+- Add a documented manual QA pass for VoiceOver and NVDA before launch.
+
+### I18N
+
+- Move remaining hardcoded public/admin runtime strings into `_data/i18n/*` and runtime message JSON.
+- Add localization coverage for download creation, product editing, order lookup, checkout errors, and fulfillment status copy.
+- Add a translation completeness check that compares every supported locale against English keys.
+- Add localized email template coverage for receipts, order lookup, digital downloads, tickets, RSVPs, and admin auth.
+- Add localized product metadata QA for canonical URLs, alternate links, JSON-LD `availableLanguage`, and language switcher behavior.
+
 ## Operational Roadmap
 
 - None before first production launch.

@@ -7,7 +7,7 @@ image: "/assets/images/sexpot-poster.png"
 type: physical
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 90
 shipping_preset: poster
 tax_category: standard

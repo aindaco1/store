@@ -217,7 +217,7 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
       subtotalCents: unitPriceCents * quantity,
       currency: product.currency || catalog.defaults?.currency || 'USD',
       fulfillmentType,
-      event: product.event || '',
+      event: product.event || product.collection || '',
       collection: product.collection || product.event || '',
       category: product.category || '',
       shippable,

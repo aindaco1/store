@@ -13,7 +13,23 @@
   {%- endcase -%}
 {%- endif -%}
 
+{%- assign category_field = product.category | default: "" | strip -%}
+{%- assign category_field_id = category_field | slugify -%}
+{%- assign category_matches_collection = false -%}
+{%- if category_field != "" -%}
+  {%- for collection in site.storefront.collections -%}
+    {%- assign configured_collection_id = collection.id | slugify -%}
+    {%- if configured_collection_id == category_field_id -%}
+      {%- assign category_matches_collection = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+
 {%- assign explicit_collection = product.store_collection | default: product.product_collection | default: "" | strip -%}
+{%- if explicit_collection == "" and category_matches_collection -%}
+  {%- assign explicit_collection = category_field -%}
+{%- endif -%}
 {%- assign event_collection = product.event | default: "" | strip -%}
 {%- if explicit_collection != "" -%}
   {%- assign collection_id = explicit_collection | slugify -%}
@@ -36,7 +52,10 @@
   {%- assign collection_label = collection_id | replace: "-", " " | capitalize -%}
 {%- endif -%}
 
-{%- assign explicit_category = product.category | default: "" | strip -%}
+{%- assign explicit_category = product.storefront_category | default: product.product_category | default: "" | strip -%}
+{%- if explicit_category == "" and category_field != "" and category_matches_collection != true -%}
+  {%- assign explicit_category = category_field -%}
+{%- endif -%}
 {%- assign category_id = "" -%}
 {%- if explicit_category != "" -%}
   {%- assign category_id = explicit_category | slugify -%}

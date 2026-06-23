@@ -7,7 +7,7 @@ image: "/assets/images/dustwave-tshirt.png"
 type: shirt
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 10
 shipping_preset: tshirt
 tax_category: standard

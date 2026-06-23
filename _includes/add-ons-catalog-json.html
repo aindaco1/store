@@ -37,6 +37,8 @@
           {%- endif -%}
           {%- capture merchandising_type -%}{% include product-merchandising-type.html product=product %}{%- endcapture -%}
           {%- assign merchandising_type = merchandising_type | strip -%}
+          {%- capture product_collection -%}{% include product-taxonomy.html product=product mode="collection" %}{%- endcapture -%}
+          {%- assign product_collection = product_collection | strip -%}
           {%- assign resolved_shipping = product.shipping -%}
           {%- if resolved_shipping == nil and fulfillment_type == "physical" and shipping_preset -%}
             {%- assign resolved_shipping = site.shipping.presets[shipping_preset] -%}
@@ -55,7 +57,7 @@
             "type": {{ merchandising_type | jsonify }},
             "fulfillment_type": {{ fulfillment_type | jsonify }},
             "category": {{ fulfillment_type | jsonify }},
-            "event": {{ product.event | default: "" | jsonify }},
+            "collection": {{ product_collection | jsonify }},
             "shipping_preset": {{ shipping_preset | jsonify }},
             "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %},
             "source_url": {{ product.url | absolute_url | jsonify }},

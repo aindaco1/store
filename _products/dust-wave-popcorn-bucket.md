@@ -7,7 +7,7 @@ image: "/assets/images/evening-bucket.png"
 type: bucket
 fulfillment_type: physical
 status: active
-event: dustwave
+category: dustwave
 order: 70
 shipping_preset: parcel
 tax_category: standard
