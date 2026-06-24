@@ -22,8 +22,12 @@
   var storeAnalyticsLoaded = false;
   var storeOrdersLoaded = false;
   var storeProductsLoaded = false;
+  var storeCouponsLoaded = false;
   var storeDownloadsLoaded = false;
   var currentStoreProducts = [];
+  var currentStoreCoupons = [];
+  var currentStoreCouponProducts = [];
+  var editingStoreCouponCode = '';
   var currentStoreDownloadFiles = [];
   var currentStoreProductRows = [];
   var currentStoreProductTotals = {};
@@ -39,6 +43,7 @@
   var storeProductPreviewTimers = new Map();
   var storeProductPreviewRequestCounter = 0;
   var storeProductMediaCache = new Map();
+  var SNIPCART_IMPORT_MAX_CSV_BYTES = 1024 * 1024;
   var storeOrderNextCursor = null;
   var storeOrderLoadTimer = null;
   var adminFieldIdCounter = 0;
@@ -53,16 +58,18 @@
 
   var labels = {
 	    en: {
-	      settings: 'Settings',
+      settings: 'Settings',
       'store-products': 'Products',
+      'store-coupons': 'Coupons',
       'store-downloads': 'Downloads',
       'store-orders': 'Orders',
       'store-analytics': 'Analytics',
       'store-marketing': 'Marketing'
     },
 	    es: {
-	      settings: 'Configuracion',
+      settings: 'Configuracion',
       'store-products': 'Productos',
+      'store-coupons': 'Cupones',
       'store-downloads': 'Descargas',
       'store-orders': 'Pedidos',
       'store-analytics': 'Analitica',
@@ -71,16 +78,18 @@
   };
   var compactLabels = {
 	    en: {
-	      settings: 'Settings',
+      settings: 'Settings',
       'store-products': 'Products',
+      'store-coupons': 'Coupons',
       'store-downloads': 'Downloads',
       'store-orders': 'Orders',
       'store-analytics': 'Stats',
       'store-marketing': 'Mktg'
     },
 	    es: {
-	      settings: 'Config.',
+      settings: 'Config.',
       'store-products': 'Productos',
+      'store-coupons': 'Cupones',
       'store-downloads': 'Descargas',
       'store-orders': 'Pedidos',
       'store-analytics': 'Datos',
@@ -319,6 +328,65 @@
     return cell;
   }
 
+  function ensureElementId(element, prefix) {
+    if (element.id) return element.id;
+    element.id = String(prefix || 'admin-control') + '-' + String(++adminFieldIdCounter);
+    return element.id;
+  }
+
+  function adminFilePickerFilenameNode(input) {
+    if (!input || !input.id) return null;
+    return $all('[data-admin-file-picker-filename-for]').find(function(node) {
+      return node.dataset.adminFilePickerFilenameFor === input.id;
+    }) || null;
+  }
+
+  function updateAdminFilePickerFilename(input, file) {
+    var filename = adminFilePickerFilenameNode(input);
+    if (!filename) return;
+    var selected = file || input && input.files && input.files[0];
+    filename.textContent = selected && selected.name
+      ? selected.name
+      : (input.dataset.adminFilePickerEmptyLabel || 'No file chosen');
+  }
+
+  function createAdminFilePicker(input, options) {
+    var opts = options || {};
+    var inputId = ensureElementId(input, opts.idPrefix || 'admin-file-picker');
+    var picker = createElement('div', 'admin-file-picker' + (opts.className ? ' ' + opts.className : ''));
+    var button = createElement('label', 'btn btn--secondary admin-file-picker__button' + (opts.buttonClass ? ' ' + opts.buttonClass : ''), opts.buttonLabel || 'Choose file');
+    var filename = createElement('span', 'admin-file-picker__filename', opts.emptyLabel || 'No file chosen');
+    input.classList.add('admin-file-picker__input');
+    input.dataset.adminFilePickerInput = 'true';
+    input.dataset.adminFilePickerEmptyLabel = opts.emptyLabel || 'No file chosen';
+    button.setAttribute('for', inputId);
+    button.setAttribute('role', 'button');
+    button.tabIndex = 0;
+    filename.dataset.adminFilePickerFilenameFor = inputId;
+    if (opts.filenameClass) filename.classList.add(opts.filenameClass);
+    input.addEventListener('change', function() {
+      updateAdminFilePickerFilename(input);
+    });
+    picker.appendChild(input);
+    picker.appendChild(button);
+    picker.appendChild(filename);
+    return picker;
+  }
+
+  function setupAdminFilePickerEvents() {
+    document.addEventListener('keydown', function(event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      var label = event.target && event.target.closest
+        ? event.target.closest('.admin-file-picker__button[for]')
+        : null;
+      if (!label) return;
+      var input = document.getElementById(label.getAttribute('for') || '');
+      if (!input) return;
+      event.preventDefault();
+      input.click();
+    });
+  }
+
   function imageUploadOptions(row) {
     var isLogo = row.path === 'platform.logo_path';
     return {
@@ -353,7 +421,6 @@
     var wrapper = createElement('div', 'admin-settings__image-field');
     var preview = createElement('div', 'admin-settings__image-preview');
     var uploadRow = createElement('div', 'admin-settings__image-upload');
-    var uploadLabel = createElement('label', 'btn btn--secondary', options.uploadLabel);
     var uploadInput = document.createElement('input');
     var uploadStatus = createElement('span', 'admin-settings__image-status', '');
 
@@ -408,12 +475,17 @@
         setStatus(uploadStatus, formatError(error), true);
       }).finally(function() {
         uploadInput.value = '';
+        updateAdminFilePickerFilename(uploadInput);
       });
     });
 
     wrapper.appendChild(control);
-    uploadLabel.appendChild(uploadInput);
-    uploadRow.appendChild(uploadLabel);
+    uploadRow.appendChild(createAdminFilePicker(uploadInput, {
+      buttonLabel: options.uploadLabel,
+      className: 'admin-file-picker--full',
+      emptyLabel: 'No file chosen',
+      idPrefix: 'admin-settings-image-upload'
+    }));
     uploadRow.appendChild(uploadStatus);
     wrapper.appendChild(preview);
     wrapper.appendChild(uploadRow);
@@ -575,6 +647,7 @@
     if (key === 'store-marketing') updateStoreMarketingBuilder();
     if (key === 'store-orders' && !storeOrdersLoaded) loadStoreOrders();
     if (key === 'store-products' && !storeProductsLoaded) loadStoreProducts();
+    if (key === 'store-coupons' && !storeCouponsLoaded) loadStoreCoupons();
     if (key === 'store-downloads' && !storeDownloadsLoaded) loadStoreDownloads();
   }
 
@@ -787,6 +860,117 @@
     return svg;
   }
 
+  function clampHelpPosition(value, min, max) {
+    if (max < min) return min;
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function resetHelpTooltipPosition(tooltip) {
+    [
+      'bottom',
+      'left',
+      'maxHeight',
+      'maxWidth',
+      'overflowY',
+      'position',
+      'right',
+      'top',
+      'transform',
+      'visibility',
+      'width',
+      'zIndex'
+    ].forEach(function(property) {
+      tooltip.style[property] = '';
+    });
+  }
+
+  function positionHelpTooltip(wrapper, button, tooltip) {
+    if (!wrapper || !button || !tooltip) return;
+    var viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    var margin = 16;
+    var gap = 8;
+    var buttonRect = button.getBoundingClientRect();
+    tooltip.style.position = 'fixed';
+    tooltip.style.transform = 'none';
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.zIndex = '1000';
+    tooltip.style.maxHeight = Math.max(120, viewportHeight - margin * 2) + 'px';
+    tooltip.style.overflowY = 'auto';
+
+    if (viewportWidth <= 900) {
+      tooltip.style.left = margin + 'px';
+      tooltip.style.right = margin + 'px';
+      tooltip.style.top = 'auto';
+      tooltip.style.bottom = margin + 'px';
+      tooltip.style.width = 'auto';
+      tooltip.style.maxWidth = 'none';
+      tooltip.style.visibility = '';
+      return;
+    }
+
+    tooltip.style.left = '0px';
+    tooltip.style.right = 'auto';
+    tooltip.style.top = '0px';
+    tooltip.style.bottom = 'auto';
+    tooltip.style.width = 'max-content';
+    tooltip.style.maxWidth = Math.min(352, Math.max(160, viewportWidth - margin * 2)) + 'px';
+
+    var tooltipRect = tooltip.getBoundingClientRect();
+    var tooltipWidth = tooltipRect.width;
+    var tooltipHeight = tooltipRect.height;
+    var left = buttonRect.left + buttonRect.width / 2 - tooltipWidth / 2;
+    if (wrapper.classList.contains('admin-settings__help--edge-start')) {
+      left = buttonRect.left;
+    } else if (wrapper.classList.contains('admin-settings__help--edge-end')) {
+      left = buttonRect.right - tooltipWidth;
+    }
+    var top = buttonRect.bottom + gap;
+    if (top + tooltipHeight > viewportHeight - margin) {
+      top = buttonRect.top - tooltipHeight - gap;
+    }
+    tooltip.style.left = clampHelpPosition(left, margin, viewportWidth - tooltipWidth - margin) + 'px';
+    tooltip.style.top = clampHelpPosition(top, margin, viewportHeight - tooltipHeight - margin) + 'px';
+    tooltip.style.visibility = '';
+  }
+
+  function wireHelpTooltip(wrapper, button, tooltip) {
+    if (!wrapper || !button || !tooltip) return;
+    var active = false;
+    var reposition = function() {
+      if (active) positionHelpTooltip(wrapper, button, tooltip);
+    };
+    var show = function() {
+      active = true;
+      tooltip.classList.add('is-visible');
+      positionHelpTooltip(wrapper, button, tooltip);
+      window.addEventListener('resize', reposition);
+      window.addEventListener('scroll', reposition, true);
+    };
+    var hide = function() {
+      active = false;
+      tooltip.classList.remove('is-visible');
+      resetHelpTooltipPosition(tooltip);
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+    var scheduleHide = function() {
+      window.setTimeout(function() {
+        if (!wrapper.matches(':hover') && !wrapper.contains(document.activeElement)) hide();
+      }, 0);
+    };
+    wrapper.addEventListener('mouseenter', show);
+    wrapper.addEventListener('mouseleave', scheduleHide);
+    wrapper.addEventListener('focusin', show);
+    wrapper.addEventListener('focusout', scheduleHide);
+    button.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        hide();
+        button.blur();
+      }
+    });
+  }
+
   function normalizedHeadingKey(label) {
     return String(label || '')
       .trim()
@@ -823,6 +1007,7 @@
     if (describedElement) describedElement.setAttribute('aria-describedby', id);
     wrapper.appendChild(button);
     wrapper.appendChild(help);
+    wireHelpTooltip(wrapper, button, help);
     return wrapper;
   }
 
@@ -3011,7 +3196,104 @@
     downloadStoreCsv('/admin/store/attendees.csv', 'store-attendees.csv', 'Preparing attendee CSV...', 'Attendee CSV download started.');
   }
 
+  function setupStoreOrdersFieldHelp() {
+    $all('[data-store-orders-help]').forEach(function(label) {
+      if (label.dataset.storeOrdersHelpEnhanced === 'true') return;
+      var control = label.htmlFor ? document.getElementById(label.htmlFor) : null;
+      var help = createHelp({
+        label: label.dataset.storeOrdersHelpLabel || label.textContent || 'Orders field',
+        path: label.dataset.storeOrdersHelpPath || label.htmlFor || 'store-orders-field',
+        help: label.dataset.storeOrdersHelpText || ''
+      }, control, {
+        className: 'admin-settings__help--edge-start'
+      });
+      if (help) {
+        var parent = label.parentNode;
+        var row = parent && parent.classList && parent.classList.contains('admin-store-orders__label-row')
+          ? parent
+          : createElement('div', 'admin-store-orders__label-row');
+        if (parent !== row && parent) {
+          parent.insertBefore(row, label);
+          row.appendChild(label);
+        }
+        row.appendChild(help);
+      }
+      label.dataset.storeOrdersHelpEnhanced = 'true';
+    });
+  }
+
+  function formatSnipcartImportSummary(data) {
+    var parts = [];
+    if (data && data.rowCount !== undefined && data.parsedOrderCount !== undefined) {
+      parts.push(String(data.rowCount || 0) + ' CSV row' + (data.rowCount === 1 ? '' : 's'));
+      parts.push(String(data.parsedOrderCount || 0) + ' legacy order' + (data.parsedOrderCount === 1 ? '' : 's'));
+    }
+    if (data && data.skippedOrderCount) {
+      parts.push(String(data.skippedOrderCount) + ' skipped');
+    }
+    if (data && data.failedOrderCount) {
+      parts.push(String(data.failedOrderCount) + ' failed');
+    }
+    if (data && Array.isArray(data.warnings) && data.warnings.length) {
+      parts.push(String(data.warnings.length) + ' warning' + (data.warnings.length === 1 ? '' : 's'));
+    }
+    return parts.join(' / ');
+  }
+
+  function updateSnipcartImportFilename(file) {
+    var input = $('#admin-store-orders-snipcart-file');
+    if (input) updateAdminFilePickerFilename(input, file);
+  }
+
+  function importSnipcartOrders() {
+    var input = $('#admin-store-orders-snipcart-file');
+    var button = $('#admin-store-orders-snipcart-import');
+    var status = $('#admin-store-orders-status');
+    var summary = $('#admin-store-orders-import-summary');
+    var file = input && input.files ? input.files[0] : null;
+    if (!file) {
+      setStatus(status, 'Choose a Snipcart CSV file before importing.', true);
+      return;
+    }
+    if (file.size > SNIPCART_IMPORT_MAX_CSV_BYTES) {
+      setStatus(status, 'Snipcart CSV must be 1 MB or smaller.', true);
+      return;
+    }
+
+    if (button) button.disabled = true;
+    setStatus(status, 'Reading Snipcart CSV...');
+    if (summary) summary.textContent = '';
+    fileToText(file).then(function(csv) {
+      setStatus(status, 'Importing Snipcart orders...');
+      return requestJson('/admin/store/orders/import-snipcart', {
+        method: 'POST',
+        body: {
+          filename: file.name,
+          csv: csv
+        }
+      });
+    }).then(function(data) {
+      var message = data.message || 'Snipcart import complete.';
+      var summaryText = formatSnipcartImportSummary(data);
+      if (summary) summary.textContent = summaryText;
+      if (input) input.value = '';
+      updateSnipcartImportFilename(null);
+      if (Number(data.importedOrderCount || 0) > 0) {
+        return loadStoreOrders().then(function() {
+          setStatus(status, message, Number(data.failedOrderCount || 0) > 0);
+        });
+      }
+      setStatus(status, message, Number(data.failedOrderCount || 0) > 0);
+      return null;
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+    }).finally(function() {
+      if (button) button.disabled = false;
+    });
+  }
+
   function setupStoreOrdersEvents() {
+    setupStoreOrdersFieldHelp();
     var filters = $('#admin-store-order-filters');
     if (filters) {
       filters.addEventListener('submit', function(event) {
@@ -3025,6 +3307,15 @@
     if (exportButton) exportButton.addEventListener('click', downloadStoreOrdersCsv);
     var attendeeExportButton = $('#admin-store-attendees-export');
     if (attendeeExportButton) attendeeExportButton.addEventListener('click', downloadStoreAttendeesCsv);
+    var snipcartImportButton = $('#admin-store-orders-snipcart-import');
+    if (snipcartImportButton) snipcartImportButton.addEventListener('click', importSnipcartOrders);
+    var snipcartFileInput = $('#admin-store-orders-snipcart-file');
+    if (snipcartFileInput) {
+      snipcartFileInput.addEventListener('change', function() {
+        var file = snipcartFileInput.files && snipcartFileInput.files[0];
+        updateSnipcartImportFilename(file);
+      });
+    }
     var next = $('#admin-store-orders-next');
     if (next) {
       next.addEventListener('click', function() {
@@ -3987,7 +4278,6 @@
     control.value = product.image || '';
     var preview = createElement('div', 'admin-settings__image-preview admin-store-products__image-preview');
     var actions = createElement('div', 'admin-store-products__image-actions');
-    var uploadLabel = createElement('label', 'btn btn--secondary', 'Upload image');
     var uploadInput = document.createElement('input');
     var choose = createElement('button', 'btn btn--secondary', 'Choose existing');
     var status = createElement('span', 'admin-settings__image-status', '');
@@ -4023,6 +4313,7 @@
         productUploadStatus(status, formatError(error), true);
       }).finally(function() {
         uploadInput.value = '';
+        updateAdminFilePickerFilename(uploadInput);
       });
     });
 
@@ -4038,8 +4329,12 @@
       });
     });
 
-    uploadLabel.appendChild(uploadInput);
-    actions.appendChild(uploadLabel);
+    actions.appendChild(createAdminFilePicker(uploadInput, {
+      buttonLabel: 'Upload image',
+      className: 'admin-file-picker--compact',
+      emptyLabel: 'No file chosen',
+      idPrefix: 'admin-store-product-image-upload'
+    }));
     actions.appendChild(choose);
     actions.appendChild(status);
     wrapper.appendChild(control);
@@ -4683,7 +4978,6 @@
   function storeProductDescriptionUploadField(context, block, index, options) {
     var wrap = createElement('div', 'admin-content-block__field admin-content-block__media-upload-field');
     var uploadRow = createElement('div', 'admin-settings__image-upload admin-content-block__media-upload');
-    var label = createElement('label', 'btn btn--secondary btn--small', options && options.buttonLabel || 'Upload image');
     var input = document.createElement('input');
     var status = createElement('span', 'admin-settings__image-status admin-content-block__media-status', '');
     input.type = 'file';
@@ -4692,8 +4986,13 @@
     input.dataset.contentAction = options && options.action || 'select-media-upload';
     if (options && options.imageIndex !== undefined) input.dataset.contentImageIndex = String(options.imageIndex);
     input.setAttribute('aria-label', options && options.buttonLabel || 'Upload image');
-    label.appendChild(input);
-    uploadRow.appendChild(label);
+    uploadRow.appendChild(createAdminFilePicker(input, {
+      buttonClass: 'btn--small',
+      buttonLabel: options && options.buttonLabel || 'Upload image',
+      className: 'admin-file-picker--compact',
+      emptyLabel: 'No file chosen',
+      idPrefix: 'admin-content-media-upload'
+    }));
     uploadRow.appendChild(status);
     wrap.appendChild(uploadRow);
     return wrap;
@@ -5412,6 +5711,7 @@
     var target = storeProductDescriptionUploadTarget(context, control);
     if (!target) {
       control.value = '';
+      updateAdminFilePickerFilename(control);
       return;
     }
     uploadStoreProductImage(context.product, file, context.status).then(function(path) {
@@ -5423,6 +5723,7 @@
       setStatus(context.status, formatError(error), true);
     }).finally(function() {
       control.value = '';
+      updateAdminFilePickerFilename(control);
     });
   }
 
@@ -5708,10 +6009,10 @@
   }
 
   function sanitizeStoreProductPreviewHtml(html) {
-    var markup = String(html || '');
+    var markup = stripStoreProductPreviewScripts(String(html || ''));
     if (!markup) return '';
     if (typeof DOMParser === 'undefined') {
-      return markup.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+      return stripStoreProductPreviewScripts(markup);
     }
     var document = new DOMParser().parseFromString(markup, 'text/html');
     document.querySelectorAll('script').forEach(function(node) {
@@ -5727,7 +6028,13 @@
         }
       });
     });
-    return '<!doctype html>\n' + document.documentElement.outerHTML;
+    return '<!doctype html>\n' + stripStoreProductPreviewScripts(document.documentElement.outerHTML);
+  }
+
+  function stripStoreProductPreviewScripts(html) {
+    return String(html || '')
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<script\b[^>]*\/?>/gi, '');
   }
 
   function refreshStoreProductPreview(form) {
@@ -6543,9 +6850,494 @@
     });
   }
 
+  var storeCouponFieldHelpText = {
+    code: 'Customer-entered coupon code. Codes are saved uppercase and can use letters, numbers, hyphens, or underscores.',
+    description: 'Internal note shown in admin so the purpose of the coupon is clear.',
+    status: 'Active coupons can be used at checkout. Draft coupons are saved but unavailable to shoppers.',
+    discountType: 'Choose Percent for a percentage off or Amount for a fixed USD discount.',
+    percentOff: 'Percentage taken off eligible merchandise before tax, shipping, and tip.',
+    amountOff: 'Dollar amount taken off eligible merchandise, capped at the eligible subtotal.',
+    appliesTo: 'Whole cart discounts all merchandise. Specific products discounts only selected products.',
+    products: 'Products eligible for this coupon when the scope is Specific products.'
+  };
+
+  function storeCouponFieldHelp(field) {
+    return storeCouponFieldHelpText[field] || '';
+  }
+
+  function normalizeStoreCouponCode(value) {
+    return String(value || '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  function formatStoreCouponDiscount(coupon) {
+    if (!coupon) return '';
+    if (coupon.discountType === 'amount') return moneyFromCents(coupon.amountOffCents || 0) + ' off';
+    return String(Number(coupon.percentOff || 0)) + '% off';
+  }
+
+  function formatStoreCouponScope(coupon) {
+    if (!coupon || coupon.appliesTo !== 'products') return 'Whole cart';
+    var ids = Array.isArray(coupon.productIds) ? coupon.productIds : [];
+    if (!ids.length) return 'Specific products';
+    return ids.length === 1 ? '1 product' : ids.length + ' products';
+  }
+
+  function storeCouponProductLabel(productId) {
+    var product = currentStoreCouponProducts.find(function(item) {
+      return item.productId === productId;
+    });
+    return product ? product.name || product.productId : productId;
+  }
+
+  function renderStoreCouponsSummary(data) {
+    var root = $('#admin-store-coupons-summary');
+    if (!root) return;
+    clear(root);
+    root.classList.add('admin-stat-grid');
+    var totals = data.totals || {};
+    [
+      ['Coupons', totals.coupons || 0],
+      ['Active', totals.active || 0],
+      ['Draft', totals.draft || 0]
+    ].forEach(function(card) {
+      root.appendChild(statCard('admin-store-coupons__card', card[0], formatNumber(card[1])));
+    });
+  }
+
+  function createStoreCouponFieldLabel(labelText, field, control) {
+    var labelRow = createElement('span', 'admin-store-coupons__field-label');
+    labelRow.appendChild(document.createTextNode(labelText));
+    var help = createHelp({
+      label: labelText,
+      path: 'store-coupon-field-' + field,
+      help: storeCouponFieldHelp(field)
+    }, control || null, {
+      className: ['status', 'products'].indexOf(field) >= 0 ? 'admin-settings__help--edge-end' : ''
+    });
+    if (help) labelRow.appendChild(help);
+    return labelRow;
+  }
+
+  function createStoreCouponInputField(labelText, field, control, options) {
+    var opts = options || {};
+    var wrap = createElement(opts.block ? 'div' : 'label', 'admin-store-coupons__field');
+    wrap.dataset.storeCouponFieldWrapper = field;
+    if (opts.full) wrap.classList.add('admin-store-coupons__field--full');
+    control.dataset.storeCouponField = field;
+    if (!control.classList.contains('admin-settings__input')) {
+      control.classList.add('admin-settings__input');
+    }
+    wrap.appendChild(createStoreCouponFieldLabel(labelText, field, control));
+    wrap.appendChild(control);
+    return wrap;
+  }
+
+  function createStoreCouponSelect(options, value) {
+    var select = document.createElement('select');
+    options.forEach(function(pair) {
+      var option = document.createElement('option');
+      option.value = pair[0];
+      option.textContent = pair[1];
+      select.appendChild(option);
+    });
+    select.value = String(value || options[0][0]);
+    return select;
+  }
+
+  function createStoreCouponDraft() {
+    return {
+      id: '',
+      code: '',
+      description: '',
+      status: 'draft',
+      discountType: 'percent',
+      percentOff: 10,
+      amountOffCents: 500,
+      appliesTo: 'cart',
+      productIds: [],
+      isNew: true
+    };
+  }
+
+  function readStoreCouponEditor(form) {
+    var fields = {};
+    $all('[data-store-coupon-field]', form).forEach(function(input) {
+      var key = input.dataset.storeCouponField;
+      if (key === 'code') fields[key] = normalizeStoreCouponCode(input.value);
+      else if (key === 'percentOff') fields[key] = Number(input.value || 0);
+      else if (key === 'amountOff') fields.amountOffCents = Math.round((Number(input.value || 0) || 0) * 100);
+      else fields[key] = input.value;
+    });
+    fields.productIds = $all('[data-store-coupon-product]', form)
+      .filter(function(input) { return input.checked; })
+      .map(function(input) { return input.value; });
+    if (fields.appliesTo !== 'products') fields.productIds = [];
+    return {
+      originalCode: form ? form.dataset.storeCouponOriginalCode || '' : '',
+      coupon: fields
+    };
+  }
+
+  function storeCouponEditorSnapshot(form) {
+    return JSON.stringify(readStoreCouponEditor(form));
+  }
+
+  function storeCouponEditorHasUnsavedChanges(form) {
+    if (!form) return false;
+    if (form.dataset.storeCouponNew === 'true') return true;
+    return storeCouponEditorSnapshot(form) !== String(form.dataset.storeCouponSavedSnapshot || '');
+  }
+
+  function updateStoreCouponEditorDirtyState(form) {
+    if (!form) return;
+    var save = $('[data-store-coupon-save]', form);
+    setDirtyButtonState(save, storeCouponEditorHasUnsavedChanges(form), 'Save coupon', 'Save coupon');
+  }
+
+  function resetStoreCouponEditorDirtyBaseline(form) {
+    if (!form) return;
+    form.dataset.storeCouponSavedSnapshot = storeCouponEditorSnapshot(form);
+    updateStoreCouponEditorDirtyState(form);
+  }
+
+  function syncStoreCouponEditorVisibility(form) {
+    if (!form) return;
+    var type = $('[data-store-coupon-field="discountType"]', form);
+    var appliesTo = $('[data-store-coupon-field="appliesTo"]', form);
+    var percent = $('[data-store-coupon-field-wrapper="percentOff"]', form);
+    var amount = $('[data-store-coupon-field-wrapper="amountOff"]', form);
+    var products = $('[data-store-coupon-products]', form);
+    var productInputs = $all('[data-store-coupon-product]', form);
+    var isAmount = type && type.value === 'amount';
+    if (percent) percent.hidden = Boolean(isAmount);
+    if (amount) amount.hidden = !isAmount;
+    var productScoped = appliesTo && appliesTo.value === 'products';
+    if (products) products.hidden = !productScoped;
+    productInputs.forEach(function(input) {
+      input.disabled = !productScoped;
+    });
+  }
+
+  function createStoreCouponProductSelector(coupon) {
+    var selected = new Set(Array.isArray(coupon.productIds) ? coupon.productIds : []);
+    var wrapper = createElement('div', 'admin-store-coupons__products admin-store-coupons__field--full');
+    wrapper.dataset.storeCouponProducts = 'true';
+    wrapper.appendChild(createStoreCouponFieldLabel('Products', 'products', null));
+    var choices = createElement('div', 'admin-store-coupons__product-grid');
+    if (!currentStoreCouponProducts.length) {
+      choices.appendChild(createElement('p', 'admin-app__muted', 'No products available.'));
+    }
+    currentStoreCouponProducts.forEach(function(product) {
+      var label = createElement('label', 'admin-store-coupons__product-choice');
+      var input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = product.productId || '';
+      input.checked = selected.has(product.productId);
+      input.dataset.storeCouponProduct = 'true';
+      var text = createElement('span', '', product.name || product.productId || 'Product');
+      var meta = [product.collection, product.category, product.status].filter(Boolean).join(' / ');
+      label.appendChild(input);
+      label.appendChild(text);
+      if (meta) label.appendChild(createElement('small', '', meta));
+      choices.appendChild(label);
+    });
+    wrapper.appendChild(choices);
+    return wrapper;
+  }
+
+  function renderStoreCouponEditor(coupon) {
+    var form = createElement('form', 'admin-store-coupons__editor');
+    var isNew = coupon && coupon.isNew === true;
+    form.dataset.storeCouponEditor = coupon.code || '__new_coupon__';
+    form.dataset.storeCouponOriginalCode = coupon.code || '';
+    form.dataset.storeCouponNew = isNew ? 'true' : 'false';
+
+    var title = createElement('h2', 'admin-store-coupons__editor-title', isNew ? 'Create coupon' : 'Edit ' + (coupon.code || 'coupon'));
+    form.appendChild(title);
+
+    var grid = createElement('div', 'admin-store-coupons__editor-grid');
+    var code = document.createElement('input');
+    code.type = 'text';
+    code.autocomplete = 'off';
+    code.inputMode = 'text';
+    code.required = true;
+    code.maxLength = 40;
+    code.value = coupon.code || '';
+    grid.appendChild(createStoreCouponInputField('Code', 'code', code));
+
+    var status = createStoreCouponSelect([
+      ['active', 'Active'],
+      ['draft', 'Draft']
+    ], coupon.status || 'draft');
+    grid.appendChild(createStoreCouponInputField('Status', 'status', status));
+
+    var description = document.createElement('textarea');
+    description.rows = 2;
+    description.maxLength = 300;
+    description.value = coupon.description || '';
+    grid.appendChild(createStoreCouponInputField('Description', 'description', description, { full: true }));
+
+    var discountType = createStoreCouponSelect([
+      ['percent', 'Percent'],
+      ['amount', 'Amount USD']
+    ], coupon.discountType || 'percent');
+    grid.appendChild(createStoreCouponInputField('Discount type', 'discountType', discountType));
+
+    var percent = document.createElement('input');
+    percent.type = 'number';
+    percent.min = '0.01';
+    percent.max = '100';
+    percent.step = '0.01';
+    percent.value = String(coupon.percentOff || 10);
+    grid.appendChild(createStoreCouponInputField('Percent off', 'percentOff', percent));
+
+    var amount = document.createElement('input');
+    amount.type = 'number';
+    amount.min = '0.01';
+    amount.step = '0.01';
+    amount.value = ((Number(coupon.amountOffCents || 0) || 0) / 100).toFixed(2);
+    grid.appendChild(createStoreCouponInputField('Amount off', 'amountOff', amount));
+
+    var appliesTo = createStoreCouponSelect([
+      ['cart', 'Whole cart'],
+      ['products', 'Specific products']
+    ], coupon.appliesTo || 'cart');
+    grid.appendChild(createStoreCouponInputField('Applies to', 'appliesTo', appliesTo));
+    grid.appendChild(createStoreCouponProductSelector(coupon));
+    form.appendChild(grid);
+
+    var actions = createElement('div', 'admin-store-coupons__editor-actions');
+    var save = createElement('button', 'btn', 'Save coupon');
+    save.type = 'submit';
+    save.dataset.storeCouponSave = 'true';
+    var cancel = createElement('button', 'btn btn--secondary', 'Cancel');
+    cancel.type = 'button';
+    cancel.dataset.storeCouponCancel = 'true';
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    form.appendChild(actions);
+
+    syncStoreCouponEditorVisibility(form);
+    resetStoreCouponEditorDirtyBaseline(form);
+    return form;
+  }
+
+  function renderStoreCouponActions(coupon) {
+    var actions = createElement('div', 'admin-store-coupons__actions');
+    var edit = createElement('button', 'btn btn--secondary btn--small', 'Edit');
+    edit.type = 'button';
+    edit.dataset.storeCouponEdit = coupon.code || '';
+    var deleteButton = createElement('button', 'btn btn--secondary btn--small', 'Delete');
+    deleteButton.type = 'button';
+    deleteButton.dataset.storeCouponDelete = coupon.code || '';
+    actions.appendChild(edit);
+    actions.appendChild(deleteButton);
+    return actions;
+  }
+
+  function renderStoreCoupons(data) {
+    var root = $('#admin-store-coupons-results');
+    if (!root) return;
+    clear(root);
+    currentStoreCoupons = Array.isArray(data.coupons) ? data.coupons : [];
+    currentStoreCouponProducts = Array.isArray(data.products) ? data.products : [];
+    data.totals = data.totals || {
+      coupons: currentStoreCoupons.length,
+      active: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'active'; }).length,
+      draft: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'draft'; }).length
+    };
+    renderStoreCouponsSummary(data);
+
+    var toolbar = createElement('div', 'admin-store-coupons__toolbar');
+    var create = createElement('button', 'btn btn--secondary', 'Create coupon');
+    create.type = 'button';
+    create.dataset.storeCouponCreate = 'true';
+    toolbar.appendChild(create);
+    root.appendChild(toolbar);
+
+    var table = createElement('table', 'admin-store-coupons__table');
+    var thead = document.createElement('thead');
+    var header = document.createElement('tr');
+    ['Code', 'Description', 'Discount', 'Applies to', 'Status', 'Actions'].forEach(function(text) {
+      header.appendChild(createElement('th', '', text));
+    });
+    thead.appendChild(header);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    var columnCount = header.children.length;
+
+    if (editingStoreCouponCode === '__new_coupon__') {
+      var createRow = document.createElement('tr');
+      createRow.className = 'admin-store-coupons__editor-row';
+      var createCell = document.createElement('td');
+      createCell.colSpan = columnCount;
+      createCell.appendChild(renderStoreCouponEditor(createStoreCouponDraft()));
+      createRow.appendChild(createCell);
+      tbody.appendChild(createRow);
+    }
+
+    currentStoreCoupons.forEach(function(coupon) {
+      var tr = document.createElement('tr');
+      tr.appendChild(createLabeledTableCell('Code', coupon.code || ''));
+      tr.appendChild(createLabeledTableCell('Description', coupon.description || ''));
+      tr.appendChild(createLabeledTableCell('Discount', formatStoreCouponDiscount(coupon)));
+      var scope = createElement('div', 'admin-store-coupons__scope', formatStoreCouponScope(coupon));
+      if (coupon.appliesTo === 'products' && Array.isArray(coupon.productIds) && coupon.productIds.length) {
+        scope.appendChild(createElement('small', '', coupon.productIds.map(storeCouponProductLabel).join(', ')));
+      }
+      tr.appendChild(createLabeledTableCell('Applies to', scope));
+      tr.appendChild(createLabeledTableCell('Status', coupon.status || 'draft'));
+      tr.appendChild(createLabeledTableCell('Actions', renderStoreCouponActions(coupon), 'admin-store-coupons__actions-cell'));
+      tbody.appendChild(tr);
+
+      if (editingStoreCouponCode === coupon.code) {
+        var editorRow = document.createElement('tr');
+        editorRow.className = 'admin-store-coupons__editor-row';
+        var editorCell = document.createElement('td');
+        editorCell.colSpan = columnCount;
+        editorCell.appendChild(renderStoreCouponEditor(coupon));
+        editorRow.appendChild(editorCell);
+        tbody.appendChild(editorRow);
+      }
+    });
+
+    if (!currentStoreCoupons.length && editingStoreCouponCode !== '__new_coupon__') {
+      var emptyRow = document.createElement('tr');
+      var emptyCell = document.createElement('td');
+      emptyCell.colSpan = columnCount;
+      emptyCell.appendChild(createElement('p', 'admin-app__muted', 'No coupons yet.'));
+      emptyRow.appendChild(emptyCell);
+      tbody.appendChild(emptyRow);
+    }
+
+    table.appendChild(tbody);
+    root.appendChild(table);
+  }
+
+  function loadStoreCoupons() {
+    var status = $('#admin-store-coupons-status');
+    setStatus(status, 'Loading Store coupons...');
+    return requestJson('/admin/store/coupons').then(function(data) {
+      storeCouponsLoaded = true;
+      renderStoreCoupons(data);
+      setStatus(status, '');
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+    });
+  }
+
+  function scrollStoreCouponEditorIntoView() {
+    window.requestAnimationFrame(function() {
+      var editor = $('[data-store-coupon-editor]');
+      if (!editor || typeof editor.scrollIntoView !== 'function') return;
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      editor.scrollIntoView({
+        behavior: reduceMotion ? 'auto' : 'smooth',
+        block: 'start',
+        inline: 'nearest'
+      });
+    });
+  }
+
+  function setupStoreCouponsEvents() {
+    var root = $('#admin-store-coupons-results');
+    if (!root) return;
+    root.addEventListener('input', function(event) {
+      var form = event.target.closest('[data-store-coupon-editor]');
+      if (!form) return;
+      if (event.target.matches('[data-store-coupon-field="code"]')) {
+        event.target.value = normalizeStoreCouponCode(event.target.value);
+      }
+      updateStoreCouponEditorDirtyState(form);
+    });
+    root.addEventListener('change', function(event) {
+      var form = event.target.closest('[data-store-coupon-editor]');
+      if (!form) return;
+      syncStoreCouponEditorVisibility(form);
+      updateStoreCouponEditorDirtyState(form);
+    });
+    root.addEventListener('click', function(event) {
+      var create = event.target.closest('[data-store-coupon-create]');
+      if (create) {
+        editingStoreCouponCode = '__new_coupon__';
+        renderStoreCoupons({ coupons: currentStoreCoupons, products: currentStoreCouponProducts, totals: {
+          coupons: currentStoreCoupons.length,
+          active: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'active'; }).length,
+          draft: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'draft'; }).length
+        } });
+        scrollStoreCouponEditorIntoView();
+        return;
+      }
+      var edit = event.target.closest('[data-store-coupon-edit]');
+      if (edit) {
+        editingStoreCouponCode = edit.dataset.storeCouponEdit || '';
+        renderStoreCoupons({ coupons: currentStoreCoupons, products: currentStoreCouponProducts, totals: {
+          coupons: currentStoreCoupons.length,
+          active: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'active'; }).length,
+          draft: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'draft'; }).length
+        } });
+        scrollStoreCouponEditorIntoView();
+        return;
+      }
+      var cancel = event.target.closest('[data-store-coupon-cancel]');
+      if (cancel) {
+        editingStoreCouponCode = '';
+        renderStoreCoupons({ coupons: currentStoreCoupons, products: currentStoreCouponProducts, totals: {
+          coupons: currentStoreCoupons.length,
+          active: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'active'; }).length,
+          draft: currentStoreCoupons.filter(function(coupon) { return coupon.status === 'draft'; }).length
+        } });
+        return;
+      }
+      var remove = event.target.closest('[data-store-coupon-delete]');
+      if (remove) {
+        var code = remove.dataset.storeCouponDelete || '';
+        if (!code) return;
+        if (!window.confirm('Delete coupon ' + code + '?')) return;
+        remove.disabled = true;
+        setStatus($('#admin-store-coupons-status'), 'Deleting coupon...');
+        requestJson('/admin/store/coupons/delete', {
+          method: 'POST',
+          body: { code: code }
+        }).then(function(data) {
+          editingStoreCouponCode = '';
+          renderStoreCoupons(data);
+          setStatus($('#admin-store-coupons-status'), 'Coupon deleted.');
+        }).catch(function(error) {
+          remove.disabled = false;
+          setStatus($('#admin-store-coupons-status'), formatError(error), true);
+        });
+      }
+    });
+    root.addEventListener('submit', function(event) {
+      var form = event.target.closest('[data-store-coupon-editor]');
+      if (!form) return;
+      event.preventDefault();
+      if (!storeCouponEditorHasUnsavedChanges(form)) {
+        setStatus($('#admin-store-coupons-status'), 'No coupon changes to save.');
+        updateStoreCouponEditorDirtyState(form);
+        return;
+      }
+      var save = $('[data-store-coupon-save]', form);
+      if (save) save.disabled = true;
+      setStatus($('#admin-store-coupons-status'), 'Saving coupon...');
+      requestJson('/admin/store/coupons', {
+        method: 'POST',
+        body: readStoreCouponEditor(form)
+      }).then(function(data) {
+        editingStoreCouponCode = form.dataset.storeCouponNew === 'true' ? '' : (data.coupon ? data.coupon.code : '');
+        renderStoreCoupons(data);
+        setStatus($('#admin-store-coupons-status'), 'Coupon saved.');
+      }).catch(function(error) {
+        updateStoreCouponEditorDirtyState(form);
+        setStatus($('#admin-store-coupons-status'), formatError(error), true);
+      });
+    });
+  }
+
   function createStoreDownloadCreateField(labelText, field, control, helpText) {
-    var label = createElement('label', 'admin-store-downloads__field');
-    label.dataset.storeDownloadCreateFieldWrapper = field;
+    var fieldWrap = createElement(control.type === 'file' ? 'div' : 'label', 'admin-store-downloads__field');
+    fieldWrap.dataset.storeDownloadCreateFieldWrapper = field;
     var labelRow = createElement('span', 'admin-store-downloads__field-label', labelText);
     var help = createHelp({
       label: labelText,
@@ -6553,11 +7345,19 @@
       help: helpText
     }, control);
     if (help) labelRow.appendChild(help);
-    control.classList.add('admin-settings__input');
     control.dataset.storeDownloadCreateField = field;
-    label.appendChild(labelRow);
-    label.appendChild(control);
-    return label;
+    fieldWrap.appendChild(labelRow);
+    if (control.type === 'file') {
+      fieldWrap.appendChild(createAdminFilePicker(control, {
+        buttonLabel: 'Choose file',
+        emptyLabel: 'No file chosen',
+        idPrefix: 'admin-store-download-create-file'
+      }));
+    } else {
+      control.classList.add('admin-settings__input');
+      fieldWrap.appendChild(control);
+    }
+    return fieldWrap;
   }
 
   function createStoreDownloadCreateForm() {
@@ -6567,6 +7367,7 @@
     var file = document.createElement('input');
     file.type = 'file';
     file.required = true;
+    file.setAttribute('aria-label', 'Choose download file');
 
     fields.appendChild(createStoreDownloadCreateField(
       'File',
@@ -6592,6 +7393,34 @@
     };
   }
 
+  function createStoreDownloadActions(row, input) {
+    var actions = createElement('div', 'admin-store-downloads__actions');
+    var fileKey = String(row.fileKey || '').trim();
+    var filename = String(row.filename || fileKey || 'download file').trim();
+    var replace = createAdminFilePicker(input, {
+      buttonClass: 'btn--small',
+      buttonLabel: 'Replace',
+      className: 'admin-file-picker--compact',
+      emptyLabel: 'No file chosen',
+      idPrefix: 'admin-store-download-replace-file'
+    });
+    var deleteButton = createElement('button', 'btn btn--secondary btn--small admin-store-downloads__delete', 'Delete');
+    deleteButton.type = 'button';
+    deleteButton.dataset.storeDownloadDelete = 'true';
+    deleteButton.dataset.fileKey = fileKey;
+    deleteButton.dataset.filename = filename;
+    deleteButton.setAttribute('aria-label', 'Delete ' + filename);
+    if (!fileKey || row.source !== 'r2') {
+      deleteButton.disabled = true;
+      deleteButton.title = fileKey
+        ? 'Only uploaded files can be deleted here.'
+        : 'This download does not have a file key.';
+    }
+    actions.appendChild(replace);
+    actions.appendChild(deleteButton);
+    return actions;
+  }
+
   function renderStoreDownloads(data) {
     var root = $('#admin-store-downloads-results');
     if (!root) return;
@@ -6606,7 +7435,7 @@
     var table = createElement('table', 'admin-store-downloads__table');
     var thead = document.createElement('thead');
     var header = document.createElement('tr');
-    var columns = ['File', 'Status', 'Attached to', 'Uploaded', 'Replace'];
+    var columns = ['File', 'Status', 'Attached to', 'Uploaded', 'Actions'];
     columns.forEach(function(text) {
       header.appendChild(createElement('th', '', text));
     });
@@ -6621,6 +7450,7 @@
       input.dataset.productId = row.productId || '';
       input.dataset.variantId = row.variantId || '';
       input.dataset.fileKey = row.fileKey || '';
+      input.setAttribute('aria-label', 'Replacement file for ' + (row.filename || row.fileKey || 'download file'));
       var attachedTo = Array.isArray(row.attachedTo) && row.attachedTo.length
         ? row.attachedTo.map(function(item) { return item.label || item.productId || item.sku || ''; }).filter(Boolean).join(', ')
         : 'Not attached';
@@ -6628,7 +7458,7 @@
       tr.appendChild(createLabeledTableCell('Status', row.status || (row.ready ? 'ready' : 'missing'), 'admin-store-downloads__status-cell'));
       tr.appendChild(createLabeledTableCell('Attached to', attachedTo, 'admin-store-downloads__file'));
       tr.appendChild(createLabeledTableCell('Uploaded', formatDate(row.uploadedAt), 'admin-store-downloads__uploaded'));
-      tr.appendChild(createLabeledTableCell('Replace', input, 'admin-store-downloads__upload'));
+      tr.appendChild(createLabeledTableCell('Actions', createStoreDownloadActions(row, input), 'admin-store-downloads__upload'));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -6653,6 +7483,15 @@
       reader.onload = function() { resolve(reader.result); };
       reader.onerror = function() { reject(reader.error || new Error('Unable to read file.')); };
       reader.readAsDataURL(file);
+    });
+  }
+
+  function fileToText(file) {
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() { resolve(String(reader.result || '')); };
+      reader.onerror = function() { reject(reader.error || new Error('Unable to read file.')); };
+      reader.readAsText(file);
     });
   }
 
@@ -6725,6 +7564,35 @@
         setStatus($('#admin-store-downloads-status'), formatError(error), true);
       });
     });
+    root.addEventListener('click', function(event) {
+      var button = event.target.closest('[data-store-download-delete]');
+      if (!button) return;
+      var fileKey = String(button.dataset.fileKey || '').trim();
+      var filename = String(button.dataset.filename || fileKey || 'download file').trim();
+      if (!fileKey) {
+        setStatus($('#admin-store-downloads-status'), 'This download does not have a file key.', true);
+        return;
+      }
+      if (!window.confirm('Delete ' + filename + '? Products that reference this file will show it as missing.')) return;
+      button.disabled = true;
+      setStatus($('#admin-store-downloads-status'), 'Deleting ' + filename + '...');
+      requestJson('/admin/store/downloads/delete', {
+        method: 'POST',
+        body: {
+          fileKey: fileKey,
+          filename: filename
+        }
+      }).then(function(data) {
+        storeProductsLoaded = false;
+        var message = (data.filename || filename) + ' deleted.';
+        return loadStoreDownloads().finally(function() {
+          setStatus($('#admin-store-downloads-status'), message);
+        });
+      }).catch(function(error) {
+        button.disabled = false;
+        setStatus($('#admin-store-downloads-status'), formatError(error), true);
+      });
+    });
   }
 
   function initAdminDashboard() {
@@ -6732,11 +7600,13 @@
     setupAdminTabs();
     setupAuth();
     setupLogout();
+    setupAdminFilePickerEvents();
     setupSettingsEvents();
     setupStoreAnalyticsEvents();
     setupStoreMarketingEvents();
     setupStoreOrdersEvents();
     setupStoreProductsEvents();
+    setupStoreCouponsEvents();
     setupStoreDownloadsEvents();
   }
 

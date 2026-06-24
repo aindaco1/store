@@ -1,4 +1,5 @@
 import { validateStoreOrderDraft } from './catalog.js';
+import { getValidationDiscountedSubtotalCents } from './coupons.js';
 import { getDefaultPlatformTipPercent, getMaxPlatformTipPercent } from './provider-config.js';
 import { calculatePlatformTip, sanitizePlatformTipPercent } from './tip.js';
 
@@ -72,6 +73,9 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
   const shippingCents = normalizeCents(options.shippingCents ?? input.shippingCents);
   const taxCents = normalizeCents(options.taxCents ?? input.taxCents);
   const subtotalCents = validation.totals.subtotalCents;
+  const discountCents = normalizeCents(validation.totals.discountCents);
+  const discountedSubtotalCents = getValidationDiscountedSubtotalCents(validation);
+  const coupon = normalizeStoreCouponSnapshot(validation.totals.coupon);
   const maxTipPercent = getMaxPlatformTipPercent(options.env || {});
   const defaultTipPercent = getDefaultPlatformTipPercent(options.env || {});
   const tipPercent = sanitizePlatformTipPercent(
@@ -79,8 +83,8 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
     defaultTipPercent,
     maxTipPercent
   );
-  const tipAmountCents = calculatePlatformTip(subtotalCents, tipPercent, maxTipPercent);
-  const totalCents = subtotalCents + tipAmountCents + shippingCents + taxCents;
+  const tipAmountCents = calculatePlatformTip(discountedSubtotalCents, tipPercent, maxTipPercent);
+  const totalCents = discountedSubtotalCents + tipAmountCents + shippingCents + taxCents;
   const customer = normalizeCustomer(input, options);
   const shippingAddress = normalizeOrderAddress(options.shippingAddress ?? input.shippingAddress);
   const billingAddress = normalizeOrderAddress(options.billingAddress ?? input.billingAddress);
@@ -107,6 +111,10 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
     totals: {
       itemCount: validation.totals.itemCount,
       subtotalCents,
+      discountCents,
+      discountedSubtotalCents,
+      couponCode: coupon?.code || '',
+      coupon,
       tipPercent,
       tipAmountCents,
       shippingCents,
@@ -144,6 +152,8 @@ export function normalizeStoreOrderDraftForHash(draft = {}) {
         quantity: normalizeQuantity(item?.quantity),
         unitPriceCents: normalizeCents(item?.unitPriceCents),
         subtotalCents: normalizeCents(item?.subtotalCents),
+        discountCents: normalizeCents(item?.discountCents),
+        discountedSubtotalCents: normalizeCents(item?.discountedSubtotalCents),
         currency: normalizeCurrency(item?.currency),
         fulfillmentType: normalizeString(item?.fulfillmentType),
         event: normalizeString(item?.event),
@@ -169,6 +179,10 @@ export function normalizeStoreOrderDraftForHash(draft = {}) {
     totals: {
       itemCount: normalizeQuantity(draft.totals?.itemCount),
       subtotalCents: normalizeCents(draft.totals?.subtotalCents),
+      discountCents: normalizeCents(draft.totals?.discountCents),
+      discountedSubtotalCents: normalizeCents(draft.totals?.discountedSubtotalCents),
+      couponCode: normalizeString(draft.totals?.couponCode),
+      coupon: normalizeStoreCouponSnapshot(draft.totals?.coupon),
       tipPercent: normalizeQuantity(draft.totals?.tipPercent),
       tipAmountCents: normalizeCents(draft.totals?.tipAmountCents),
       shippingCents: normalizeCents(draft.totals?.shippingCents),
@@ -205,6 +219,8 @@ function compactStoreOrderItem(item = {}) {
     quantity: normalizeQuantity(item.quantity),
     unitPriceCents: normalizeCents(item.unitPriceCents),
     subtotalCents: normalizeCents(item.subtotalCents),
+    discountCents: normalizeCents(item.discountCents),
+    discountedSubtotalCents: normalizeCents(item.discountedSubtotalCents ?? item.subtotalCents),
     currency: normalizeCurrency(item.currency),
     fulfillmentType: normalizeString(item.fulfillmentType),
     event: normalizeString(item.event),
@@ -222,6 +238,25 @@ function compactStoreOrderItem(item = {}) {
     eventDetails: item.eventDetails || null,
     download: item.download || null,
     turnstileRequired: item.turnstileRequired === true
+  };
+}
+
+function normalizeStoreCouponSnapshot(coupon = null) {
+  if (!coupon || typeof coupon !== 'object' || Array.isArray(coupon)) return null;
+  const code = normalizeString(coupon.code).toUpperCase();
+  if (!code) return null;
+  return {
+    id: normalizeString(coupon.id),
+    code,
+    description: normalizeString(coupon.description),
+    discountType: normalizeString(coupon.discountType),
+    percentOff: normalizeNumber(coupon.percentOff),
+    amountOffCents: normalizeCents(coupon.amountOffCents),
+    appliesTo: normalizeString(coupon.appliesTo),
+    productIds: Array.isArray(coupon.productIds)
+      ? coupon.productIds.map((productId) => normalizeString(productId)).filter(Boolean)
+      : [],
+    discountCents: normalizeCents(coupon.discountCents)
   };
 }
 
@@ -302,6 +337,11 @@ function normalizeCents(value) {
 function normalizeQuantity(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
+function normalizeNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function normalizeString(value) {

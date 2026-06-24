@@ -69,6 +69,21 @@ async function visibleProductMetadata(page: any) {
     })));
 }
 
+async function productCardImageMetrics(page: any, limit = 3) {
+  return page.locator(`${PRODUCT_CARD} img.store-product-card__image`).evaluateAll((images: HTMLImageElement[], limit: number) => images
+    .slice(0, limit)
+    .map((image) => ({
+      alt: image.alt,
+      src: image.getAttribute('src') || '',
+      loading: image.getAttribute('loading') || '',
+      complete: image.complete,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      currentSrc: image.currentSrc,
+      objectFit: window.getComputedStyle(image).objectFit
+    })), limit);
+}
+
 test.describe('Store Public Page Controls', () => {
   test.beforeEach(async ({ page }) => {
     await clearCartStorage(page);
@@ -78,6 +93,11 @@ test.describe('Store Public Page Controls', () => {
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto('/');
     await expect(page.locator(PRODUCT_CARD).first()).toBeVisible();
+    await expect(page.locator('.store-product-card__eyebrow').first()).toBeVisible();
+    await expect.poll(async () => {
+      const images = await productCardImageMetrics(page, 3);
+      return images.length === 3 && images.every((image) => image.loading === 'eager' && image.complete && image.naturalWidth > 0 && image.objectFit === 'contain');
+    }).toBe(true);
 
     await expect.poll(async () => (await storefrontLayoutMetrics(page)).firstRowCount).toBe(3);
     await expect.poll(async () => (await storefrontLayoutMetrics(page)).maxTitleLines).toBeLessThanOrEqual(2);
@@ -100,6 +120,30 @@ test.describe('Store Public Page Controls', () => {
     expect(metrics.titleOverflows).toEqual([]);
     expect(metrics.titleBlockHeights).toHaveLength(1);
     expect(metrics.descriptionFontSize).toBeLessThan(13);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('product card images survive product navigation and browser back', async ({ page }) => {
+    await page.goto('/');
+    await expect.poll(async () => {
+      const images = await productCardImageMetrics(page, 3);
+      return images.length === 3 && images.every((image) => image.complete && image.naturalWidth > 0);
+    }).toBe(true);
+
+    await page.locator('a.store-product-card__media[href="/products/dust-wave-sticker/"]').click();
+    await expect(page).toHaveURL(/\/products\/dust-wave-sticker\/$/);
+    await expect(page.locator('h1')).toContainText('DUST WAVE Sticker');
+    await expect.poll(async () => {
+      const images = await productCardImageMetrics(page, 1);
+      return images.length === 1 && images[0].loading === 'eager' && images[0].complete && images[0].naturalWidth > 0;
+    }).toBe(true);
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(async () => {
+      const images = await productCardImageMetrics(page, 3);
+      return images.length === 3 && images.every((image) => image.complete && image.naturalWidth > 0);
+    }).toBe(true);
     await expectNoHorizontalOverflow(page);
   });
 
@@ -175,16 +219,28 @@ test.describe('Store Public Page Controls', () => {
   test('product pages expose language-prefixed localized routes with canonical product controls', async ({ page }) => {
     await page.goto('/products/fronteras-t-shirt/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('h1')).toContainText('Fronteras T-Shirt');
+    const englishCard = page.locator('.storefront__product-detail > .store-product-card').first();
+    await expect(englishCard).toBeVisible();
+    await expect(englishCard.locator('.store-product-card__title')).toHaveCount(0);
+    await expect(englishCard.locator('.store-product-card__description')).toHaveCount(0);
+    await expect(page.locator('.storefront--product .storefront__eyebrow')).toHaveCount(0);
+    await expect(page.locator('.storefront--product .store-product-card__eyebrow')).toHaveCount(0);
     await expect(page.locator('link[rel="alternate"][hreflang="es"]')).toHaveAttribute('href', /\/es\/products\/fronteras-t-shirt\/$/);
     await expect(page.getByRole('link', { name: 'Español' })).toHaveAttribute('href', '/es/products/fronteras-t-shirt/');
 
     await page.goto('/es/products/fronteras-t-shirt/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+    await expect(page.locator('.storefront--product .storefront__eyebrow')).toHaveCount(0);
+    await expect(page.locator('.storefront--product .store-product-card__eyebrow')).toHaveCount(0);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/es\/products\/fronteras-t-shirt\/$/);
     await expect(page.locator('link[rel="alternate"][hreflang="en"]')).toHaveAttribute('href', /\/products\/fronteras-t-shirt\/$/);
     await expect(page.locator('h1')).toContainText('Fronteras T-Shirt');
 
-    const card = await firstProductCard(page);
+    const card = page.locator('.storefront__product-detail > .store-product-card').first();
+    await expect(card).toBeVisible();
+    await expect(card.locator('.store-product-card__title')).toHaveCount(0);
+    await expect(card.locator('.store-product-card__description')).toHaveCount(0);
     await expect(card.locator('.store-product-card__label').filter({ hasText: 'Talla' })).toBeVisible();
     await expect(card.locator('.store-product-card__label').filter({ hasText: 'Cantidad' })).toBeVisible();
     await expect(card.locator('button.store-add-item')).toHaveText(/Añadir al carrito - \$30/i);

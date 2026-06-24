@@ -4,14 +4,12 @@ layout: default
 
 <section class="storefront storefront--product">
   <div class="storefront__header storefront__header--compact">
-    {%- capture product_collection_label -%}{% include product-taxonomy.html product=page mode="collection_label" %}{%- endcapture -%}
     {%- assign product_display_name = page.product_name | default: page.name | default: page.title -%}
-    <p class="storefront__eyebrow">{{ product_collection_label | strip | escape }}</p>
     <h1>{{ product_display_name | escape }}</h1>
   </div>
 
   <div class="storefront__product-detail">
-    {% include product-card.html product=page %}
+    {% include product-card.html product=page show_eyebrow=false show_summary=false image_loading="eager" image_fetchpriority="high" %}
     <div class="storefront__product-copy">
       {% if page.long_content and page.long_content.size > 0 %}
         {% include long-content.html blocks=page.long_content %}

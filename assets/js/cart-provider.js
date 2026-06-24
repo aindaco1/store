@@ -1708,21 +1708,49 @@
       : 0;
   }
 
+  function normalizeAppliedCoupon(coupon) {
+    if (!coupon || typeof coupon !== 'object') return null;
+    const code = String(coupon.code || '').trim().toUpperCase();
+    const discountCents = Math.max(0, Math.round(Number(coupon.discountCents || 0) || 0));
+    if (!code || discountCents <= 0) return null;
+    return {
+      id: String(coupon.id || '').trim(),
+      code,
+      description: String(coupon.description || '').trim(),
+      discountType: String(coupon.discountType || '').trim(),
+      percentOff: Number(coupon.percentOff || 0) || 0,
+      amountOffCents: Math.max(0, Math.round(Number(coupon.amountOffCents || 0) || 0)),
+      appliesTo: String(coupon.appliesTo || '').trim(),
+      productIds: Array.isArray(coupon.productIds) ? coupon.productIds : [],
+      discountCents
+    };
+  }
+
+  function normalizeCouponCodeInput(value) {
+    return String(value || '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
   function buildFirstPartyPricing(state) {
     const items = state?.cart?.items?.items || [];
     const subtotalCents = Math.round((Number(state?.cart?.subtotal || 0)) * 100);
+    const coupon = normalizeAppliedCoupon(state?.cart?.coupon);
+    const discountCents = Math.min(subtotalCents, coupon ? coupon.discountCents : 0);
+    const discountedSubtotalCents = Math.max(0, subtotalCents - discountCents);
     const tipPercent = sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent());
-    const tipAmountCents = Math.round((subtotalCents * tipPercent) / 100);
+    const tipAmountCents = Math.round((discountedSubtotalCents * tipPercent) / 100);
     const shippingCents = getStoreFallbackShippingCents(items);
     const taxCents = 0;
 
     return {
       subtotalCents,
+      discountCents,
+      discountedSubtotalCents,
+      coupon,
       tipPercent,
       tipAmountCents,
       taxCents,
       shippingCents,
-      totalCents: subtotalCents + tipAmountCents + taxCents + shippingCents
+      totalCents: discountedSubtotalCents + tipAmountCents + taxCents + shippingCents
     };
   }
 
@@ -1742,8 +1770,8 @@
     const taxState = resolveDisplayedTaxState(state, {
       ...options,
       shippingDraft,
-      subtotalCents: pricing.subtotalCents,
-      taxQuote: options?.taxQuote || null
+          subtotalCents: pricing.discountedSubtotalCents,
+          taxQuote: options?.taxQuote || null
     });
     if (!isCustomCheckoutEstimateActive(state, options)) {
       return {
@@ -1758,7 +1786,7 @@
         isShippingEstimate: false,
         showShippingRow: pricing.shippingCents > 0,
         shippingDisplayValue: '',
-        totalCents: pricing.subtotalCents + pricing.tipAmountCents + taxState.taxCents + pricing.shippingCents
+        totalCents: pricing.discountedSubtotalCents + pricing.tipAmountCents + taxState.taxCents + pricing.shippingCents
       };
     }
 
@@ -1810,7 +1838,7 @@
       taxLabel: taxState.taxLabel,
       taxDisplayValue: taxState.taxDisplayValue,
       shippingCents,
-      totalCents: pricing.subtotalCents + pricing.tipAmountCents + taxState.taxCents + shippingCents,
+      totalCents: pricing.discountedSubtotalCents + pricing.tipAmountCents + taxState.taxCents + shippingCents,
       shippingLabel,
       totalLabel: isCalculatingQuote || isEstimate || needsEstimateInput || quoteUnavailable || !taxState.taxReady
         ? getRuntimeMessage('cart.estimatedTotal', 'Estimated total')
@@ -1978,6 +2006,54 @@
           ${renderCartShippingSummaryValue(shippingQuote, pricing.shippingCents, pricing.shippingDisplayValue)}
         </div>
       </div>
+    `;
+  }
+
+  function renderCartDiscountSummaryRow(pricing, prefix) {
+    if (!pricing || pricing.discountCents <= 0) return '';
+    const coupon = pricing.coupon || {};
+    const label = coupon.code
+      ? getRuntimeMessage('cart.discountWithCode', 'Discount (%{code})').replace('%{code}', coupon.code)
+      : getRuntimeMessage('cart.discount', 'Discount');
+    const dataPrefix = prefix === 'checkout' ? 'data-cart-checkout-summary' : 'data-cart-summary';
+    return `
+      <div class="store-first-party-cart__summary-row" ${dataPrefix}-discount-row>
+        <span ${dataPrefix}-discount-label>${escapeHtml(label)}</span>
+        <strong ${dataPrefix}-discount>-${formatCents(pricing.discountCents)}</strong>
+      </div>
+    `;
+  }
+
+  function renderCartCouponBox(state, pricing) {
+    const cart = state?.cart || {};
+    const coupon = pricing?.coupon || normalizeAppliedCoupon(cart.coupon);
+    const couponCode = normalizeCouponCodeInput(cart.couponCode || coupon?.code || '');
+    const status = String(cart.couponStatus || '').trim();
+    const error = String(cart.couponError || '').trim();
+    const message = error
+      ? error
+      : coupon
+        ? getRuntimeMessage('cart.couponApplied', 'Coupon applied.')
+        : '';
+    return `
+      <form class="store-first-party-cart__coupon" data-cart-coupon-form>
+        <label class="store-first-party-cart__section-label" for="store-cart-coupon-code">${escapeHtml(getRuntimeMessage('cart.couponCode', 'Coupon code'))}</label>
+        <div class="store-first-party-cart__coupon-row">
+          <input
+            id="store-cart-coupon-code"
+            class="store-first-party-cart__coupon-input"
+            type="text"
+            autocomplete="off"
+            inputmode="text"
+            value="${escapeAttribute(couponCode)}"
+            aria-describedby="store-cart-coupon-status"
+            data-cart-coupon-code
+          >
+          <button type="submit" class="store-first-party-cart__action store-first-party-cart__action--secondary store-first-party-cart__coupon-apply" data-cart-coupon-apply ${status === 'loading' ? 'disabled aria-busy="true"' : ''}>${escapeHtml(getRuntimeMessage('cart.applyCoupon', 'Apply'))}</button>
+          ${coupon ? `<button type="button" class="store-first-party-cart__remove store-first-party-cart__coupon-remove" data-cart-coupon-remove>${escapeHtml(getRuntimeMessage('cart.removeCoupon', 'Remove coupon'))}</button>` : ''}
+        </div>
+        <p id="store-cart-coupon-status" class="store-first-party-cart__coupon-status${error ? ' is-error' : ''}" role="status" aria-live="polite">${escapeHtml(message)}</p>
+      </form>
     `;
   }
 
@@ -2575,6 +2651,8 @@
       cart: {
         tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
         tipTouched: state?.cart?.tipTouched === true,
+        couponCode: normalizeCouponCodeInput(state?.cart?.couponCode || state?.cart?.coupon?.code || ''),
+        coupon: normalizeAppliedCoupon(state?.cart?.coupon),
         items: items.map((item) => ({
           id: item?.id || '',
           name: item?.name || '',
@@ -2832,6 +2910,8 @@
       token: String(state?.cart?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
       tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
       tipTouched: state?.cart?.tipTouched === true,
+      couponCode: normalizeCouponCodeInput(state?.cart?.couponCode || state?.cart?.coupon?.code || ''),
+      coupon: normalizeAppliedCoupon(state?.cart?.coupon),
       items: items.map((item) => ({
         id: String(item?.id || ''),
         uniqueId: String(item?.uniqueId || ''),
@@ -2908,6 +2988,8 @@
         token: String(persisted?.token || `${FIRST_PARTY_CART_TOKEN_PREFIX}${Date.now().toString(36)}`),
         tipPercent: resolveStoredTipPercent(persisted?.tipPercent, persisted?.tipTouched === true),
         tipTouched: persisted?.tipTouched === true,
+        couponCode: normalizeCouponCodeInput(persisted?.couponCode || persisted?.coupon?.code || ''),
+        coupon: normalizeAppliedCoupon(persisted?.coupon),
         items
       };
     } catch (_error) {
@@ -2970,6 +3052,8 @@
       tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
       preferredLang: getCurrentLang()
     };
+    const couponCode = normalizeCouponCodeInput(state?.cart?.couponCode || state?.cart?.coupon?.code || '');
+    if (couponCode) payload.couponCode = couponCode;
     const attribution = readStoreMarketingAttribution();
     if (attribution) {
       payload.attribution = attribution;
@@ -3021,6 +3105,10 @@
         email: draftEmail,
         tipPercent: persistedTipPercent,
         tipTouched: persisted?.tipTouched === true,
+        couponCode: persisted?.couponCode || '',
+        coupon: persisted?.coupon || null,
+        couponStatus: '',
+        couponError: '',
         billingAddress: draft?.billingAddress || {},
         items: {
           count: persistedItems.length,
@@ -3128,6 +3216,10 @@
           cart: {
             ...state.cart,
             ...totals,
+            couponCode: '',
+            coupon: null,
+            couponStatus: '',
+            couponError: '',
             items: {
               count: nextItems.length,
               items: nextItems
@@ -3317,6 +3409,10 @@
           email: nextEmail,
           tipPercent: nextTipPercent,
           tipTouched: snapshot?.cart?.tipTouched === true,
+          couponCode: normalizeCouponCodeInput(snapshot?.cart?.couponCode || snapshot?.cart?.coupon?.code || ''),
+          coupon: normalizeAppliedCoupon(snapshot?.cart?.coupon),
+          couponStatus: '',
+          couponError: '',
           billingAddress: draft?.billingAddress || store.getState().cart?.billingAddress || {},
           items: {
             count: nextItems.length,
@@ -3580,6 +3676,7 @@
         ${cartRequiresQuotedShipping(items)
           ? renderCartShippingEstimateField(customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft)
           : ''}
+        ${renderCartCouponBox(state, pricing)}
         <section class="store-first-party-cart__callout">
           <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.orderTotal', 'Order total'))}</p>
           <div class="store-first-party-cart__checkout-summary">
@@ -3587,6 +3684,7 @@
               <span>${escapeHtml(getRuntimeMessage('cart.subtotal', 'Subtotal'))}</span>
               <strong data-cart-summary-subtotal>${formatCents(pricing.subtotalCents)}</strong>
             </div>
+            ${renderCartDiscountSummaryRow(pricing, 'cart')}
             ${pricing.tipAmountCents > 0 ? `
               <div class="store-first-party-cart__summary-row" data-cart-summary-tip-row>
                 <span data-cart-summary-tip-label>${escapeHtml(getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)').replace('%{platform}', getPlatformCompanyName()).replace('%{percent}', String(pricing.tipPercent)))}</span>
@@ -3628,6 +3726,7 @@
                 <span>${escapeHtml(getRuntimeMessage('cart.subtotal', 'Subtotal'))}</span>
                 <strong data-cart-checkout-summary-subtotal>${formatCents(pricing.subtotalCents)}</strong>
               </div>
+              ${renderCartDiscountSummaryRow(pricing, 'checkout')}
               ${pricing.tipAmountCents > 0 ? `
                 <div class="store-first-party-cart__summary-row" data-cart-checkout-summary-tip-row>
                   <span data-cart-checkout-summary-tip-label>${escapeHtml(getRuntimeMessage('cart.tipWithPercent', '%{platform} tip (%{percent}%)').replace('%{platform}', getPlatformCompanyName()).replace('%{percent}', String(pricing.tipPercent)))}</span>
@@ -4064,6 +4163,10 @@
             ...state.cart,
             ...totals,
             email: '',
+            couponCode: '',
+            coupon: null,
+            couponStatus: '',
+            couponError: '',
             tipPercent: getDefaultPlatformTipPercent(),
             tipTouched: false,
             items: {
@@ -4716,7 +4819,7 @@
       if (!isCheckoutRoute && !isCartRoute) return;
 
       const state = store.getState();
-      const subtotalCents = Math.round((Number(state?.cart?.subtotal || 0)) * 100);
+      const subtotalCents = buildFirstPartyPricing(state).discountedSubtotalCents;
       if (subtotalCents <= 0) {
         customCheckoutTaxQuoteToken += 1;
         checkoutUiState.customCheckout = {
@@ -4841,7 +4944,7 @@
 
     async function quoteStoreCheckoutTaxForSubmit(shippingDraft, shippingCents) {
       const state = store.getState();
-      const subtotalCents = Math.round((Number(state?.cart?.subtotal || 0)) * 100);
+      const subtotalCents = buildFirstPartyPricing(state).discountedSubtotalCents;
       if (subtotalCents <= 0) return null;
 
       const billingDestination = normalizeTaxDestination(getCurrentBillingAddress(state));
@@ -5541,6 +5644,103 @@
       mountCustomCheckoutIntoDrawer(root);
     }
 
+    async function applyCartCouponFromForm(form) {
+      const input = form ? form.querySelector('[data-cart-coupon-code]') : null;
+      const code = normalizeCouponCodeInput(input ? input.value : '');
+      if (!code) {
+        updateCartState((state) => ({
+          ...state,
+          cart: {
+            ...state.cart,
+            couponCode: '',
+            coupon: null,
+            couponStatus: '',
+            couponError: getRuntimeMessage('cart.couponRequired', 'Enter a coupon code.')
+          }
+        }));
+        return;
+      }
+
+      updateCartState((state) => ({
+        ...state,
+        cart: {
+          ...state.cart,
+          couponCode: code,
+          couponStatus: 'loading',
+          couponError: ''
+        }
+      }));
+
+      const payloadResult = buildStoreCheckoutPayload(store.getState());
+      if (!payloadResult.valid) {
+        updateCartState((state) => ({
+          ...state,
+          cart: {
+            ...state.cart,
+            couponStatus: '',
+            couponError: payloadResult.error || getRuntimeMessage('cart.couponApplyError', 'Coupon could not be applied.')
+          }
+        }));
+        return;
+      }
+      payloadResult.payload.couponCode = code;
+
+      try {
+        const response = await fetch(`${getWorkerBase()}/api/cart/validate`, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payloadResult.payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || (Array.isArray(data.errors) && data.errors[0]?.message) || getRuntimeMessage('cart.couponInvalid', 'Coupon code could not be applied.'));
+        }
+        const coupon = normalizeAppliedCoupon(data.coupon || data.totals?.coupon);
+        if (!coupon) {
+          throw new Error(getRuntimeMessage('cart.couponNotEligible', 'Coupon code does not apply to this cart.'));
+        }
+        updateCartState((state) => ({
+          ...state,
+          cart: {
+            ...state.cart,
+            couponCode: coupon.code,
+            coupon,
+            couponStatus: 'applied',
+            couponError: ''
+          }
+        }));
+        refreshCustomCheckoutEstimates();
+      } catch (error) {
+        updateCartState((state) => ({
+          ...state,
+          cart: {
+            ...state.cart,
+            couponCode: code,
+            coupon: null,
+            couponStatus: '',
+            couponError: error?.message || getRuntimeMessage('cart.couponApplyError', 'Coupon could not be applied.')
+          }
+        }));
+      }
+    }
+
+    function removeCartCoupon() {
+      updateCartState((state) => ({
+        ...state,
+        cart: {
+          ...state.cart,
+          couponCode: '',
+          coupon: null,
+          couponStatus: '',
+          couponError: ''
+        }
+      }));
+      refreshCustomCheckoutEstimates();
+    }
+
     function bindFirstPartyCartChrome() {
       if (document._storeFirstPartyCartChromeHandler) {
         document.removeEventListener('click', document._storeFirstPartyCartChromeHandler);
@@ -5551,6 +5751,20 @@
         if (closeTrigger) {
           event.preventDefault();
           requestCloseFirstPartyCart();
+          return;
+        }
+
+        const couponApplyTrigger = event.target?.closest?.('[data-cart-coupon-apply]');
+        if (couponApplyTrigger) {
+          event.preventDefault();
+          applyCartCouponFromForm(couponApplyTrigger.closest('[data-cart-coupon-form]'));
+          return;
+        }
+
+        const couponRemoveTrigger = event.target?.closest?.('[data-cart-coupon-remove]');
+        if (couponRemoveTrigger) {
+          event.preventDefault();
+          removeCartCoupon();
           return;
         }
 
@@ -5675,6 +5889,9 @@
       }
       if (document._storeFirstPartyCartChangeHandler) {
         document.removeEventListener('change', document._storeFirstPartyCartChangeHandler);
+      }
+      if (document._storeFirstPartyCartSubmitHandler) {
+        document.removeEventListener('submit', document._storeFirstPartyCartSubmitHandler);
       }
 
       document._storeFirstPartyCartInputHandler = function handleFirstPartyCartInput(event) {
@@ -5915,8 +6132,16 @@
         });
       };
 
+      document._storeFirstPartyCartSubmitHandler = function handleFirstPartyCartSubmit(event) {
+        const form = event.target?.closest?.('[data-cart-coupon-form]');
+        if (!form) return;
+        event.preventDefault();
+        applyCartCouponFromForm(form);
+      };
+
       document.addEventListener('input', document._storeFirstPartyCartInputHandler);
       document.addEventListener('change', document._storeFirstPartyCartChangeHandler);
+      document.addEventListener('submit', document._storeFirstPartyCartSubmitHandler);
     }
 
     const apiRoot = {
@@ -6011,6 +6236,10 @@
                     cart: {
                       ...state.cart,
                       ...totals,
+                      couponCode: '',
+                      coupon: null,
+                      couponStatus: '',
+                      couponError: '',
                       items: {
                         count: nextItems.length,
                         items: nextItems
@@ -6038,6 +6267,10 @@
                   cart: {
                     ...state.cart,
                     ...totals,
+                    couponCode: '',
+                    coupon: null,
+                    couponStatus: '',
+                    couponError: '',
                     items: {
                       count: nextItems.length,
                       items: nextItems
@@ -6072,6 +6305,10 @@
                   cart: {
                     ...state.cart,
                     ...totals,
+                    couponCode: '',
+                    coupon: null,
+                    couponStatus: '',
+                    couponError: '',
                     items: {
                       count: nextItems.length,
                       items: nextItems
@@ -6117,6 +6354,10 @@
                   cart: {
                     ...state.cart,
                     ...totals,
+                    couponCode: '',
+                    coupon: null,
+                    couponStatus: '',
+                    couponError: '',
                     items: {
                       count: nextItems.length,
                       items: nextItems

@@ -24,6 +24,7 @@ admin:
   store_marketing_short_title: Marketing
   store_orders_short_title: Pedidos
   store_products_short_title: Productos
+  store_coupons_short_title: Cupones
   store_downloads_short_title: Descargas
   settings_intro: Revisa la configuración de %{platform}, checkout, envíos, impuestos, usuarios y operaciones de plataforma disponibles para esta cuenta de administración.
   settings_publish: Publicar
@@ -63,6 +64,7 @@ admin:
   export_attendees: Exportar asistentes
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
+  store_coupons_intro: Crea, edita y elimina códigos de cupón para descuentos de carrito completo o productos específicos.
   store_downloads_intro: Verifica las claves de archivos digitales contra el bucket de descargas de %{platform} y las URL de respaldo configuradas.
 misc:
   skip_to_main: Saltar al contenido principal
@@ -114,6 +116,16 @@ runtime:
     tip_with_percent: Propina para %{platform} (%{percent}%)
     estimated_total: Total estimado
     subtotal: Subtotal
+    discount: Descuento
+    discount_with_code: "Descuento (%{code})"
+    coupon_code: Código de cupón
+    apply_coupon: Aplicar
+    remove_coupon: Quitar cupón
+    coupon_applied: Cupón aplicado.
+    coupon_required: Ingresa un código de cupón.
+    coupon_invalid: No se pudo aplicar el código de cupón.
+    coupon_not_eligible: El código de cupón no aplica a este carrito.
+    coupon_apply_error: No se pudo aplicar el cupón.
     sales_tax_label: Impuesto sobre ventas (%{rate}%)
     tax_label: Impuesto
     sales_tax_pending_label: Impuesto
@@ -173,6 +185,7 @@ email:
     questions_prefix: "¿Preguntas? Responde a este correo o visita"
   store_order:
     subtotal: Subtotal
+    discount: Descuento
     tip: Propina
     shipping: Envío
     tax: Impuesto

@@ -10,6 +10,7 @@ describe('Store auth protection', () => {
       '/admin/store/health',
       '/admin/store/orders',
       '/admin/store/products',
+      '/admin/store/coupons',
       '/admin/store/downloads',
       '/admin/store/inventory'
     ];
@@ -27,8 +28,11 @@ describe('Store auth protection', () => {
       ['/admin/store/products/publish', { productId: 't-shirt-2' }],
       ['/admin/store/products/bulk-publish', { intent: 'bulk_publish', productIds: ['t-shirt-2'], fields: { status: 'draft' } }],
       ['/admin/store/products/order', { intent: 'order_publish', productIds: ['t-shirt-2'] }],
+      ['/admin/store/coupons', { coupon: { code: 'SAVE10', discountType: 'percent', percentOff: 10, appliesTo: 'cart' } }],
+      ['/admin/store/coupons/delete', { code: 'SAVE10' }],
       ['/admin/store/downloads/upload', { productId: 'download-1', content: 'data:text/plain;base64,AA==' }],
       ['/admin/store/downloads/create', { filename: 'download.txt', content: 'data:text/plain;base64,AA==' }],
+      ['/admin/store/downloads/delete', { fileKey: 'download-1' }],
       ['/admin/store/inventory', { action: 'set', productId: 't-shirt-2', inventory: 1 }],
       ['/admin/store/orders/download-access', { orderToken: 'fake', itemId: 'fake', action: 'expire' }],
       ['/admin/store/orders/check-in', { orderToken: 'fake', itemId: 'fake', checkedIn: true, quantity: 1 }]

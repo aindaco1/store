@@ -5,6 +5,7 @@ translation_key: home
 ---
 
 {%- assign products = site.products | sort: "order" -%}
+{%- assign visible_product_index = 0 -%}
 {%- capture storefront_heading -%}{% include platform-display-title.html %}{%- endcapture -%}
 <section class="storefront">
   <h1 class="sr-only">{{ storefront_heading | strip }}</h1>
@@ -38,7 +39,16 @@ translation_key: home
       {%- unless product.type == "archive" -%}
         {%- if product_public -%}
           {%- if product_status == "active" or product_status == "sold_out" -%}
-            {% include product-card.html product=product %}
+            {%- assign product_image_loading = "lazy" -%}
+            {%- assign product_image_fetchpriority = "" -%}
+            {%- if visible_product_index < 3 -%}
+              {%- assign product_image_loading = "eager" -%}
+              {%- if visible_product_index == 0 -%}
+                {%- assign product_image_fetchpriority = "high" -%}
+              {%- endif -%}
+            {%- endif -%}
+            {% include product-card.html product=product image_loading=product_image_loading image_fetchpriority=product_image_fetchpriority %}
+            {%- assign visible_product_index = visible_product_index | plus: 1 -%}
           {%- endif -%}
         {%- endif -%}
       {%- endunless -%}

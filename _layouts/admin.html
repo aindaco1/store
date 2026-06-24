@@ -51,6 +51,7 @@
           <div class="admin-tabs__list" role="tablist" aria-label="{% include t.html key='admin.tabs_label' lang=current_lang %}">
             <button id="admin-tab-settings" class="admin-tabs__tab" type="button" role="tab" aria-selected="true" aria-controls="admin-panel-settings" data-admin-tab="settings">{% include t.html key="admin.settings_title" lang=current_lang %}</button>
             <button id="admin-tab-store-products" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-products" data-admin-tab="store-products" tabindex="-1">{% include t.html key="admin.store_products_short_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-coupons" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-coupons" data-admin-tab="store-coupons" tabindex="-1">{% include t.html key="admin.store_coupons_short_title" lang=current_lang %}</button>
             <button id="admin-tab-store-downloads" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-downloads" data-admin-tab="store-downloads" tabindex="-1">{% include t.html key="admin.store_downloads_short_title" lang=current_lang %}</button>
             <button id="admin-tab-store-orders" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-orders" data-admin-tab="store-orders" tabindex="-1">{% include t.html key="admin.store_orders_short_title" lang=current_lang %}</button>
             <button id="admin-tab-store-analytics" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-analytics" data-admin-tab="store-analytics" tabindex="-1">{% include t.html key="admin.store_analytics_short_title" lang=current_lang %}</button>
@@ -151,9 +152,35 @@
               <p class="admin-app__muted">{% include t.html key="admin.store_orders_intro" lang=current_lang platform=admin_platform_name %}</p>
             </div>
           </div>
+          <div class="admin-store-orders__import admin-section-panel">
+            <div class="admin-store-orders__import-copy">
+              <label
+                class="admin-store-orders__import-title"
+                for="admin-store-orders-snipcart-file"
+                data-store-orders-help
+                data-store-orders-help-label="Import Snipcart CSV"
+                data-store-orders-help-path="store-orders-import-snipcart"
+                data-store-orders-help-text="Upload a Snipcart order export. Production imports create historical Store orders and skip records already imported."
+              >Import Snipcart CSV</label>
+              <span class="admin-store-orders__import-note">Production-only.</span>
+            </div>
+            <div class="admin-store-orders__import-controls">
+              <input id="admin-store-orders-snipcart-file" class="admin-file-picker__input sr-only" type="file" accept=".csv,text/csv" data-admin-file-picker-input="true" data-admin-file-picker-empty-label="No file chosen">
+              <label class="btn btn--secondary admin-file-picker__button admin-store-orders__file-button" for="admin-store-orders-snipcart-file" role="button" tabindex="0">Choose CSV</label>
+              <span id="admin-store-orders-snipcart-file-name" class="admin-file-picker__filename admin-store-orders__file-name" data-admin-file-picker-filename-for="admin-store-orders-snipcart-file">No file chosen</span>
+              <button id="admin-store-orders-snipcart-import" class="btn btn--secondary" type="button">Import</button>
+            </div>
+            <div id="admin-store-orders-import-summary" class="admin-store-orders__import-summary" aria-live="polite"></div>
+          </div>
           <form id="admin-store-order-filters" class="admin-store-orders__filters">
             <div class="admin-store-orders__field">
-              <label for="admin-store-order-status">{% include t.html key="admin.store_order_status" lang=current_lang %}</label>
+              <label
+                for="admin-store-order-status"
+                data-store-orders-help
+                data-store-orders-help-label="Status"
+                data-store-orders-help-path="store-orders-status"
+                data-store-orders-help-text="Filter orders by lifecycle state: confirmed, payment pending, payment failed, draft, or all."
+              >{% include t.html key="admin.store_order_status" lang=current_lang %}</label>
               <select id="admin-store-order-status" class="admin-settings__input" name="status">
                 <option value="all">{% include t.html key="admin.filter_all" lang=current_lang %}</option>
                 <option value="confirmed">Confirmed</option>
@@ -164,7 +191,13 @@
             </div>
 
             <div class="admin-store-orders__field">
-              <label for="admin-store-order-fulfillment">{% include t.html key="admin.store_order_fulfillment" lang=current_lang %}</label>
+              <label
+                for="admin-store-order-fulfillment"
+                data-store-orders-help
+                data-store-orders-help-label="Fulfillment"
+                data-store-orders-help-path="store-orders-fulfillment"
+                data-store-orders-help-text="Filter rows by delivery type or ticket check-in state."
+              >{% include t.html key="admin.store_order_fulfillment" lang=current_lang %}</label>
               <select id="admin-store-order-fulfillment" class="admin-settings__input" name="fulfillment">
                 <option value="all">{% include t.html key="admin.filter_all" lang=current_lang %}</option>
                 <option value="physical">Physical</option>
@@ -177,7 +210,13 @@
             </div>
 
             <div class="admin-store-orders__field">
-              <label for="admin-store-order-query">{% include t.html key="admin.search_label" lang=current_lang %}</label>
+              <label
+                for="admin-store-order-query"
+                data-store-orders-help
+                data-store-orders-help-label="Search"
+                data-store-orders-help-path="store-orders-search"
+                data-store-orders-help-text="Search order tokens, customers, payment state, item names, variants, SKUs, and check-in notes."
+              >{% include t.html key="admin.search_label" lang=current_lang %}</label>
               <input id="admin-store-order-query" class="admin-settings__input" name="q" type="search" autocomplete="off">
             </div>
 
@@ -202,6 +241,17 @@
           <div id="admin-store-products-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
           <div id="admin-store-products-summary" class="admin-store-products__summary" aria-live="polite"></div>
           <div id="admin-store-products-results" class="admin-store-products__results"></div>
+        </section>
+
+        <section id="admin-panel-store-coupons" class="admin-store-coupons admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-coupons" data-admin-tab-panel="store-coupons" hidden>
+          <div class="admin-store-coupons__header">
+            <div>
+              <p class="admin-app__muted">{% include t.html key="admin.store_coupons_intro" lang=current_lang platform=admin_platform_name %}</p>
+            </div>
+          </div>
+          <div id="admin-store-coupons-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
+          <div id="admin-store-coupons-summary" class="admin-store-coupons__summary" aria-live="polite"></div>
+          <div id="admin-store-coupons-results" class="admin-store-coupons__results"></div>
         </section>
 
         <section id="admin-panel-store-downloads" class="admin-store-downloads admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-downloads" data-admin-tab-panel="store-downloads" hidden>

@@ -645,6 +645,15 @@ $admin-section-gap: clamp(16px, 2vw, 24px);
   opacity: 1;
 }
 
+.admin-settings__help-tooltip.is-visible {
+  display: block;
+  max-height: calc(100vh - 32px);
+  opacity: 1;
+  overflow-y: auto;
+  position: fixed;
+  z-index: 1000;
+}
+
 .admin-settings__help--edge-start .admin-settings__help-tooltip,
 .admin-settings__help--edge-end .admin-settings__help-tooltip,
 .admin-stat-card__label .admin-settings__help-tooltip {
@@ -680,6 +689,60 @@ $admin-section-gap: clamp(16px, 2vw, 24px);
   width: 100%;
 
   @include admin-control-focus($surface--base);
+}
+
+.admin-file-picker {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-file-picker__input {
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.admin-file-picker__button {
+  justify-content: center;
+  min-height: 2.6rem;
+  white-space: nowrap;
+  width: auto;
+}
+
+.admin-file-picker__filename {
+  color: $color--secondary;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-file-picker--compact {
+  gap: 6px;
+  grid-template-columns: auto minmax(4rem, 1fr);
+  width: auto;
+}
+
+.admin-file-picker--compact .admin-file-picker__button {
+  min-height: 1.9rem;
+  padding: 5px 9px;
+}
+
+.admin-file-picker--full {
+  width: 100%;
 }
 
 select.admin-settings__input,
@@ -1012,7 +1075,6 @@ textarea.admin-settings__input--readonly {
 
   .btn {
     justify-content: center;
-    width: 100%;
 
     &:focus-within {
       border-color: $border--strong;
@@ -1032,6 +1094,14 @@ textarea.admin-settings__input--readonly {
     white-space: nowrap;
     width: 1px;
   }
+}
+
+.admin-settings__image-upload .admin-file-picker {
+  flex: 1 1 100%;
+}
+
+.admin-settings__image-upload .admin-file-picker__button {
+  width: auto;
 }
 
 .admin-settings__image-status {
@@ -1406,6 +1476,7 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-analytics,
 .admin-store-marketing,
+.admin-store-coupons,
 .admin-store-downloads,
 .admin-store-orders,
 .admin-store-products,
@@ -1418,6 +1489,7 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-store-analytics__header,
+.admin-store-coupons__header,
 .admin-store-downloads__header,
 .admin-store-orders__header,
 .admin-store-products__header,
@@ -1638,13 +1710,81 @@ textarea.admin-settings__input--readonly {
   white-space: nowrap;
 }
 
+.admin-store-orders__import {
+  align-items: center;
+  display: grid;
+  gap: 8px 14px;
+  grid-template-columns: minmax(18rem, 1fr) minmax(22rem, 1.15fr);
+  margin-top: 10px;
+  padding: 12px 14px;
+  position: relative;
+  z-index: 2;
+}
+
+.admin-store-orders__import-copy,
+.admin-store-orders__label-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-store-orders__import-copy {
+  flex-wrap: wrap;
+}
+
+.admin-store-orders__import-title,
+.admin-store-orders__field label {
+  @include admin-label;
+}
+
+.admin-store-orders__import-note,
+.admin-store-orders__file-name {
+  color: $color--secondary;
+  font-size: 0.9rem;
+  line-height: 1.25;
+}
+
+.admin-store-orders__import-note {
+  white-space: nowrap;
+}
+
+.admin-store-orders__import-controls {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(7rem, 1fr) auto;
+  min-width: 0;
+}
+
+.admin-store-orders__file-button,
+.admin-store-orders__import-controls .btn {
+  justify-content: center;
+  min-height: 2.6rem;
+  white-space: nowrap;
+}
+
+.admin-store-orders__file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-store-orders__import-summary {
+  color: $color--secondary;
+  font-size: 0.86rem;
+  grid-column: 1 / -1;
+  line-height: 1.35;
+}
+
+.admin-store-orders__import-summary:empty {
+  display: none;
+}
+
 .admin-store-orders__field {
   display: grid;
   gap: 6px;
-}
-
-.admin-store-orders__field label {
-  @include admin-label;
 }
 
 .admin-store-orders__field select,
@@ -1655,6 +1795,7 @@ textarea.admin-settings__input--readonly {
 .admin-store-analytics__results,
 .admin-store-readiness__results,
 .admin-store-downloads__results,
+.admin-store-coupons__results,
 .admin-store-orders__results,
 .admin-store-products__results {
   margin-top: 12px;
@@ -1663,6 +1804,7 @@ textarea.admin-settings__input--readonly {
 .admin-store-analytics__table-wrap,
 .admin-store-readiness__results,
 .admin-store-downloads__results,
+.admin-store-coupons__results,
 .admin-store-orders__results,
 .admin-store-products__results {
   overflow-x: auto;
@@ -1671,6 +1813,7 @@ textarea.admin-settings__input--readonly {
 .admin-store-analytics__table,
 .admin-store-readiness__table,
 .admin-store-downloads__table,
+.admin-store-coupons__table,
 .admin-store-orders__attendance-table,
 .admin-store-orders__table,
 .admin-store-products__table {
@@ -1720,6 +1863,7 @@ textarea.admin-settings__input--readonly {
 .admin-store-analytics__summary,
 .admin-store-readiness__summary,
 .admin-store-orders__summary,
+.admin-store-coupons__summary,
 .admin-store-products__summary {
   margin-top: 12px;
 }
@@ -2005,10 +2149,8 @@ textarea.admin-settings__input--readonly {
   gap: 6px;
 }
 
-.admin-store-downloads__field input[type="file"] {
-  font-size: 0.82rem;
-  line-height: 1.3;
-  min-width: 0;
+.admin-store-downloads__field .admin-file-picker {
+  width: 100%;
 }
 
 .admin-store-downloads__create-actions {
@@ -2021,12 +2163,27 @@ textarea.admin-settings__input--readonly {
   overflow-wrap: anywhere;
 }
 
-.admin-store-downloads__upload input[type="file"] {
-  font-size: 0.78rem;
-  line-height: 1.3;
+.admin-store-downloads__upload .admin-file-picker {
   max-width: 100%;
   min-width: 0;
   width: 100%;
+}
+
+.admin-store-downloads__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.admin-store-downloads__actions .admin-file-picker {
+  flex: 1 1 12rem;
+}
+
+.admin-store-downloads__delete {
+  flex: 0 0 auto;
 }
 
 .admin-store-products__bulk-actions {
@@ -2086,6 +2243,128 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-products__bulk-field span {
   @include admin-label;
+}
+
+.admin-store-coupons__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.admin-store-coupons__table {
+  width: 100%;
+}
+
+.admin-store-coupons__table th,
+.admin-store-coupons__table td {
+  vertical-align: top;
+}
+
+.admin-store-coupons__scope {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-store-coupons__scope small {
+  color: $color--secondary;
+  font-size: $type--meta;
+  line-height: 1.35;
+}
+
+.admin-store-coupons__actions {
+  @include admin-action-row(8px);
+  justify-content: flex-start;
+}
+
+.admin-store-coupons__editor-row > td {
+  padding: 0;
+}
+
+.admin-store-coupons__editor {
+  background: $surface--subtle;
+  border: 1px solid $border--default;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.admin-store-coupons__editor-title {
+  @include type-section-title;
+  margin: 0;
+}
+
+.admin-store-coupons__editor-grid {
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-store-coupons__field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-store-coupons__field--full,
+.admin-store-coupons__products {
+  grid-column: 1 / -1;
+}
+
+.admin-store-coupons__field-label {
+  align-items: center;
+  color: $color--secondary;
+  display: inline-flex;
+  font-size: $type--meta;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.admin-store-coupons__editor textarea {
+  min-height: 4.75rem;
+  resize: vertical;
+}
+
+.admin-store-coupons__product-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+.admin-store-coupons__product-choice {
+  align-items: flex-start;
+  background: $surface--base;
+  border: 1px solid $border--default;
+  border-radius: $radius--sm;
+  display: grid;
+  gap: 2px 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.admin-store-coupons__product-choice input {
+  accent-color: $color--primary;
+  margin-top: 0.2rem;
+}
+
+.admin-store-coupons__product-choice span,
+.admin-store-coupons__product-choice small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-store-coupons__product-choice small {
+  color: $color--secondary;
+  font-size: $type--meta;
+  grid-column: 2;
+}
+
+.admin-store-coupons__editor-actions {
+  @include admin-action-row(8px);
+  justify-content: flex-start;
 }
 
 @media (max-width: 760px) {
@@ -2238,16 +2517,10 @@ textarea.admin-settings__input--readonly {
   justify-content: flex-start;
 }
 
-.admin-store-products__image-actions input[type="file"] {
-  border: 0;
-  clip: rect(0, 0, 0, 0);
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  padding: 0;
-  position: absolute;
-  white-space: nowrap;
-  width: 1px;
+.admin-store-products__image-actions .admin-file-picker,
+.admin-store-products__description-media .admin-file-picker {
+  flex: 1 1 13rem;
+  max-width: 100%;
 }
 
 .admin-store-products__image-actions .btn,
@@ -3536,6 +3809,10 @@ textarea.admin-settings__input--readonly {
     grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
   }
 
+  .admin-store-orders__import {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .admin-store-marketing__form {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
@@ -3547,6 +3824,7 @@ textarea.admin-settings__input--readonly {
 
 @media (max-width: 720px) {
   .admin-store-downloads__results,
+  .admin-store-coupons__results,
   .admin-store-orders__attendance,
   .admin-store-orders__results,
   .admin-store-products__results {
@@ -3566,7 +3844,27 @@ textarea.admin-settings__input--readonly {
     width: 100%;
   }
 
+  .admin-store-coupons__toolbar,
+  .admin-store-coupons__editor-actions {
+    justify-content: stretch;
+  }
+
+  .admin-store-coupons__toolbar .btn,
+  .admin-store-coupons__editor-actions .btn {
+    width: 100%;
+  }
+
+  .admin-store-coupons__editor {
+    padding: 10px;
+  }
+
+  .admin-store-coupons__editor-grid,
+  .admin-store-coupons__product-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .admin-store-downloads__table,
+  .admin-store-coupons__table,
   .admin-store-orders__attendance-table,
   .admin-store-orders__table,
   .admin-store-products__table {
@@ -3579,6 +3877,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table thead,
+  .admin-store-coupons__table thead,
   .admin-store-orders__attendance-table thead,
   .admin-store-orders__table thead,
   .admin-store-products__table thead {
@@ -3586,6 +3885,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody,
+  .admin-store-coupons__table tbody,
   .admin-store-orders__attendance-table tbody,
   .admin-store-orders__table tbody,
   .admin-store-products__table tbody {
@@ -3595,6 +3895,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr,
+  .admin-store-coupons__table tbody tr,
   .admin-store-orders__attendance-table tbody tr,
   .admin-store-orders__table tbody tr,
   .admin-store-products__table tbody tr[data-store-product-order-row] {
@@ -3612,6 +3913,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr > td,
+  .admin-store-coupons__table tbody tr > td,
   .admin-store-orders__attendance-table tbody tr > td,
   .admin-store-orders__table tbody tr > td,
   .admin-store-products__table tbody tr[data-store-product-order-row] > td {
@@ -3623,6 +3925,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr > td,
+  .admin-store-coupons__table tbody tr > td,
   .admin-store-orders__attendance-table tbody tr > td,
   .admin-store-orders__table tbody tr > td {
     align-items: baseline;
@@ -3636,6 +3939,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr > td:first-child,
+  .admin-store-coupons__table tbody tr > td:first-child,
   .admin-store-orders__attendance-table tbody tr > td:first-child,
   .admin-store-orders__table tbody tr > td:first-child {
     border-top: 0;
@@ -3643,10 +3947,37 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr > td::before,
+  .admin-store-coupons__table tbody tr > td::before,
   .admin-store-orders__attendance-table tbody tr > td::before,
   .admin-store-orders__table tbody tr > td::before {
     @include admin-label;
     content: attr(data-label);
+  }
+
+  .admin-store-coupons__table tbody tr.admin-store-coupons__editor-row {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    display: block;
+    padding: 0;
+  }
+
+  .admin-store-coupons__table tbody tr.admin-store-coupons__editor-row > td {
+    border: 0;
+    display: block;
+    grid-column: 1 / -1;
+    padding: 0;
+    width: 100%;
+  }
+
+  .admin-store-coupons__table tbody tr.admin-store-coupons__editor-row > td::before {
+    content: none;
+    display: none;
+  }
+
+  .admin-store-coupons__editor {
+    box-sizing: border-box;
+    width: 100%;
   }
 
   .admin-store-downloads__download {
@@ -3925,6 +4256,17 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-orders__filters {
     grid-template-columns: 1fr;
+  }
+
+  .admin-store-orders__import-controls {
+    grid-template-columns: auto minmax(4rem, 1fr) auto;
+  }
+
+  .admin-store-orders__file-button,
+  .admin-store-orders__import-controls .btn {
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 
   .admin-store-marketing__form {

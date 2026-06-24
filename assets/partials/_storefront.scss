@@ -198,11 +198,23 @@
   object-fit: cover;
 }
 
+.storefront:not(.storefront--product) .store-product-card__image {
+  object-fit: contain;
+}
+
 .store-product-card__body {
   display: grid;
   grid-template-rows: auto minmax(5rem, 1fr) auto;
   gap: 12px;
   padding: 16px;
+}
+
+.store-product-card--purchase-only .store-product-card__body {
+  grid-template-rows: auto;
+}
+
+.store-product-card--purchase-only .store-product-card__purchase {
+  align-self: start;
 }
 
 .store-product-card__header,

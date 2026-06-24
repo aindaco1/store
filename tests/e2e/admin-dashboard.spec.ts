@@ -87,9 +87,11 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeOrders: [],
     storeOrderCsv: [],
     storeAttendeeCsv: [],
+    storeSnipcartImports: [],
     storeOrderCheckIns: [],
     storeOrderDownloadAccesses: [],
     storeProducts: [],
+    storeCoupons: [],
     storeProductMedia: [],
     storeProductPreviews: [],
     storeProductPublishes: [],
@@ -98,6 +100,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeDownloads: [],
     storeDownloadUploads: [],
     storeDownloadCreates: [],
+    storeDownloadDeletes: [],
     storeInventoryWrites: []
   };
   const user = {
@@ -383,6 +386,21 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         body: `order,item,quantity\n${TICKET_ORDER_TOKEN},Fronteras Screening,1\n`
       });
     }
+    if (url.pathname === '/admin/store/orders/import-snipcart' && method === 'POST') {
+      calls.storeSnipcartImports.push(body);
+      return fulfillJson({
+        success: true,
+        message: 'Imported 1 Snipcart order.',
+        filename: body.filename,
+        rowCount: 2,
+        parsedOrderCount: 1,
+        importedOrderCount: 1,
+        skippedOrderCount: 0,
+        failedOrderCount: 0,
+        warnings: [],
+        writeBudget: { readOnly: false, kvWritesExpected: 2, kvListExpected: 1 }
+      });
+    }
     if (url.pathname === '/admin/store/attendees.csv' && method === 'GET') {
       calls.storeAttendeeCsv.push(Object.fromEntries(url.searchParams.entries()));
       return route.fulfill({
@@ -453,7 +471,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         scope: 'store',
         productId: body.productId,
         preview: {
-          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"><script>window.__storePreviewHeadScriptRan = true;</script></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview onclick="window.__storePreviewInlineHandlerRan = true"><div class="storefront__header storefront__header--compact"><p class="storefront__eyebrow">FRONTERAS</p><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card" data-store-product-card><a class="store-product-card__media" href="javascript:window.__storePreviewHrefRan=true" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}"></a><div class="store-product-card__body"><div class="store-product-card__header"><p class="store-product-card__eyebrow">FRONTERAS</p><h2 class="store-product-card__title"><a href="#" tabindex="-1">${previewName}</a></h2></div><p class="store-product-card__description">${previewDescription}</p><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Pool preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section><script>window.__storePreviewBodyScriptRan = true;</script></body></html>`,
+          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"><script>window.__storePreviewHeadScriptRan = true;</script></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview onclick="window.__storePreviewInlineHandlerRan = true"><div class="storefront__header storefront__header--compact"><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card store-product-card--purchase-only" data-store-product-card><a class="store-product-card__media" href="javascript:window.__storePreviewHrefRan=true" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}" loading="eager" decoding="async" fetchpriority="high"></a><div class="store-product-card__body"><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Pool preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section><script>window.__storePreviewBodyScriptRan = true;</script></body></html>`,
           generatedAt: '2026-06-11T12:00:00.000Z'
         },
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
@@ -497,6 +515,41 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         writeBudget: { readOnly: false, kvWritesExpected: 1 }
       });
     }
+    if (url.pathname === '/admin/store/coupons' && method === 'GET') {
+      calls.storeCoupons.push({ method });
+      return fulfillJson(storeCouponsPayload());
+    }
+    if (url.pathname === '/admin/store/coupons' && method === 'POST') {
+      calls.storeCoupons.push({ method, body });
+      const coupon = body.coupon || body || {};
+      return fulfillJson({
+        success: true,
+        coupon: {
+          id: String(coupon.code || '').toLowerCase(),
+          code: String(coupon.code || '').toUpperCase(),
+          description: coupon.description || '',
+          status: coupon.status || 'draft',
+          discountType: coupon.discountType || 'percent',
+          percentOff: Number(coupon.percentOff || 0),
+          amountOffCents: Number(coupon.amountOffCents || 0),
+          appliesTo: coupon.appliesTo || 'cart',
+          productIds: Array.isArray(coupon.productIds) ? coupon.productIds : []
+        },
+        coupons: storeCouponsPayload().coupons,
+        products: storeCouponsPayload().products,
+        writeBudget: { readOnly: false, kvWritesExpected: 1 }
+      });
+    }
+    if (url.pathname === '/admin/store/coupons/delete' && method === 'POST') {
+      calls.storeCoupons.push({ method, body, delete: true });
+      return fulfillJson({
+        success: true,
+        deleted: body.code,
+        coupons: [],
+        products: storeCouponsPayload().products,
+        writeBudget: { readOnly: false, kvWritesExpected: 1 }
+      });
+    }
     if (url.pathname === '/admin/store/downloads' && method === 'GET') {
       calls.storeDownloads.push({ method });
       return fulfillJson(storeDownloadsPayload());
@@ -526,6 +579,16 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         uploaded: true,
         fileKey,
         filename: body.filename,
+        writeBudget: { readOnly: false, kvWritesExpected: 1, r2WritesExpected: 1 }
+      });
+    }
+    if (url.pathname === '/admin/store/downloads/delete' && method === 'POST') {
+      calls.storeDownloadDeletes.push(body);
+      return fulfillJson({
+        success: true,
+        deleted: true,
+        fileKey: body.fileKey,
+        filename: body.filename || body.fileKey,
         writeBudget: { readOnly: false, kvWritesExpected: 1, r2WritesExpected: 1 }
       });
     }
@@ -1222,6 +1285,59 @@ function storeProductsPayload() {
   };
 }
 
+function storeCouponsPayload() {
+  return {
+    scope: 'store',
+    coupons: [{
+      id: 'save10',
+      code: 'SAVE10',
+      description: 'Ten percent off the whole cart.',
+      status: 'active',
+      discountType: 'percent',
+      percentOff: 10,
+      amountOffCents: 0,
+      appliesTo: 'cart',
+      productIds: [],
+      createdAt: '2026-06-10T12:00:00.000Z',
+      updatedAt: '2026-06-10T12:00:00.000Z'
+    }, {
+      id: 'poster5',
+      code: 'POSTER5',
+      description: 'Five dollars off the Fronteras poster.',
+      status: 'draft',
+      discountType: 'amount',
+      percentOff: 0,
+      amountOffCents: 500,
+      appliesTo: 'products',
+      productIds: ['fronteras-poster-big'],
+      createdAt: '2026-06-10T12:00:00.000Z',
+      updatedAt: '2026-06-10T12:00:00.000Z'
+    }],
+    products: [{
+      productId: 'fronteras-poster-big',
+      name: 'Fronteras Poster (Big)',
+      status: 'active',
+      fulfillmentType: 'physical',
+      collection: 'fronteras',
+      category: 'prints'
+    }, {
+      productId: DIGITAL_ITEM_ID,
+      name: 'DUST WAVE Digital Download',
+      status: 'active',
+      fulfillmentType: 'digital',
+      collection: 'dustwave',
+      category: 'downloads'
+    }],
+    totals: {
+      coupons: 2,
+      active: 1,
+      draft: 1
+    },
+    updatedAt: '2026-06-10T12:00:00.000Z',
+    writeBudget: { readOnly: true, kvWritesExpected: 0 }
+  };
+}
+
 function storeDownloadsPayload() {
   return {
     scope: 'store',
@@ -1295,6 +1411,7 @@ test.describe('Admin Dashboard', () => {
 	    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab')).toHaveText([
 	      'Settings',
 	      'Products',
+	      'Coupons',
 	      'Downloads',
 	      'Orders',
 	      'Analytics',
@@ -1574,6 +1691,10 @@ test.describe('Admin Dashboard', () => {
 
     await selectAdminSection(page, 'Orders');
     await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About Import Snipcart CSV' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About Status' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About Search' })).toBeVisible();
     await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
     await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
     await expect(page.locator('#admin-store-orders-results')).toContainText('Fronteras Download');
@@ -1618,6 +1739,20 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-store-orders-export').click();
     await expect.poll(() => calls.storeOrderCsv.length).toBe(1);
     await expect(page.locator('#admin-store-orders-status')).toContainText('Order CSV download started.');
+    await page.locator('#admin-store-orders-snipcart-file').setInputFiles({
+      name: 'snipcart-orders.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Invoice number,Token,Customer email,Item name\nSNIP-1,legacy-token,buyer@example.com,DUST WAVE Sticker\n')
+    });
+    await expect(page.locator('#admin-store-orders-snipcart-file-name')).toContainText('snipcart-orders.csv');
+    await page.locator('#admin-store-orders-snipcart-import').click();
+    await expect.poll(() => calls.storeSnipcartImports.length).toBe(1);
+    expect(calls.storeSnipcartImports[0]).toMatchObject({
+      filename: 'snipcart-orders.csv'
+    });
+    expect(calls.storeSnipcartImports[0].csv).toContain('SNIP-1');
+    await expect(page.locator('#admin-store-orders-status')).toContainText('Imported 1 Snipcart order.');
+    await expect(page.locator('#admin-store-orders-import-summary')).toContainText('2 CSV rows / 1 legacy order');
 
     await selectAdminSection(page, 'Products');
     await expect(page.locator('#admin-store-products-load')).toHaveCount(0);
@@ -1976,8 +2111,13 @@ test.describe('Admin Dashboard', () => {
     });
     expect(sandboxScriptErrors).toEqual([]);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront--product.admin-store-product-preview')).toBeVisible();
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront__eyebrow')).toHaveCount(0);
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__eyebrow')).toHaveCount(0);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront__product-detail')).toBeVisible();
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card')).toBeVisible();
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card')).toHaveClass(/store-product-card--purchase-only/);
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__title')).toHaveCount(0);
+    await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__description')).toHaveCount(0);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__button')).toContainText('Add to cart');
     await expect.poll(async () => productEditor.frameLocator('[data-store-product-preview-frame]').locator('body').evaluate(() => {
       return document.documentElement.scrollWidth <= window.innerWidth + 1 && document.body.scrollWidth <= window.innerWidth + 1;
@@ -2210,6 +2350,9 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-store-downloads-load')).toHaveCount(0);
     await expect.poll(() => calls.storeDownloads.length).toBe(1);
     await expect(page.locator('#admin-store-downloads-results')).toContainText('fronteras-download.pdf');
+    await expect(page.locator('#admin-store-downloads-results th')).toContainText(['File', 'Status', 'Attached to', 'Uploaded', 'Actions']);
+    await expect(page.locator('#admin-store-downloads-results').getByRole('button', { name: 'Replace', exact: true })).toBeVisible();
+    await expect(page.locator('#admin-store-downloads-results').getByRole('button', { name: 'Delete fronteras-download.pdf' })).toBeVisible();
     await page.locator('[data-store-download-upload="true"]').setInputFiles({
       name: 'fronteras-download-updated.pdf',
       mimeType: 'application/pdf',
@@ -2223,6 +2366,10 @@ test.describe('Admin Dashboard', () => {
     });
     expect(calls.storeDownloadCreates[0].content).toMatch(/^data:application\/pdf;base64,/);
     await expect(page.locator('#admin-store-downloads-status')).toContainText('fronteras-download-updated.pdf uploaded.');
+    await page.locator('#admin-store-downloads-results').getByRole('button', { name: 'Delete fronteras-download.pdf' }).click();
+    await expect.poll(() => calls.storeDownloadDeletes.length).toBe(1);
+    expect(calls.storeDownloadDeletes[0]).toMatchObject({ fileKey: DIGITAL_ITEM_ID, filename: 'fronteras-download.pdf' });
+    await expect(page.locator('#admin-store-downloads-status')).toContainText('fronteras-download.pdf deleted.');
 
     const createDownloadForm = page.locator('[data-store-download-create]');
     await expect(createDownloadForm.locator('[data-store-download-create-field="name"]')).toHaveCount(0);
@@ -2250,6 +2397,9 @@ test.describe('Admin Dashboard', () => {
 	    await page.locator('#admin-tab-settings').focus();
 	    await page.keyboard.press('ArrowRight');
 	    await expect(page.getByRole('tab', { name: 'Products', exact: true })).toHaveAttribute('aria-selected', 'true');
+	    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('tab', { name: 'Coupons', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => calls.storeCoupons.length).toBe(1);
 	    await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Downloads', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('ArrowRight');
@@ -2401,6 +2551,9 @@ test.describe('Admin Dashboard', () => {
   test('keeps Store downloads admin usable on mobile viewports', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     await page.setViewportSize({ width: 390, height: 844 });
+    page.on('dialog', async (dialog) => {
+      await dialog.accept();
+    });
 
     await page.goto('/admin/?admin_login=admin-token-downloads-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
@@ -2425,10 +2578,41 @@ test.describe('Admin Dashboard', () => {
     })).toBe(true);
     await expect.poll(() => downloadRows.first().evaluate((row: HTMLElement) => {
       return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
-    })).toEqual(['File', 'Status', 'Attached to', 'Uploaded', 'Replace']);
+    })).toEqual(['File', 'Status', 'Attached to', 'Uploaded', 'Actions']);
+    await expect(downloadRows.first().getByRole('button', { name: 'Replace', exact: true })).toBeVisible();
+    await expect(downloadRows.first().getByRole('button', { name: 'Delete fronteras-download.pdf' })).toBeVisible();
     await expect.poll(() => downloadsResults.locator('[data-store-download-upload="true"]').evaluate((input: HTMLInputElement) => {
       return input.getBoundingClientRect().right <= window.innerWidth + 1 && getComputedStyle(input).width !== 'auto';
     })).toBe(true);
+    const createDownloadForm = page.locator('[data-store-download-create]');
+    await createDownloadForm.getByRole('button', { name: 'About File' }).hover();
+    const downloadFileTooltipBounds = await createDownloadForm.locator('.admin-settings__help-tooltip').evaluate((tooltip: HTMLElement) => {
+      const rect = tooltip.getBoundingClientRect();
+      const styles = getComputedStyle(tooltip);
+      return {
+        bottom: Math.ceil(rect.bottom),
+        display: styles.display,
+        left: Math.floor(rect.left),
+        position: styles.position,
+        right: Math.ceil(rect.right),
+        top: Math.floor(rect.top),
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth
+      };
+    });
+    expect(downloadFileTooltipBounds.display).toBe('block');
+    expect(downloadFileTooltipBounds.position).toBe('fixed');
+    expect(downloadFileTooltipBounds.left).toBeGreaterThanOrEqual(0);
+    expect(downloadFileTooltipBounds.right).toBeLessThanOrEqual(downloadFileTooltipBounds.viewportWidth);
+    expect(downloadFileTooltipBounds.top).toBeGreaterThanOrEqual(0);
+    expect(downloadFileTooltipBounds.bottom).toBeLessThanOrEqual(downloadFileTooltipBounds.viewportHeight);
+    await downloadRows.first().getByRole('button', { name: 'Delete fronteras-download.pdf' }).click();
+    await expect.poll(() => calls.storeDownloadDeletes.length).toBe(1);
+    expect(calls.storeDownloadDeletes[0]).toMatchObject({
+      fileKey: DIGITAL_ITEM_ID,
+      filename: 'fronteras-download.pdf'
+    });
+    await expect(page.locator('#admin-store-downloads-status')).toContainText('fronteras-download.pdf deleted.');
 
     await downloadsResults.locator('[data-store-download-upload="true"]').setInputFiles({
       name: 'fronteras-download-mobile.pdf',

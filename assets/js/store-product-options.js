@@ -3,6 +3,9 @@
 
   var titleResizeObserver = null;
   var titleFitQueued = false;
+  var productImageRecoveryReady = false;
+  var productImageRefreshQueued = false;
+  var maxProductImageRetries = 2;
 
   function formatMoney(value) {
     var amount = Number(value || 0);
@@ -57,6 +60,100 @@
     titleFitQueued = true;
     document.documentElement.dataset.storeProductTitlesFit = 'pending';
     window.requestAnimationFrame(fitProductTitles);
+  }
+
+  function isProductCardImage(image) {
+    return image instanceof HTMLImageElement && image.classList.contains('store-product-card__image');
+  }
+
+  function isBrokenImage(image) {
+    return isProductCardImage(image) && image.complete && image.naturalWidth === 0;
+  }
+
+  function retryUrl(src, retryCount) {
+    if (!src || /^data:/i.test(src) || /^blob:/i.test(src)) return src;
+
+    try {
+      var url = new URL(src, window.location.href);
+      if (url.origin === window.location.origin) {
+        url.searchParams.set('_store_image_retry', String(Date.now()) + '-' + String(retryCount));
+        return src.charAt(0) === '/' ? url.pathname + url.search + url.hash : url.href;
+      }
+    } catch (_error) {
+      return src;
+    }
+
+    return src;
+  }
+
+  function retryProductCardImage(image) {
+    if (!isBrokenImage(image)) return false;
+
+    var currentRetries = Number(image.dataset.storeImageRetries || 0);
+    if (!Number.isFinite(currentRetries) || currentRetries < 0) currentRetries = 0;
+    if (currentRetries >= maxProductImageRetries) return false;
+
+    var src = image.getAttribute('src') || '';
+    if (!src) return false;
+
+    var nextRetry = currentRetries + 1;
+    image.dataset.storeImageRetries = String(nextRetry);
+    image.removeAttribute('src');
+    window.requestAnimationFrame(function() {
+      image.setAttribute('src', retryUrl(src, nextRetry));
+    });
+    return true;
+  }
+
+  function refreshProductCardImages() {
+    productImageRefreshQueued = false;
+    var retried = 0;
+    document.querySelectorAll('.store-product-card__image').forEach(function(image) {
+      if (retryProductCardImage(image)) retried += 1;
+    });
+    return retried;
+  }
+
+  function scheduleProductCardImageRefresh(delay) {
+    if (productImageRefreshQueued) return;
+    productImageRefreshQueued = true;
+    window.setTimeout(refreshProductCardImages, Math.max(0, Number(delay || 0)));
+  }
+
+  function navigationWasRestored() {
+    try {
+      var entries = performance.getEntriesByType?.('navigation') || [];
+      return entries.some(function(entry) {
+        return entry && entry.type === 'back_forward';
+      });
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function initProductImageRecovery() {
+    if (productImageRecoveryReady) return;
+    productImageRecoveryReady = true;
+
+    document.addEventListener('error', function(event) {
+      var image = event.target;
+      if (!isProductCardImage(image)) return;
+      scheduleProductCardImageRefresh(80);
+    }, true);
+
+    document.addEventListener('load', function(event) {
+      var image = event.target;
+      if (isProductCardImage(image) && image.naturalWidth > 0) {
+        delete image.dataset.storeImageRetries;
+      }
+    }, true);
+
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted || navigationWasRestored()) {
+        scheduleProductCardImageRefresh(0);
+        window.setTimeout(refreshProductCardImages, 160);
+      }
+    });
   }
 
   function initProductTitleFit() {
@@ -350,6 +447,7 @@
 
   function initProductOptions() {
     document.querySelectorAll('[data-store-product-controls]').forEach(syncControls);
+    initProductImageRecovery();
     initStorefrontFilters();
     initProductTitleFit();
 
@@ -376,6 +474,10 @@
     }, true);
 
     document.documentElement.dataset.storeProductOptionsReady = 'true';
+    window.StoreProductOptions = Object.assign({}, window.StoreProductOptions, {
+      refreshProductCardImages: refreshProductCardImages,
+      retryProductCardImage: retryProductCardImage
+    });
   }
 
   if (document.readyState === 'loading') {

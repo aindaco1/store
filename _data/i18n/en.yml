@@ -24,6 +24,7 @@ admin:
   store_marketing_short_title: Marketing
   store_orders_short_title: Orders
   store_products_short_title: Products
+  store_coupons_short_title: Coupons
   store_downloads_short_title: Downloads
   settings_intro: Review %{platform} configuration, checkout settings, shipping, tax, users, and platform operations available to this admin account.
   settings_publish: Publish
@@ -63,6 +64,7 @@ admin:
   export_attendees: Export attendees
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
+  store_coupons_intro: Create, edit, and delete Store coupon codes for cart-wide or product-specific discounts.
   store_downloads_intro: Verify digital download file keys against the %{platform} downloads bucket and configured fallback URLs.
 misc:
   skip_to_main: Skip to main content
@@ -114,6 +116,16 @@ runtime:
     tip_with_percent: "%{platform} tip (%{percent}%)"
     estimated_total: Estimated total
     subtotal: Subtotal
+    discount: Discount
+    discount_with_code: "Discount (%{code})"
+    coupon_code: Coupon code
+    apply_coupon: Apply
+    remove_coupon: Remove coupon
+    coupon_applied: Coupon applied.
+    coupon_required: Enter a coupon code.
+    coupon_invalid: Coupon code could not be applied.
+    coupon_not_eligible: Coupon code does not apply to this cart.
+    coupon_apply_error: Coupon could not be applied.
     sales_tax_label: Sales tax (%{rate}%)
     tax_label: Tax
     sales_tax_pending_label: Tax
@@ -173,6 +185,7 @@ email:
     questions_prefix: Questions? Reply to this email or visit
   store_order:
     subtotal: Subtotal
+    discount: Discount
     tip: Tip
     shipping: Shipping
     tax: Tax

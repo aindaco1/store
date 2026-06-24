@@ -94,10 +94,32 @@
 {%- endif -%}
 {%- assign product_url = product.url | absolute_url -%}
 {%- assign desc_text = product.description | default: product.content | strip_html | strip -%}
+{%- assign product_image_loading = include.image_loading | default: "lazy" -%}
+{%- assign product_image_fetchpriority = include.image_fetchpriority | default: "" -%}
 {%- capture product_collection -%}{% include product-taxonomy.html product=product mode="collection" %}{%- endcapture -%}
 {%- assign product_collection = product_collection | strip -%}
 {%- capture product_collection_label -%}{% include product-taxonomy.html product=product mode="collection_label" %}{%- endcapture -%}
 {%- assign product_collection_label = product_collection_label | strip -%}
+{%- assign show_product_eyebrow = true -%}
+{%- if include.show_eyebrow == false -%}
+  {%- assign show_product_eyebrow = false -%}
+{%- endif -%}
+{%- assign show_product_title = true -%}
+{%- assign show_product_description = true -%}
+{%- if include.show_summary == false -%}
+  {%- assign show_product_title = false -%}
+  {%- assign show_product_description = false -%}
+{%- endif -%}
+{%- if include.show_title == false -%}
+  {%- assign show_product_title = false -%}
+{%- endif -%}
+{%- if include.show_description == false -%}
+  {%- assign show_product_description = false -%}
+{%- endif -%}
+{%- assign product_purchase_only = false -%}
+{%- unless show_product_eyebrow or show_product_title or show_product_description -%}
+  {%- assign product_purchase_only = true -%}
+{%- endunless -%}
 {%- capture product_category -%}{% include product-taxonomy.html product=product mode="category" %}{%- endcapture -%}
 {%- assign product_category = product_category | strip -%}
 {%- capture product_category_label -%}{% include product-taxonomy.html product=product mode="category_label" %}{%- endcapture -%}
@@ -129,7 +151,7 @@
 {%- assign low_stock_template = low_stock_template | strip -%}
 
 <article
-  class="store-product-card"
+  class="store-product-card{% if product_purchase_only %} store-product-card--purchase-only{% endif %}"
   id="{{ product_id | slugify }}"
           data-store-product-card
   data-store-collection="{{ product_collection | escape }}"
@@ -137,14 +159,22 @@
   data-store-category="{{ product_category | escape }}"
   data-store-category-label="{{ product_category_label | escape }}">
   <a class="store-product-card__media" href="{{ product.url }}">
-    {% include responsive-image.html src=product.image alt=product_display_name class="store-product-card__image" loading="lazy" decoding="async" sizes="(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" %}
+    {% include responsive-image.html src=product.image alt=product_display_name class="store-product-card__image" loading=product_image_loading decoding="async" fetchpriority=product_image_fetchpriority sizes="(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" %}
   </a>
   <div class="store-product-card__body">
+    {%- if show_product_eyebrow or show_product_title -%}
     <div class="store-product-card__header">
+      {%- if show_product_eyebrow -%}
       <p class="store-product-card__eyebrow">{{ product_collection_label | escape }}</p>
+      {%- endif -%}
+      {%- if show_product_title -%}
       <h2 class="store-product-card__title"><a href="{{ product.url }}">{{ product_display_name | escape }}</a></h2>
+      {%- endif -%}
     </div>
+    {%- endif -%}
+    {%- if show_product_description -%}
     <p class="store-product-card__description">{{ desc_text | truncate: 170 | escape }}</p>
+    {%- endif -%}
     <div class="store-product-card__purchase">
       <p class="store-product-card__price" data-store-price>{% if selected_is_free %}Free{% else %}{{ selected_product_price | money }}{% endif %}</p>
       <p

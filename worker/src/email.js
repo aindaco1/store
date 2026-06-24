@@ -233,9 +233,14 @@ function formatCurrency(cents) {
   return `$${(Math.max(0, Number(cents || 0) || 0) / 100).toFixed(2)}`;
 }
 
-function renderAmountBreakdown({ subtotal = 0, tip = 0, tax = 0, shipping = 0, total = 0 } = {}, theme, t) {
+function renderAmountBreakdown({ subtotal = 0, discount = 0, couponCode = '', tip = 0, tax = 0, shipping = 0, total = 0 } = {}, theme, t) {
+  const discountCents = Math.max(0, Number(discount || 0) || 0);
+  const discountLabel = couponCode
+    ? `${t('store_order.discount', 'Discount')} (${couponCode})`
+    : t('store_order.discount', 'Discount');
   const rows = [
-    [t('store_order.subtotal', 'Subtotal'), subtotal],
+    [t('store_order.subtotal', 'Subtotal'), subtotal, false],
+    ...(discountCents > 0 ? [[discountLabel, discountCents, true]] : []),
     ...(Math.max(0, Number(tip || 0) || 0) > 0 ? [[t('store_order.tip', 'Tip'), tip]] : []),
     [t('store_order.shipping', 'Shipping'), shipping],
     [t('store_order.tax', 'Tax'), tax],
@@ -246,7 +251,7 @@ function renderAmountBreakdown({ subtotal = 0, tip = 0, tax = 0, shipping = 0, t
     ${rows.map(([label, value], index) => `
       <tr>
         <td style="padding: ${index === rows.length - 1 ? '12px 0 0' : '4px 0'}; color: ${index === rows.length - 1 ? theme.textColor : theme.mutedTextColor}; font-weight: ${index === rows.length - 1 ? '700' : '400'};">${escapeHtml(label)}</td>
-        <td style="padding: ${index === rows.length - 1 ? '12px 0 0' : '4px 0'}; text-align: right; color: ${theme.textColor}; font-weight: ${index === rows.length - 1 ? '700' : '400'};">${formatCurrency(value)}</td>
+        <td style="padding: ${index === rows.length - 1 ? '12px 0 0' : '4px 0'}; text-align: right; color: ${theme.textColor}; font-weight: ${index === rows.length - 1 ? '700' : '400'};">${rows[index][2] ? '-' : ''}${formatCurrency(value)}</td>
       </tr>`).join('')}
   </table>`;
 }
@@ -474,6 +479,8 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
     <p style="margin: 0 0 12px 0; color: ${theme.mutedTextColor};">${escapeHtml(t('store_order.order_label', 'Order'))}: ${escapeHtml(orderId)}</p>
     ${renderAmountBreakdown({
       subtotal: totals.subtotalCents || 0,
+      discount: totals.discountCents || 0,
+      couponCode: totals.couponCode || totals.coupon?.code || '',
       tip: totals.tipAmountCents || 0,
       tax: totals.taxCents || 0,
       shipping: totals.shippingCents || 0,

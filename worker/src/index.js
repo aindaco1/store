@@ -27,6 +27,7 @@
  *   GET  /admin/store/orders.csv - Download Store order fulfillment CSV
  *   GET  /admin/store/attendees.csv - Download Store ticket/RSVP attendee CSV
  *   GET  /admin/store/reconciliation.csv - Download Store order reconciliation CSV
+ *   POST /admin/store/orders/import-snipcart - Import legacy Snipcart orders into production
  *   POST /admin/store/orders/download-access - Expire or reissue Store digital download access
  *   POST /admin/store/orders/check-in - Mark Store ticket/RSVP check-in state
  *   GET  /admin/store/products   - Read Store catalog products and variants
@@ -35,9 +36,13 @@
  *   POST /admin/store/products/publish - Publish Store product catalog edits
  *   POST /admin/store/products/bulk-publish - Publish bulk Store product catalog edits
  *   POST /admin/store/products/order - Publish Store product display order
+ *   GET  /admin/store/coupons   - Read Store coupon codes
+ *   POST /admin/store/coupons   - Create or update Store coupon codes
+ *   POST /admin/store/coupons/delete - Delete Store coupon codes
  *   GET  /admin/store/downloads  - Verify Store digital download readiness
  *   POST /admin/store/downloads/upload - Upload or replace Store download R2 objects
  *   POST /admin/store/downloads/create - Upload a Store download library file
+ *   POST /admin/store/downloads/delete - Delete a Store download library file
  *   GET  /admin/store/inventory  - Read Store catalog inventory
  *   POST /admin/store/inventory  - Override or reset Store inventory baselines
  *   GET  /admin/add-ons/inventory - Read platform add-on inventory
@@ -50,6 +55,7 @@ import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreOrderE
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
+import { applyStoreCouponCode, getValidationTaxableSubtotalCents, loadStoreCoupons, saveStoreCoupons, upsertStoreCoupon } from './coupons.js';
 import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
 import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
@@ -63,6 +69,7 @@ import {
 } from './provider-config.js';
 import { normalizeShippingDestination, quoteStoreShipment } from './shipping.js';
 import { normalizeTaxDestination, quoteTax } from './tax.js';
+import { parseSnipcartOrdersCsv, SNIPCART_IMPORT_MAX_CSV_BYTES } from './snipcart-import.js';
 import {
   getPlatformDateKey,
   getPlatformTimeZone,
@@ -260,6 +267,7 @@ const MAX_ADMIN_AUDIO_UPLOAD_BODY_BYTES = 36 * 1024 * 1024;
 const MAX_ADMIN_VIDEO_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_ADMIN_STORE_DOWNLOAD_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_ADMIN_STORE_DOWNLOAD_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_ADMIN_SNIPCART_IMPORT_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
 const OBSERVABILITY_RETENTION_SECONDS = 14 * 24 * 60 * 60;
@@ -372,6 +380,27 @@ function getAppMode(env = {}) {
   return String(env.APP_MODE || 'live').trim().toLowerCase() === 'test'
     ? 'test'
     : 'live';
+}
+
+function isProductionWorkerRequest(request, env = {}) {
+  if (getAppMode(env) !== 'live') return false;
+  let requestHost = '';
+  try {
+    requestHost = new URL(request.url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (!requestHost || requestHost === 'localhost' || requestHost === '127.0.0.1' || requestHost === '::1') {
+    return false;
+  }
+  const configuredBase = String(env.WORKER_BASE || env.CANONICAL_WORKER_BASE || '').trim();
+  if (!configuredBase) return true;
+  try {
+    const configuredHost = new URL(configuredBase).hostname.toLowerCase();
+    return configuredHost ? requestHost === configuredHost : true;
+  } catch {
+    return true;
+  }
 }
 
   // SEC-005: Rate limiting helper
@@ -1659,6 +1688,18 @@ export default {
         return handleAdminStoreOrdersCsv(request, env);
       }
 
+      if (path === '/admin/store/orders/import-snipcart' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_ADMIN_SNIPCART_IMPORT_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreSnipcartOrderImport(request, env, parsedBody.body || {});
+      }
+
       if (path === '/admin/store/attendees.csv' && method === 'GET') {
         return handleAdminStoreAttendeesCsv(request, env);
       }
@@ -1787,6 +1828,22 @@ export default {
         return handleAdminStoreProductOrderPublish(request, env);
       }
 
+      if (path === '/admin/store/coupons' && method === 'GET') {
+        return handleAdminStoreCoupons(request, env);
+      }
+
+      if (path === '/admin/store/coupons' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreCouponSave(request, env);
+      }
+
+      if (path === '/admin/store/coupons/delete' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreCouponDelete(request, env);
+      }
+
       if (path === '/admin/store/downloads' && method === 'GET') {
         return handleAdminStoreDownloads(request, env);
       }
@@ -1801,6 +1858,12 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreDownloadCreate(request, env);
+      }
+
+      if (path === '/admin/store/downloads/delete' && method === 'POST') {
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreDownloadDelete(request, env);
       }
 
       if (path === '/admin/store/inventory' && method === 'GET') {
@@ -4517,6 +4580,77 @@ async function handleAdminStoreDownloadCreate(request, env) {
   }, 200, env);
 }
 
+async function handleAdminStoreDownloadDelete(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: 4096,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  if (!env.STORE_DOWNLOADS || typeof env.STORE_DOWNLOADS.delete !== 'function') {
+    return privateJsonResponse({
+      error: 'Store downloads bucket is not configured for deletes.',
+      code: 'store_downloads_bucket_missing',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, 503, env);
+  }
+
+  const fileKeyResult = normalizeAdminStoreDownloadFileKey(
+    parsedBody.body?.fileKey || parsedBody.body?.file_key,
+    'Download file key'
+  );
+  if (!fileKeyResult.ok) {
+    return privateJsonResponse({
+      error: fileKeyResult.error || 'Download file key is invalid.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, fileKeyResult.status || 400, env);
+  }
+
+  const fileKey = fileKeyResult.value;
+  const filename = sanitizeDownloadFilename(parsedBody.body?.filename || fileKey);
+  const existing = await inspectStoreDownloadObject(env, fileKey);
+  if (existing.checked && existing.exists === false) {
+    return privateJsonResponse({
+      error: 'Store download file was not found.',
+      fileKey,
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0, kvListExpected: 0, r2WritesExpected: 0 })
+    }, 404, env);
+  }
+
+  await env.STORE_DOWNLOADS.delete(fileKey);
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_download:delete',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    fileKey,
+    filename,
+    contentType: existing.contentType || '',
+    bytes: existing.size ?? null
+  });
+
+  return privateJsonResponse({
+    success: true,
+    scope: STORE_ADMIN_SCOPE,
+    deleted: true,
+    fileKey,
+    filename,
+    auditKey,
+    writeBudget: adminWriteBudget({
+      readOnly: false,
+      kvWritesExpected: 1,
+      kvListExpected: 0,
+      r2WritesExpected: 1
+    })
+  }, 200, env);
+}
+
 async function handleStoreDownload(_request, env, _storedOrder, item = {}, itemId = '') {
   if (!isStoreDownloadItem(item)) {
     return privateJsonResponse({ error: 'Store item is not a digital download' }, 404, env);
@@ -4920,6 +5054,8 @@ function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
     customerEmail: order.customer?.email || '',
     customerName: order.customer?.name || '',
     totalCents: order.totals?.totalCents || 0,
+    discountCents: order.totals?.discountCents || 0,
+    couponCode: order.totals?.couponCode || order.totals?.coupon?.code || '',
     currency: order.totals?.currency || order.payment?.currency || 'USD',
     paymentStatus: order.payment?.status || '',
     emailSent: order.emailSent === true,
@@ -6394,7 +6530,6 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const siteBase = adminStorePreviewSiteBase(env);
   const stylesheet = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
   const name = String(product.name || product.id || 'Untitled product').trim();
-  const category = String(product.collection_label || product.collection || product.category || product.fulfillment_type || 'Product').trim();
   const image = adminStorePreviewUrl(product.image || '', env);
   const productId = adminStorePreviewSlug(product.id || product.slug || name);
   const selectedVariant = adminStorePreviewSelectedVariant(product);
@@ -6404,7 +6539,6 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const isFree = selectedPriceCents <= 0;
   const descriptionSource = product.description || '';
   const description = renderAdminStoreProductMarkdown(descriptionSource, env);
-  const cardDescription = adminStorePreviewTruncate(descriptionSource);
   const buttonLabel = adminStorePreviewButtonLabel(product, selectedPriceCents);
   const buttonText = isFree ? buttonLabel : `${buttonLabel} - ${price}`;
   const variants = Array.isArray(product.variants) ? product.variants : [];
@@ -6412,7 +6546,7 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const controlsClass = hasVariants ? 'store-product-card__controls--with-option' : 'store-product-card__controls--simple';
   const optionLabel = String(product.variant_option_name || 'Option').trim();
   const imageHtml = image
-    ? `<img class="store-product-card__image" src="${escapeAdminStorePreviewAttribute(image)}" alt="${escapeAdminStorePreviewAttribute(name)}" loading="lazy" decoding="async">`
+    ? `<img class="store-product-card__image" src="${escapeAdminStorePreviewAttribute(image)}" alt="${escapeAdminStorePreviewAttribute(name)}" loading="eager" decoding="async" fetchpriority="high">`
     : '<div class="admin-store-product-preview__image-placeholder">No image selected</div>';
   const optionHtml = hasVariants
     ? `<div class="store-product-card__field store-product-card__field--option">
@@ -6435,18 +6569,12 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
 <body class="admin-store-product-preview-body">
   <section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview>
     <div class="storefront__header storefront__header--compact">
-      <p class="storefront__eyebrow">${escapeAdminStorePreviewHtml(category)}</p>
       <h1>${escapeAdminStorePreviewHtml(name)}</h1>
     </div>
     <div class="storefront__product-detail">
-      <article class="store-product-card" id="${escapeAdminStorePreviewAttribute(productId)}" data-store-product-card>
+      <article class="store-product-card store-product-card--purchase-only" id="${escapeAdminStorePreviewAttribute(productId)}" data-store-product-card>
         <a class="store-product-card__media" href="#" tabindex="-1" aria-disabled="true">${imageHtml}</a>
         <div class="store-product-card__body">
-          <div class="store-product-card__header">
-            <p class="store-product-card__eyebrow">${escapeAdminStorePreviewHtml(category)}</p>
-            <h2 class="store-product-card__title"><a href="#" tabindex="-1">${escapeAdminStorePreviewHtml(name)}</a></h2>
-          </div>
-          <p class="store-product-card__description">${escapeAdminStorePreviewHtml(cardDescription)}</p>
           <div class="store-product-card__purchase">
             <p class="store-product-card__price" data-store-price>${isFree ? 'Free' : escapeAdminStorePreviewHtml(price)}</p>
             <p class="store-product-card__availability" data-store-availability data-store-inventory-state="none"></p>
@@ -6590,6 +6718,167 @@ async function handleAdminStoreProducts(request, env) {
     overridesUpdatedAt: snapshot.overridesUpdatedAt,
     updatedAt: snapshot.updatedAt,
     writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
+}
+
+function buildAdminStoreCouponProductChoices(env) {
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  return (catalog.products || [])
+    .filter((product) => String(product?.id || '').trim())
+    .sort(compareAdminStoreProducts)
+    .map((product) => ({
+      productId: String(product.id || '').trim(),
+      name: String(product.name || product.id || '').trim(),
+      status: String(product.status || 'active').trim() || 'active',
+      fulfillmentType: String(product.fulfillment_type || product.type || 'physical').trim() || 'physical',
+      collection: String(product.collection || product.event || '').trim(),
+      category: String(product.category || '').trim()
+    }));
+}
+
+async function handleAdminStoreCoupons(request, env) {
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+
+  const loaded = await loadStoreCoupons(env);
+  if (!loaded.ok) {
+    return privateJsonResponse({
+      error: loaded.error || 'Coupon storage unavailable.',
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, loaded.status || 503, env);
+  }
+
+  return privateJsonResponse({
+    scope: STORE_ADMIN_SCOPE,
+    coupons: loaded.coupons,
+    products: buildAdminStoreCouponProductChoices(env),
+    totals: {
+      coupons: loaded.coupons.length,
+      active: loaded.coupons.filter((coupon) => coupon.status === 'active').length,
+      draft: loaded.coupons.filter((coupon) => coupon.status === 'draft').length
+    },
+    updatedAt: loaded.updatedAt || '',
+    writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
+}
+
+async function handleAdminStoreCouponSave(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  const loaded = await loadStoreCoupons(env);
+  if (!loaded.ok) {
+    return privateJsonResponse({
+      error: loaded.error || 'Coupon storage unavailable.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, loaded.status || 503, env);
+  }
+
+  const incoming = parsedBody.body?.coupon || parsedBody.body || {};
+  const originalCode = String(parsedBody.body?.originalCode || parsedBody.body?.original_code || '').trim();
+  const upserted = upsertStoreCoupon(loaded.coupons, incoming, { originalCode });
+  if (!upserted.ok) {
+    return privateJsonResponse({
+      error: upserted.error || 'Coupon is invalid.',
+      errors: upserted.errors || [upserted.error || 'Coupon is invalid.'],
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, upserted.status || 422, env);
+  }
+
+  const saved = await saveStoreCoupons(env, upserted.coupons);
+  if (!saved.ok) {
+    return privateJsonResponse({
+      error: saved.error || 'Coupon could not be saved.',
+      errors: saved.errors || [],
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, saved.status || 422, env);
+  }
+
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: upserted.existing ? 'store_coupon:update' : 'store_coupon:create',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    couponCode: upserted.coupon.code,
+    before: upserted.existing,
+    after: upserted.coupon
+  });
+
+  return privateJsonResponse({
+    success: true,
+    coupon: upserted.coupon,
+    coupons: saved.coupons,
+    products: buildAdminStoreCouponProductChoices(env),
+    updatedAt: saved.updatedAt,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 2 : 1 })
+  }, 200, env);
+}
+
+async function handleAdminStoreCouponDelete(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  const loaded = await loadStoreCoupons(env);
+  if (!loaded.ok) {
+    return privateJsonResponse({
+      error: loaded.error || 'Coupon storage unavailable.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, loaded.status || 503, env);
+  }
+
+  const requestedCode = String(parsedBody.body?.code || parsedBody.body?.id || '').trim().toUpperCase();
+  const existing = loaded.coupons.find((coupon) => coupon.code === requestedCode || coupon.id === requestedCode.toLowerCase());
+  if (!existing) {
+    return privateJsonResponse({
+      error: 'Coupon code was not found.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, 404, env);
+  }
+
+  const saved = await saveStoreCoupons(env, loaded.coupons.filter((coupon) => coupon.code !== existing.code));
+  if (!saved.ok) {
+    return privateJsonResponse({
+      error: saved.error || 'Coupon could not be deleted.',
+      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 0 })
+    }, saved.status || 422, env);
+  }
+
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_coupon:delete',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    couponCode: existing.code,
+    before: existing
+  });
+
+  return privateJsonResponse({
+    success: true,
+    deleted: existing.code,
+    coupons: saved.coupons,
+    products: buildAdminStoreCouponProductChoices(env),
+    updatedAt: saved.updatedAt,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 2 : 1 })
   }, 200, env);
 }
 
@@ -7317,6 +7606,135 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
       generatedAt: new Date().toISOString()
     }
   };
+}
+
+async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+
+  if (!isProductionWorkerRequest(request, env)) {
+    return privateJsonResponse({
+      success: false,
+      error: 'Snipcart order imports can only run against the production Worker.',
+      code: 'production_only',
+      writeBudget: adminWriteBudget({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 })
+    }, 409, env);
+  }
+
+  if (!env?.STORE_STATE) {
+    return privateJsonResponse({ error: 'Order storage unavailable' }, 503, env);
+  }
+
+  const csv = String(body.csv || body.content || '');
+  const filename = String(body.filename || 'snipcart-orders.csv').trim().slice(0, 160) || 'snipcart-orders.csv';
+  if (!csv.trim()) {
+    return privateJsonResponse({ error: 'Choose a Snipcart CSV file before importing.' }, 400, env);
+  }
+
+  const csvBytes = new TextEncoder().encode(csv).byteLength;
+  if (csvBytes > SNIPCART_IMPORT_MAX_CSV_BYTES) {
+    return privateJsonResponse({
+      error: 'Snipcart CSV must be 1 MB or smaller.'
+    }, 413, env);
+  }
+
+  const importedAt = new Date().toISOString();
+  const parsed = parseSnipcartOrdersCsv(csv, { importedAt });
+  if (!parsed.ok) {
+    return privateJsonResponse({
+      success: false,
+      error: parsed.error || 'Snipcart CSV could not be imported.',
+      missingHeaders: parsed.missingHeaders || [],
+      errors: parsed.errors || [],
+      warnings: parsed.warnings || [],
+      writeBudget: adminWriteBudget({ readOnly: true, kvWritesExpected: 0, kvListExpected: 0 })
+    }, parsed.status || 422, env);
+  }
+
+  const listed = await listAdminStoreOrderKeys(env);
+  if (!listed.ok) {
+    return privateJsonResponse({ error: listed.error }, listed.status || 503, env);
+  }
+  const existingKeys = new Set((listed.keys || []).map((key) => String(key?.name || '').trim()).filter(Boolean));
+  const importedOrders = [];
+  const skippedOrders = [];
+  const failures = [];
+
+  for (const order of parsed.orders) {
+    const storageKey = getStoreOrderStorageKey(order.orderToken);
+    if (!storageKey) {
+      failures.push({ orderToken: order.orderToken || '', error: 'Invalid Store order token.' });
+      continue;
+    }
+    if (existingKeys.has(storageKey)) {
+      skippedOrders.push(order.orderToken);
+      continue;
+    }
+
+    try {
+      const orderHash = await hashStoreOrderDraft(order.orderDraft || {});
+      const storedOrder = {
+        ...order,
+        orderHash,
+        orderDraft: {
+          ...(order.orderDraft || {}),
+          orderHash
+        },
+        emailSent: false
+      };
+      await env.STORE_STATE.put(storageKey, JSON.stringify(storedOrder));
+      existingKeys.add(storageKey);
+      importedOrders.push(storedOrder.orderToken);
+    } catch (error) {
+      failures.push({
+        orderToken: order.orderToken || '',
+        error: error?.message || 'Failed to write imported order.'
+      });
+    }
+  }
+
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_orders:snipcart_import',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    filename,
+    rowCount: parsed.rowCount,
+    parsedOrderCount: parsed.orderCount,
+    importedOrderCount: importedOrders.length,
+    skippedOrderCount: skippedOrders.length,
+    failedOrderCount: failures.length
+  });
+
+  const message = [
+    `Imported ${importedOrders.length} Snipcart order${importedOrders.length === 1 ? '' : 's'}.`,
+    skippedOrders.length ? `Skipped ${skippedOrders.length} existing order${skippedOrders.length === 1 ? '' : 's'}.` : '',
+    failures.length ? `${failures.length} order${failures.length === 1 ? '' : 's'} failed.` : ''
+  ].filter(Boolean).join(' ');
+
+  return privateJsonResponse({
+    success: failures.length === 0,
+    message,
+    scope: STORE_ADMIN_SCOPE,
+    filename,
+    rowCount: parsed.rowCount,
+    parsedOrderCount: parsed.orderCount,
+    importedOrderCount: importedOrders.length,
+    skippedOrderCount: skippedOrders.length,
+    failedOrderCount: failures.length,
+    importedOrderTokens: importedOrders.slice(0, 50),
+    skippedOrderTokens: skippedOrders.slice(0, 50),
+    failures: failures.slice(0, 20),
+    warnings: (parsed.warnings || []).slice(0, 20),
+    auditKey,
+    writeBudget: adminWriteBudget({
+      readOnly: false,
+      kvWritesExpected: importedOrders.length + (auditKey ? 1 : 0),
+      kvListExpected: listed.listCalls || 1
+    })
+  }, failures.length ? 207 : 200, env);
 }
 
 async function handleAdminStoreOrders(request, env) {
@@ -8430,11 +8848,34 @@ async function handleStoreCartValidate(request, env) {
     enforceSubmittedPrices: true,
     enforceInventory: false
   });
-  const status = validation.valid ? 200 : 422;
+  let responseValidation = validation;
+  let couponResult = { ok: true, coupon: null, discountCents: 0 };
+  const couponCode = String(parsedBody.body?.couponCode || parsedBody.body?.coupon_code || '').trim();
+  if (validation.valid && couponCode) {
+    couponResult = await applyStoreCouponCode(env, couponCode, validation);
+    if (couponResult.ok) {
+      responseValidation = couponResult.validation;
+    } else {
+      responseValidation = {
+        ...validation,
+        valid: false,
+        errors: [
+          ...(validation.errors || []),
+          {
+            code: couponResult.code || 'coupon_invalid',
+            message: couponResult.error || 'Coupon code is invalid.',
+            couponCode: couponResult.couponCode || couponCode
+          }
+        ]
+      };
+    }
+  }
+  const status = responseValidation.valid ? 200 : (couponResult.status || 422);
 
   return privateJsonResponse({
-    ok: validation.valid,
-    ...validation
+    ok: responseValidation.valid,
+    coupon: couponResult.ok ? couponResult.coupon : null,
+    ...responseValidation
   }, status, env);
 }
 
@@ -8492,14 +8933,27 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
 
   const orderToken = `store-order-${createCheckoutNonce()}`;
   const storeCatalogSnapshot = await getEffectiveStoreCatalogSnapshot(env);
-  const validation = validateStoreOrderDraft(body, {
+  let validation = validateStoreOrderDraft(body, {
     env,
     snapshot: storeCatalogSnapshot,
     enforceSubmittedPrices: true,
     enforceInventory: false
   });
+  const couponCode = String(body.couponCode || body.coupon_code || '').trim();
+  if (validation.valid && couponCode) {
+    const couponResult = await applyStoreCouponCode(env, couponCode, validation);
+    if (!couponResult.ok) {
+      return privateJsonResponse({
+        ok: false,
+        code: couponResult.code || 'coupon_invalid',
+        error: couponResult.error || 'Coupon code is invalid.',
+        couponCode: couponResult.couponCode || couponCode
+      }, couponResult.status || 422, env);
+    }
+    validation = couponResult.validation;
+  }
   const submittedShippingCents = Math.max(0, Number(body.shippingCents) || 0);
-  const validatedSubtotalCents = Math.max(0, Number(validation?.totals?.subtotalCents || 0) || 0);
+  const validatedTaxableSubtotalCents = getValidationTaxableSubtotalCents(validation);
   const normalizedShippingTaxAddress = body.shippingAddress
     ? normalizeTaxDestination(body.shippingAddress)
     : { valid: false, destination: null };
@@ -8507,10 +8961,10 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     ? normalizedBillingAddress.destination
     : (normalizedShippingTaxAddress.valid ? normalizedShippingTaxAddress.destination : null);
   let computedTaxCents = Math.max(0, Number(body.taxCents) || 0);
-  if (taxDestination && validatedSubtotalCents > 0) {
+  if (taxDestination && validatedTaxableSubtotalCents > 0) {
     try {
       const taxQuote = await quoteTax(env, {
-        subtotalCents: validatedSubtotalCents,
+        subtotalCents: validatedTaxableSubtotalCents,
         shippingCents: submittedShippingCents,
         destination: taxDestination
       });
@@ -8717,6 +9171,8 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       storeOrderVersion: String(STORE_ORDER_DRAFT_VERSION),
       email: pendingOrderDraft.customer.email || '',
       itemCount: String(pendingOrderDraft.totals.itemCount),
+      couponCode: String(pendingOrderDraft.totals.couponCode || ''),
+      discountCents: String(pendingOrderDraft.totals.discountCents || 0),
       tipPercent: String(pendingOrderDraft.totals.tipPercent || 0),
       tipAmountCents: String(pendingOrderDraft.totals.tipAmountCents || 0),
       requiresShipping: pendingOrderDraft.totals.requiresShipping ? 'true' : 'false',

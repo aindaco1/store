@@ -31,6 +31,7 @@
     "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.ts",
     "test:security:staging": "WORKER_URL=https://checkout-staging.dustwave.xyz vitest run --config vitest.security.config.ts",
     "test:usps": "node ./scripts/usps-smoke.mjs",
+    "seed:local-orders": "node ./scripts/seed-local-orders.mjs",
     "assets:minify": "node ./scripts/minify-site-assets.mjs --write",
     "assets:minify:check": "node ./scripts/minify-site-assets.mjs --check",
     "media:optimize": "node ./scripts/optimize-media.mjs --write",
