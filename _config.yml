@@ -40,10 +40,10 @@ platform:
   worker_url: https://checkout.dustwave.xyz
   default_creator_name: Dust Wave
   timezone: America/Denver
-  logo_path: "/assets/images/logo.svg"
-  footer_logo_path: "/assets/images/logo.svg"
+  logo_path: "/assets/images/defaults/dust-wave-square.png"
+  footer_logo_path: "/assets/images/defaults/dust-wave-square.png"
   favicon_path: "/assets/icons/favicon.png"
-  default_social_image_path: "/assets/images/logo.svg"
+  default_social_image_path: "/assets/images/defaults/dust-wave-square.png"
 admin:
   production_site_url: https://shop.dustwave.xyz
   production_worker_url: https://checkout.dustwave.xyz

@@ -25,6 +25,7 @@ import { getScopedConsole } from './logger.js';
 const DEFAULT_I18N_LANG = 'en';
 const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE || 'https://shop.dustwave.xyz';
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+const EMAIL_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
 const EMAIL_I18N_CACHE = new Map();
 let console = globalThis.console;
 
@@ -195,6 +196,9 @@ function safeEmailHostedAssetUrl(pathOrUrl, siteBaseOrEnv) {
     const parsed = new URL(pathOrUrl, baseUrl);
     if (!SAFE_LINK_PROTOCOLS.has(parsed.protocol) || parsed.origin !== baseUrl.origin) return '';
     if (!parsed.pathname.startsWith('/assets/images/') && !parsed.pathname.startsWith('/assets/icons/')) return '';
+    const pathname = parsed.pathname.toLowerCase();
+    const extension = pathname.includes('.') ? pathname.slice(pathname.lastIndexOf('.')) : '';
+    if (!EMAIL_IMAGE_EXTENSIONS.has(extension)) return '';
     return parsed.toString();
   } catch {
     return '';
@@ -283,29 +287,32 @@ function getEmailTheme(env = {}) {
 }
 
 function getEmailBodyStyle(theme) {
-  return `margin: 0; padding: 32px 20px; background: ${theme.surfaceColor}; color: ${theme.textColor}; font-family: ${theme.fontFamily}; line-height: 1.5;`;
+  return `font-family: ${theme.fontFamily}; line-height: 1.6; color: ${theme.textColor}; max-width: 600px; margin: 0 auto; padding: 20px;`;
 }
 
-function getEmailCardStyle(theme) {
-  return `background: #ffffff; border: 1px solid ${theme.borderColor}; border-radius: 8px; padding: 24px; margin-bottom: 24px;`;
+function getEmailCardStyle(theme, extras = '') {
+  return `background: ${theme.surfaceColor}; border-radius: 8px; padding: 20px; margin-bottom: 24px;${extras ? ` ${extras}` : ''}`;
 }
 
-function getEmailPrimaryButtonStyle(theme) {
-  return `display: inline-block; background: ${theme.primaryColor}; color: ${theme.primaryTextColor}; text-decoration: none; border-radius: ${theme.buttonRadius}; padding: 12px 18px; font-weight: 700;`;
+function getEmailPrimaryButtonStyle(theme, extras = '') {
+  return `display: inline-block; background: ${theme.primaryColor}; color: ${theme.primaryTextColor}; padding: 12px 24px; text-decoration: none; border-radius: ${theme.buttonRadius}; font-weight: 600;${extras ? ` ${extras}` : ''}`;
 }
 
 function getEmailFooterStyle(theme) {
-  return `border-top: 1px solid ${theme.borderColor}; padding-top: 18px; font-size: 13px; color: ${theme.mutedTextColor};`;
+  return `border-top: 1px solid ${theme.borderColor}; padding-top: 20px; font-size: 12px; color: ${theme.mutedTextColor};`;
 }
 
-function renderEmailHeader(theme, heading) {
+function renderEmailHeader(theme, heading, { emoji = '', headingColor = '' } = {}) {
   const logo = theme.logoUrl
-    ? `<a href="${escapeHtml(theme.siteHomeUrl)}" style="text-decoration: none;"><img src="${escapeHtml(theme.logoUrl)}" alt="${escapeHtml(theme.platformName)}" width="56" height="56" style="display: block; width: 56px; height: 56px; object-fit: contain; margin: 0 0 16px 0;"></a>`
+    ? `<p style="margin: 0 0 16px 0;"><a href="${escapeHtml(theme.siteHomeUrl)}" style="text-decoration: none;"><img src="${escapeHtml(theme.logoUrl)}" alt="${escapeHtml(theme.platformName)}" style="display: inline-block; max-width: 88px; max-height: 88px; width: auto; height: auto;"></a></p>`
     : '';
+  const emojiBlock = emoji ? `<div style="font-size: 48px; margin-bottom: 16px;">${emoji}</div>` : '';
+  const resolvedHeadingColor = headingColor ? ` color: ${headingColor};` : '';
   return `
-  <div style="margin-bottom: 24px;">
+  <div style="text-align: center; margin-bottom: 32px;">
     ${logo}
-    <h1 style="margin: 0; font-family: ${theme.headingFontFamily}; font-size: 28px; line-height: 1.1; color: ${theme.textColor};">${heading}</h1>
+    ${emojiBlock}
+    <h1 style="margin: 0; font-size: 24px; font-family: ${theme.headingFontFamily};${resolvedHeadingColor}">${heading}</h1>
   </div>`;
 }
 

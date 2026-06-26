@@ -11885,7 +11885,7 @@ async function handleAdminSettings(request, env) {
   const canonicalSiteBase = env.CANONICAL_SITE_BASE || env.SITE_BASE;
   const canonicalWorkerBase = env.CANONICAL_WORKER_BASE || env.WORKER_BASE;
   const seoSameAs = parseAdminDelimitedList(env.SEO_SAME_AS);
-  const platformLogoPath = env.EMAIL_LOGO_PATH || '/assets/images/logo.svg';
+  const platformLogoPath = env.EMAIL_LOGO_PATH || '/assets/images/defaults/dust-wave-square.png';
   const platformFooterLogoPath = env.PLATFORM_FOOTER_LOGO_PATH || platformLogoPath;
   const platformFaviconPath = env.PLATFORM_FAVICON_PATH || '/assets/icons/favicon.png';
   const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH || platformLogoPath;

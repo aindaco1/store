@@ -629,8 +629,8 @@ function storeSettingsSections() {
   }, {
     title: 'Brand & SEO',
     rows: [
-      settingsRow({ label: 'Logo', value: '/assets/images/logo.svg', rawValue: '/assets/images/logo.svg', editable: true, path: 'platform.logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' }),
-      settingsRow({ label: 'Footer logo', value: '/assets/images/logo.svg', rawValue: '/assets/images/logo.svg', editable: true, path: 'platform.footer_logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' }),
+      settingsRow({ label: 'Logo', value: '/assets/images/defaults/dust-wave-square.png', rawValue: '/assets/images/defaults/dust-wave-square.png', editable: true, path: 'platform.logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' }),
+      settingsRow({ label: 'Footer logo', value: '/assets/images/defaults/dust-wave-square.png', rawValue: '/assets/images/defaults/dust-wave-square.png', editable: true, path: 'platform.footer_logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' }),
       settingsRow({ label: 'X handle', value: '', rawValue: '', editable: true, path: 'seo.x_handle', type: 'string', input: 'text' })
     ]
   }, {
@@ -1441,10 +1441,10 @@ test.describe('Admin Dashboard', () => {
     await expect(brandPanel.locator('.admin-settings__field-grid .admin-settings__field-grid-item')).toHaveCount(2);
     await expect(brandPanel.locator('.admin-settings__image-preview img')).toHaveCount(2);
     const logoRow = page.locator('[data-settings-row-label="Logo"]');
-    await expect(page.locator('[data-settings-path="platform.logo_path"]')).toHaveValue('/assets/images/logo.svg');
+    await expect(page.locator('[data-settings-path="platform.logo_path"]')).toHaveValue('/assets/images/defaults/dust-wave-square.png');
     await expect(page.locator('[data-settings-path="platform.logo_path"]')).toBeHidden();
     await expect(logoRow.locator('input[type="text"]')).toHaveCount(0);
-    await expect(logoRow.locator('.admin-settings__image-preview img')).toHaveAttribute('src', /\/assets\/images\/logo\.svg$/);
+    await expect(logoRow.locator('.admin-settings__image-preview img')).toHaveAttribute('src', /\/assets\/images\/defaults\/dust-wave-square\.png$/);
     await logoRow.locator('[data-logo-upload-input]').setInputFiles({
       name: 'logo-e2e.png',
       mimeType: 'image/png',

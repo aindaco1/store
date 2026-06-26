@@ -161,6 +161,43 @@ describe('Store email integration', () => {
     expect(payload.html).not.toContain('javascript:alert(1)');
   });
 
+  it('renders admin login emails with Pool-style layout and an email-safe logo URL', async () => {
+    const fetchMock = mockResend();
+
+    await expect(sendAdminLoginEmail({
+      ...env,
+      EMAIL_LOGO_PATH: '/assets/images/defaults/dust-wave-square.png'
+    }, {
+      email: 'admin@example.com',
+      loginUrl: 'https://shop.test/admin/?admin_login=magic-token',
+      lang: 'en'
+    })).resolves.toEqual({ sent: true });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('max-width: 600px; margin: 0 auto; padding: 20px;');
+    expect(payload.html).toContain('text-align: center; margin-bottom: 32px;');
+    expect(payload.html).toContain('src="https://shop.test/assets/images/defaults/dust-wave-square.png"');
+    expect(payload.html).toContain('href="https://shop.test/admin/?admin_login=magic-token"');
+    expect(payload.html).toContain('This link works for 15 minutes.');
+  });
+
+  it('does not embed SVG logos in email clients', async () => {
+    const fetchMock = mockResend();
+
+    await expect(sendAdminLoginEmail({
+      ...env,
+      EMAIL_LOGO_PATH: '/assets/images/logo.svg'
+    }, {
+      email: 'admin@example.com',
+      loginUrl: 'https://shop.test/admin/?admin_login=magic-token',
+      lang: 'en'
+    })).resolves.toEqual({ sent: true });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).not.toContain('/assets/images/logo.svg');
+    expect(payload.html).not.toContain('<img');
+  });
+
   it('sends Store order lookup links through the order sender', async () => {
     const fetchMock = mockResend();
 
