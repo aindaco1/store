@@ -3367,6 +3367,95 @@ function buildCompactStoreOrderItems(items = []) {
   }));
 }
 
+function extractStorePaymentIntentCustomer(paymentIntent = {}) {
+  const charge = getStripePaymentIntentCharge(paymentIntent) || {};
+  const billingDetails = charge?.billing_details && typeof charge.billing_details === 'object'
+    ? charge.billing_details
+    : {};
+  return {
+    email: normalizeStoreOrderLookupEmail(
+      paymentIntent.receipt_email ||
+      billingDetails.email ||
+      paymentIntent.metadata?.email ||
+      ''
+    ),
+    name: String(
+      billingDetails.name ||
+      paymentIntent.shipping?.name ||
+      ''
+    ).trim()
+  };
+}
+
+function mergeStoreOrderCustomer(storedOrder = {}, customer = {}) {
+  const orderDraft = storedOrder.orderDraft || {};
+  const existingCustomer = orderDraft.customer && typeof orderDraft.customer === 'object'
+    ? orderDraft.customer
+    : {};
+  const email = normalizeStoreOrderLookupEmail(existingCustomer.email) ||
+    normalizeStoreOrderLookupEmail(customer.email);
+  const name = String(existingCustomer.name || customer.name || '').trim();
+  const phone = String(existingCustomer.phone || customer.phone || '').trim();
+  return {
+    ...existingCustomer,
+    email,
+    name,
+    phone
+  };
+}
+
+async function backfillStoreOrderCustomerFromStripe(env, storedOrder = {}, expectedEmailHash = '', storageKey = '') {
+  if (!env?.STORE_STATE || !isStoreOrderFulfillmentReady(storedOrder)) return null;
+  if (normalizeStoreOrderLookupEmail(storedOrder.orderDraft?.customer?.email)) return storedOrder;
+
+  const paymentIntentId = String(
+    storedOrder.payment?.paymentIntentId ||
+    storedOrder.stripePaymentIntentId ||
+    ''
+  ).trim();
+  const stripeSecretKey = getStripeKey(env);
+  if (!paymentIntentId || !stripeSecretKey) return null;
+
+  try {
+    const stripe = createStripeClient(stripeSecretKey);
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge']
+    });
+    if (!paymentIntent || paymentIntent.error) return null;
+
+    const customer = extractStorePaymentIntentCustomer(paymentIntent);
+    if (!customer.email) return null;
+    if (expectedEmailHash) {
+      const paymentEmailHash = await getStoreOrderEmailHash(customer.email);
+      if (paymentEmailHash !== expectedEmailHash) return null;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const updatedOrder = {
+      ...storedOrder,
+      updatedAt,
+      customerBackfilledAt: updatedAt,
+      orderDraft: {
+        ...(storedOrder.orderDraft || {}),
+        customer: mergeStoreOrderCustomer(storedOrder, customer)
+      },
+      payment: {
+        ...(storedOrder.payment || {}),
+        receiptEmail: customer.email
+      }
+    };
+    const key = storageKey || getStoreOrderStorageKey(updatedOrder.orderToken || updatedOrder.orderDraft?.orderToken);
+    if (key) await env.STORE_STATE.put(key, JSON.stringify(updatedOrder));
+    return updatedOrder;
+  } catch (error) {
+    console.warn('Store order customer Stripe backfill failed:', {
+      orderToken: storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '',
+      error: error?.message || String(error)
+    });
+    return null;
+  }
+}
+
 function buildStoreOrderLookupIndexEntry(storedOrder = {}) {
   const orderDraft = storedOrder.orderDraft || {};
   const orderToken = String(storedOrder.orderToken || orderDraft.orderToken || '').trim();
@@ -3399,14 +3488,28 @@ async function collectStoreOrderLookupEntriesForEmailHash(env, emailHash) {
   if (!listed.ok) return [];
 
   const entries = [];
+  let stripeBackfillAttempts = 0;
   for (const key of listed.keys || []) {
     const keyName = String(key?.name || '').trim();
     if (!keyName) continue;
 
-    const storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
+    let storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
     if (!storedOrder || typeof storedOrder !== 'object') continue;
 
-    const email = normalizeStoreOrderLookupEmail(storedOrder.orderDraft?.customer?.email);
+    let email = normalizeStoreOrderLookupEmail(storedOrder.orderDraft?.customer?.email);
+    const paymentIntentId = String(
+      storedOrder.payment?.paymentIntentId ||
+      storedOrder.stripePaymentIntentId ||
+      ''
+    ).trim();
+    if (!email && isStoreOrderFulfillmentReady(storedOrder) && paymentIntentId && stripeBackfillAttempts < 25) {
+      stripeBackfillAttempts += 1;
+      const backfilledOrder = await backfillStoreOrderCustomerFromStripe(env, storedOrder, emailHash, keyName);
+      if (backfilledOrder) {
+        storedOrder = backfilledOrder;
+        email = normalizeStoreOrderLookupEmail(storedOrder.orderDraft?.customer?.email);
+      }
+    }
     if (!email) continue;
 
     const storedEmailHash = await getStoreOrderEmailHash(email);
@@ -10291,6 +10394,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   }
 
   const snapshot = buildStorePaymentSnapshot(loaded.storedOrder, paymentIntent, 'succeeded', confirmedAt);
+  const paymentCustomer = extractStorePaymentIntentCustomer(paymentIntent);
   const updatedOrder = {
     ...loaded.storedOrder,
     status: STORE_ORDER_STATUS_CONFIRMED,
@@ -10298,6 +10402,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
     updatedAt: new Date().toISOString(),
     orderDraft: {
       ...(loaded.storedOrder.orderDraft || {}),
+      customer: mergeStoreOrderCustomer(loaded.storedOrder, paymentCustomer),
       status: STORE_ORDER_STATUS_CONFIRMED,
       confirmedAt
     },

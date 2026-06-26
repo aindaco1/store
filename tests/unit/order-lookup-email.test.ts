@@ -42,6 +42,36 @@ function mockResend() {
   return fetchMock;
 }
 
+function mockStripeAndResend(email: string, name = 'Alonso Indacochea') {
+  const fetchMock = vi.fn(async (input) => {
+    const url = String(input || '');
+    if (url.includes('/v1/payment_intents/pi_lookup123')) {
+      return new Response(JSON.stringify({
+        id: 'pi_lookup123',
+        status: 'succeeded',
+        receipt_email: email,
+        latest_charge: {
+          id: 'ch_lookup123',
+          billing_details: {
+            email,
+            name
+          }
+        }
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify({ id: 'email_123' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 describe('Store order lookup delivery', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -103,10 +133,10 @@ describe('Store order lookup delivery', () => {
     expect(payload.subject).toBe('Find your order | Dust Wave Shop');
   });
 
-  it('rebuilds missing lookup indexes from confirmed orders and keeps lookup links reusable until expiry', async () => {
+  it('backfills missing order emails from Stripe, rebuilds lookup indexes, and keeps lookup links reusable until expiry', async () => {
     const storeState = new MockKVNamespace();
     const ratelimit = new MockKVNamespace();
-    const email = 'alonso@dustwave.xyz';
+    const email = 'alonso@hey.com';
     const orderToken = 'store-order-lookup123';
     await storeState.put(`orders:${orderToken}`, JSON.stringify({
       orderToken,
@@ -122,7 +152,7 @@ describe('Store order lookup delivery', () => {
         preferredLang: 'en',
         currency: 'USD',
         customer: {
-          email,
+          email: '',
           name: 'Alonso Indacochea'
         },
         totals: {
@@ -157,11 +187,13 @@ describe('Store order lookup delivery', () => {
         paymentIntentId: 'pi_lookup123'
       }
     }));
-    mockResend();
+    mockStripeAndResend(email);
 
     const env = {
       SITE_BASE: 'http://127.0.0.1:4002',
+      APP_MODE: 'test',
       MAGIC_LINK_SECRET: 'local-order-lookup-secret',
+      STRIPE_SECRET_KEY_TEST: 'sk_test_lookup',
       RESEND_API_KEY: 'resend_test',
       ORDERS_EMAIL_FROM: 'Dust Wave Shop <orders@dustwave.xyz>',
       UPDATES_EMAIL_FROM: 'Dust Wave Shop <updates@dustwave.xyz>',
@@ -194,6 +226,15 @@ describe('Store order lookup delivery', () => {
         orderToken,
         fulfillmentReady: true
       }]
+    });
+    expect(await storeState.get(`orders:${orderToken}`, { type: 'json' })).toMatchObject({
+      customerBackfilledAt: expect.any(String),
+      orderDraft: {
+        customer: {
+          email,
+          name: 'Alonso Indacochea'
+        }
+      }
     });
 
     for (let attempt = 0; attempt < 2; attempt += 1) {

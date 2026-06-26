@@ -3052,6 +3052,19 @@
       tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
       preferredLang: getCurrentLang()
     };
+    const draft = readFirstPartyCartDraftState();
+    const customer = {
+      ...(draft?.customer && typeof draft.customer === 'object' ? draft.customer : {}),
+      ...(state?.customer && typeof state.customer === 'object' ? state.customer : {})
+    };
+    const email = String(state?.cart?.email || customer.email || draft?.email || '').trim();
+    if (email || customer.name || customer.phone) {
+      payload.customer = {
+        ...customer,
+        ...(email ? { email } : {})
+      };
+      if (email) payload.email = email;
+    }
     const couponCode = normalizeCouponCodeInput(state?.cart?.couponCode || state?.cart?.coupon?.code || '');
     if (couponCode) payload.couponCode = couponCode;
     const attribution = readStoreMarketingAttribution();
@@ -5568,9 +5581,13 @@
 
       const billingDestination = readReadyTaxDestination(store.getState());
       const emailField = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
-      const emailValue = emailField instanceof HTMLInputElement
-        ? String(emailField.value || '').trim()
-        : readCustomCheckoutEmailDraft();
+      const emailValue = String(
+        (emailField instanceof HTMLInputElement ? emailField.value : '') ||
+        readCustomCheckoutEmailDraft() ||
+        state?.customer?.email ||
+        state?.cart?.email ||
+        ''
+      ).trim();
 
       if (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) {
         const message = getRuntimeMessage('cart.shippingAddressRequired', 'Enter a complete shipping address to continue.');
