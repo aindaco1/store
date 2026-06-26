@@ -141,8 +141,8 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)
-# - GITHUB_OWNER               (defaults to 'aindaco1')
-# - GITHUB_REPO                (defaults to 'store')
+# - GITHUB_OWNER               (set explicitly; legacy helper fallback is not launch-safe)
+# - GITHUB_REPO                (set explicitly; legacy helper fallback is not launch-safe)
 # - GITHUB_WORKFLOW            (defaults to 'deploy.yml')
 # - ADMIN_TURNSTILE_REQUIRED   (set true to fail closed when Turnstile is expected)
 # - ADMIN_TURNSTILE_BYPASS     (local/test-only bypass for automated admin auth tests)

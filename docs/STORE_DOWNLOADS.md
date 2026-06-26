@@ -21,9 +21,18 @@ The Worker signs order-scoped fulfillment links after checkout. Digital access d
 
 Object keys must match `_products/*` `download.file_key` values. For example, `_products/dust-wave-digital-download.md` currently expects an R2 object or Worker-only fallback URL mapped to `dust-wave-digital-download`.
 
-Store admins can upload or replace a configured object from the admin Downloads tab. The upload writes to the product's existing `download.file_key`; the browser cannot choose an arbitrary bucket key. Uploads are limited to 100 MB, require the Store fulfillment permission plus CSRF, write the object to `STORE_DOWNLOADS`, and record a short admin audit event in KV.
+Store admins can upload reusable library files from the admin Downloads tab, then attach the selected `file_key` to a product or digital variant in the product editor. Admins can also replace a configured product/variant object. Uploads are limited to 100 MB, require the Store fulfillment permission plus CSRF, write the object to `STORE_DOWNLOADS`, and record a short admin audit event in KV.
+
+Download endpoints:
+
+- `GET /admin/store/downloads`: readiness/library snapshot.
+- `POST /admin/store/downloads/create`: upload a reusable library file.
+- `POST /admin/store/downloads/upload`: replace a configured product/variant object.
+- `POST /admin/store/downloads/delete`: delete a library object.
 
 Admins can also expire or reissue access for a specific digital fulfillment row from the admin Orders tab. Expiring access updates the stored order immediately, so previously issued links fail on the next request. Reissuing access starts a fresh window using the product's configured expiry hours and records the admin action in KV audit history.
+
+Use a dedicated `STORE_DOWNLOAD_SECRET` in production when possible. If it is absent, Store falls back through shared fulfillment/magic-link secrets, but dedicated download signing gives cleaner rotation boundaries.
 
 ## Fallback URL Map
 

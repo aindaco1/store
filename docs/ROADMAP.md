@@ -1,6 +1,6 @@
 # Store Roadmap
 
-Store is not deployed yet. The roadmap is focused on reaching a clean first production launch for `shop.dustwave.xyz` and the Worker API domain.
+Store's main code paths are implemented. The roadmap is focused on completing a clean first production launch for `shop.dustwave.xyz` and `checkout.dustwave.xyz`, then keeping future work scoped to operational hardening.
 
 ## Done
 
@@ -40,6 +40,11 @@ Store is not deployed yet. The roadmap is focused on reaching a clean first prod
 - Product admin bulk status publishing for active, draft, archived, and sold-out states.
 - Product draft/archive visibility controls for storefront listings, public product JSON, and SEO indexing.
 - Customer-facing order lookup by email with emailed one-time tokens.
+- Admin coupon management and Worker-side coupon application.
+- Admin Marketing referral/UTM link builder with QR exports and saved referrals.
+- Opt-in abandoned-checkout reminders with resume/unsubscribe links and admin suppression controls.
+- Event reminder queueing/delivery for ticket and RSVP orders.
+- Reusable digital download library create/replace/delete flow in R2.
 - Historical extraction and Snipcart migration notes separated from launch-facing docs.
 - Admin audit CSV export from recent KV-backed mutation events.
 - Backup/restore runbook for KV, R2, and product catalog Git history.
@@ -52,9 +57,10 @@ Store is not deployed yet. The roadmap is focused on reaching a clean first prod
 ## Launch Blockers
 
 - Upload real production digital download files to `STORE_DOWNLOADS` or configure Worker-only fallback URLs for externally hosted media.
-- Configure production Cloudflare Worker secrets.
+- Configure production Cloudflare Worker secrets, including dedicated signing secrets where appropriate.
 - Configure Stripe production webhook endpoint and signing secret.
 - Verify USPS and New Mexico GRT behavior against the production origin address.
+- Verify admin coupons, marketing referrals, reminder suppression, order lookup, and download library flows against production.
 - Run a full paid physical checkout in Stripe test mode.
 - Run a full paid digital checkout and download fulfillment.
 - Run a paid ticket checkout and admin check-in.
@@ -87,7 +93,7 @@ These features are not separate product surfaces. They should land as part of no
 
 ### Security
 
-- Add a pre-launch security checklist view in admin that mirrors the security guide: secrets, webhook signatures, R2, CSP, admin users, Turnstile, and production mode.
+- Expand Store readiness so it mirrors the full security guide: secrets, webhook signatures, R2, CSP, admin users, Turnstile, production mode, coupons, reminders, and lookup token posture.
 - Add an admin session/device review screen with recent login metadata and explicit session revocation.
 - Expand audit events into a searchable admin audit view, not just CSV export.
 - Add signed-download abuse controls: per-order attempt counts, soft lockouts, and clearer admin reissue history.

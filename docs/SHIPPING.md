@@ -63,6 +63,8 @@ The Worker derives the shipping requirement from the validated cart:
 
 For physical carts, the Worker calculates package inputs from product quantities and shipping presets, then attempts a USPS quote when configured. If USPS is disabled, missing credentials, cooling down, rate-limited, or unavailable, the Worker falls back to the configured flat rate.
 
+Paid domestic physical shipments can expose signature-required options when the quote path can price them. Free-shipping defaults suppress paid signature options.
+
 ## USPS Boundary
 
 The USPS client ID is non-secret runtime config and is mirrored from `_config.yml` into Worker vars. The USPS client secret must stay outside Git in Worker secrets or ignored local `worker/.dev.vars`.

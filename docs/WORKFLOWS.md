@@ -8,6 +8,7 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 - The Worker owns every price, tax, shipping, inventory, and fulfillment decision that affects money or access.
 - Stripe handles payment collection through PaymentIntents.
 - Free RSVP-style orders do not require Stripe.
+- Coupons are stored in KV and applied server-side before tax, shipping, and optional tip calculations.
 - Product catalog changes are GitHub-backed and reviewable in `_products/*.md`.
 - Digital files live in `STORE_DOWNLOADS` R2 and are served through signed Worker routes.
 - Store admin mutations use `store_admin_session` plus `x-store-admin-csrf`.
@@ -39,7 +40,18 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 2. `assets/js/store-product-options.js` updates displayed price, button total, and cart payload fields.
 3. The Store cart runtime stores browser cart state under Store-owned keys.
 4. The cart drawer shows canonical line items and checkout controls.
-5. Heavy cart runtime files lazy-load only after cart state or user intent.
+5. Shopper-entered coupon codes are carried with the cart intent but validated only by the Worker.
+6. Opted-in checkout reminder consent is stored with the draft when checkout starts.
+7. Heavy cart runtime files lazy-load only after cart state or user intent.
+
+## Coupon Workflow
+
+1. Admin creates or edits a coupon in **Coupons**.
+2. Worker stores normalized coupon records at `store-coupons:v1` in `STORE_STATE`.
+3. The browser submits a coupon code with cart validation and checkout intent payloads.
+4. Worker rejects invalid, inactive, expired, duplicate, or ineligible coupons.
+5. Valid discounts reduce eligible line-item subtotal before tax, shipping, and platform tip.
+6. Confirmed order records and emails include the applied coupon snapshot and discount amount.
 
 ## Checkout Workflow
 
@@ -58,15 +70,16 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 
 4. The Worker creates an order draft at `orders:<orderToken>`.
 5. Positive-count SKUs are reserved by the SKU inventory Durable Object.
-6. Paid orders receive a Stripe PaymentIntent and mount on-site payment UI.
-7. Free RSVP orders confirm immediately.
-8. Browser redirects to:
+6. If the shopper opted into checkout reminders, the Worker queues a delayed reminder record.
+7. Paid orders receive a Stripe PaymentIntent and mount on-site payment UI.
+8. Free RSVP orders confirm immediately.
+9. Browser redirects to:
 
    ```text
    /order-success/?orderToken=<token>
    ```
 
-9. `/order-success/` polls the token-scoped order summary until fulfillment is ready or payment fails.
+10. `/order-success/` polls the token-scoped order summary until fulfillment is ready or payment fails.
 
 ## Payment Settlement
 
@@ -87,6 +100,9 @@ On success, the Worker:
 - commits inventory reservations
 - stores Stripe financial snapshots when available
 - sends the Store order confirmation email
+- indexes confirmed order email hashes for customer lookup
+- queues event reminder records when applicable
+- clears pending abandoned-checkout reminders for the completed order
 - exposes fulfillment actions through the token-scoped order summary
 
 On failure, the Worker:
@@ -122,6 +138,29 @@ On failure, the Worker:
   ```text
   POST /admin/store/orders/check-in
   ```
+
+### Order Lookup
+
+- `/orders/` lets customers request a secure order lookup email.
+- `POST /api/orders/lookup` always returns generic copy.
+- Matching confirmed orders are indexed by email hash under `store-order-email:*`.
+- Lookup emails contain short-lived `store-order-lookup:*` tokens.
+- `GET /api/orders/lookup?token=...` consumes the token before returning order links.
+
+### Abandoned Checkout Reminders
+
+- Checkout reminder emails are opt-in only.
+- Pending records use `abandoned-cart:*` keys.
+- Sent markers, suppression records, queue state, and health summaries use `abandoned-cart-sent:*`, `abandoned-cart-suppressed:*`, `abandoned-cart-queue:v1`, and `abandoned-cart-health:v1`.
+- Public signed links support resume and unsubscribe through `/abandoned-cart/resume` and `/abandoned-cart/unsubscribe`.
+- Admin Marketing shows queue health and can suppress or unsuppress reminder emails.
+
+### Event Reminders
+
+- Confirmed ticket/RSVP order items with valid event start times queue reminders.
+- Current offsets are 1 week, 1 day, 6 hours, and 1 hour before the event.
+- Queue and sent records use `store-event-reminder:*`, `store-event-reminder-sent:*`, and `store-event-reminder-queue:v1`.
+- The Worker cron processes due reminders and retries failures with bounded backoff.
 
 ## Inventory Workflow
 
@@ -171,6 +210,14 @@ The checkout path consults the reservation-aware coordinator before committing s
 3. Worker dispatches repository media optimization.
 4. Admin publishes the product to persist the selected image path.
 
+### Download Library
+
+1. Admin uploads reusable files in **Downloads**.
+2. Worker writes files to `STORE_DOWNLOADS` through `POST /admin/store/downloads/create`.
+3. Admin attaches a file key to a digital product or digital variant from the product editor.
+4. Attached objects can be replaced through `POST /admin/store/downloads/upload`.
+5. Unattached or retired library objects can be deleted through `POST /admin/store/downloads/delete`.
+
 ### Settings Publish
 
 Settings publish writes GitHub-backed config changes and triggers deploy. Runtime-only user edits save directly to KV and do not deploy the site.
@@ -189,14 +236,22 @@ Settings publish writes GitHub-backed config changes and triggers deploy. Runtim
 | Key / Binding | Purpose |
 |---------------|---------|
 | `orders:<orderToken>` | Store order draft and final order state |
-| `store-inventory-override:*` | Admin SKU baseline overrides |
+| `store-inventory-overrides:v1` | Admin SKU baseline overrides |
+| `store-inventory:v1:*` | Derived inventory projections synced by the Durable Object |
+| `store-coupons:v1` | Admin-managed coupon definitions |
+| `store-order-email:*` | Confirmed order lookup index by customer email hash |
+| `store-order-lookup:*` | Short-lived customer order lookup tokens |
+| `abandoned-cart:*` | Opt-in checkout reminder queue records |
+| `store-event-reminder:*` | Event reminder queue records |
+| `observability:*` | Bounded webhook/performance summaries and recent events |
 | Store SKU Durable Object | Reservation-aware SKU inventory coordination |
 | `STORE_DOWNLOADS` | Digital download R2 objects |
 | `admin-users:v1` | Runtime admin users |
+| `admin-store-marketing-referrals:v1` | Saved referral/UTM links |
 | `store_admin_session` | Admin session cookie |
 | GitHub contents API | `_products`, `_config.yml`, and product media publishing |
 
-Store KV state should use order, inventory, admin, audit, rate-limit, and email retry keys only.
+Store KV state should stay inside the documented order, inventory, coupon, admin, audit, lookup, reminder, marketing, observability, rate-limit, and email keys.
 
 Super admins can export recent admin mutation audit events from **Settings -> Store readiness**. The CSV is backed by bounded `admin-audit:` KV listing and is intended for launch/post-launch operational review, not permanent retention.
 
@@ -248,11 +303,11 @@ Use [PRODUCTION_LAUNCH.md](PRODUCTION_LAUNCH.md) for the full operator checklist
 1. Merge catalog/settings/media changes.
 2. Generate catalog snapshot.
 3. Build Jekyll.
-4. Minify generated `_site` assets.
-5. Deploy static site to GitHub Pages.
-6. Deploy Worker to Cloudflare.
-7. Sync Worker config.
-8. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, and admin magic links.
+4. Build Jekyll and minify generated `_site` assets.
+5. Deploy Worker to Cloudflare on pushes to `main`.
+6. Deploy static site to GitHub Pages.
+7. Optionally purge Cloudflare cache when enabled.
+8. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
 
 ## Launch Readiness
 

@@ -44,12 +44,14 @@ Use `/Users/aindaco1/Desktop/agents.md` as the product brief when working in Cod
 ## Development Rules
 
 - Keep Store product data in `_products/`.
+- Prefer `store_collection` for collections and `storefront_category`/`product_category` for product-type categories; treat the existing `category: dustwave` and `category: fronteras` values as migrated collection data.
 - Do not reintroduce Snipcart.
 - Do not add Pool cart button classes; Store buttons use `store-add-item`.
 - Treat the Worker as authoritative for cart totals, inventory, tax, shipping, and order state.
 - Do not commit secrets. Local secrets belong in `worker/.dev.vars`; production secrets belong in Cloudflare Worker secrets.
-- Admin mutations must keep session, CSRF, role/scope, normalization, and audit boundaries intact.
+- Admin mutations must keep session, CSRF, role/scope, normalization, rate-limit, and audit boundaries intact.
 - Product content should use Markdown, not raw HTML.
+- Coupons, reminders, marketing referrals, and runtime admin users live in KV-backed Worker/admin flows, not product markdown.
 
 ## Product Changes
 
@@ -101,6 +103,7 @@ Default browser coverage is Store-only. Add new Playwright coverage to the Store
 - [ ] Relevant Worker smoke/security checks pass.
 - [ ] Default Playwright suite passes for UI changes.
 - [ ] Admin changes preserve session, CSRF, role/scope, and audit behavior.
+- [ ] Coupon, lookup, reminder, or marketing changes include Worker tests or focused admin/browser coverage.
 - [ ] No secrets, tokens, customer data, or production export files are committed.
 - [ ] Docs are updated when workflow or operator behavior changes.
 

@@ -59,6 +59,16 @@ Current Settings sections:
 
 Settings media fields use upload controls and image previews rather than manual path-only editing where supported.
 
+Settings write/upload endpoints:
+
+- `POST /admin/settings/preview`
+- `POST /admin/settings/publish`
+- `POST /admin/settings/logo-upload`
+- `POST /admin/settings/image-upload`
+- `POST /admin/settings/audio-upload`
+- `POST /admin/settings/video-upload`
+- `POST /admin/users`
+
 ## Products
 
 Products is the combined catalog and inventory view. It reads from `/admin/store/products`.
@@ -99,6 +109,7 @@ Variants:
 
 Product write endpoints:
 
+- `GET /admin/store/products/address-lookup`
 - `POST /admin/store/products/preview`
 - `POST /admin/store/products/publish`
 - `POST /admin/store/products/bulk-publish`
@@ -156,6 +167,7 @@ Download write endpoints:
 
 - `POST /admin/store/downloads/create`: upload a reusable library file.
 - `POST /admin/store/downloads/upload`: replace a configured product/variant download object. This remains for attached catalog targets.
+- `POST /admin/store/downloads/delete`: remove an R2 library file that should no longer be reused.
 
 ## Orders
 
@@ -237,11 +249,14 @@ Marketing endpoints:
 - `GET /admin/store/marketing/referrals`
 - `POST /admin/store/marketing/referrals`
 - `DELETE /admin/store/marketing/referrals`
+- `GET /admin/store/marketing/draft`
+- `POST /admin/store/marketing/draft`
+- `DELETE /admin/store/marketing/draft`
 - `GET /admin/store/marketing/abandoned-checkout/health`
 - `POST /admin/store/marketing/abandoned-checkout/suppression`
 - `DELETE /admin/store/marketing/abandoned-checkout/suppression`
 
-The old shared draft controls are not part of the current visible workflow.
+The shared draft endpoints remain available for the link-builder draft state, but they are not a separate top-level workflow.
 
 ## Write Paths
 
@@ -262,6 +277,7 @@ Primary write targets:
 - `_config.yml`: Settings publish.
 - `_products/*.md`: product create/edit/order and digital download associations.
 - `assets/images/products/`: product image uploads.
+- `assets/images/defaults/`, `assets/audio/defaults/`, and `assets/videos/defaults/`: settings/default media uploads.
 - `STORE_DOWNLOADS` R2 bucket: digital download files.
 - `STORE_STATE` KV: admin audit events, coupons, inventory overrides, marketing referrals, abandoned checkout state, order/download/check-in state.
 

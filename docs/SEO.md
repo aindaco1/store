@@ -1,6 +1,6 @@
 # SEO
 
-Store SEO focuses on public product, terms, and home pages. Private order/admin routes are noindex.
+Store SEO focuses on public product, terms, and home pages. Private order/admin/lookup routes are noindex.
 
 ## Public Metadata
 
@@ -20,8 +20,9 @@ Product pages emit Product JSON-LD from `_products/` metadata.
 These routes should stay out of search indexes:
 
 - `/admin/`
+- `/orders/`
 - `/order-success/`
-- token-scoped Worker fulfillment routes
+- token-scoped Worker fulfillment, lookup, reminder, and check-in routes
 
 ## Required Product Fields
 

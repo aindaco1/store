@@ -14,17 +14,20 @@ References:
 Back up these before launch, after launch smoke, before bulk admin changes, and before replacing production downloads:
 
 - Git history: `_products/`, `_config.yml`, `api/products.json`, `worker/src/generated/catalog-snapshot.js`, and the commit hash deployed to the storefront and Worker.
-- `STORE_STATE` KV authoritative records: `orders:`, `store-inventory-overrides:v1`, `add-on-inventory-overrides`, `add-on-inventory-sold`, `admin-users:v1`, `admin-user:`, `admin-audit:`, `store-order-email:`, and `store-order-email-sent:`.
+- `STORE_STATE` KV authoritative records: `orders:`, `admin-store-orders:index:v1`, `store-inventory-overrides:v1`, `store-inventory:v1:`, `store-coupons:v1`, `add-on-inventory-overrides`, `add-on-inventory-sold`, `admin-users:v1`, `admin-user:`, `admin-audit:`, `store-order-email:`, `store-order-email-sent:`, `admin-store-marketing-referrals:v1`, and reminder queue/sent records.
 - `STORE_DOWNLOADS` R2 objects referenced by active product `download.file_key` values.
-- Operator exports: Store orders CSV, attendee CSV, audit CSV, launch notes, configured Cloudflare resource IDs, Stripe webhook endpoint ID, and manual inventory adjustments.
+- Operator exports: Store orders CSV, attendee CSV, reconciliation CSV, audit CSV, launch notes, configured Cloudflare resource IDs, Stripe webhook endpoint ID, coupon/referral review notes, and manual inventory adjustments.
 
 Do not restore ephemeral records unless you are deliberately debugging an incident:
 
 - `admin-session:` and `admin-login:` records.
 - `rl:` rate-limit records.
 - `store-order-lookup:` one-time tokens.
+- `abandoned-cart-resume:` signed resume snapshots, unless you are reconstructing reminder behavior.
+- `abandoned-cart-suppressed:` suppression records are usually user preference records; restore them only when preserving suppression state is required and privacy review has approved it.
 - Stripe webhook idempotency markers, unless replay behavior is the incident being repaired.
 - `cron:lastRun` and `cron:lastError`, unless restoring a staging clone for diagnostics.
+- `observability:` summaries, unless restoring them for incident review.
 
 Durable Object inventory state should be treated as derived live state. Restore orders and inventory overrides first, then verify inventory through the admin dashboard rather than writing Durable Object storage directly.
 
@@ -52,14 +55,26 @@ cd worker
 
 for prefix in \
   'orders:' \
+  'admin-store-orders:index:v1' \
   'store-inventory-overrides:v1' \
+  'store-inventory:v1:' \
+  'store-coupons:v1' \
   'add-on-inventory-overrides' \
   'add-on-inventory-sold' \
   'admin-users:v1' \
   'admin-user:' \
   'admin-audit:' \
   'store-order-email:' \
-  'store-order-email-sent:'
+  'store-order-email-sent:' \
+  'admin-store-marketing-referrals:v1' \
+  'abandoned-cart:' \
+  'abandoned-cart-sent:' \
+  'abandoned-cart-suppressed:' \
+  'abandoned-cart-queue:v1' \
+  'abandoned-cart-health:v1' \
+  'store-event-reminder:' \
+  'store-event-reminder-sent:' \
+  'store-event-reminder-queue:v1'
 do
   safe_prefix=$(printf '%s' "$prefix" | tr -c 'A-Za-z0-9._-' '_')
   keys_file="$STORE_BACKUP_DIR/kv/${safe_prefix}.keys.json"
@@ -91,9 +106,12 @@ Restore production in this order:
 
 1. `admin-users:v1` and `admin-user:` only if admin users were lost or intentionally rolled back.
 2. `orders:` records.
-3. Inventory override records.
-4. Email index/sent records.
-5. `admin-audit:` records only when preserving historical audit context matters.
+3. `admin-store-orders:index:v1` only after order records are present, or let the Worker rebuild/index through normal admin reads.
+4. Inventory override records, then derived inventory projection records only if you are restoring a known-good production snapshot.
+5. Coupon and marketing referral records.
+6. Email index/sent records.
+7. Reminder records only after reviewing whether queued sends should still happen.
+8. `admin-audit:` records only when preserving historical audit context matters.
 
 After restore, use the admin dashboard to verify orders, inventory, downloads, and audit export. Run the Worker smoke script against the target environment before accepting new checkout traffic.
 

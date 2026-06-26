@@ -1,6 +1,6 @@
 # Testing
 
-The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, content safety, and Worker security.
+The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
 ## Quick Commands
 
@@ -26,7 +26,7 @@ Default Playwright specs:
 - `tests/e2e/public-page-controls.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
 
-These cover public layout/accessibility, product-card and product-detail controls, cart quantity updates, keyboard add-to-cart flow, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product publish, download replacement upload, inventory baseline writes, scoped Store admin access, and Spanish admin tabs.
+These cover public layout/accessibility, product-card and product-detail controls, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product publish, download replacement upload, coupon management, inventory baseline writes, scoped Store admin access, and Spanish admin tabs.
 
 ## Unit Coverage
 
@@ -39,9 +39,12 @@ Focused Store runs:
 ```bash
 npx vitest run \
   tests/unit/store-catalog.test.ts \
+  tests/unit/store-coupons.test.ts \
   tests/unit/shipping.test.ts \
   tests/unit/tax.test.ts \
   tests/unit/tier-inventory-do.test.ts \
+  tests/unit/order-lookup-email.test.ts \
+  tests/unit/event-reminders.test.ts \
   tests/unit/cart-runtime-loader.test.ts \
   tests/unit/page-prefetch.test.ts
 ```
@@ -63,7 +66,7 @@ The security suite checks Store admin auth boundaries, cart/checkout input valid
 npm run test:premerge
 ```
 
-The pre-merge script runs secret/content audits, syntax checks, focused Store unit tests, full unit tests, build artifact checks, Worker security tests, Worker smoke tests, and the headless Playwright suite.
+The pre-merge script runs secret/content audits, syntax checks, focused Store unit tests, full unit tests, build artifact checks, Worker security tests, Worker smoke tests, asset minification checks, and the headless Playwright suite. When host Jekyll gems are unavailable it can fall back to a Podman-backed build path.
 
 ## Manual Store Smoke
 
@@ -80,9 +83,13 @@ Before launch or after checkout/fulfillment changes:
 9. Search for a ticket attendee and export attendee CSV from admin.
 10. Check in a ticket/RSVP order from admin.
 11. Upload or replace a digital download in admin.
-12. Expire and reissue a confirmed digital fulfillment item from admin.
-13. Download a confirmed digital fulfillment item.
-14. Set an inventory baseline and verify checkout respects it.
+12. Create and delete a reusable download library file.
+13. Expire and reissue a confirmed digital fulfillment item from admin.
+14. Download a confirmed digital fulfillment item.
+15. Create, apply, and delete a coupon.
+16. Request an order lookup link and consume it.
+17. Verify abandoned-checkout reminder suppression/resume behavior in a controlled test.
+18. Set an inventory baseline and verify checkout respects it.
 
 ## Launch Checklist
 
@@ -98,3 +105,6 @@ Use [PRODUCTION_LAUNCH.md](PRODUCTION_LAUNCH.md) for the full production runbook
 - Real inventory baselines are entered for finite-stock products, and unlimited/made-to-order products use `inventory_tracking: false`.
 - Admin product publish triggers deploy.
 - Admin user scopes are correct.
+- Coupons discount only eligible carts.
+- Customer order lookup links are generic on request and token-scoped on consume.
+- Reminder cron heartbeat and queue health are visible.

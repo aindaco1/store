@@ -5,7 +5,7 @@ This runbook is for the first Store production launch at:
 - Storefront: `https://shop.dustwave.xyz`
 - Worker API: `https://checkout.dustwave.xyz`
 
-Store is not live yet, so launch can favor the long-term shape over compatibility shims.
+Launch can favor the long-term Store shape over compatibility shims. Do not re-enable removed Snipcart or campaign routes to get through smoke testing.
 
 ## Preflight
 
@@ -40,6 +40,7 @@ Required production resources:
 - R2 bucket bound as `STORE_DOWNLOADS`
 - Durable Object binding `STORE_INVENTORY_COORDINATOR`
 - DNS records for `shop.dustwave.xyz` and `checkout.dustwave.xyz`
+- Cron trigger enabled for Store background maintenance
 
 Before deploy:
 
@@ -63,9 +64,19 @@ Production secrets must be configured outside Git:
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `RESEND_API_KEY`
-- `USPS_CLIENT_SECRET`
 - `TURNSTILE_SECRET_KEY` when admin Turnstile is required
+- `USPS_CLIENT_SECRET` when USPS live quotes are enabled
 - `ZIP_TAX_API_KEY` only if the tax provider changes to ZIP.TAX
+
+Recommended dedicated secrets:
+
+- `STORE_DOWNLOAD_SECRET` for signed download/fulfillment links.
+- `STORE_ORDER_LOOKUP_SECRET` for customer order lookup tokens.
+- `ABANDONED_CART_TOKEN_SECRET` for checkout reminder resume/unsubscribe links.
+- `ADMIN_TURNSTILE_SECRET_KEY` if admin Turnstile should not share the global Turnstile secret.
+- `STORE_ORDER_TURNSTILE_SECRET_KEY` if order lookup Turnstile should not share the global Turnstile secret.
+
+Production admin publish/rebuild integrations also need `GITHUB_TOKEN` plus the intended `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_REF`, `GITHUB_WORKFLOW`, and optional `GITHUB_MEDIA_OPTIMIZATION_WORKFLOW` runtime values. Set owner/repo/ref explicitly; do not rely on legacy helper fallbacks. Keep GitHub and Cloudflare deploy credentials separate from public `_config.yml`.
 
 Production non-secret config should match the intended launch values:
 
@@ -140,7 +151,10 @@ Before launch:
 5. Open **Settings -> Store readiness** and review secrets, webhook activity, R2 readiness, inventory baselines, cron heartbeat, and catalog snapshot posture.
 6. Open **Settings -> Plan usage** and confirm Cloudflare and Resend quota posture is visible, or that missing optional usage credentials are clearly reported.
 7. Enter true inventory baselines for finite-stock physical products, or set made-to-order/unlimited products to `inventory_tracking: false`.
-8. Export Store orders CSV and confirm it downloads.
+8. Create a draft coupon, save it, and delete it.
+9. Create a test referral link and confirm QR download/copy actions work.
+10. Add and clear an abandoned-checkout suppression address.
+11. Export Store orders CSV and confirm it downloads.
 
 When a product has a verified physical inventory count, add `inventory_baseline_source` or `inventory_verified_at` to its product front matter. This lets `npm run launch:readiness` distinguish a true zero-stock baseline from an untouched imported `0`.
 
@@ -153,8 +167,9 @@ Before launch:
 1. Confirm product cards and product pages render the active catalog.
 2. Confirm cart quantity and variant price behavior on at least one variant product.
 3. Confirm `/api/products.json` and `/api/add-ons.json` return expected Store payloads.
-4. Confirm `/order-success/` is not indexed and is not prefetched.
-5. Confirm Terms and policy copy are production-ready.
+4. Confirm `/orders/` renders the customer order lookup form.
+5. Confirm `/order-success/` is not indexed and is not prefetched.
+6. Confirm Terms and policy copy are production-ready.
 
 ## Launch Smoke
 
@@ -167,7 +182,10 @@ Run these against production before public announcement:
 5. Admin ticket/RSVP check-in and undo check-in.
 6. Admin product edit/publish on a harmless draft product.
 7. Admin download replacement on a non-public test product.
-8. Stripe webhook replay or equivalent test event for paid settlement.
+8. Coupon application on a harmless test cart.
+9. Customer order lookup email/link flow.
+10. Abandoned-checkout reminder suppression/resume link behavior in a controlled test.
+11. Stripe webhook replay or equivalent test event for paid settlement.
 
 ## Rollback
 
@@ -187,6 +205,7 @@ Within the first 24 hours:
 1. Review Stripe payments against Store orders with the admin reconciliation CSV.
 2. Review Resend delivery and bounce events.
 3. Review admin **Settings -> Store readiness** for webhook activity and cron heartbeat.
-4. Export orders CSV for fulfillment reconciliation.
-5. Export audit CSV for admin mutation review.
-6. Back up launch notes, configured resource ids, and any manual inventory adjustments using [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
+4. Review abandoned-checkout and event reminder health after the first scheduled cron windows.
+5. Export orders CSV for fulfillment reconciliation.
+6. Export audit CSV for admin mutation review.
+7. Back up launch notes, configured resource ids, coupon/referral changes, and any manual inventory adjustments using [BACKUP_RESTORE.md](BACKUP_RESTORE.md).

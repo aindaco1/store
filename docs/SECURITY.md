@@ -2,7 +2,7 @@
 
 This document covers the active Store security model: static product pages, first-party cart runtime, Cloudflare Worker checkout APIs, Stripe, USPS/NM GRT integrations, Resend email, signed downloads, inventory, and the private admin dashboard.
 
-Store is not deployed yet, so this guide describes the long-term target shape rather than preserving imported compatibility paths.
+This guide describes the current Store security model and the launch target. Historical imported compatibility paths should be removed or kept returning `404`; do not preserve old campaign/Snipcart behavior as a security workaround.
 
 ## Trust Boundaries
 
@@ -39,13 +39,20 @@ Secret storage rules:
 | `orders:{token}` | KV | Order draft/settlement/fulfillment state | High |
 | `store-order-email:{emailHash}` | KV | Order lookup index by customer email hash | Medium |
 | `store-order-lookup:{jti}` | KV | Short-lived one-time order lookup nonce | Medium |
-| `store-inventory:*` | KV / Durable Object | SKU inventory projections, reservations, commits | Medium |
-| `store-download:*` | KV / R2 | Download readiness metadata and private file objects | High |
+| `store-inventory-overrides:v1` | KV | Admin-entered SKU baseline overrides | Medium |
+| `store-inventory:v1:*` | KV / Durable Object | Derived SKU projections, reservations, commits | Medium |
+| `store-coupons:v1` | KV | Coupon definitions and status | Medium |
+| `orders:{token}.downloadAccess` / R2 object metadata | KV / R2 | Per-order download access state and private file objects | High |
+| `abandoned-cart:*` | KV | Opt-in checkout reminder queue snapshots | Medium |
+| `abandoned-cart-suppressed:*` | KV | Reminder suppression records | Medium |
+| `store-event-reminder:*` | KV | Event reminder queue records | Medium |
 | `stripe-event:{id}` | KV | Webhook idempotency marker | Low |
 | `admin-login:{hash}` | KV | One-time admin login nonce | Medium |
 | `admin-session:{hash}` | KV | Admin identity, role, scopes, CSRF, expiry | High |
 | `admin-users:v1` | KV | Runtime admin users and scopes | High |
 | `admin-audit:{date}:{action}:{id}` | KV | Recent admin mutation audit metadata | Medium |
+| `admin-store-marketing-referrals:v1` | KV | Saved referral/UTM links | Medium |
+| `observability:*` | KV | Bounded webhook/performance telemetry summaries | Low |
 | `rl:{endpoint}:{ip}` | KV | Rate-limit counters | Low |
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
@@ -55,6 +62,7 @@ Sensitive responses should use `Cache-Control: private, no-store`. Tokenized ord
 The browser cart is convenience state only. The Worker recalculates and validates:
 
 - product identifiers, SKUs, variants, quantities, and unit prices from the generated Store catalog
+- coupon code validity, eligibility, status, date windows, and discount amount
 - tax category and NM GRT destination handling
 - shipping presets, USPS quote/fallback behavior, and non-shippable product handling
 - tip/platform fee policy
@@ -80,6 +88,7 @@ Digital products use private R2 objects and signed fulfillment actions.
 
 - Product markdown declares `download.file_key`; raw public download URLs are not used.
 - Admin download uploads/replacements require an authenticated Store admin session.
+- Admin library download create/delete operations require the same fulfillment permission and R2 object validation.
 - Order Success exposes download actions only for confirmed orders and token-scoped fulfillment items.
 - Per-order download access state enforces expiry and admin reissues server-side, so expired access blocks previously issued links.
 - Admin download expiry/reissue mutations require an authenticated Store admin session plus CSRF and write an audit event.
@@ -95,7 +104,7 @@ Required protections:
 
 - valid admin session cookie
 - `x-store-admin-csrf` for mutations
-- role/scope checks for Store orders, products, downloads, inventory, settings, and user management
+- role/scope checks for Store orders, products, coupons, downloads, inventory, marketing, settings, and user management
 - server-side allowlists for publishable fields
 - strict media upload validation for type, size, destination, filename, and path traversal
 - no inline scripts in the static admin shell
@@ -127,6 +136,7 @@ Use Markdown for product descriptions; do not author raw HTML in product markdow
 - Intent prefetching is limited to public Store document routes.
 - Admin, checkout, API, Worker, tokenized, order lookup, Order Success, and sensitive query routes are blocked from prefetch.
 - Cart recovery is limited to cart, checkout, and Order Success flows.
+- Abandoned-checkout resume/unsubscribe links are signed, scoped, expiring URLs and should not be crawled or logged with tokens intact.
 - `robots.txt` disallows admin, order lookup, and Order Success routes.
 - `sitemap.xml` includes public product URLs and excludes admin/tokenized/private pages.
 

@@ -23,7 +23,8 @@ bundle exec jekyll build --quiet
 - Checkout writes compact order drafts.
 - Inventory reads use SKU-level projections and overrides.
 - Admin order/product/download/inventory views are explicit reads, not background polling.
-- Scheduled work is limited to Store heartbeat and queued order-email retries.
+- Scheduled work is limited to bounded heartbeat writes, opted-in abandoned-checkout reminders, due event reminders, and recent error/observability summaries.
+- Queue-state markers avoid scanning reminder prefixes when cron has no known pending work.
 
 ## Prefetch
 
@@ -33,6 +34,7 @@ Public prefetch excludes private or stateful routes, including:
 - `/cart`
 - `/checkout`
 - `/order-success`
+- `/orders`
 - `/api`
 - `/worker`
 

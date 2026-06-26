@@ -38,17 +38,21 @@ For ticket or RSVP items, confirmations attach event artifacts when available:
 
 ### Order Lookup
 
-Sent when a customer requests order lookup by email and matching orders exist. The email contains a one-time link to `/orders/` that expires quickly.
+Sent when a customer requests order lookup by email and matching orders exist. The email contains a one-time link to `/orders/` backed by `store-order-lookup:*` KV records. Tokens currently expire after 15 minutes.
+
+Order lookup signs tokens with `STORE_ORDER_LOOKUP_SECRET` when configured, then falls back through Store fulfillment/download and magic-link secrets.
 
 ### Abandoned Checkout
 
-Sent only when the customer asked for a checkout reminder. The email contains:
+Sent only when the customer asked for a checkout reminder. The default send delay is 6 hours after checkout starts. The email contains:
 
 - A resume checkout link.
 - A one-click unsubscribe link.
 - List-Unsubscribe headers.
 
 Queue, sent, suppression, and health records live in `STORE_STATE` KV with `abandoned-cart:*` keys.
+
+Use `ABANDONED_CART_TOKEN_SECRET` for dedicated reminder resume/unsubscribe signing when possible. If it is not configured, Store falls back to checkout intent or magic-link signing secrets.
 
 ### Event Reminders
 
@@ -70,6 +74,8 @@ Queue and sent records live in `STORE_STATE` KV:
 - `store-event-reminder-queue:v1`
 
 The cron handler processes due reminders and retries failures with bounded backoff.
+
+Cron status and recent errors are visible in **Settings -> Store readiness** and through the authenticated cron/observability endpoints.
 
 ## Calendar And QR Behavior
 

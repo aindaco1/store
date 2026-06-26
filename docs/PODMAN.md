@@ -20,6 +20,7 @@ Included:
 - Worker dev image based on Node 24
 - ignored `worker/.dev.vars` support
 - local admin dashboard defaults and CORS wiring for `http://127.0.0.1:4002`
+- local admin repo sidecar for dashboard publish flows
 - optional host Stripe CLI webhook forwarding
 - headless Playwright in a dedicated Podman container
 - Podman-aware Worker smoke, security, media, and E2E helpers
@@ -56,6 +57,12 @@ The Worker serves Store APIs at:
 
 ```text
 http://127.0.0.1:8989
+```
+
+Local admin repository writes use the sidecar at:
+
+```text
+http://127.0.0.1:8799
 ```
 
 ## Self-Check

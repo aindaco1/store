@@ -37,7 +37,8 @@ Supported fulfillment types:
 Optional storefront taxonomy fields:
 
 - `store_collection` groups products by campaign or event. When omitted, Store falls back to `event`, then `dustwave`.
-- `category` powers storefront category filters. When omitted, Store derives a category from `fulfillment_type`, `type`, shipping preset, and product name.
+- `storefront_category` or `product_category` powers storefront category filters. When omitted, Store derives a category from `fulfillment_type`, `type`, shipping preset, and product name.
+- `category` is still accepted for migrated catalog records. If it matches a configured `storefront.collections` id such as `dustwave` or `fronteras`, Store treats it as the collection. If it does not match a collection id, Store treats it as an explicit category.
 
 Current derived categories:
 
@@ -164,6 +165,20 @@ Add-ons support:
 
 For the current Dust Wave Store launch, keep the main sellable catalog in `_products/` and use add-ons sparingly.
 
+## Coupons
+
+Coupons are not add-ons. Admin-managed coupon definitions live in `STORE_STATE` at `store-coupons:v1` and are applied by the Worker during cart validation/checkout.
+
+Coupon support includes:
+
+- active or draft status
+- percent or fixed-amount discounts
+- whole-cart or product-scoped eligibility
+- optional start/end dates
+- order/email snapshots of the applied discount
+
+Use **Admin -> Coupons** for coupon operations instead of editing product or add-on metadata.
+
 ## Content Safety
 
 Run:
@@ -184,4 +199,4 @@ When product, shipping, tax, pricing, or URL settings change:
 npm run sync:worker-config
 ```
 
-That regenerates the Worker catalog/config snapshots used for server-authoritative validation.
+That regenerates the Worker catalog/config snapshots used for server-authoritative validation. Use `npm run catalog:generate` only when you need to refresh `worker/src/generated/catalog-snapshot.js` without also mirroring `_config.yml` into `worker/wrangler.toml`.
