@@ -3,6 +3,7 @@
 {%- capture add_ons_catalog_json -%}{% include add-ons-catalog-json.html %}{%- endcapture -%}
 {%- assign asset_version = site.time | date: "%s" -%}
 <script
+  data-cfasync="false"
   src="/assets/js/store-config.js?v={{ asset_version }}"
   defer
   data-store-config-script="true"
@@ -32,13 +33,14 @@
   data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
   data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
   data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
-<script src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
-<script src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
+<script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
+<script data-cfasync="false" src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
 {%- comment -%}Keep checkout domains discoverable without opening Stripe connections before cart intent.{%- endcomment -%}
 <link rel="dns-prefetch" href="//js.stripe.com">
 <link rel="dns-prefetch" href="//api.stripe.com">
 <div hidden data-store-cart-root="true"></div>
 <script
+  data-cfasync="false"
   src="/assets/js/cart-runtime-loader.js?v={{ asset_version }}"
   defer
   data-store-cart-runtime-loader="true"

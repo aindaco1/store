@@ -47,10 +47,10 @@
 
   {% include cart-foot.html %}
   {%- if page.order_lookup_script -%}
-    <script src="/assets/js/order-lookup.js?v={{ asset_version }}" defer></script>
+    <script data-cfasync="false" src="/assets/js/order-lookup.js?v={{ asset_version }}" defer></script>
   {%- endif -%}
   {%- if page.order_success_script -%}
-    <script src="/assets/js/order-success.js?v={{ asset_version }}" defer></script>
+    <script data-cfasync="false" src="/assets/js/order-success.js?v={{ asset_version }}" defer></script>
   {%- endif -%}
   {% include page-prefetch.html %}
 </body>

@@ -53,6 +53,8 @@ describe('Store SEO templates', () => {
     expect(header).toContain("translation_key='terms'");
     expect(header).not.toContain("translation_key='about'");
     expect(header).not.toContain("translation_key='campaigns_index'");
+    expect(header).toContain('<script data-cfasync="false" src="/assets/js/header-nav.js" defer></script>');
+    expect(header).toContain('<script data-cfasync="false" src="/assets/js/a11y-live.js" defer></script>');
     expect(footer).toContain('responsive-image.html src=footer_logo_path');
     expect(responsiveImage).toContain('local_image_dimensions');
     expect(responsiveImage).toContain('<source type="image/webp" srcset="{{ responsive_srcset | escape }}"');
