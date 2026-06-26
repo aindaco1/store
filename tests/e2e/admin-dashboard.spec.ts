@@ -371,8 +371,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       });
     }
     if (url.pathname === '/admin/store/orders' && method === 'GET') {
-      calls.storeOrders.push(Object.fromEntries(url.searchParams.entries()));
-      return fulfillJson(storeOrdersPayload());
+      const params = Object.fromEntries(url.searchParams.entries());
+      calls.storeOrders.push(params);
+      return fulfillJson(storeOrdersPayload(params));
     }
     if (url.pathname === '/admin/store/orders.csv' && method === 'GET') {
       calls.storeOrderCsv.push(Object.fromEntries(url.searchParams.entries()));
@@ -754,10 +755,8 @@ function storeSettingsSections() {
   }];
 }
 
-function storeOrdersPayload() {
-  return {
-    scope: 'store',
-    orders: [{
+function storeOrdersPayload(params: Record<string, string> = {}) {
+  const allOrders = [{
       orderToken: TICKET_ORDER_TOKEN,
       status: 'confirmed',
       createdAt: '2026-06-11T12:00:00.000Z',
@@ -803,49 +802,8 @@ function storeOrdersPayload() {
         quantity: 1,
         fulfillmentType: 'digital'
       }]
-    }],
-    totals: {
-      orders: 2,
-      fulfillmentRows: 2,
-      physicalQuantity: 0,
-      digitalQuantity: 1,
-      ticketQuantity: 1,
-      rsvpQuantity: 0,
-      checkedInQuantity: 0
-    },
-    page: {
-      cursor: 0,
-      returned: 2,
-      matched: 2,
-      matchedOrders: 2,
-      nextCursor: null
-    },
-    attendance: {
-      totals: {
-        eventCount: 1,
-        orderCount: 1,
-        quantity: 1,
-        checkedInQuantity: 0,
-        uncheckedQuantity: 1
-      },
-      events: [{
-        productId: 'fronteras-ticket',
-        variantId: 'general',
-        itemName: 'Fronteras Screening',
-        variantLabel: 'General Admission',
-        fulfillmentType: 'ticket',
-        eventStartsAt: '2026-07-01T01:00:00.000Z',
-        eventVenue: 'Guild Cinema',
-        eventAddress: '3405 Central Ave NE, Albuquerque, NM',
-        quantity: 1,
-        checkedInQuantity: 0,
-        uncheckedQuantity: 1,
-        checkedInRate: 0,
-        orderCount: 1,
-        rowCount: 1
-      }]
-    },
-    fulfillments: [{
+    }];
+  const allFulfillments = [{
       orderToken: TICKET_ORDER_TOKEN,
       createdAt: '2026-06-11T12:00:00.000Z',
       customerName: TICKET_BUYER_NAME,
@@ -896,7 +854,77 @@ function storeOrdersPayload() {
         expiresInSeconds: 259200,
         expiresHours: 72
       }
-    }],
+    }];
+  const query = String(params.q || '').trim().toLowerCase();
+  const rowsByToken = new Map<string, typeof allFulfillments>();
+  for (const row of allFulfillments) {
+    const rows = rowsByToken.get(row.orderToken) || [];
+    rows.push(row);
+    rowsByToken.set(row.orderToken, rows);
+  }
+  const orders = query
+    ? allOrders.filter((order) => JSON.stringify([order, rowsByToken.get(order.orderToken) || []]).toLowerCase().includes(query))
+    : allOrders;
+  const orderTokens = new Set(orders.map((order) => order.orderToken));
+  const fulfillments = allFulfillments.filter((row) => orderTokens.has(row.orderToken));
+  const ticketRows = fulfillments.filter((row) => row.fulfillmentType === 'ticket');
+  const attendance = ticketRows.length
+    ? {
+        totals: {
+          eventCount: 1,
+          orderCount: 1,
+          quantity: 1,
+          checkedInQuantity: 0,
+          uncheckedQuantity: 1
+        },
+        events: [{
+          productId: 'fronteras-ticket',
+          variantId: 'general',
+          itemName: 'Fronteras Screening',
+          variantLabel: 'General Admission',
+          fulfillmentType: 'ticket',
+          eventStartsAt: '2026-07-01T01:00:00.000Z',
+          eventVenue: 'Guild Cinema',
+          eventAddress: '3405 Central Ave NE, Albuquerque, NM',
+          quantity: 1,
+          checkedInQuantity: 0,
+          uncheckedQuantity: 1,
+          checkedInRate: 0,
+          orderCount: 1,
+          rowCount: 1
+        }]
+      }
+    : {
+        totals: {
+          eventCount: 0,
+          orderCount: 0,
+          quantity: 0,
+          checkedInQuantity: 0,
+          uncheckedQuantity: 0
+        },
+        events: []
+      };
+  return {
+    scope: 'store',
+    orders,
+    totals: {
+      orders: orders.length,
+      fulfillmentRows: fulfillments.length,
+      physicalQuantity: 0,
+      digitalQuantity: fulfillments.filter((row) => row.fulfillmentType === 'digital').reduce((sum, row) => sum + row.quantity, 0),
+      ticketQuantity: ticketRows.reduce((sum, row) => sum + row.quantity, 0),
+      rsvpQuantity: 0,
+      checkedInQuantity: 0
+    },
+    page: {
+      cursor: 0,
+      returned: orders.length,
+      matched: fulfillments.length,
+      matchedOrders: orders.length,
+      nextCursor: null
+    },
+    attendance,
+    fulfillments,
     writeBudget: { readOnly: true, kvWritesExpected: 0 }
   };
 }
@@ -1777,12 +1805,14 @@ test.describe('Admin Dashboard', () => {
       action: 'expire'
     });
     await expect(page.locator('#admin-store-orders-status')).toContainText('Download access expired.');
-    const storeOrderCallsBeforeSearch = calls.storeOrders.length;
     await page.locator('#admin-store-order-query').fill(TICKET_BUYER_NAME);
+    await expect.poll(() => calls.storeOrders.some((call) => call.q === TICKET_BUYER_NAME)).toBe(true);
     await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
     await expect(page.locator('#admin-store-orders-results')).not.toContainText(DIGITAL_ORDER_TOKEN);
-    await page.waitForTimeout(250);
-    expect(calls.storeOrders).toHaveLength(storeOrderCallsBeforeSearch);
+    const storeOrderCallsAfterSearch = calls.storeOrders.length;
+    await page.locator('#admin-store-order-query').fill(TICKET_BUYER_NAME);
+    await page.waitForTimeout(450);
+    expect(calls.storeOrders).toHaveLength(storeOrderCallsAfterSearch);
     await page.locator('#admin-store-attendees-export').click();
     await expect.poll(() => calls.storeAttendeeCsv.length).toBe(1);
     expect(calls.storeAttendeeCsv[0]).toMatchObject({ q: TICKET_BUYER_NAME });

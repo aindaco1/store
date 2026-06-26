@@ -1,5 +1,6 @@
 import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.js';
 import { sendAdminLoginEmail } from './email.js';
+import { DEFAULT_SITE_BASE } from './provider-config.js';
 import { getTurnstileSecret, shouldBypassTurnstile, verifyTurnstile } from './turnstile.js';
 
 export const ADMIN_SESSION_COOKIE = 'store_admin_session';
@@ -265,9 +266,27 @@ function getSiteAdminPath(lang) {
   return normalizeLang(lang) === 'es' ? '/es/admin/' : '/admin/';
 }
 
+function getAdminPublicSiteBase(env = {}) {
+  const candidates = [
+    env?.CANONICAL_SITE_BASE,
+    env?.SITE_BASE,
+    DEFAULT_SITE_BASE
+  ];
+  for (const candidate of candidates) {
+    try {
+      const parsed = new URL(String(candidate || '').trim());
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+        return parsed.origin;
+      }
+    } catch {
+      // Try the next configured origin.
+    }
+  }
+  return DEFAULT_SITE_BASE;
+}
+
 function buildAdminUrl(env, token, lang) {
-  const base = String(env?.SITE_BASE || '').replace(/\/$/, '');
-  const url = new URL(`${base}${getSiteAdminPath(lang)}`);
+  const url = new URL(getSiteAdminPath(lang), getAdminPublicSiteBase(env));
   url.searchParams.set('admin_login', token);
   return url.toString();
 }

@@ -145,7 +145,7 @@ function getLocalizedPath(path, preferredLang = DEFAULT_I18N_LANG) {
 function getResolvedSiteBase(siteBaseOrEnv) {
   const siteBase = typeof siteBaseOrEnv === 'string'
     ? siteBaseOrEnv
-    : getSiteBase(siteBaseOrEnv || {});
+    : String(siteBaseOrEnv?.CANONICAL_SITE_BASE || '').trim() || getSiteBase(siteBaseOrEnv || {});
   try {
     return new URL(siteBase || FALLBACK_SITE_BASE).origin;
   } catch {

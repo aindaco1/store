@@ -57,9 +57,11 @@
   var storeProductMediaCache = new Map();
   var SNIPCART_IMPORT_MAX_CSV_BYTES = 1024 * 1024;
   var currentStoreOrdersPayload = null;
+  var storeOrderPayloadCache = new Map();
   var storeOrderNextCursor = null;
   var storeOrderLoadTimer = null;
   var storeOrderRenderTimer = null;
+  var storeOrderLoadRequestCounter = 0;
   var adminFieldIdCounter = 0;
   var storeProductDescriptionEditorCounter = 0;
   var storeProductDescriptionUploadCounter = 0;
@@ -1868,15 +1870,29 @@
     return $all('[data-admin-user-card]', root).map(readAdminUserCard);
   }
 
-  function orderFilters(cursor, options) {
-    var opts = options || {};
+  function orderFilters(cursor) {
     return {
       status: ($('#admin-store-order-status') || {}).value || 'confirmed',
       fulfillment: ($('#admin-store-order-fulfillment') || {}).value || 'all',
-      q: opts.includeQuery === false ? '' : (($('#admin-store-order-query') || {}).value || ''),
+      q: (($('#admin-store-order-query') || {}).value || '').trim(),
       cursor: cursor || 0,
       limit: 25
     };
+  }
+
+  function storeOrderCacheKey(params) {
+    var source = params || {};
+    return JSON.stringify({
+      status: String(source.status || 'confirmed'),
+      fulfillment: String(source.fulfillment || 'all'),
+      q: String(source.q || '').trim().toLowerCase(),
+      cursor: Number(source.cursor || 0) || 0,
+      limit: Number(source.limit || 25) || 25
+    });
+  }
+
+  function clearStoreOrderCache() {
+    storeOrderPayloadCache.clear();
   }
 
   function planUsagePeriodLabel(period) {
@@ -3351,189 +3367,6 @@
     };
   }
 
-  function storeOrderSearchText(order, rows) {
-    return [
-      order?.orderToken,
-      order?.status,
-      order?.customer?.name,
-      order?.customer?.email,
-      order?.payment?.status,
-      getStoreOrderFulfillmentLabel(order),
-      getStoreOrderItemsSummary(order),
-      ...(Array.isArray(rows) ? rows.flatMap(function(row) {
-        return [
-          row.orderToken,
-          row.status,
-          row.paymentStatus,
-          row.customerName,
-          row.customerEmail,
-          row.itemId,
-          row.productId,
-          row.variantId,
-          row.sku,
-          row.itemName,
-          row.variantLabel,
-          row.fulfillmentType,
-          row.eventStartsAt,
-          row.eventVenue,
-          row.eventAddress,
-          row.checkedIn ? 'checked in' : 'not checked in',
-          row.checkedInBy,
-          row.checkInUpdatedBy,
-          row.checkInNote
-        ];
-      }) : [])
-    ].filter(Boolean).join(' ').toLowerCase();
-  }
-
-  function isStoreOrdersTicketLikeRow(row) {
-    var fulfillmentType = String(row?.fulfillmentType || '').trim().toLowerCase();
-    if (fulfillmentType === 'ticket' || fulfillmentType === 'rsvp') return true;
-    return fulfillmentType === 'legacy' &&
-      String(row?.taxCategory || '').trim().toLowerCase() === 'admission' &&
-      row?.shippable !== true;
-  }
-
-  function buildStoreOrdersLocalTotals(orders, rows) {
-    var sourceOrders = Array.isArray(orders) ? orders : [];
-    var sourceRows = Array.isArray(rows) ? rows : [];
-    return {
-      orders: sourceOrders.length,
-      fulfillmentRows: sourceRows.length,
-      totalCents: sourceOrders.reduce(function(sum, order) {
-        return sum + Math.max(0, Number(order?.totals?.totalCents || 0) || 0);
-      }, 0),
-      ticketQuantity: sourceRows.filter(isStoreOrdersTicketLikeRow).reduce(function(sum, row) {
-        return sum + Math.max(0, Number(row.quantity || 0) || 0);
-      }, 0),
-      checkedInQuantity: sourceRows.filter(function(row) {
-        return row.checkInAvailable === true;
-      }).reduce(function(sum, row) {
-        return sum + Math.max(0, Number(row.checkedInQuantity || 0) || 0);
-      }, 0),
-      physicalQuantity: sourceRows.filter(function(row) {
-        return row.shippable === true || String(row.fulfillmentType || '').toLowerCase() === 'physical';
-      }).reduce(function(sum, row) {
-        return sum + Math.max(0, Number(row.quantity || 0) || 0);
-      }, 0),
-      digitalQuantity: sourceRows.filter(function(row) {
-        return String(row.fulfillmentType || '').toLowerCase() === 'digital';
-      }).reduce(function(sum, row) {
-        return sum + Math.max(0, Number(row.quantity || 0) || 0);
-      }, 0)
-    };
-  }
-
-  function buildStoreOrdersLocalAttendance(rows) {
-    var groups = new Map();
-    var orderTokens = new Set();
-    (Array.isArray(rows) ? rows : []).filter(isStoreOrdersTicketLikeRow).forEach(function(row) {
-      var key = [
-        row.productId || row.sku || row.itemId || '',
-        row.variantId || row.variantLabel || '',
-        row.fulfillmentType || '',
-        row.eventStartsAt || '',
-        row.eventVenue || '',
-        row.eventAddress || '',
-        row.itemName || ''
-      ].join('|');
-      var group = groups.get(key) || {
-        productId: row.productId || '',
-        variantId: row.variantId || '',
-        itemName: row.itemName || '',
-        variantLabel: row.variantLabel || '',
-        fulfillmentType: row.fulfillmentType || '',
-        eventStartsAt: row.eventStartsAt || '',
-        eventVenue: row.eventVenue || '',
-        eventAddress: row.eventAddress || '',
-        quantity: 0,
-        checkedInQuantity: 0,
-        orderTokens: new Set()
-      };
-      var quantity = Math.max(0, Number(row.quantity || 0) || 0);
-      group.quantity += quantity;
-      group.checkedInQuantity += Math.max(0, Number(row.checkedInQuantity || 0) || 0);
-      if (row.orderToken) {
-        group.orderTokens.add(row.orderToken);
-        orderTokens.add(row.orderToken);
-      }
-      groups.set(key, group);
-    });
-
-    var events = Array.from(groups.values()).map(function(group) {
-      var quantity = Math.max(0, Number(group.quantity || 0) || 0);
-      var checkedInQuantity = Math.max(0, Number(group.checkedInQuantity || 0) || 0);
-      return {
-        productId: group.productId,
-        variantId: group.variantId,
-        itemName: group.itemName,
-        variantLabel: group.variantLabel,
-        fulfillmentType: group.fulfillmentType,
-        eventStartsAt: group.eventStartsAt,
-        eventVenue: group.eventVenue,
-        eventAddress: group.eventAddress,
-        quantity: quantity,
-        checkedInQuantity: checkedInQuantity,
-        uncheckedQuantity: Math.max(0, quantity - checkedInQuantity),
-        checkedInRate: quantity > 0 ? Math.round((checkedInQuantity / quantity) * 100) : 0,
-        orderCount: group.orderTokens.size
-      };
-    }).sort(function(a, b) {
-      var aTime = Date.parse(a.eventStartsAt || '') || 0;
-      var bTime = Date.parse(b.eventStartsAt || '') || 0;
-      return aTime - bTime || String(a.itemName || '').localeCompare(String(b.itemName || ''));
-    });
-
-    return {
-      totals: {
-        eventCount: events.length,
-        orderCount: orderTokens.size,
-        quantity: events.reduce(function(sum, event) { return sum + Number(event.quantity || 0); }, 0),
-        checkedInQuantity: events.reduce(function(sum, event) { return sum + Number(event.checkedInQuantity || 0); }, 0),
-        uncheckedQuantity: events.reduce(function(sum, event) { return sum + Number(event.uncheckedQuantity || 0); }, 0)
-      },
-      events: events
-    };
-  }
-
-  function filterStoreOrdersPayloadForSearch(data, query) {
-    var source = data || {};
-    var orders = getStoreOrdersFromPayload(source);
-    var fulfillments = Array.isArray(source.fulfillments) ? source.fulfillments : [];
-    if (!query) {
-      return {
-        ...source,
-        orders: orders,
-        fulfillments: fulfillments
-      };
-    }
-
-    var rowsByToken = getStoreOrderRowsByToken(fulfillments);
-    var filteredOrders = orders.filter(function(order) {
-      var token = String(order?.orderToken || '').trim();
-      return storeOrderSearchText(order, rowsByToken[token] || []).includes(query);
-    });
-    var matchedTokens = new Set(filteredOrders.map(function(order) {
-      return String(order?.orderToken || '').trim();
-    }).filter(Boolean));
-    var filteredRows = fulfillments.filter(function(row) {
-      return matchedTokens.has(String(row?.orderToken || '').trim());
-    });
-    return {
-      ...source,
-      orders: filteredOrders,
-      fulfillments: filteredRows,
-      totals: buildStoreOrdersLocalTotals(filteredOrders, filteredRows),
-      attendance: buildStoreOrdersLocalAttendance(filteredRows),
-      page: {
-        ...(source.page || {}),
-        returned: filteredOrders.length,
-        matched: filteredRows.length,
-        matchedOrders: filteredOrders.length
-      }
-    };
-  }
-
   function appendStoreOrderActionControls(parent, order, rowsByToken) {
     var token = String(order?.orderToken || '').trim();
     var rows = rowsByToken[token] || [];
@@ -3612,14 +3445,20 @@
       totals: {},
       attendance: { totals: {}, events: [] }
     };
-    var filtered = filterStoreOrdersPayloadForSearch(source, query);
-    renderStoreOrders(filtered, false);
+    var normalized = {
+      ...source,
+      orders: getStoreOrdersFromPayload(source),
+      fulfillments: Array.isArray(source.fulfillments) ? source.fulfillments : []
+    };
+    renderStoreOrders(normalized, false);
     var next = $('#admin-store-orders-next');
     if (next) next.hidden = storeOrderNextCursor === null || storeOrderNextCursor === undefined;
     if (query) {
-      var visible = Array.isArray(filtered.orders) ? filtered.orders.length : 0;
-      var loaded = getStoreOrdersFromPayload(source).length;
-      setStatus(status, 'Showing ' + formatNumber(visible) + ' of ' + formatNumber(loaded) + ' loaded orders.');
+      var visible = Array.isArray(normalized.orders) ? normalized.orders.length : 0;
+      var matched = source.page && source.page.matchedOrders !== undefined
+        ? Number(source.page.matchedOrders || 0)
+        : visible;
+      setStatus(status, 'Showing ' + formatNumber(visible) + ' of ' + formatNumber(matched) + ' matching orders.');
     } else {
       setStatus(status, '');
     }
@@ -3628,22 +3467,41 @@
   function loadStoreOrders(options) {
     var opts = options || {};
     var status = $('#admin-store-orders-status');
+    var params = orderFilters(opts.cursor || 0);
+    var cacheKey = storeOrderCacheKey(params);
+    var requestId = ++storeOrderLoadRequestCounter;
+    if (!opts.force && !opts.append && storeOrderPayloadCache.has(cacheKey)) {
+      var cached = storeOrderPayloadCache.get(cacheKey);
+      storeOrdersLoaded = true;
+      storeOrderNextCursor = cached && cached.page ? cached.page.nextCursor : null;
+      currentStoreOrdersPayload = cached;
+      renderCurrentStoreOrders();
+      return Promise.resolve(cached);
+    }
+
     setStatus(status, opts.append ? 'Loading more orders...' : 'Loading Store orders...');
-    return requestJson('/admin/store/orders', { params: orderFilters(opts.cursor || 0, { includeQuery: false }) }).then(function(data) {
+    return requestJson('/admin/store/orders', { params: params }).then(function(data) {
+      if (requestId !== storeOrderLoadRequestCounter) return data;
       storeOrdersLoaded = true;
       storeOrderNextCursor = data.page ? data.page.nextCursor : null;
       currentStoreOrdersPayload = opts.append
         ? mergeStoreOrderPayload(currentStoreOrdersPayload, data)
         : data;
+      if (!opts.append) storeOrderPayloadCache.set(cacheKey, data);
       renderCurrentStoreOrders();
+      return data;
     }).catch(function(error) {
+      if (requestId !== storeOrderLoadRequestCounter) return null;
       setStatus(status, formatError(error), true);
+      return null;
     });
   }
 
   function scheduleStoreOrderRender() {
     clearTimeout(storeOrderRenderTimer);
-    storeOrderRenderTimer = setTimeout(renderCurrentStoreOrders, 75);
+    storeOrderRenderTimer = setTimeout(function() {
+      loadStoreOrders();
+    }, 350);
   }
 
   function scheduleStoreOrderLoad() {
@@ -3757,7 +3615,8 @@
       if (input) input.value = '';
       updateSnipcartImportFilename(null);
       if (Number(data.importedOrderCount || 0) > 0) {
-        return loadStoreOrders().then(function() {
+        clearStoreOrderCache();
+        return loadStoreOrders({ force: true }).then(function() {
           setStatus(status, message, Number(data.failedOrderCount || 0) > 0);
         });
       }
@@ -3776,7 +3635,7 @@
     if (filters) {
       filters.addEventListener('submit', function(event) {
         event.preventDefault();
-        renderCurrentStoreOrders();
+        loadStoreOrders({ force: true });
       });
       filters.addEventListener('change', function(event) {
         var name = event.target && event.target.name;
@@ -3839,7 +3698,8 @@
             method: 'POST',
             body: body
           }).then(function(data) {
-            return loadStoreOrders().then(function() {
+            clearStoreOrderCache();
+            return loadStoreOrders({ force: true }).then(function() {
               setStatus($('#admin-store-orders-status'), data.message || 'Download access updated.');
             });
           }).catch(function(error) {
@@ -3859,6 +3719,7 @@
             quantity: Number(button.dataset.quantity || 1)
           }
         }).then(function() {
+          clearStoreOrderCache();
           setStatus($('#admin-store-orders-status'), 'Check-in saved.');
           button.textContent = button.dataset.checkedIn === 'true' ? 'Undo check-in' : 'Check in';
           button.dataset.checkedIn = button.dataset.checkedIn === 'true' ? 'false' : 'true';

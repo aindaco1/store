@@ -181,6 +181,25 @@ describe('Store email integration', () => {
     expect(payload.html).toContain('This link works for 15 minutes.');
   });
 
+  it('resolves admin login email logos from the canonical public site base', async () => {
+    const fetchMock = mockResend();
+
+    await expect(sendAdminLoginEmail({
+      ...env,
+      SITE_BASE: 'http://127.0.0.1:4002',
+      CANONICAL_SITE_BASE: 'https://shop.dustwave.xyz',
+      EMAIL_LOGO_PATH: '/assets/images/defaults/dust-wave-square.png'
+    }, {
+      email: 'admin@example.com',
+      loginUrl: 'https://shop.dustwave.xyz/admin/?admin_login=magic-token',
+      lang: 'en'
+    })).resolves.toEqual({ sent: true });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('src="https://shop.dustwave.xyz/assets/images/defaults/dust-wave-square.png"');
+    expect(payload.html).not.toContain('src="http://127.0.0.1:4002');
+  });
+
   it('does not embed SVG logos in email clients', async () => {
     const fetchMock = mockResend();
 
