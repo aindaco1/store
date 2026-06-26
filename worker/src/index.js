@@ -290,11 +290,24 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
+const ADMIN_STORE_ORDER_INDEX_KEY = 'admin-store-orders:index:v1';
+const ADMIN_STORE_ORDER_INDEX_VERSION = 1;
+const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 10 * 60;
+const ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS = ADMIN_STORE_ORDER_INDEX_TTL_SECONDS * 1000;
 
 let adminStoreOrderScanCache = null;
+let adminStoreOrderIndexCache = null;
 
-function invalidateAdminStoreOrderScanCache() {
+function invalidateAdminStoreOrderScanCache(env = null, ctx = null) {
   adminStoreOrderScanCache = null;
+  adminStoreOrderIndexCache = null;
+  if (env?.STORE_STATE?.delete) {
+    queueBackgroundTask(
+      ctx,
+      env.STORE_STATE.delete(ADMIN_STORE_ORDER_INDEX_KEY),
+      'admin Store order index invalidation'
+    );
+  }
 }
 
 
@@ -1761,11 +1774,11 @@ export default {
       }
 
       if (path === '/admin/store/orders' && method === 'GET') {
-        return handleAdminStoreOrders(request, env);
+        return handleAdminStoreOrders(request, env, ctx);
       }
 
       if (path === '/admin/store/orders.csv' && method === 'GET') {
-        return handleAdminStoreOrdersCsv(request, env);
+        return handleAdminStoreOrdersCsv(request, env, ctx);
       }
 
       if (path === '/admin/store/orders/import-snipcart' && method === 'POST') {
@@ -1777,11 +1790,11 @@ export default {
         if (!parsedBody.ok) return parsedBody.response;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreSnipcartOrderImport(request, env, parsedBody.body || {});
+        return handleAdminStoreSnipcartOrderImport(request, env, parsedBody.body || {}, ctx);
       }
 
       if (path === '/admin/store/attendees.csv' && method === 'GET') {
-        return handleAdminStoreAttendeesCsv(request, env);
+        return handleAdminStoreAttendeesCsv(request, env, ctx);
       }
 
       if (path === '/admin/store/reconciliation.csv' && method === 'GET') {
@@ -1974,7 +1987,7 @@ export default {
         if (!parsedBody.ok) return parsedBody.response;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreOrderDownloadAccess(request, env, parsedBody.body || {});
+        return handleAdminStoreOrderDownloadAccess(request, env, parsedBody.body || {}, ctx);
       }
 
       if (path === '/admin/store/orders/check-in' && method === 'POST') {
@@ -1986,7 +1999,7 @@ export default {
         if (!parsedBody.ok) return parsedBody.response;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreOrderCheckIn(request, env, parsedBody.body || {});
+        return handleAdminStoreOrderCheckIn(request, env, parsedBody.body || {}, ctx);
       }
 
       if (path === '/admin/add-ons/inventory' && method === 'GET') {
@@ -3454,7 +3467,7 @@ async function backfillStoreOrderCustomerFromStripe(env, storedOrder = {}, expec
     const key = storageKey || getStoreOrderStorageKey(updatedOrder.orderToken || updatedOrder.orderDraft?.orderToken);
     if (key) {
       await env.STORE_STATE.put(key, JSON.stringify(updatedOrder));
-      invalidateAdminStoreOrderScanCache();
+      invalidateAdminStoreOrderScanCache(env);
     }
     return updatedOrder;
   } catch (error) {
@@ -5899,6 +5912,67 @@ async function listAdminStoreOrderKeys(env) {
   return { ok: true, keys: keys.slice(0, 5000), listCalls, truncated };
 }
 
+function normalizeAdminStoreOrderIndex(index = {}) {
+  if (!index || typeof index !== 'object' || Array.isArray(index)) return null;
+  if (Number(index.version || 0) !== ADMIN_STORE_ORDER_INDEX_VERSION) return null;
+  const generatedAtMs = parseTimestampMs(index.generatedAt || index.createdAt || '');
+  if (!Number.isFinite(generatedAtMs)) return null;
+  if (Date.now() - generatedAtMs > ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS) return null;
+  const orders = Array.isArray(index.orders)
+    ? index.orders.filter((order) => STORE_ORDER_TOKEN_PATTERN.test(String(order?.orderToken || '')))
+    : [];
+  if (!orders.length && Number(index.indexed || 0) > 0) return null;
+  return {
+    orders: orders.sort(compareAdminStoreOrders),
+    scanned: Math.max(0, Number(index.scanned || 0) || 0),
+    indexed: Math.max(orders.length, Number(index.indexed || orders.length) || orders.length),
+    listCalls: Math.max(0, Number(index.listCalls || 0) || 0),
+    truncated: index.truncated === true,
+    generatedAt: new Date(generatedAtMs).toISOString(),
+    ageMs: Math.max(0, Date.now() - generatedAtMs)
+  };
+}
+
+async function readAdminStoreOrderIndex(env) {
+  const memoryIndex = normalizeAdminStoreOrderIndex(adminStoreOrderIndexCache);
+  if (memoryIndex) {
+    return {
+      ok: true,
+      ...memoryIndex,
+      source: 'memory_index'
+    };
+  }
+
+  if (!env?.STORE_STATE?.get) return { ok: false, skipped: 'store_state_unavailable' };
+  const storedIndex = await env.STORE_STATE.get(ADMIN_STORE_ORDER_INDEX_KEY, { type: 'json' });
+  const normalized = normalizeAdminStoreOrderIndex(storedIndex);
+  if (!normalized) return { ok: false, skipped: 'missing_or_stale_index' };
+  adminStoreOrderIndexCache = storedIndex;
+  return {
+    ok: true,
+    ...normalized,
+    source: 'kv_index'
+  };
+}
+
+async function writeAdminStoreOrderIndex(env, data = {}) {
+  if (!env?.STORE_STATE?.put || !Array.isArray(data.orders)) return;
+  const generatedAt = data.generatedAt || new Date().toISOString();
+  const index = {
+    version: ADMIN_STORE_ORDER_INDEX_VERSION,
+    generatedAt,
+    scanned: Math.max(0, Number(data.scanned || 0) || 0),
+    indexed: Math.max(0, Number(data.indexed || data.orders.length) || data.orders.length),
+    listCalls: Math.max(0, Number(data.listCalls || 0) || 0),
+    truncated: data.truncated === true,
+    orders: data.orders
+  };
+  adminStoreOrderIndexCache = index;
+  await env.STORE_STATE.put(ADMIN_STORE_ORDER_INDEX_KEY, JSON.stringify(index), {
+    expirationTtl: ADMIN_STORE_ORDER_INDEX_TTL_SECONDS
+  });
+}
+
 async function readAdminStoreOrderScan(env, options = {}) {
   const nowMs = Date.now();
   if (
@@ -5915,6 +5989,27 @@ async function readAdminStoreOrderScan(env, options = {}) {
         ttlMs: ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS
       }
     };
+  }
+
+  if (options.force !== true) {
+    const indexed = await readAdminStoreOrderIndex(env);
+    if (indexed.ok) {
+      return {
+        ok: true,
+        orders: indexed.orders,
+        scanned: indexed.scanned,
+        indexed: indexed.indexed,
+        listCalls: indexed.listCalls,
+        truncated: indexed.truncated,
+        generatedAt: indexed.generatedAt,
+        cache: {
+          hit: true,
+          source: indexed.source,
+          ageMs: indexed.ageMs,
+          ttlMs: ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS
+        }
+      };
+    }
   }
 
   const listed = await listAdminStoreOrderKeys(env);
@@ -5946,6 +6041,11 @@ async function readAdminStoreOrderScan(env, options = {}) {
     expiresAtMs: Date.now() + ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS,
     data
   };
+  queueBackgroundTask(
+    options.ctx,
+    writeAdminStoreOrderIndex(env, data),
+    'admin Store order index write'
+  );
 
   return {
     ok: true,
@@ -8554,7 +8654,8 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   if (!auth.ok) return { ok: false, response: auth.response };
 
   const scannedOrders = await readAdminStoreOrderScan(env, {
-    force: options.forceScan === true
+    force: options.forceScan === true,
+    ctx: options.ctx || null
   });
   if (!scannedOrders.ok) {
     return { ok: false, response: privateJsonResponse({ error: scannedOrders.error }, scannedOrders.status || 503, env) };
@@ -8586,6 +8687,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
     ? cursorOffset + pageOrders.length
     : null;
 
+  const scanCache = scannedOrders.cache || null;
   return {
     ok: true,
     payload: {
@@ -8618,15 +8720,17 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
       },
       filters,
       writeBudget: adminReadBudget({
-        kvListExpected: scannedOrders.cache?.hit ? 0 : (scannedOrders.listCalls || 1),
-        kvReadsExpected: scannedOrders.cache?.hit ? 0 : scannedOrders.scanned
+        kvListExpected: scanCache?.hit ? 0 : (scannedOrders.listCalls || 1),
+        kvReadsExpected: scanCache?.hit
+          ? (scanCache.source === 'kv_index' ? 1 : 0)
+          : scannedOrders.scanned
       }),
       generatedAt: new Date().toISOString()
     }
   };
 }
 
-async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
+async function handleAdminStoreSnipcartOrderImport(request, env, body = {}, ctx = null) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
     accessScope: STORE_ADMIN_SCOPE,
     requireCsrf: true
@@ -8719,7 +8823,7 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
       });
     }
   }
-  if (importedOrders.length > 0) invalidateAdminStoreOrderScanCache();
+  if (importedOrders.length > 0) invalidateAdminStoreOrderScanCache(env, ctx);
 
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'store_orders:snipcart_import',
@@ -8765,8 +8869,8 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
   }, failures.length ? 207 : 200, env);
 }
 
-async function handleAdminStoreOrders(request, env) {
-  const built = await buildAdminStoreOrdersPayload(request, env);
+async function handleAdminStoreOrders(request, env, ctx = null) {
+  const built = await buildAdminStoreOrdersPayload(request, env, { ctx });
   if (!built.ok) return built.response;
   return privateJsonResponse(built.payload, 200, env);
 }
@@ -9342,15 +9446,15 @@ function storeAttendeeRowsCsv(rows = []) {
   return rebuildCsvReport({ header, rows: csvRows }).csv;
 }
 
-async function handleAdminStoreOrdersCsv(request, env) {
-  const built = await buildAdminStoreOrdersPayload(request, env, { paginate: false });
+async function handleAdminStoreOrdersCsv(request, env, ctx = null) {
+  const built = await buildAdminStoreOrdersPayload(request, env, { paginate: false, ctx });
   if (!built.ok) return built.response;
   const dateKey = getPlatformDateKey(env, new Date());
   return csvResponse(storeFulfillmentRowsCsv(built.payload.fulfillments), `store-orders-${dateKey}.csv`, env);
 }
 
-async function handleAdminStoreAttendeesCsv(request, env) {
-  const built = await buildAdminStoreOrdersPayload(request, env, { paginate: false });
+async function handleAdminStoreAttendeesCsv(request, env, ctx = null) {
+  const built = await buildAdminStoreOrdersPayload(request, env, { paginate: false, ctx });
   if (!built.ok) return built.response;
   const dateKey = getPlatformDateKey(env, new Date());
   return csvResponse(storeAttendeeRowsCsv(built.payload.fulfillments), `store-attendees-${dateKey}.csv`, env);
@@ -9660,7 +9764,7 @@ function normalizeAdminStoreDownloadAccessIntent(body = {}, item = {}) {
   };
 }
 
-async function handleAdminStoreOrderDownloadAccess(request, env, body = {}) {
+async function handleAdminStoreOrderDownloadAccess(request, env, body = {}, ctx = null) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
     accessScope: STORE_ADMIN_SCOPE,
     requireCsrf: true
@@ -9708,7 +9812,7 @@ async function handleAdminStoreOrderDownloadAccess(request, env, body = {}) {
   };
   const storageKey = getStoreOrderStorageKey(orderToken);
   await env.STORE_STATE.put(storageKey, JSON.stringify(updatedOrder));
-  invalidateAdminStoreOrderScanCache();
+  invalidateAdminStoreOrderScanCache(env, ctx);
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'store_order:download_access',
     adminEmail: auth.user.email,
@@ -9739,7 +9843,7 @@ async function handleAdminStoreOrderDownloadAccess(request, env, body = {}) {
   }, 200, env);
 }
 
-async function handleAdminStoreOrderCheckIn(request, env, body = {}) {
+async function handleAdminStoreOrderCheckIn(request, env, body = {}, ctx = null) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
     accessScope: STORE_ADMIN_SCOPE,
     requireCsrf: true
@@ -9816,7 +9920,7 @@ async function handleAdminStoreOrderCheckIn(request, env, body = {}) {
   };
   const storageKey = getStoreOrderStorageKey(orderToken);
   await env.STORE_STATE.put(storageKey, JSON.stringify(updatedOrder));
-  invalidateAdminStoreOrderScanCache();
+  invalidateAdminStoreOrderScanCache(env, ctx);
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'store_order:check_in',
     adminEmail: auth.user.email,
@@ -10134,7 +10238,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       storeOrderStorageKey,
       JSON.stringify(storedOrder)
     );
-    invalidateAdminStoreOrderScanCache();
+    invalidateAdminStoreOrderScanCache(env, ctx);
     queueStoreOrderEmailIndexUpsert(ctx, env, storedOrder);
     queueStoreOrderEmailDelivery(ctx, env, storedOrder);
     queueStoreEventRemindersQuietly(ctx, env, storedOrder);
@@ -10274,7 +10378,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     JSON.stringify(storedOrder),
     { expirationTtl: STORE_ORDER_DRAFT_TTL_SECONDS }
   );
-  invalidateAdminStoreOrderScanCache();
+  invalidateAdminStoreOrderScanCache(env, ctx);
   if (abandonedCartReminder) {
     queueAbandonedCheckoutFollowupQuietly(ctx, env, storedOrder);
   }
@@ -10512,7 +10616,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   delete updatedOrder.orderDraft.failedAt;
 
   await env.STORE_STATE.put(loaded.storageKey, JSON.stringify(updatedOrder));
-  invalidateAdminStoreOrderScanCache();
+  invalidateAdminStoreOrderScanCache(env, ctx);
   await deleteAbandonedCheckoutFollowup(env, metadata.orderToken, { reason: 'completed' });
   queueStoreOrderEmailIndexUpsert(ctx, env, updatedOrder);
   queueStoreOrderEmailDelivery(ctx, env, updatedOrder);
@@ -10530,7 +10634,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   };
 }
 
-async function failStorePaymentIntentOrder(paymentIntent, env) {
+async function failStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   const metadata = getStorePaymentIntentMetadata(paymentIntent);
   const loaded = await loadStorePaymentOrder(env, metadata.orderToken);
   if (!loaded.ok) return loaded;
@@ -10581,7 +10685,7 @@ async function failStorePaymentIntentOrder(paymentIntent, env) {
     JSON.stringify(updatedOrder),
     { expirationTtl: STORE_ORDER_DRAFT_TTL_SECONDS }
   );
-  invalidateAdminStoreOrderScanCache();
+  invalidateAdminStoreOrderScanCache(env, ctx);
 
   return {
     ok: true,
@@ -10839,7 +10943,7 @@ async function handleStripeWebhook(request, env, ctx) {
       observedOrderId = metadata.orderToken;
       const result = event.type === 'payment_intent.succeeded'
         ? await confirmStorePaymentIntentOrder(paymentIntent, env, ctx)
-        : await failStorePaymentIntentOrder(paymentIntent, env);
+        : await failStorePaymentIntentOrder(paymentIntent, env, ctx);
 
       if (!result.ok) {
         console.error('Store PaymentIntent webhook rejected:', {
