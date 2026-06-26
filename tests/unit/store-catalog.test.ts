@@ -36,6 +36,35 @@ describe('Store catalog snapshot and validation', () => {
     );
   });
 
+  it('keeps archived products visible to admin catalog data but unavailable for checkout', () => {
+    const archivedProduct = findStoreProduct('annihilation-1', STORE_CATALOG_SNAPSHOT);
+    expect(archivedProduct).toMatchObject({
+      id: 'annihilation-1',
+      status: 'archived',
+      public: false
+    });
+
+    const result = validateStoreOrderDraft({
+      items: [
+        {
+          id: 'annihilation-1',
+          price: 10,
+          quantity: 1
+        }
+      ]
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'product_unavailable',
+          productId: 'annihilation-1'
+        })
+      ])
+    );
+  });
+
   it('validates Store cart items against product IDs, variants, SKUs, and catalog prices', () => {
     const result = validateStoreOrderDraft({
       items: [

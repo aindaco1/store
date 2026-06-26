@@ -32,6 +32,7 @@
  *   POST /admin/store/orders/check-in - Mark Store ticket/RSVP check-in state
  *   GET  /admin/store/products   - Read Store catalog products and variants
  *   GET  /admin/store/products/media - Read reusable Store product media references
+ *   GET  /admin/store/products/address-lookup - Look up a public event address
  *   POST /admin/store/products/preview - Render a Store product editor preview
  *   POST /admin/store/products/publish - Publish Store product catalog edits
  *   POST /admin/store/products/bulk-publish - Publish bulk Store product catalog edits
@@ -51,7 +52,7 @@
  *   GET  /admin/cron/status      - Check cron heartbeat status
  */
 
-import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
+import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventReminderEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
@@ -62,6 +63,7 @@ import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { verifyTurnstile } from './turnstile.js';
 import {
+  DEFAULT_SITE_BASE,
   getCheckoutProvider,
   getCheckoutUiMode,
   getSiteBase,
@@ -237,6 +239,17 @@ const ABANDONED_CART_SENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const ABANDONED_CART_SUPPRESSION_TTL_SECONDS = 400 * 24 * 60 * 60;
 const ABANDONED_CART_DEFAULT_DELAY_MS = 6 * 60 * 60 * 1000;
 const ABANDONED_CART_DEFAULT_BATCH_SIZE = 10;
+const STORE_EVENT_REMINDER_PREFIX = 'store-event-reminder:';
+const STORE_EVENT_REMINDER_SENT_PREFIX = 'store-event-reminder-sent:';
+const STORE_EVENT_REMINDER_QUEUE_STATE_KEY = 'store-event-reminder-queue:v1';
+const STORE_EVENT_REMINDER_TTL_SECONDS = 400 * 24 * 60 * 60;
+const STORE_EVENT_REMINDER_DEFAULT_BATCH_SIZE = 20;
+const STORE_EVENT_REMINDER_OFFSETS = [
+  { key: '1w', label: '1 week before', ms: 7 * 24 * 60 * 60 * 1000 },
+  { key: '1d', label: '1 day before', ms: 24 * 60 * 60 * 1000 },
+  { key: '6h', label: '6 hours before', ms: 6 * 60 * 60 * 1000 },
+  { key: '1h', label: '1 hour before', ms: 60 * 60 * 1000 }
+];
 const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 const ADMIN_STORE_PRODUCT_STATUSES = new Set(['active', 'draft', 'archived', 'sold_out']);
 const ADMIN_STORE_TAX_CATEGORIES = new Set(['admission', 'digital', 'exempt', 'standard']);
@@ -891,6 +904,7 @@ const RATE_LIMITS = {
   complete: { prefix: 'rl:complete', limit: 12, windowSeconds: 60 },    // 12 recovery attempts/min/order
   abandon: { prefix: 'rl:abandon', limit: 12, windowSeconds: 60 },      // 12 abandon attempts/min/order
   admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
+  adminAddressLookup: { prefix: 'rl:admin-address-lookup', limit: 30, windowSeconds: 60 },
   orderRead: { prefix: 'rl:order-read', limit: 120, windowSeconds: 60 },   // 120 order reads/min/IP
   orderLookup: { prefix: 'rl:order-lookup', limit: 8, windowSeconds: 60 }   // 8 order lookup requests/min/IP
 };
@@ -1804,6 +1818,15 @@ export default {
         return handleAdminStoreProductMedia(request, env);
       }
 
+      if (path === '/admin/store/products/address-lookup' && method === 'GET') {
+        const rl = await checkRateLimit(request, env, {
+          ...RATE_LIMITS.adminAddressLookup,
+          privateResponse: true
+        });
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreProductAddressLookup(request, env);
+      }
+
       if (path === '/admin/store/products/preview' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
@@ -2054,6 +2077,22 @@ export default {
         }), { expirationTtl: 604800 });
       }
     }
+
+    try {
+      const eventReminderResults = await processStoreEventReminders(env, now);
+      if (env.STORE_STATE && eventReminderResults.attempted) {
+        await env.STORE_STATE.put('cron:lastEventReminderRun', now.toISOString(), { expirationTtl: 172800 });
+      }
+      console.log('Store event reminder cron complete:', eventReminderResults);
+    } catch (err) {
+      console.error('Store event reminder cron failed:', err);
+      if (env.STORE_STATE) {
+        await env.STORE_STATE.put('cron:lastError', JSON.stringify({
+          at: new Date().toISOString(),
+          error: err?.message || String(err)
+        }), { expirationTtl: 604800 });
+      }
+    }
   }
 };
 
@@ -2066,17 +2105,21 @@ function getStoreOrderEmailSentKey(orderToken) {
   return `store-order-email-sent:${String(orderToken || '').trim()}`;
 }
 
-function buildStoreOrderEmailPayload(storedOrder = {}) {
+async function buildStoreOrderEmailPayload(env, storedOrder = {}) {
   const orderDraft = storedOrder.orderDraft || {};
   const email = String(orderDraft.customer?.email || '').trim().toLowerCase();
   if (!email || !isValidEmail(email)) return null;
+  const attachments = isStoreOrderFulfillmentReady(storedOrder)
+    ? await buildStoreOrderEventEmailAttachments(env, storedOrder, { calendarMethod: 'REQUEST' })
+    : [];
 
   return {
     email,
     orderToken: storedOrder.orderToken || orderDraft.orderToken || '',
     orderDraft,
     payment: storedOrder.payment || {},
-    preferredLang: orderDraft.preferredLang || storedOrder.preferredLang || DEFAULT_I18N_LANG
+    preferredLang: orderDraft.preferredLang || storedOrder.preferredLang || DEFAULT_I18N_LANG,
+    attachments
   };
 }
 
@@ -2103,7 +2146,7 @@ async function attemptStoreOrderEmailDelivery(env, storedOrder = {}) {
     return { ok: true, skipped: 'email_not_configured' };
   }
 
-  const payload = buildStoreOrderEmailPayload(storedOrder);
+  const payload = await buildStoreOrderEmailPayload(env, storedOrder);
   if (!orderToken || !payload) {
     return { ok: true, skipped: 'missing_email' };
   }
@@ -2171,6 +2214,8 @@ const STORE_ORDER_LOOKUP_SCOPE = 'store_order_lookup';
 const STORE_FULFILLMENT_TOKEN_TTL_SECONDS = 72 * 60 * 60;
 const STORE_DOWNLOAD_ACCESS_DEFAULT_HOURS = 72;
 const STORE_DOWNLOAD_ACCESS_MAX_HOURS = 24 * 365;
+const STORE_EVENT_ADDRESS_LOOKUP_CACHE_PREFIX = 'store-event-address-lookup:';
+const STORE_EVENT_ADDRESS_LOOKUP_CACHE_TTL_SECONDS = 24 * 60 * 60;
 
 function normalizeStoreOrderLookupEmail(value) {
   const email = String(value || '').trim().toLowerCase();
@@ -2400,6 +2445,249 @@ async function writeAbandonedCartQueueState(env, hasPending, nextDueAt = '') {
   }), {
     expirationTtl: hasPending === true ? ABANDONED_CART_TTL_SECONDS : IDLE_QUEUE_RECHECK_TTL_SECONDS
   });
+}
+
+function normalizeStoreEventReminderQueueState(value) {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    hasPending: value.hasPending === true,
+    nextDueAt: String(value.nextDueAt || '')
+  };
+}
+
+async function writeStoreEventReminderQueueState(env, hasPending, nextDueAt = '') {
+  if (!env?.STORE_STATE) return;
+  await env.STORE_STATE.put(STORE_EVENT_REMINDER_QUEUE_STATE_KEY, JSON.stringify({
+    version: 1,
+    hasPending: hasPending === true,
+    nextDueAt: hasPending === true ? String(nextDueAt || '') : '',
+    updatedAt: new Date().toISOString()
+  }), {
+    expirationTtl: hasPending === true ? STORE_EVENT_REMINDER_TTL_SECONDS : IDLE_QUEUE_RECHECK_TTL_SECONDS
+  });
+}
+
+function getStoreEventReminderBatchSize(env = {}) {
+  const raw = Number.parseInt(String(env.STORE_EVENT_REMINDER_BATCH_SIZE || ''), 10);
+  return Math.max(1, Math.min(100, Number.isFinite(raw) ? raw : STORE_EVENT_REMINDER_DEFAULT_BATCH_SIZE));
+}
+
+function getStoreEventReminderKey(record = {}) {
+  const dueMs = parseTimestampMs(record.sendAfter) || 0;
+  return `${STORE_EVENT_REMINDER_PREFIX}${String(dueMs).padStart(13, '0')}:${normalizeStoreFulfillmentId(record.orderToken)}:${normalizeStoreFulfillmentId(record.itemId)}:${normalizeStoreFulfillmentId(record.offsetKey)}`;
+}
+
+function getStoreEventReminderSentKey(orderToken, itemId, offsetKey) {
+  return `${STORE_EVENT_REMINDER_SENT_PREFIX}${normalizeStoreFulfillmentId(orderToken)}:${normalizeStoreFulfillmentId(itemId)}:${normalizeStoreFulfillmentId(offsetKey)}`;
+}
+
+function buildStoreOrderSuccessUrl(env = {}, orderToken = '') {
+  const siteBase = getSiteBase(env) || getWorkerBase(env) || DEFAULT_SITE_BASE;
+  try {
+    const url = new URL('/order-success/', siteBase);
+    if (orderToken) url.searchParams.set('orderToken', orderToken);
+    return url.href;
+  } catch {
+    return '';
+  }
+}
+
+function getStoreEventReminderRetryDelayMs(attempts) {
+  return Math.min(
+    24 * 60 * 60 * 1000,
+    Math.max(15 * 60 * 1000, (2 ** Math.min(Number(attempts || 0) || 0, 6)) * 15 * 60 * 1000)
+  );
+}
+
+async function buildStoreEventReminderRecords(storedOrder = {}, now = new Date()) {
+  const orderDraft = storedOrder.orderDraft || {};
+  const orderToken = String(storedOrder.orderToken || orderDraft.orderToken || '').trim();
+  const email = normalizeAbandonedCartEmail(orderDraft.customer?.email);
+  const items = Array.isArray(orderDraft.items) ? orderDraft.items : [];
+  const nowMs = now instanceof Date && Number.isFinite(now.getTime()) ? now.getTime() : Date.now();
+  if (!orderToken || !email || !isStoreOrderFulfillmentReady(storedOrder)) return [];
+
+  const emailHash = await sha256HexString(email);
+  const records = [];
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index] || {};
+    if (!isStoreTicketLikeItem(item)) continue;
+
+    const event = summarizeStoreEventDetails(item.eventDetails);
+    const startsAtMs = parseTimestampMs(event?.startsAt);
+    if (!Number.isFinite(startsAtMs) || startsAtMs <= nowMs) continue;
+
+    const itemId = getStoreFulfillmentId(item, index);
+    for (const offset of STORE_EVENT_REMINDER_OFFSETS) {
+      const sendAfterMs = startsAtMs - offset.ms;
+      if (sendAfterMs <= nowMs) continue;
+      records.push({
+        version: 1,
+        status: 'pending',
+        orderToken,
+        itemId,
+        email,
+        emailHash,
+        preferredLang: orderDraft.preferredLang || storedOrder.preferredLang || DEFAULT_I18N_LANG,
+        productId: item.productId || '',
+        variantId: item.variantId || '',
+        sku: item.sku || '',
+        eventTitle: item.name || item.sku || 'Store event',
+        startsAt: event?.startsAt || '',
+        endsAt: event?.endsAt || '',
+        venue: event?.venue || '',
+        address: event?.address || '',
+        quantity: Math.max(1, Number(item.quantity || 1) || 1),
+        offsetKey: offset.key,
+        offsetLabel: offset.label,
+        sendAfter: new Date(sendAfterMs).toISOString(),
+        createdAt: new Date(nowMs).toISOString(),
+        attempts: 0,
+        lastError: ''
+      });
+    }
+  }
+  return records;
+}
+
+async function queueStoreEventReminders(env, storedOrder = {}, now = new Date()) {
+  if (!env?.STORE_STATE) return { queued: 0, skipped: 0 };
+  const records = await buildStoreEventReminderRecords(storedOrder, now);
+  let queued = 0;
+  let skipped = 0;
+  let nextDueAt = '';
+
+  for (const record of records) {
+    const sentKey = getStoreEventReminderSentKey(record.orderToken, record.itemId, record.offsetKey);
+    if (await env.STORE_STATE.get(sentKey)) {
+      skipped += 1;
+      continue;
+    }
+    const key = getStoreEventReminderKey(record);
+    await env.STORE_STATE.put(key, JSON.stringify(record), { expirationTtl: STORE_EVENT_REMINDER_TTL_SECONDS });
+    queued += 1;
+    if (!nextDueAt || Date.parse(record.sendAfter) < Date.parse(nextDueAt)) nextDueAt = record.sendAfter;
+  }
+
+  if (queued > 0) await writeStoreEventReminderQueueState(env, true, nextDueAt);
+  return { queued, skipped, nextDueAt };
+}
+
+function queueStoreEventRemindersQuietly(ctx, env, storedOrder = {}) {
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  queueBackgroundTask(
+    ctx,
+    queueStoreEventReminders(env, storedOrder).catch((error) => {
+      console.error('Store event reminder queue failed:', {
+        orderToken,
+        error: error?.message || String(error)
+      });
+    }),
+    `store event reminders (${orderToken || 'unknown'})`
+  );
+}
+
+async function processStoreEventReminders(env, now = new Date()) {
+  if (!env?.STORE_STATE) {
+    return { attempted: false, sent: 0, skipped: 0, failed: 0, checked: 0, skippedReason: 'storage_not_configured' };
+  }
+  const queueState = normalizeStoreEventReminderQueueState(
+    await env.STORE_STATE.get(STORE_EVENT_REMINDER_QUEUE_STATE_KEY, { type: 'json' })
+  );
+  if (queueState && !queueState.hasPending) {
+    return { attempted: false, sent: 0, skipped: 0, failed: 0, checked: 0, skippedReason: 'idle' };
+  }
+  const nextDueMs = queueState?.nextDueAt ? Date.parse(queueState.nextDueAt) : 0;
+  if (Number.isFinite(nextDueMs) && nextDueMs > now.getTime()) {
+    return { attempted: false, sent: 0, skipped: 0, failed: 0, checked: 0, skippedReason: 'not_due', nextDueAt: queueState.nextDueAt };
+  }
+
+  const listing = await env.STORE_STATE.list({
+    prefix: STORE_EVENT_REMINDER_PREFIX,
+    limit: getStoreEventReminderBatchSize(env)
+  });
+  const keys = Array.isArray(listing?.keys) ? listing.keys : [];
+  const results = { attempted: keys.length > 0, sent: 0, skipped: 0, failed: 0, checked: 0 };
+  let hasPending = listing?.list_complete === false;
+  let nextDueAt = '';
+
+  for (const keyInfo of keys) {
+    const key = String(keyInfo?.name || '').trim();
+    if (!key) continue;
+    const record = await env.STORE_STATE.get(key, { type: 'json' });
+    results.checked += 1;
+
+    if (!record?.orderToken || !record?.itemId || !record?.offsetKey || !normalizeAbandonedCartEmail(record.email)) {
+      await env.STORE_STATE.delete(key);
+      results.skipped += 1;
+      continue;
+    }
+
+    const sendAfterMs = Date.parse(record.sendAfter || '');
+    if (Number.isFinite(sendAfterMs) && sendAfterMs > now.getTime()) {
+      hasPending = true;
+      if (!nextDueAt || sendAfterMs < Date.parse(nextDueAt)) nextDueAt = new Date(sendAfterMs).toISOString();
+      continue;
+    }
+
+    const sentKey = getStoreEventReminderSentKey(record.orderToken, record.itemId, record.offsetKey);
+    if (await env.STORE_STATE.get(sentKey)) {
+      await env.STORE_STATE.delete(key);
+      results.skipped += 1;
+      continue;
+    }
+
+    const storedOrder = await env.STORE_STATE.get(getStoreOrderStorageKey(record.orderToken), { type: 'json' });
+    const match = storedOrder ? findStoreFulfillmentItem(storedOrder, record.itemId) : null;
+    const item = match?.item || null;
+    const event = item ? summarizeStoreEventDetails(item.eventDetails) : null;
+    const eventStartMs = parseTimestampMs(event?.startsAt);
+    if (!storedOrder || !isStoreOrderFulfillmentReady(storedOrder) || !item || !isStoreTicketLikeItem(item) || !Number.isFinite(eventStartMs) || eventStartMs <= now.getTime()) {
+      await env.STORE_STATE.delete(key);
+      results.skipped += 1;
+      continue;
+    }
+
+    try {
+      const attachments = await buildStoreEventEmailAttachments(env, storedOrder, item, match.itemId, { calendarMethod: 'REQUEST' });
+      const result = await sendStoreEventReminderEmail(env, {
+        email: record.email,
+        orderToken: record.orderToken,
+        orderUrl: buildStoreOrderSuccessUrl(env, record.orderToken),
+        eventTitle: item.name || record.eventTitle || 'Store event',
+        eventTime: formatStoreEventDisplay(event, env),
+        venue: event?.venue || record.venue || '',
+        address: event?.address || record.address || '',
+        reminderLabel: record.offsetLabel || '',
+        preferredLang: record.preferredLang || DEFAULT_I18N_LANG,
+        attachments
+      });
+
+      if (!result?.sent) throw new Error(result?.reason || 'Event reminder email was not sent');
+
+      await env.STORE_STATE.put(sentKey, now.toISOString(), { expirationTtl: STORE_EVENT_REMINDER_TTL_SECONDS });
+      await env.STORE_STATE.delete(key);
+      results.sent += 1;
+    } catch (error) {
+      const attempts = Number(record.attempts || 0) + 1;
+      const retryDelayMs = getStoreEventReminderRetryDelayMs(attempts);
+      record.attempts = attempts;
+      record.lastError = String(error?.message || 'Event reminder send failed').slice(0, 300);
+      record.sendAfter = new Date(now.getTime() + retryDelayMs).toISOString();
+      await env.STORE_STATE.delete(key);
+      await env.STORE_STATE.put(getStoreEventReminderKey(record), JSON.stringify(record), { expirationTtl: STORE_EVENT_REMINDER_TTL_SECONDS });
+      hasPending = true;
+      nextDueAt = nextDueAt && Date.parse(nextDueAt) < Date.parse(record.sendAfter) ? nextDueAt : record.sendAfter;
+      results.failed += 1;
+    }
+  }
+
+  if (keys.length === 0 && listing?.list_complete !== false) {
+    await writeStoreEventReminderQueueState(env, false);
+  } else {
+    await writeStoreEventReminderQueueState(env, hasPending, nextDueAt);
+  }
+  return results;
 }
 
 async function signAbandonedCartToken(env, payload = {}, ttlDays = 14) {
@@ -3237,7 +3525,7 @@ function queueStoreOrderLookupEmailDelivery(ctx, env, payload = {}) {
   const email = normalizeStoreOrderLookupEmail(payload.email);
   queueBackgroundTask(
     ctx,
-    sendStoreOrderLookupEmail(env, {
+    deliverStoreOrderLookupEmail(env, {
       ...payload,
       email
     }).then((result) => {
@@ -3250,6 +3538,18 @@ function queueStoreOrderLookupEmailDelivery(ctx, env, payload = {}) {
     }),
     `store order lookup email (${email || 'unknown'})`
   );
+}
+
+async function deliverStoreOrderLookupEmail(env, payload = {}) {
+  const email = normalizeStoreOrderLookupEmail(payload.email);
+  return sendStoreOrderLookupEmail(env, {
+    ...payload,
+    email
+  });
+}
+
+function shouldDeliverStoreOrderLookupInline(request, env = {}) {
+  return getAppMode(env) === 'test' || !isProductionWorkerRequest(request, env);
 }
 
 async function handleStoreOrderLookupRequest(request, env, ctx = null) {
@@ -3278,19 +3578,48 @@ async function handleStoreOrderLookupRequest(request, env, ctx = null) {
     ? await env.STORE_STATE.get(indexKey, { type: 'json' })
     : null;
   const orders = Array.isArray(index?.orders) ? index.orders : [];
+  const inlineDelivery = shouldDeliverStoreOrderLookupInline(request, env);
+  let debug = inlineDelivery
+    ? {
+        orderLookup: {
+          matchedOrders: orders.length,
+          deliverySent: null,
+          deliveryReason: '',
+          deliveryError: '',
+          lookupUrl: ''
+        }
+      }
+    : null;
 
   if (orders.length > 0) {
     const tokenResult = await createStoreOrderLookupToken(env, emailHash);
     if (tokenResult.ok) {
       const preferredLang = normalizePreferredLang(orders[0]?.preferredLang);
-      queueStoreOrderLookupEmailDelivery(ctx, env, {
+      const deliveryPayload = {
         email,
         emailHash,
         lookupUrl: getLocalizedSiteUrl(env, `/orders/?token=${encodeURIComponent(tokenResult.token)}`, preferredLang),
         orderCount: orders.length,
         preferredLang
-      });
+      };
+      if (inlineDelivery) {
+        debug.orderLookup.lookupUrl = deliveryPayload.lookupUrl;
+        try {
+          const deliveryResult = await deliverStoreOrderLookupEmail(env, deliveryPayload);
+          debug.orderLookup.deliverySent = deliveryResult?.sent !== false;
+          debug.orderLookup.deliveryReason = deliveryResult?.reason || '';
+        } catch (error) {
+          debug.orderLookup.deliverySent = false;
+          debug.orderLookup.deliveryError = error?.message || 'Email delivery failed.';
+        }
+      } else {
+        queueStoreOrderLookupEmailDelivery(ctx, env, deliveryPayload);
+      }
     } else {
+      if (debug) {
+        debug.orderLookup.deliverySent = false;
+        debug.orderLookup.deliveryError = tokenResult.error || 'Lookup token was not created.';
+      }
       console.error('Store order lookup token not created:', {
         emailHash,
         error: tokenResult.error
@@ -3298,10 +3627,12 @@ async function handleStoreOrderLookupRequest(request, env, ctx = null) {
     }
   }
 
-  return privateJsonResponse({
+  const responseBody = {
     ok: true,
     message: getStoreOrderLookupGenericMessage(env)
-  }, 200, env);
+  };
+  if (debug) responseBody.debug = debug;
+  return privateJsonResponse(responseBody, 200, env);
 }
 
 async function handleStoreOrderLookupConsume(request, env) {
@@ -3566,6 +3897,65 @@ function buildStoreFulfillmentUrl(request, env, orderToken, section, itemId, suf
   const url = new URL(path, base || request.url);
   if (token) url.searchParams.set('token', token);
   return url.href;
+}
+
+function getStoreFulfillmentPublicBaseUrl(env = {}) {
+  const configured = String(getWorkerBase(env) || env.WORKER_BASE || env.CANONICAL_WORKER_BASE || '').replace(/\/+$/, '');
+  if (configured) return configured;
+  return String(getSiteBase(env) || DEFAULT_SITE_BASE || '').replace(/\/+$/, '');
+}
+
+function buildStoreFulfillmentPublicUrl(env, orderToken, section, itemId, suffix = '', token = '') {
+  const path = `/api/orders/${encodeURIComponent(orderToken)}/${section}/${encodeURIComponent(itemId)}${suffix}`;
+  const base = getStoreFulfillmentPublicBaseUrl(env);
+  try {
+    const url = new URL(path, base || DEFAULT_SITE_BASE);
+    if (token) url.searchParams.set('token', token);
+    return url.href;
+  } catch {
+    return '';
+  }
+}
+
+function getStoreEventFulfillmentTokenTtlSeconds(event = null) {
+  const startsAtMs = parseTimestampMs(event?.startsAt);
+  if (!Number.isFinite(startsAtMs)) return STORE_FULFILLMENT_TOKEN_TTL_SECONDS;
+  const endsAtMs = parseTimestampMs(event?.endsAt);
+  const safeEndsAtMs = Number.isFinite(endsAtMs) && endsAtMs > startsAtMs
+    ? endsAtMs
+    : startsAtMs + (2 * 60 * 60 * 1000);
+  const expiresAtMs = safeEndsAtMs + (24 * 60 * 60 * 1000);
+  const ttlSeconds = Math.ceil((expiresAtMs - Date.now()) / 1000);
+  return Math.max(60, Math.min(STORE_EVENT_REMINDER_TTL_SECONDS, ttlSeconds));
+}
+
+async function buildStoreCheckInQrSvg(checkInUrl = '') {
+  if (!checkInUrl) return '';
+  return QRCode.toString(checkInUrl, {
+    type: 'svg',
+    margin: 1,
+    color: {
+      dark: '#101215',
+      light: '#ffffff'
+    }
+  });
+}
+
+async function buildStoreTicketEmailArtifacts(env, storedOrder = {}, item = {}, itemId = '', options = {}) {
+  if (!isStoreTicketLikeItem(item)) return null;
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  const event = summarizeStoreEventDetails(item.eventDetails);
+  const tokenTtlSeconds = Math.max(
+    STORE_FULFILLMENT_TOKEN_TTL_SECONDS,
+    Number(options.tokenTtlSeconds || getStoreEventFulfillmentTokenTtlSeconds(event)) || STORE_FULFILLMENT_TOKEN_TTL_SECONDS
+  );
+  const checkInToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'check_in' }, tokenTtlSeconds);
+  if (!orderToken || !checkInToken) return null;
+
+  const checkInUrl = buildStoreFulfillmentPublicUrl(env, orderToken, 'check-in', itemId, '', checkInToken);
+  const qrSvg = await buildStoreCheckInQrSvg(checkInUrl);
+  const ticketSvg = buildStoreTicketSvg(env, storedOrder, item, itemId, checkInUrl, qrSvg);
+  return { checkInUrl, qrSvg, ticketSvg, tokenTtlSeconds };
 }
 
 function getStoreDownloadFileKey(item = {}) {
@@ -4698,14 +5088,7 @@ async function handleStoreTicketSvg(request, env, storedOrder = {}, item = {}, i
   const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
   const checkInToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'check_in' });
   const checkInUrl = buildStoreFulfillmentUrl(request, env, orderToken, 'check-in', itemId, '', checkInToken);
-  const qrSvg = await QRCode.toString(checkInUrl, {
-    type: 'svg',
-    margin: 1,
-    color: {
-      dark: '#101215',
-      light: '#ffffff'
-    }
-  });
+  const qrSvg = await buildStoreCheckInQrSvg(checkInUrl);
   const ticketSvg = buildStoreTicketSvg(env, storedOrder, item, itemId, checkInUrl, qrSvg);
   return new Response(ticketSvg, {
     status: 200,
@@ -4738,7 +5121,6 @@ function buildStoreTicketSvg(env, storedOrder = {}, item = {}, itemId = '', chec
   <image href="${qrDataUri}" x="150" y="430" width="420" height="420"/>
   <text x="88" y="908" font-family="Inter, Arial, sans-serif" font-size="22" fill="#252930">Order: ${escapeXml(storedOrder.orderToken || '')}</text>
   <text x="88" y="944" font-family="Inter, Arial, sans-serif" font-size="22" fill="#252930">Qty: ${quantity}${holder ? ` · ${escapeXml(holder)}` : ''}</text>
-  <text x="88" y="974" font-family="Inter, Arial, sans-serif" font-size="13" fill="#5d6573">${escapeXml(checkInUrl)}</text>
 </svg>`;
 }
 
@@ -4792,15 +5174,15 @@ function handleStoreCheckIn(_request, env, storedOrder = {}, item = {}, itemId =
   }, 200, env);
 }
 
-function handleStoreCalendar(_request, env, storedOrder = {}, item = {}, itemId = '') {
+function buildStoreCalendarIcs(env, storedOrder = {}, item = {}, itemId = '', options = {}) {
   if (!isStoreTicketLikeItem(item) || item.eventDetails?.ics === false) {
-    return privateJsonResponse({ error: 'Store item does not have calendar fulfillment' }, 404, env);
+    return '';
   }
 
   const event = summarizeStoreEventDetails(item.eventDetails);
   const starts = new Date(event?.startsAt || '');
   if (Number.isNaN(starts.getTime())) {
-    return privateJsonResponse({ error: 'Store event start time is not configured' }, 404, env);
+    return '';
   }
   const ends = event?.endsAt ? new Date(event.endsAt) : new Date(starts.getTime() + (2 * 60 * 60 * 1000));
   const safeEnds = Number.isNaN(ends.getTime()) ? new Date(starts.getTime() + (2 * 60 * 60 * 1000)) : ends;
@@ -4812,12 +5194,13 @@ function handleStoreCalendar(_request, env, storedOrder = {}, item = {}, itemId 
   ].join('\n');
   const location = [event?.venue, event?.address].filter(Boolean).join(', ');
   const uidHost = getSiteOrigin(env).replace(/^https?:\/\//, '') || 'store.local';
-  const ics = [
+  const method = String(options.method || 'PUBLISH').trim().toUpperCase() === 'REQUEST' ? 'REQUEST' : 'PUBLISH';
+  return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Dust Wave//Store//EN',
     'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
+    `METHOD:${method}`,
     'BEGIN:VEVENT',
     `UID:${escapeIcsText(`${storedOrder.orderToken || 'store'}-${itemId}@${uidHost}`)}`,
     `DTSTAMP:${formatIcsDate(new Date())}`,
@@ -4826,9 +5209,21 @@ function handleStoreCalendar(_request, env, storedOrder = {}, item = {}, itemId 
     `SUMMARY:${escapeIcsText(summary)}`,
     location ? `LOCATION:${escapeIcsText(location)}` : '',
     `DESCRIPTION:${escapeIcsText(description)}`,
+    'STATUS:CONFIRMED',
     'END:VEVENT',
     'END:VCALENDAR'
   ].filter(Boolean).join('\r\n');
+}
+
+function handleStoreCalendar(_request, env, storedOrder = {}, item = {}, itemId = '') {
+  if (!isStoreTicketLikeItem(item) || item.eventDetails?.ics === false) {
+    return privateJsonResponse({ error: 'Store item does not have calendar fulfillment' }, 404, env);
+  }
+
+  const ics = buildStoreCalendarIcs(env, storedOrder, item, itemId, { method: 'PUBLISH' });
+  if (!ics) {
+    return privateJsonResponse({ error: 'Store event start time is not configured' }, 404, env);
+  }
 
   return new Response(ics, {
     status: 200,
@@ -4836,6 +5231,50 @@ function handleStoreCalendar(_request, env, storedOrder = {}, item = {}, itemId 
       'Content-Disposition': `attachment; filename="${sanitizeDownloadFilename(`${itemId || 'store-event'}.ics`)}"`
     })
   });
+}
+
+async function buildStoreEventEmailAttachments(env, storedOrder = {}, item = {}, itemId = '', options = {}) {
+  const attachments = [];
+  if (!isStoreTicketLikeItem(item)) return attachments;
+
+  const safeItemId = sanitizeDownloadFilename(itemId || item.sku || item.name || 'store-event');
+  const calendarMethod = String(options.calendarMethod || 'REQUEST').trim().toUpperCase() === 'PUBLISH' ? 'PUBLISH' : 'REQUEST';
+  const ics = buildStoreCalendarIcs(env, storedOrder, item, itemId, { method: calendarMethod });
+  if (ics) {
+    attachments.push({
+      filename: sanitizeDownloadFilename(`${safeItemId}.ics`),
+      content: base64EncodeString(ics)
+    });
+  }
+
+  const artifacts = await buildStoreTicketEmailArtifacts(env, storedOrder, item, itemId, options);
+  if (artifacts?.ticketSvg) {
+    attachments.push({
+      filename: sanitizeDownloadFilename(`${safeItemId}-ticket.svg`),
+      content: base64EncodeString(artifacts.ticketSvg)
+    });
+  }
+  if (artifacts?.qrSvg) {
+    attachments.push({
+      filename: sanitizeDownloadFilename(`${safeItemId}-check-in-qr.svg`),
+      content: base64EncodeString(artifacts.qrSvg)
+    });
+  }
+  return attachments;
+}
+
+async function buildStoreOrderEventEmailAttachments(env, storedOrder = {}, options = {}) {
+  const items = Array.isArray(storedOrder.orderDraft?.items) ? storedOrder.orderDraft.items : [];
+  const attachments = [];
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index] || {};
+    if (!isStoreTicketLikeItem(item)) continue;
+    const itemId = getStoreFulfillmentId(item, index);
+    const itemAttachments = await buildStoreEventEmailAttachments(env, storedOrder, item, itemId, options);
+    attachments.push(...itemAttachments);
+    if (attachments.length >= 24) break;
+  }
+  return attachments.slice(0, 24);
 }
 
 function getStoreFulfillmentCheckIns(storedOrder = {}) {
@@ -5398,6 +5837,22 @@ function adminStoreDownloadSummary(source = {}) {
   };
 }
 
+function adminStoreEventDetailsSummary(source = {}) {
+  const event = source?.event_details && typeof source.event_details === 'object'
+    ? source.event_details
+    : source?.eventDetails && typeof source.eventDetails === 'object'
+      ? source.eventDetails
+      : {};
+  return {
+    startsAt: String(event.starts_at || event.startsAt || '').trim(),
+    endsAt: String(event.ends_at || event.endsAt || '').trim(),
+    venue: String(event.venue || '').trim(),
+    address: String(event.address || '').trim(),
+    ticketDelivery: String(event.ticket_delivery || event.ticketDelivery || '').trim(),
+    ics: event.ics !== false
+  };
+}
+
 function buildAdminStoreEditableVariant(variant = {}, overrides = {}, productId = '') {
   const variantId = String(variant?.id || '').trim();
   const download = adminStoreDownloadSummary(variant);
@@ -5419,6 +5874,7 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
   const slug = String(product?.slug || '').trim();
   const variants = Array.isArray(product?.variants) ? product.variants : [];
   const download = adminStoreDownloadSummary(product);
+  const eventDetails = adminStoreEventDetailsSummary(product);
   return {
     productId,
     slug,
@@ -5453,6 +5909,12 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     hasDownload: Boolean(product?.download),
     downloadFileKey: download.fileKey,
     downloadFilename: download.filename,
+    eventDetails,
+    eventStartsAt: eventDetails.startsAt,
+    eventEndsAt: eventDetails.endsAt,
+    eventVenue: eventDetails.venue,
+    eventAddress: eventDetails.address,
+    eventIcs: eventDetails.ics,
     hasEventDetails: Boolean(product?.event_details),
     turnstileRequired: product?.turnstile_required === true
   };
@@ -5566,6 +6028,11 @@ function defaultAdminStoreProductType(fulfillmentType = 'physical') {
   return 'product';
 }
 
+function isAdminStoreEventFulfillmentType(fulfillmentType = '') {
+  const type = String(fulfillmentType || '').trim().toLowerCase();
+  return type === 'ticket' || type === 'rsvp';
+}
+
 function yamlBlockAdminString(value, indent = '  ') {
   const text = String(value ?? '');
   if (!text) return '""';
@@ -5665,6 +6132,18 @@ function serializeAdminStoreDownloadYaml(fileKey = '', filename = '') {
     '  delivery: "signed_link"',
     '  expires_hours: 72'
   ].join('\n');
+}
+
+function serializeAdminStoreEventDetailsYaml(eventDetails = {}) {
+  const event = adminStoreEventDetailsSummary({ eventDetails });
+  const lines = ['event_details:'];
+  yamlAdminMaybeLine(lines, 'starts_at', event.startsAt, '  ');
+  yamlAdminMaybeLine(lines, 'ends_at', event.endsAt, '  ');
+  yamlAdminMaybeLine(lines, 'venue', event.venue, '  ');
+  yamlAdminMaybeLine(lines, 'address', event.address, '  ');
+  yamlAdminMaybeLine(lines, 'ticket_delivery', event.ticketDelivery, '  ');
+  yamlAdminMaybeLine(lines, 'ics', event.ics, '  ');
+  return lines.length > 1 ? lines.join('\n') : 'event_details: {}';
 }
 
 function normalizeAdminStoreDownloadSelection(fileKey, filename, label, { required = false } = {}) {
@@ -5955,6 +6434,38 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
         : product?.fulfillment_type || product?.type || 'physical'
   ).trim().toLowerCase();
   const digitalProduct = nextFulfillmentType === 'digital';
+  const eventProduct = isAdminStoreEventFulfillmentType(nextFulfillmentType);
+  const eventFieldKeys = ['eventStartsAt', 'eventEndsAt', 'eventVenue', 'eventAddress', 'eventIcs'];
+  const eventFieldsSubmitted = eventFieldKeys.some((fieldKey) => hasAdminStoreProductPatchField(fields, fieldKey));
+  if (!eventProduct) {
+    if (product?.event_details || eventFieldsSubmitted) {
+      frontMatter.push({ key: 'event_details', remove: true });
+      changedFields.push('eventDetails');
+    }
+  } else if (eventFieldsSubmitted || product?.event_details) {
+    const eventDetails = adminStoreEventDetailsSummary(product);
+    const updateEventString = (fieldKey, prop, label, max = 240) => {
+      if (!hasAdminStoreProductPatchField(fields, fieldKey)) return;
+      const normalized = normalizeAdminStoreStringField(fields[fieldKey], label, { required: false, max });
+      if (normalized.ok) eventDetails[prop] = normalized.value;
+      else errors.push(normalized.error);
+    };
+    updateEventString('eventStartsAt', 'startsAt', 'Event start', 80);
+    updateEventString('eventEndsAt', 'endsAt', 'Event end', 80);
+    updateEventString('eventVenue', 'venue', 'Event venue', 160);
+    updateEventString('eventAddress', 'address', 'Event address', 320);
+    if (hasAdminStoreProductPatchField(fields, 'eventIcs')) {
+      const normalized = normalizeAdminStoreBooleanField(fields.eventIcs, 'Calendar file');
+      if (normalized.ok) eventDetails.ics = normalized.value;
+      else errors.push(normalized.error);
+    }
+    if (eventDetails.ticketDelivery === '') eventDetails.ticketDelivery = 'qr';
+    frontMatter.push({
+      key: 'event_details',
+      replacement: serializeAdminStoreEventDetailsYaml(eventDetails)
+    });
+    changedFields.push('eventDetails');
+  }
   const variantBased = hasAdminStoreProductPatchField(fields, 'variantBased')
     ? fields.variantBased === true || String(fields.variantBased || '').trim().toLowerCase() === 'true'
     : submittedVariants
@@ -6281,6 +6792,18 @@ function adminStorePreviewUrl(value, env = {}) {
   return normalized.value;
 }
 
+function renderAdminStoreProductInlineMarkdownHtml(value) {
+  let html = escapeAdminStorePreviewHtml(value);
+  html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  html = html.replace(/\*\*_([^_\n]+)_\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/___([^_\n]+)___/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  html = html.replace(/(^|[\s(])_([^_\n]+)_/g, '$1<em>$2</em>');
+  return html;
+}
+
 function renderAdminStoreProductInlineMarkdown(value, env = {}) {
   const placeholders = [];
   const placeholder = (html) => {
@@ -6298,13 +6821,10 @@ function renderAdminStoreProductInlineMarkdown(value, env = {}) {
     if (!url) return match;
     const external = /^https?:\/\//i.test(url) && !url.startsWith(`${adminStorePreviewSiteBase(env)}/`);
     const rel = external ? ' rel="noopener noreferrer" target="_blank"' : '';
-    return placeholder(`<a href="${escapeAdminStorePreviewAttribute(url)}"${rel}>${escapeAdminStorePreviewHtml(label)}</a>`);
+    return placeholder(`<a href="${escapeAdminStorePreviewAttribute(url)}"${rel}>${renderAdminStoreProductInlineMarkdownHtml(label)}</a>`);
   });
 
-  let html = escapeAdminStorePreviewHtml(text);
-  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>');
-  html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  let html = renderAdminStoreProductInlineMarkdownHtml(text);
   html = html.replace(/\u0000(\d+)\u0000/g, (_match, index) => placeholders[Number(index)] || '');
   return html;
 }
@@ -6464,6 +6984,27 @@ function adminStorePreviewButtonLabel(product = {}, priceCents = 0) {
   return 'Add to cart';
 }
 
+function buildAdminStoreProductPreviewEventHtml(product = {}, env = {}) {
+  const type = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
+  if (!isAdminStoreEventFulfillmentType(type)) return '';
+  const event = summarizeStoreEventDetails(product.event_details || product.eventDetails);
+  if (!event?.startsAt && !event?.venue && !event?.address) return '';
+  const lines = [];
+  const eventTime = formatStoreEventDisplay(event, env);
+  if (eventTime) {
+    lines.push(`<p class="store-product-card__event-line store-product-card__event-line--date">${escapeAdminStorePreviewHtml(eventTime)}</p>`);
+  }
+  if (event?.venue) {
+    lines.push(`<p class="store-product-card__event-line store-product-card__event-line--venue">${escapeAdminStorePreviewHtml(event.venue)}</p>`);
+  }
+  if (event?.address) {
+    lines.push(`<p class="store-product-card__event-line store-product-card__event-line--address">${escapeAdminStorePreviewHtml(event.address)}</p>`);
+  }
+  return lines.length
+    ? `<div class="store-product-card__event">${lines.join('')}</div>`
+    : '';
+}
+
 function buildAdminStoreProductPreviewVariantOptions(product = {}, selectedVariant = null) {
   const variants = Array.isArray(product?.variants) ? product.variants : [];
   const basePrice = adminStoreProductPriceCents(product);
@@ -6497,8 +7038,37 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
   }
   if (hasAdminStoreProductPatchField(fields, 'image')) preview.image = String(fields.image || '').trim();
   if (hasAdminStoreProductPatchField(fields, 'status')) preview.status = String(fields.status || '').trim();
+  if (hasAdminStoreProductPatchField(fields, 'fulfillmentType')) preview.fulfillment_type = String(fields.fulfillmentType || '').trim();
+  else if (hasAdminStoreProductPatchField(fields, 'fulfillment_type')) preview.fulfillment_type = String(fields.fulfillment_type || '').trim();
+  if (hasAdminStoreProductPatchField(fields, 'variantOptionName')) preview.variant_option_name = String(fields.variantOptionName || '').trim();
+  else if (hasAdminStoreProductPatchField(fields, 'variant_option_name')) preview.variant_option_name = String(fields.variant_option_name || '').trim();
   if (hasAdminStoreProductPatchField(fields, 'priceCents')) preview.price_cents = normalizeAdminStorePriceCentsField(fields.priceCents, 'Product price').value;
   else if (hasAdminStoreProductPatchField(fields, 'price')) preview.price_cents = normalizeAdminStorePriceField(fields.price, 'Product price').value;
+  if (
+    hasAdminStoreProductPatchField(fields, 'eventStartsAt') ||
+    hasAdminStoreProductPatchField(fields, 'eventEndsAt') ||
+    hasAdminStoreProductPatchField(fields, 'eventVenue') ||
+    hasAdminStoreProductPatchField(fields, 'eventAddress') ||
+    hasAdminStoreProductPatchField(fields, 'eventIcs')
+  ) {
+    const eventDetails = adminStoreEventDetailsSummary(preview);
+    if (hasAdminStoreProductPatchField(fields, 'eventStartsAt')) eventDetails.startsAt = String(fields.eventStartsAt || '').trim();
+    if (hasAdminStoreProductPatchField(fields, 'eventEndsAt')) eventDetails.endsAt = String(fields.eventEndsAt || '').trim();
+    if (hasAdminStoreProductPatchField(fields, 'eventVenue')) eventDetails.venue = String(fields.eventVenue || '').trim();
+    if (hasAdminStoreProductPatchField(fields, 'eventAddress')) eventDetails.address = String(fields.eventAddress || '').trim();
+    if (hasAdminStoreProductPatchField(fields, 'eventIcs')) {
+      eventDetails.ics = fields.eventIcs === true || String(fields.eventIcs || '').trim().toLowerCase() === 'true';
+    }
+    if (eventDetails.ticketDelivery === '') eventDetails.ticketDelivery = 'qr';
+    preview.event_details = {
+      starts_at: eventDetails.startsAt,
+      ends_at: eventDetails.endsAt,
+      venue: eventDetails.venue,
+      address: eventDetails.address,
+      ticket_delivery: eventDetails.ticketDelivery,
+      ics: eventDetails.ics
+    };
+  }
 
   const submittedVariants = Array.isArray(body?.variants)
     ? body.variants
@@ -6541,6 +7111,7 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const description = renderAdminStoreProductMarkdown(descriptionSource, env);
   const buttonLabel = adminStorePreviewButtonLabel(product, selectedPriceCents);
   const buttonText = isFree ? buttonLabel : `${buttonLabel} - ${price}`;
+  const eventHtml = buildAdminStoreProductPreviewEventHtml(product, env);
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const hasVariants = variants.length > 0;
   const controlsClass = hasVariants ? 'store-product-card__controls--with-option' : 'store-product-card__controls--simple';
@@ -6575,6 +7146,7 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
       <article class="store-product-card store-product-card--purchase-only" id="${escapeAdminStorePreviewAttribute(productId)}" data-store-product-card>
         <a class="store-product-card__media" href="#" tabindex="-1" aria-disabled="true">${imageHtml}</a>
         <div class="store-product-card__body">
+          ${eventHtml}
           <div class="store-product-card__purchase">
             <p class="store-product-card__price" data-store-price>${isFree ? 'Free' : escapeAdminStorePreviewHtml(price)}</p>
             <p class="store-product-card__availability" data-store-availability data-store-inventory-state="none"></p>
@@ -6718,6 +7290,138 @@ async function handleAdminStoreProducts(request, env) {
     overridesUpdatedAt: snapshot.overridesUpdatedAt,
     updatedAt: snapshot.updatedAt,
     writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
+}
+
+function formatPhotonAddressFeature(feature = {}) {
+  const props = feature?.properties && typeof feature.properties === 'object' ? feature.properties : {};
+  const street = [props.housenumber, props.street].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+  const parts = [
+    props.name,
+    street,
+    props.city || props.county || props.district,
+    props.state,
+    props.postcode,
+    props.country
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  return Array.from(new Set(parts)).join(', ');
+}
+
+function normalizeAdminStoreAddressLookupQuery(query = '') {
+  return String(query || '').replace(/\s+/g, ' ').trim();
+}
+
+async function getAdminStoreAddressLookupCacheKey(query = '') {
+  const normalized = normalizeAdminStoreAddressLookupQuery(query).toLowerCase();
+  if (!normalized) return '';
+  return `${STORE_EVENT_ADDRESS_LOOKUP_CACHE_PREFIX}${await sha256HexString(normalized)}`;
+}
+
+async function lookupAdminStoreEventAddress(query, env) {
+  const cacheKey = env?.STORE_STATE ? await getAdminStoreAddressLookupCacheKey(query) : '';
+  if (cacheKey) {
+    const cached = await env.STORE_STATE.get(cacheKey, { type: 'json' }).catch(() => null);
+    if (cached?.address) {
+      return {
+        ok: true,
+        address: String(cached.address || '').trim(),
+        source: String(cached.source || 'cache').trim() || 'cache',
+        latitude: String(cached.latitude || '').trim(),
+        longitude: String(cached.longitude || '').trim(),
+        cached: true
+      };
+    }
+  }
+  const siteHost = (() => {
+    try {
+      return new URL(String(env?.SITE_BASE || 'https://shop.dustwave.xyz')).hostname;
+    } catch {
+      return 'shop.dustwave.xyz';
+    }
+  })();
+  const headers = {
+    Accept: 'application/json',
+    Referer: getSiteOrigin(env) || 'https://shop.dustwave.xyz',
+    'User-Agent': `DustWaveStore/1.0 (${siteHost})`
+  };
+  try {
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`;
+    const response = await fetch(nominatimUrl, { headers });
+    const results = await response.json().catch(() => []);
+    const first = Array.isArray(results) ? results[0] : null;
+    const displayName = String(first?.display_name || '').trim();
+    if (response.ok && displayName) {
+      const result = {
+        ok: true,
+        address: displayName,
+        source: 'nominatim',
+        latitude: String(first?.lat || '').trim(),
+        longitude: String(first?.lon || '').trim()
+      };
+      if (cacheKey) {
+        await env.STORE_STATE.put(cacheKey, JSON.stringify({
+          address: result.address,
+          source: result.source,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          cachedAt: new Date().toISOString()
+        }), { expirationTtl: STORE_EVENT_ADDRESS_LOOKUP_CACHE_TTL_SECONDS }).catch(() => {});
+      }
+      return result;
+    }
+  } catch (error) {
+    console.warn('Store event address lookup failed with Nominatim:', error?.message || error);
+  }
+
+  const photonUrl = `https://photon.komoot.io/api/?limit=1&q=${encodeURIComponent(query)}`;
+  const response = await fetch(photonUrl, { headers: { Accept: 'application/json' } });
+  const data = await response.json().catch(() => ({}));
+  const feature = Array.isArray(data?.features) ? data.features[0] : null;
+  const address = formatPhotonAddressFeature(feature);
+  if (!response.ok || !address) {
+    return { ok: false, error: 'No matching address found.' };
+  }
+  const coordinates = Array.isArray(feature?.geometry?.coordinates) ? feature.geometry.coordinates : [];
+  const result = {
+    ok: true,
+    address,
+    source: 'photon',
+    latitude: coordinates[1] !== undefined ? String(coordinates[1]) : '',
+    longitude: coordinates[0] !== undefined ? String(coordinates[0]) : ''
+  };
+  if (cacheKey) {
+    await env.STORE_STATE.put(cacheKey, JSON.stringify({
+      address: result.address,
+      source: result.source,
+      latitude: result.latitude,
+      longitude: result.longitude,
+      cachedAt: new Date().toISOString()
+    }), { expirationTtl: STORE_EVENT_ADDRESS_LOOKUP_CACHE_TTL_SECONDS }).catch(() => {});
+  }
+  return result;
+}
+
+async function handleAdminStoreProductAddressLookup(request, env) {
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+
+  const query = normalizeAdminStoreAddressLookupQuery(new URL(request.url).searchParams.get('q') || '');
+  if (query.length < 3) {
+    return privateJsonResponse({ error: 'Enter at least 3 characters to find an address.' }, 400, env);
+  }
+  if (query.length > 240) {
+    return privateJsonResponse({ error: 'Address search must be 240 characters or fewer.' }, 400, env);
+  }
+  const result = await lookupAdminStoreEventAddress(query, env);
+  if (!result.ok) return privateJsonResponse({ error: result.error || 'No matching address found.' }, 404, env);
+  return privateJsonResponse({
+    ok: true,
+    query,
+    address: result.address,
+    source: result.source,
+    latitude: result.latitude,
+    longitude: result.longitude,
+    cached: result.cached === true
   }, 200, env);
 }
 
@@ -7660,6 +8364,7 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
   }
   const existingKeys = new Set((listed.keys || []).map((key) => String(key?.name || '').trim()).filter(Boolean));
   const importedOrders = [];
+  const lookupIndexedOrders = [];
   const skippedOrders = [];
   const failures = [];
 
@@ -7671,6 +8376,9 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
     }
     if (existingKeys.has(storageKey)) {
       skippedOrders.push(order.orderToken);
+      const existingOrder = await env.STORE_STATE.get(storageKey, { type: 'json' });
+      const indexResult = existingOrder ? await upsertStoreOrderEmailIndex(env, existingOrder) : null;
+      if (indexResult?.ok) lookupIndexedOrders.push(order.orderToken);
       continue;
     }
 
@@ -7686,6 +8394,8 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
         emailSent: false
       };
       await env.STORE_STATE.put(storageKey, JSON.stringify(storedOrder));
+      const indexResult = await upsertStoreOrderEmailIndex(env, storedOrder);
+      if (indexResult?.ok) lookupIndexedOrders.push(storedOrder.orderToken);
       existingKeys.add(storageKey);
       importedOrders.push(storedOrder.orderToken);
     } catch (error) {
@@ -7704,6 +8414,7 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
     rowCount: parsed.rowCount,
     parsedOrderCount: parsed.orderCount,
     importedOrderCount: importedOrders.length,
+    lookupIndexedOrderCount: lookupIndexedOrders.length,
     skippedOrderCount: skippedOrders.length,
     failedOrderCount: failures.length
   });
@@ -7722,16 +8433,18 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
     rowCount: parsed.rowCount,
     parsedOrderCount: parsed.orderCount,
     importedOrderCount: importedOrders.length,
+    lookupIndexedOrderCount: lookupIndexedOrders.length,
     skippedOrderCount: skippedOrders.length,
     failedOrderCount: failures.length,
     importedOrderTokens: importedOrders.slice(0, 50),
+    lookupIndexedOrderTokens: lookupIndexedOrders.slice(0, 50),
     skippedOrderTokens: skippedOrders.slice(0, 50),
     failures: failures.slice(0, 20),
     warnings: (parsed.warnings || []).slice(0, 20),
     auditKey,
     writeBudget: adminWriteBudget({
       readOnly: false,
-      kvWritesExpected: importedOrders.length + (auditKey ? 1 : 0),
+      kvWritesExpected: importedOrders.length + lookupIndexedOrders.length + (auditKey ? 1 : 0),
       kvListExpected: listed.listCalls || 1
     })
   }, failures.length ? 207 : 200, env);
@@ -9100,6 +9813,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     );
     queueStoreOrderEmailIndexUpsert(ctx, env, storedOrder);
     queueStoreOrderEmailDelivery(ctx, env, storedOrder);
+    queueStoreEventRemindersQuietly(ctx, env, storedOrder);
 
     return privateJsonResponse({
       ok: true,
@@ -9470,6 +10184,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   await deleteAbandonedCheckoutFollowup(env, metadata.orderToken, { reason: 'completed' });
   queueStoreOrderEmailIndexUpsert(ctx, env, updatedOrder);
   queueStoreOrderEmailDelivery(ctx, env, updatedOrder);
+  queueStoreEventRemindersQuietly(ctx, env, updatedOrder);
 
   return {
     ok: true,
@@ -13057,3 +13772,10 @@ function corsResponse(env = null, isPublic = false) {
     }
   });
 }
+
+export {
+  buildStoreOrderEmailPayload,
+  buildStoreOrderEventEmailAttachments,
+  processStoreEventReminders,
+  queueStoreEventReminders
+};

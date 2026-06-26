@@ -180,7 +180,9 @@ email:
   subjects:
     admin_user_created: Acceso de administración agregado
     store_order_confirmed: Pedido confirmado
-    store_order_lookup: Enlace para buscar pedidos
+    store_order_lookup: Busca tu pedido
+    store_abandoned_cart: Termina tu compra
+    store_event_reminder: Recordatorio de evento
   common:
     questions_prefix: "¿Preguntas? Responde a este correo o visita"
   store_order:
@@ -195,32 +197,52 @@ email:
     fulfillment_rsvp: RSVP
     fulfillment_service: Servicio
     fulfillment_physical: Artículo físico
-    download_note: La descarga llegará por correo cuando esté lista.
-    ticket_note: El boleto llegará por correo.
+    download_note: Abre la página del pedido para acceder a tu descarga.
+    ticket_note: Abre la página del pedido para ver tu boleto.
     rsvp_note: Tu RSVP está confirmado.
-    shipping_note: Te enviaremos otro correo cuando haya novedades de cumplimiento o envío.
+    shipping_note: Las novedades de envío aparecerán en la página del pedido.
     quantity_label: Cant.
     items_heading: Artículos
     shipping_heading: Envío
     heading: Pedido confirmado
     order_label: Pedido
-    body: Gracias por tu pedido. Guarda este correo para tus registros.
-    cta: Ver estado del pedido
+    body: Gracias por tu pedido. Tu página de pedido tiene los detalles más recientes de boletos, descargas, envíos y recibos.
+    attachments_note: Los boletos, codigos QR de registro y archivos de calendario se adjuntan cuando estan disponibles.
+    cta: Ver pedido
+  store_event_reminder:
+    fallback_title: Tu evento
+    heading: "%{event} se acerca"
+    body: Este es un recordatorio para tu boleto o RSVP.
+    reminder_label: "Este es tu recordatorio de %{label}."
+    when: Cuándo
+    where: Dónde
+    order: Pedido
+    attachments: La invitacion de calendario y el codigo QR de registro se adjuntan cuando estan disponibles.
+    cta: Ver pedido
+    footer: Recibes esto porque este correo esta asociado a un pedido de evento o RSVP de %{platform}.
   store_order_lookup:
     heading: Busca tu pedido
-    body_one: Usa este enlace dentro de 15 minutos para ver tu pedido de %{platform}.
-    body_other: Usa este enlace dentro de 15 minutos para ver tus pedidos de %{platform}.
+    body_one: Aquí está tu enlace seguro para ver tu pedido de %{platform}. Funciona por 15 minutos.
+    body_other: Aquí está tu enlace seguro para ver tus pedidos de %{platform}. Funciona por 15 minutos.
     cta: Ver pedidos
-    expiry: Este enlace caduca después de un uso.
-    ignore: Si no solicitaste este correo, puedes ignorarlo.
+    expiry: Este enlace funciona una sola vez.
+    ignore: Si no pediste esto, puedes ignorarlo.
+  store_abandoned_cart:
+    heading: Termina tu compra
+    body: Pediste un recordatorio antes de salir del pago. Tu carrito sigue aquí cuando quieras volver.
+    item_count: "%{count} artículo%{plural} en tu carrito"
+    estimated_total: "Total estimado: %{amount}"
+    cta: Terminar compra
+    footer: Recibes esto porque pediste un recordatorio de pago antes de salir de %{platform}.
+    unsubscribe: No enviar recordatorios de pago
   admin_user_created:
     heading: Acceso de administración agregado
     greeting: 'Hola %{name}:'
-    intro: Te agregaron como %{role} de %{platform}.
-    instructions: Usa la página de inicio de sesión de administración e ingresa este correo para recibir un enlace mágico. No hay contraseña que configurar.
-    cta: Abrir inicio de administración
+    intro: Ahora tienes acceso de %{role} a %{platform}.
+    instructions: Para iniciar sesión, abre administración e ingresa este correo. Te enviaremos un enlace mágico.
+    cta: Abrir administración
     role_super_admin: superadministrador
     role_limited_admin: administrador limitado
     access_heading: Acceso
     created_by: Agregado por %{email}
-    footer: Si no esperabas este acceso, ignora este correo o contacta a la persona responsable de la plataforma.
+    footer: ¿No esperabas este acceso? Ignora este correo o contacta a la persona responsable del sitio.

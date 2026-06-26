@@ -2492,6 +2492,19 @@ test.describe('Admin Dashboard', () => {
     const ticketEditor = page.locator('[data-store-product-editor="ticket-1"]');
     await expect(ticketEditor).toBeVisible();
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
+    const variantsTable = ticketEditor.locator('.admin-store-products__variants-table');
+    await expect.poll(() => variantsTable.evaluate((table: HTMLElement) => {
+      return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
+    })).toBe(true);
+    await expect.poll(() => variantsTable.locator('thead').evaluate((thead: HTMLElement) => {
+      return getComputedStyle(thead).display;
+    })).toBe('none');
+    await expect.poll(() => variantsTable.locator('tbody > tr').first().evaluate((row: HTMLElement) => {
+      return row.getBoundingClientRect().right <= window.innerWidth + 1;
+    })).toBe(true);
+    await expect.poll(() => variantsTable.locator('tbody > tr').first().evaluate((row: HTMLElement) => {
+      return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
+    })).toEqual(['Label', 'ID', 'SKU', 'File', 'Price (USD)', 'Inventory', 'Status', 'Actions']);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
     await expect.poll(() => ticketEditor.locator('select[data-store-product-field="taxCategory"]').evaluate((select: HTMLSelectElement) => {
       const styles = getComputedStyle(select);

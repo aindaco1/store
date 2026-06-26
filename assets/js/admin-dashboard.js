@@ -41,6 +41,7 @@
   var STORE_PRODUCT_TOUCH_DRAG_DELAY = 350;
   var STORE_PRODUCT_TOUCH_DRAG_SLOP = 8;
   var storeProductPreviewTimers = new Map();
+  var storeProductAddressLookupCache = new Map();
   var storeProductPreviewRequestCounter = 0;
   var storeProductMediaCache = new Map();
   var SNIPCART_IMPORT_MAX_CSV_BYTES = 1024 * 1024;
@@ -2314,9 +2315,12 @@
 
   function repairStoreProductPreviewFrameImages(frame) {
     if (!frame || !frame.contentDocument) return;
+    sanitizeStoreProductPreviewDocument(frame.contentDocument);
     $all('img', frame.contentDocument).forEach(function(image) {
       var current = image.getAttribute('src') || '';
       var next = storeProductPreviewAssetUrl(current);
+      image.loading = 'eager';
+      image.decoding = 'sync';
       if (next && next !== current) image.setAttribute('src', next);
     });
   }
@@ -3644,6 +3648,11 @@
     inventoryTracking: 'Turns live inventory counts on or off for this product and its variants.',
     inventory: 'Available quantity for non-variant products. Variant quantities are managed in the Variants section.',
     downloadFileKey: 'Existing download file delivered after checkout for digital products.',
+    eventStartsAt: 'Event start date and time used for tickets, product pages, and calendar files.',
+    eventEndsAt: 'Optional event end date and time used by calendar files when present.',
+    eventVenue: 'Public venue name shown on event products, confirmations, and tickets.',
+    eventAddress: 'Optional event address shown on the product page and embedded in calendar files.',
+    eventIcs: 'Adds an iCalendar file link to event order confirmations when a start time is set.',
     image: 'Primary product image used on public product cards, cart rows, receipts, and previews.',
     preview: 'Live product-card preview generated from the current editor values.',
     description: 'Public product copy. Use the block editor for text, media, embeds, and galleries.'
@@ -3764,8 +3773,8 @@
   }
 
   function storeProductFieldHelpClass(field) {
-    var edgeStartFields = ['sku', 'shippingPreset', 'image'];
-    var edgeEndFields = ['fulfillmentType', 'inventoryTracking', 'inventory', 'preview'];
+    var edgeStartFields = ['sku', 'shippingPreset', 'image', 'eventStartsAt'];
+    var edgeEndFields = ['fulfillmentType', 'inventoryTracking', 'inventory', 'preview', 'eventAddress', 'eventIcs'];
     var key = String(field || '');
     if (edgeStartFields.indexOf(key) >= 0) return 'admin-settings__help--edge-start';
     if (edgeEndFields.indexOf(key) >= 0) return 'admin-settings__help--edge-end';
@@ -3862,6 +3871,48 @@
 
   function isDigitalFulfillment(fulfillmentType) {
     return String(fulfillmentType || '').trim().toLowerCase() === 'digital';
+  }
+
+  function isEventFulfillment(fulfillmentType) {
+    var type = String(fulfillmentType || '').trim().toLowerCase();
+    return type === 'ticket' || type === 'rsvp';
+  }
+
+  function storeProductDateTimeLocalValue(value) {
+    var text = String(value || '').trim();
+    var match = text.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/);
+    return match ? match[1] : text.slice(0, 16);
+  }
+
+  function storeProductDateTimeOffset(value) {
+    var text = String(value || '').trim();
+    var match = text.match(/(Z|[+-]\d{2}:?\d{2})$/);
+    if (!match) return '';
+    if (match[1] === 'Z') return 'Z';
+    return match[1].replace(/^([+-]\d{2})(\d{2})$/, '$1:$2');
+  }
+
+  function browserDateTimeOffset(value) {
+    var date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    var offset = -date.getTimezoneOffset();
+    var sign = offset >= 0 ? '+' : '-';
+    var absolute = Math.abs(offset);
+    var hours = String(Math.floor(absolute / 60)).padStart(2, '0');
+    var minutes = String(absolute % 60).padStart(2, '0');
+    return sign + hours + ':' + minutes;
+  }
+
+  function storeProductDateTimePublishValue(input) {
+    var value = String(input && input.value || '').trim();
+    if (!value) return '';
+    var secondsValue = value.length === 16 ? value + ':00' : value;
+    var initialValue = String(input.dataset.storeDateTimeInitialValue || '').trim();
+    var originalOffset = String(input.dataset.storeDateTimeOffset || '').trim();
+    var offset = initialValue && value === initialValue && originalOffset
+      ? originalOffset
+      : browserDateTimeOffset(value);
+    return offset ? secondsValue + offset : secondsValue;
   }
 
   function taxCategoryLabel(value) {
@@ -4380,6 +4431,9 @@
         ? '<a href="' + escapeStoreProductEditorAttribute(normalizedHref) + '">' + label + '</a>'
         : match;
     });
+    html = html.replace(/\*\*_([^_\n]+)_\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+    html = html.replace(/___([^_\n]+)___/g, '<strong><em>$1</em></strong>');
     html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
     html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
@@ -6014,11 +6068,17 @@
     if (typeof DOMParser === 'undefined') {
       return stripStoreProductPreviewScripts(markup);
     }
-    var document = new DOMParser().parseFromString(markup, 'text/html');
-    document.querySelectorAll('script').forEach(function(node) {
+    var parsed = new DOMParser().parseFromString(markup, 'text/html');
+    sanitizeStoreProductPreviewDocument(parsed);
+    return '<!doctype html>\n' + stripStoreProductPreviewScripts(parsed.documentElement.outerHTML);
+  }
+
+  function sanitizeStoreProductPreviewDocument(doc) {
+    if (!doc) return;
+    doc.querySelectorAll('script').forEach(function(node) {
       node.remove();
     });
-    document.querySelectorAll('*').forEach(function(node) {
+    doc.querySelectorAll('*').forEach(function(node) {
       Array.from(node.attributes || []).forEach(function(attribute) {
         var name = String(attribute.name || '').toLowerCase();
         var value = String(attribute.value || '').trim().toLowerCase();
@@ -6028,7 +6088,6 @@
         }
       });
     });
-    return '<!doctype html>\n' + stripStoreProductPreviewScripts(document.documentElement.outerHTML);
   }
 
   function stripStoreProductPreviewScripts(html) {
@@ -6087,6 +6146,7 @@
     var fulfillmentValue = product.fulfillmentType || 'physical';
     var basics = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--basics');
     var commerce = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--commerce');
+    var eventDetails = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--event');
     var mediaDescription = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--media-description');
     basics.appendChild(productField('Name', 'name', product.name || '', 'text', { noHelp: true, required: true }));
     basics.appendChild(productField('Price (USD)', 'price', productPrice(product), 'number', { step: '0.01', min: '0' }));
@@ -6111,10 +6171,18 @@
       options: [['true', 'Yes'], ['false', 'No']]
     }));
     commerce.appendChild(productField('Inventory', 'inventory', product.inventory ?? '', 'number', { step: '1', min: '0' }));
+    commerce.appendChild(productField('Calendar', 'eventIcs', product.eventIcs === false ? 'false' : 'true', 'select', {
+      options: [['true', 'Yes'], ['false', 'No']]
+    }));
+    eventDetails.appendChild(productField('Starts at', 'eventStartsAt', product.eventStartsAt || product.eventDetails?.startsAt || '', 'datetime-local'));
+    eventDetails.appendChild(productField('Ends at', 'eventEndsAt', product.eventEndsAt || product.eventDetails?.endsAt || '', 'datetime-local'));
+    eventDetails.appendChild(productField('Venue', 'eventVenue', product.eventVenue || product.eventDetails?.venue || '', 'text'));
+    eventDetails.appendChild(createStoreProductEventAddressField(product));
     mediaDescription.appendChild(createStoreProductImageField(product));
     mediaDescription.appendChild(createStoreProductDescriptionEditor(product));
     fields.appendChild(basics);
     fields.appendChild(commerce);
+    fields.appendChild(eventDetails);
     fields.appendChild(mediaDescription);
     form.appendChild(fields);
     form.appendChild(renderStoreProductVariants(product));
@@ -6163,6 +6231,12 @@
       }
       updateStoreProductEditorDirtyState(form);
     });
+    form.addEventListener('click', function(event) {
+      var lookup = event.target.closest('[data-store-product-address-lookup]');
+      if (!lookup) return;
+      event.preventDefault();
+      lookupStoreProductEventAddress(lookup);
+    });
     if (isNewProduct) updateStoreProductEditorDirtyState(form);
     else resetStoreProductEditorDirtyBaseline(form);
     window.setTimeout(function() {
@@ -6191,6 +6265,9 @@
   }
 
   function syncStoreProductVariantInventoryVisible(form, visible) {
+    $all('.admin-store-products__variants-table', form).forEach(function(table) {
+      table.dataset.storeVariantInventoryVisible = visible ? 'true' : 'false';
+    });
     $all('[data-store-product-variant-inventory-cell]', form).forEach(function(cell) {
       cell.hidden = !visible;
     });
@@ -6200,6 +6277,9 @@
   }
 
   function syncStoreProductVariantDownloadVisible(form, visible) {
+    $all('.admin-store-products__variants-table', form).forEach(function(table) {
+      table.dataset.storeVariantDownloadVisible = visible ? 'true' : 'false';
+    });
     $all('[data-store-product-variant-download-cell]', form).forEach(function(cell) {
       cell.hidden = !visible;
     });
@@ -6222,6 +6302,7 @@
     var fulfillmentType = fulfillment ? fulfillment.value : 'physical';
     var physical = isPhysicalFulfillment(fulfillmentType);
     var digital = isDigitalFulfillment(fulfillmentType);
+    var eventProduct = isEventFulfillment(fulfillmentType);
     var variantsEnabled = $('[data-store-product-variants-enabled]', form);
     var variantBased = variantsEnabled && variantsEnabled.value === 'true';
     var inventoryTracking = $('[data-store-product-field="inventoryTracking"]', form);
@@ -6230,6 +6311,11 @@
     setStoreProductFieldVisible(form, 'downloadFileKey', digital && !variantBased);
     setStoreProductFieldVisible(form, 'inventoryTracking', !digital);
     setStoreProductFieldVisible(form, 'inventory', tracksInventory && !variantBased);
+    setStoreProductFieldVisible(form, 'eventStartsAt', eventProduct);
+    setStoreProductFieldVisible(form, 'eventEndsAt', eventProduct);
+    setStoreProductFieldVisible(form, 'eventVenue', eventProduct);
+    setStoreProductFieldVisible(form, 'eventAddress', eventProduct);
+    setStoreProductFieldVisible(form, 'eventIcs', eventProduct);
     syncStoreProductVariantInventoryVisible(form, tracksInventory);
     syncStoreProductVariantDownloadVisible(form, digital && variantBased);
     syncStoreProductEditorSections(form);
@@ -6258,7 +6344,13 @@
     } else {
       input = document.createElement('input');
       input.type = type;
-      input.value = value;
+      if (type === 'datetime-local') {
+        input.value = storeProductDateTimeLocalValue(value);
+        input.dataset.storeDateTimeOffset = storeProductDateTimeOffset(value);
+        input.dataset.storeDateTimeInitialValue = input.value;
+      } else {
+        input.value = value;
+      }
       if (opts.step) input.step = opts.step;
       if (opts.min) input.min = opts.min;
     }
@@ -6268,6 +6360,77 @@
     label.appendChild(createStoreProductFieldLabel(labelText, field, input, opts.noHelp ? false : opts.help));
     label.appendChild(input);
     return label;
+  }
+
+  function createStoreProductEventAddressField(product) {
+    var wrapper = createElement('div', 'admin-store-products__field admin-store-products__field--event-address');
+    wrapper.dataset.storeProductFieldWrapper = 'eventAddress';
+    var inputId = 'store-product-event-address-' + Math.random().toString(36).slice(2);
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.id = inputId;
+    input.className = 'admin-settings__input';
+    input.value = product.eventAddress || product.eventDetails?.address || '';
+    input.dataset.storeProductField = 'eventAddress';
+    var label = document.createElement('label');
+    label.setAttribute('for', inputId);
+    label.appendChild(createStoreProductFieldLabel('Address', 'eventAddress', input));
+    var controls = createElement('div', 'admin-store-products__event-address-control');
+    controls.appendChild(input);
+    var lookup = createElement('button', 'btn btn--secondary btn--small', 'Find address');
+    lookup.type = 'button';
+    lookup.dataset.storeProductAddressLookup = 'true';
+    controls.appendChild(lookup);
+    var status = createElement('span', 'admin-app__muted admin-store-products__event-address-status', '');
+    status.dataset.storeProductAddressStatus = 'true';
+    wrapper.appendChild(label);
+    wrapper.appendChild(controls);
+    wrapper.appendChild(status);
+    return wrapper;
+  }
+
+  async function lookupStoreProductEventAddress(button) {
+    var form = button && button.closest('[data-store-product-editor]');
+    if (!form) return;
+    var addressInput = $('[data-store-product-field="eventAddress"]', form);
+    var venueInput = $('[data-store-product-field="eventVenue"]', form);
+    var status = $('[data-store-product-address-status]', form);
+    var query = String(addressInput && addressInput.value || venueInput && venueInput.value || '').trim();
+    if (!query) {
+      if (status) status.textContent = 'Enter a venue or address first.';
+      addressInput?.focus();
+      return;
+    }
+    var cacheKey = query.replace(/\s+/g, ' ').trim().toLowerCase();
+    if (storeProductAddressLookupCache.has(cacheKey)) {
+      if (addressInput) {
+        addressInput.value = storeProductAddressLookupCache.get(cacheKey);
+        addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+        addressInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (status) status.textContent = 'Address found.';
+      return;
+    }
+    button.disabled = true;
+    if (status) status.textContent = 'Finding address...';
+    try {
+      var data = await requestJson('/admin/store/products/address-lookup', {
+        params: { q: query }
+      });
+      var display = String(data.address || '').trim();
+      if (!display) throw new Error('No matching address found.');
+      storeProductAddressLookupCache.set(cacheKey, display);
+      if (addressInput) {
+        addressInput.value = display;
+        addressInput.dispatchEvent(new Event('input', { bubbles: true }));
+        addressInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (status) status.textContent = 'Address found.';
+    } catch (error) {
+      if (status) status.textContent = error?.message || 'Address lookup failed.';
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function createStoreProductVariantModeField(product) {
@@ -6308,23 +6471,19 @@
 
     var table = createElement('table', 'admin-store-products__variants-table');
     table.hidden = !variants.length;
+    var colgroup = document.createElement('colgroup');
+    storeProductVariantColumns().forEach(function(pair) {
+      var col = document.createElement('col');
+      applyStoreProductVariantColumnMetadata(col, pair[0]);
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
     var thead = document.createElement('thead');
     var header = document.createElement('tr');
-    [
-      ['label', 'Label'],
-      ['id', 'ID'],
-      ['sku', 'SKU'],
-      ['downloadFileKey', 'File'],
-      ['price', 'Price (USD)'],
-      ['inventory', 'Inventory'],
-      ['status', 'Status'],
-      ['actions', '']
-    ].forEach(function(pair) {
+    storeProductVariantColumns().forEach(function(pair) {
       var text = pair[1];
       var th = createElement('th', '', text);
-      th.dataset.storeVariantColumn = pair[0];
-      if (text === 'Inventory') th.dataset.storeProductVariantInventoryCell = 'true';
-      if (text === 'File') th.dataset.storeProductVariantDownloadCell = 'true';
+      applyStoreProductVariantColumnMetadata(th, pair[0]);
       header.appendChild(th);
     });
     thead.appendChild(header);
@@ -6341,9 +6500,33 @@
     return wrapper;
   }
 
+  function storeProductVariantColumns() {
+    return [
+      ['label', 'Label'],
+      ['id', 'ID'],
+      ['sku', 'SKU'],
+      ['downloadFileKey', 'File'],
+      ['price', 'Price (USD)'],
+      ['inventory', 'Inventory'],
+      ['status', 'Status'],
+      ['actions', '', 'Actions']
+    ];
+  }
+
+  function applyStoreProductVariantColumnMetadata(element, column) {
+    if (!element) return;
+    element.dataset.storeVariantColumn = column;
+    if (column === 'inventory') element.dataset.storeProductVariantInventoryCell = 'true';
+    if (column === 'downloadFileKey') element.dataset.storeProductVariantDownloadCell = 'true';
+  }
+
   function createStoreProductVariantRow(product, variant) {
     var source = variant || {};
     var tr = document.createElement('tr');
+    var labels = storeProductVariantColumns().reduce(function(map, column) {
+      map[column[0]] = column[2] || column[1];
+      return map;
+    }, {});
     var labelValue = source.label || '';
     tr.dataset.storeProductVariant = derivedStoreVariantId(labelValue, source.id || 'variant');
     [
@@ -6356,9 +6539,8 @@
       ['status', source.status || 'active', 'select']
     ].forEach(function(field) {
       var td = document.createElement('td');
-      td.dataset.storeVariantColumn = field[0];
-      if (field[0] === 'inventory') td.dataset.storeProductVariantInventoryCell = 'true';
-      if (field[0] === 'downloadFileKey') td.dataset.storeProductVariantDownloadCell = 'true';
+      applyStoreProductVariantColumnMetadata(td, field[0]);
+      td.dataset.label = labels[field[0]] || '';
       var input;
       if (field[2] === 'derived') {
         var derived = createStoreProductVariantDerivedField(field[0], field[1]);
@@ -6398,7 +6580,8 @@
       tr.appendChild(td);
     });
     var actionCell = document.createElement('td');
-    actionCell.dataset.storeVariantColumn = 'actions';
+    applyStoreProductVariantColumnMetadata(actionCell, 'actions');
+    actionCell.dataset.label = labels.actions || 'Actions';
     var remove = createElement('button', 'btn btn--secondary btn--small', 'Remove');
     remove.type = 'button';
     remove.dataset.storeProductVariantRemove = 'true';
@@ -6481,6 +6664,8 @@
       if (key === 'price') fields[key] = Number(input.value || 0);
       else if (key === 'inventory') fields[key] = input.value === '' ? '' : Number(input.value);
       else if (key === 'inventoryTracking') fields[key] = input.value === 'true';
+      else if (key === 'eventIcs') fields[key] = input.value === 'true';
+      else if (key === 'eventStartsAt' || key === 'eventEndsAt') fields[key] = storeProductDateTimePublishValue(input);
       else if (key === 'downloadFileKey') {
         fields[key] = input.value;
         fields.downloadFilename = input.options && input.selectedIndex >= 0

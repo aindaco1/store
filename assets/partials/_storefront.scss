@@ -257,6 +257,24 @@
   line-height: 1.32;
 }
 
+.store-product-card__event {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.store-product-card__event-line {
+  margin: 0;
+}
+
+.store-product-card__event-line--venue,
+.store-product-card__event-line--address {
+  color: var(--color-text-strong);
+}
+
 .store-product-card__price {
   margin: 0;
   color: var(--color-text-strong);
@@ -444,6 +462,56 @@
   gap: 12px;
 }
 
+.store-order-lookup__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-base);
+}
+
+.store-order-lookup__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+}
+
+.store-order-lookup__table th,
+.store-order-lookup__table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: top;
+}
+
+.store-order-lookup__table th {
+  color: var(--color-text-strong);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.store-order-lookup__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.store-order-lookup__token-cell,
+.store-order-lookup__total-cell {
+  color: var(--color-text-strong);
+  font-weight: 700;
+}
+
+.store-order-lookup__items-cell {
+  white-space: pre-line;
+}
+
+.store-order-lookup__debug {
+  gap: 12px;
+}
+
 .store-order__status {
   color: var(--color-text-muted);
   font-size: 0.95rem;
@@ -553,5 +621,15 @@
 
   .store-order-lookup__form {
     grid-template-columns: 1fr;
+  }
+
+  .store-order-lookup__table-wrap {
+    display: none;
+  }
+}
+
+@media (min-width: 761px) {
+  .store-order-lookup__orders {
+    display: none;
   }
 }

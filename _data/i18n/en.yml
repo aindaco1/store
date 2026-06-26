@@ -180,7 +180,9 @@ email:
   subjects:
     admin_user_created: Admin access added
     store_order_confirmed: Order confirmed
-    store_order_lookup: Order lookup link
+    store_order_lookup: Find your order
+    store_abandoned_cart: Finish your checkout
+    store_event_reminder: Event reminder
   common:
     questions_prefix: Questions? Reply to this email or visit
   store_order:
@@ -195,32 +197,52 @@ email:
     fulfillment_rsvp: RSVP
     fulfillment_service: Service
     fulfillment_physical: Physical item
-    download_note: Download delivery will arrive by email when fulfillment is ready.
-    ticket_note: Ticket delivery will arrive by email.
+    download_note: Open your order page to access your download.
+    ticket_note: Open your order page for your ticket.
     rsvp_note: Your RSVP is confirmed.
-    shipping_note: We will email again when fulfillment or shipping updates are available.
+    shipping_note: Shipping updates will appear on your order page.
     quantity_label: Qty
     items_heading: Items
     shipping_heading: Shipping
     heading: Order confirmed
     order_label: Order
-    body: Thanks for your order. Save this email for your records.
-    cta: View order status
+    body: Thanks for your order. Your order page has the latest details for tickets, downloads, shipping, and receipts.
+    attachments_note: Event tickets, check-in QR codes, and calendar files are attached when available.
+    cta: View order
+  store_event_reminder:
+    fallback_title: Your event
+    heading: "%{event} is coming up"
+    body: This is a reminder for your ticket or RSVP.
+    reminder_label: "This is your %{label} reminder."
+    when: When
+    where: Where
+    order: Order
+    attachments: The calendar invite and check-in QR are attached when available.
+    cta: View order
+    footer: You are receiving this because this email address is attached to an event or RSVP order from %{platform}.
   store_order_lookup:
     heading: Find your order
-    body_one: Use this link within 15 minutes to view your %{platform} order.
-    body_other: Use this link within 15 minutes to view your %{platform} orders.
+    body_one: Here is your secure link to view your %{platform} order. It works for 15 minutes.
+    body_other: Here is your secure link to view your %{platform} orders. It works for 15 minutes.
     cta: View orders
-    expiry: This link expires after one use.
-    ignore: If you did not request this email, you can ignore it.
+    expiry: This link works once.
+    ignore: If you did not ask for this, you can ignore it.
+  store_abandoned_cart:
+    heading: Finish your checkout
+    body: You asked for one reminder before leaving checkout. Your cart is still here when you are ready.
+    item_count: "%{count} item%{plural} in your cart"
+    estimated_total: "Estimated total: %{amount}"
+    cta: Finish checkout
+    footer: You are receiving this because you asked for one checkout reminder before leaving %{platform}.
+    unsubscribe: Do not send checkout reminders
   admin_user_created:
     heading: Admin access added
     greeting: Hi %{name},
-    intro: You have been added as a %{role} for %{platform}.
-    instructions: Use the admin sign-in page and enter this email address to receive a magic link. There is no password to set.
-    cta: Open admin sign-in
+    intro: You now have %{role} access to %{platform}.
+    instructions: To sign in, open admin and enter this email address. We will send you a magic link.
+    cta: Open admin
     role_super_admin: super admin
     role_limited_admin: limited admin
     access_heading: Access
     created_by: Added by %{email}
-    footer: If you were not expecting this access, ignore this email or contact the platform owner.
+    footer: Not expecting this access? Ignore this email or contact the site owner.

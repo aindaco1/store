@@ -4,6 +4,11 @@
 {%- assign product_id = product.identifier | default: product.slug | default: product_display_name | slugify -%}
 {%- assign product_type = product.fulfillment_type | default: product.type | default: "physical" -%}
 {%- assign product_status = product.status | default: product.type -%}
+{%- assign unavailable_statuses = "archived,archive,draft,sold_out,sold-out,unavailable" | split: "," -%}
+{%- assign product_unavailable = false -%}
+{%- if unavailable_statuses contains product_status -%}
+  {%- assign product_unavailable = true -%}
+{%- endif -%}
 {%- assign product_price = product.price | plus: 0 -%}
 {%- assign product_inventory = product.inventory | default: 0 | plus: 0 -%}
 {%- assign tracks_inventory = false -%}
@@ -50,7 +55,7 @@
     {%- assign candidate_variant_inventory = variant.inventory | default: product_inventory | default: 0 | plus: 0 -%}
     {%- assign candidate_variant_status = variant.status | default: product_status -%}
     {%- assign candidate_variant_available = true -%}
-    {%- if candidate_variant_status == "sold_out" or candidate_variant_status == "sold-out" or candidate_variant_status == "unavailable" -%}
+    {%- if unavailable_statuses contains candidate_variant_status -%}
       {%- assign candidate_variant_available = false -%}
     {%- elsif tracks_inventory and variant.inventory != nil and candidate_variant_inventory <= 0 -%}
       {%- assign candidate_variant_available = false -%}
@@ -76,7 +81,7 @@
       {%- if variant.inventory != nil -%}
         {%- assign selected_product_inventory_configured = true -%}
       {%- endif -%}
-      {%- if selected_product_status == "sold_out" or selected_product_status == "sold-out" or selected_product_status == "unavailable" -%}
+      {%- if unavailable_statuses contains selected_product_status -%}
         {%- assign selected_variant_unavailable = true -%}
       {%- elsif tracks_inventory and selected_product_inventory_configured and selected_product_inventory <= 0 -%}
         {%- assign selected_variant_unavailable = true -%}
@@ -94,6 +99,20 @@
 {%- endif -%}
 {%- assign product_url = product.url | absolute_url -%}
 {%- assign desc_text = product.description | default: product.content | strip_html | strip -%}
+{%- assign event_starts_at = "" -%}
+{%- assign event_venue = "" -%}
+{%- assign event_address = "" -%}
+{%- if product.event_details -%}
+  {%- assign event_starts_at = product.event_details.starts_at | default: product.event_details.startsAt | default: "" -%}
+  {%- assign event_venue = product.event_details.venue | default: "" -%}
+  {%- assign event_address = product.event_details.address | default: "" -%}
+{%- endif -%}
+{%- assign has_event_meta = false -%}
+{%- if product_type == "ticket" or product_type == "rsvp" -%}
+  {%- if event_starts_at != "" or event_venue != "" or event_address != "" -%}
+    {%- assign has_event_meta = true -%}
+  {%- endif -%}
+{%- endif -%}
 {%- assign product_image_loading = include.image_loading | default: "lazy" -%}
 {%- assign product_image_fetchpriority = include.image_fetchpriority | default: "" -%}
 {%- capture product_collection -%}{% include product-taxonomy.html product=product mode="collection" %}{%- endcapture -%}
@@ -119,6 +138,9 @@
 {%- assign product_purchase_only = false -%}
 {%- unless show_product_eyebrow or show_product_title or show_product_description -%}
   {%- assign product_purchase_only = true -%}
+{%- endunless -%}
+{%- unless product_purchase_only -%}
+  {%- assign has_event_meta = false -%}
 {%- endunless -%}
 {%- capture product_category -%}{% include product-taxonomy.html product=product mode="category" %}{%- endcapture -%}
 {%- assign product_category = product_category | strip -%}
@@ -175,12 +197,25 @@
     {%- if show_product_description -%}
     <p class="store-product-card__description">{{ desc_text | truncate: 170 | escape }}</p>
     {%- endif -%}
+    {%- if has_event_meta -%}
+    <div class="store-product-card__event">
+      {%- if event_starts_at != "" -%}
+      <p class="store-product-card__event-line store-product-card__event-line--date">{{ event_starts_at | date: "%b %-d, %Y at %-I:%M %p" }}</p>
+      {%- endif -%}
+      {%- if event_venue != "" -%}
+      <p class="store-product-card__event-line store-product-card__event-line--venue">{{ event_venue | escape }}</p>
+      {%- endif -%}
+      {%- if event_address != "" -%}
+      <p class="store-product-card__event-line store-product-card__event-line--address">{{ event_address | escape }}</p>
+      {%- endif -%}
+    </div>
+    {%- endif -%}
     <div class="store-product-card__purchase">
       <p class="store-product-card__price" data-store-price>{% if selected_is_free %}Free{% else %}{{ selected_product_price | money }}{% endif %}</p>
       <p
         class="store-product-card__availability"
         data-store-availability
-        data-store-inventory-state="{% if tracks_inventory %}{% if product_status == 'sold_out' %}unavailable{% elsif product_inventory > 0 and product_inventory <= low_stock_threshold %}low{% elsif product_inventory > low_stock_threshold %}in-stock{% else %}pending{% endif %}{% else %}none{% endif %}"
+        data-store-inventory-state="{% if product_unavailable %}unavailable{% elsif tracks_inventory %}{% if product_inventory > 0 and product_inventory <= low_stock_threshold %}low{% elsif product_inventory > low_stock_threshold %}in-stock{% else %}pending{% endif %}{% else %}none{% endif %}"
         data-store-tracks-inventory="{{ tracks_inventory }}"
         data-store-low-stock-threshold="{{ low_stock_threshold }}"
         data-store-sold-out-label="{{ sold_out_label | escape }}"
@@ -188,10 +223,10 @@
         data-store-in-stock-label="{{ in_stock_label | escape }}"
         data-store-low-stock-template="{{ low_stock_template | escape }}"
         aria-live="polite">
-        {%- if tracks_inventory -%}
-          {%- if product_status == "sold_out" -%}
-            {{ sold_out_label }}
-          {%- elsif product_inventory > 0 and product_inventory <= low_stock_threshold -%}
+        {%- if product_unavailable -%}
+          {{ sold_out_label }}
+        {%- elsif tracks_inventory -%}
+          {%- if product_inventory > 0 and product_inventory <= low_stock_threshold -%}
             {% include t.html key="storefront.only_left" lang=current_lang count=product_inventory %}
           {%- elsif product_inventory > low_stock_threshold -%}
             {{ in_stock_label }}
@@ -218,7 +253,7 @@
                 {%- assign variant_inventory_configured = true -%}
               {%- endif -%}
               {%- assign variant_unavailable = false -%}
-              {%- if variant_status == "sold_out" or variant_status == "sold-out" or variant_status == "unavailable" -%}
+              {%- if unavailable_statuses contains variant_status -%}
                 {%- assign variant_unavailable = true -%}
               {%- elsif tracks_inventory and variant_inventory_configured and variant_inventory <= 0 -%}
                 {%- assign variant_unavailable = true -%}
@@ -283,7 +318,7 @@
           data-product-inventory-tracking="{{ tracks_inventory }}"
           data-product-low-stock-threshold="{{ low_stock_threshold }}"
           data-store-sold-out-label="{{ sold_out_label | escape }}"
-          {% if product_status == "sold_out" or selected_variant_unavailable %}disabled aria-disabled="true"{% endif %}
+          {% if product_unavailable or selected_variant_unavailable %}disabled aria-disabled="true"{% endif %}
           {% if resolved_shipping and resolved_shipping.manual_domestic_rate %}data-item-manual-domestic-rate="{{ resolved_shipping.manual_domestic_rate }}"{% endif %}
           {% if resolved_shipping and resolved_shipping.weight_oz != nil %}data-item-shipping-weight-oz="{{ resolved_shipping.weight_oz }}"{% endif %}
           {% if resolved_shipping and resolved_shipping.packaging_weight_oz != nil %}data-item-shipping-packaging-weight-oz="{{ resolved_shipping.packaging_weight_oz }}"{% endif %}
@@ -310,7 +345,7 @@
           data-item-custom6-type="hidden"
           data-item-custom6-value="{{ product_id | escape }}"
           data-store-button-label="{{ button_label | escape }}">
-          {%- if product_status == "sold_out" or selected_variant_unavailable -%}{{ sold_out_label }}{%- else -%}{{ button_label }}{% unless selected_is_free %} - {{ selected_product_price | money }}{% endunless %}{%- endif -%}
+          {%- if product_unavailable or selected_variant_unavailable -%}{{ sold_out_label }}{%- else -%}{{ button_label }}{% unless selected_is_free %} - {{ selected_product_price | money }}{% endunless %}{%- endif -%}
         </button>
       </div>
     </div>

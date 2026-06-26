@@ -14,6 +14,7 @@ import {
   getEmailSurfaceColor,
   getEmailTextColor,
   getOrdersEmailFrom,
+  getPlatformCompanyName,
   getPlatformName,
   getSiteBase,
   getSupportEmail,
@@ -22,6 +23,8 @@ import {
 import { getScopedConsole } from './logger.js';
 
 const DEFAULT_I18N_LANG = 'en';
+const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE || 'https://shop.dustwave.xyz';
+const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const EMAIL_I18N_CACHE = new Map();
 let console = globalThis.console;
 
@@ -143,16 +146,31 @@ function getResolvedSiteBase(siteBaseOrEnv) {
     ? siteBaseOrEnv
     : getSiteBase(siteBaseOrEnv || {});
   try {
-    return new URL(siteBase || DEFAULT_SITE_BASE || 'https://shop.dustwave.xyz').origin;
+    return new URL(siteBase || FALLBACK_SITE_BASE).origin;
   } catch {
-    return DEFAULT_SITE_BASE || 'https://shop.dustwave.xyz';
+    return FALLBACK_SITE_BASE;
+  }
+}
+
+function getEmailAssetBase(siteBaseOrEnv) {
+  try {
+    const resolved = new URL(getResolvedSiteBase(siteBaseOrEnv));
+    const hostname = resolved.hostname.toLowerCase();
+    const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    return resolved.protocol === 'https:' && !isLocalHost ? resolved.origin : getResolvedSiteBase(FALLBACK_SITE_BASE);
+  } catch {
+    return getResolvedSiteBase(FALLBACK_SITE_BASE);
   }
 }
 
 function safeSiteUrl(path, siteBaseOrEnv) {
   const base = getResolvedSiteBase(siteBaseOrEnv);
   try {
-    return new URL(String(path || '/'), base).toString();
+    const baseUrl = new URL(base);
+    const parsed = new URL(String(path || '/'), baseUrl);
+    return SAFE_LINK_PROTOCOLS.has(parsed.protocol) && parsed.origin === baseUrl.origin
+      ? parsed.toString()
+      : base;
   } catch {
     return base;
   }
@@ -162,8 +180,22 @@ function safeExternalUrl(value, fallbackBase = DEFAULT_SITE_BASE) {
   const raw = String(value || '').trim();
   if (!raw) return '';
   try {
-    const parsed = new URL(raw, fallbackBase || DEFAULT_SITE_BASE);
-    return ['http:', 'https:', 'mailto:'].includes(parsed.protocol) ? parsed.toString() : '';
+    const parsed = new URL(raw, fallbackBase || FALLBACK_SITE_BASE);
+    return SAFE_LINK_PROTOCOLS.has(parsed.protocol) ? parsed.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+function safeEmailHostedAssetUrl(pathOrUrl, siteBaseOrEnv) {
+  if (!pathOrUrl) return '';
+  try {
+    const assetBase = getEmailAssetBase(siteBaseOrEnv);
+    const baseUrl = new URL(assetBase);
+    const parsed = new URL(pathOrUrl, baseUrl);
+    if (!SAFE_LINK_PROTOCOLS.has(parsed.protocol) || parsed.origin !== baseUrl.origin) return '';
+    if (!parsed.pathname.startsWith('/assets/images/') && !parsed.pathname.startsWith('/assets/icons/')) return '';
+    return parsed.toString();
   } catch {
     return '';
   }
@@ -181,24 +213,72 @@ function buildEmailSubject(primary, secondary, prefix = '') {
   return [safeEmailHeaderText(prefix), core].filter(Boolean).join(' ').trim();
 }
 
+function getEmailPlatformDisplayName(env = {}) {
+  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const hasCompanySetting = String(env.PLATFORM_COMPANY_NAME || env.PLATFORM_AUTHOR || '').trim();
+  const companyName = hasCompanySetting ? safeEmailHeaderText(getPlatformCompanyName(env)) : '';
+  if (!companyName || companyName.toLowerCase() === platformName.toLowerCase()) return platformName;
+  if (platformName.toLowerCase().includes(companyName.toLowerCase())) return platformName;
+  return `${companyName} ${platformName}`;
+}
+
+function parseHexColor(value) {
+  const normalized = String(value || '').trim();
+  if (/^#[0-9a-f]{3}$/i.test(normalized)) {
+    return normalized.slice(1).split('').map((char) => parseInt(char + char, 16));
+  }
+  if (/^#[0-9a-f]{6}$/i.test(normalized)) {
+    return [
+      parseInt(normalized.slice(1, 3), 16),
+      parseInt(normalized.slice(3, 5), 16),
+      parseInt(normalized.slice(5, 7), 16)
+    ];
+  }
+  return null;
+}
+
+function getAccessibleButtonTextColor(backgroundColor, fallback = '#ffffff') {
+  const channels = parseHexColor(backgroundColor);
+  if (!channels) return fallback;
+  const [red, green, blue] = channels.map((channel) => channel / 255);
+  const linear = [red, green, blue].map((channel) => (
+    channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4
+  ));
+  const luminance = (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+  return luminance > 0.5 ? '#111111' : '#ffffff';
+}
+
+function emailListUnsubscribeHeaders(unsubscribeUrl, siteBaseOrEnv) {
+  const href = safeExternalUrl(unsubscribeUrl, getResolvedSiteBase(siteBaseOrEnv));
+  if (!href) return {};
+  return {
+    'List-Unsubscribe': `<${href}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+  };
+}
+
 function getEmailTheme(env = {}) {
+  const primaryColor = getEmailPrimaryColor(env);
   const siteBase = getResolvedSiteBase(env);
   const logoPath = getEmailLogoPath(env);
-  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const logoUrl = logoPath ? safeEmailHostedAssetUrl(logoPath, siteBase) : '';
   return {
     siteBase,
-    platformName,
+    platformName: safeEmailHeaderText(getEmailPlatformDisplayName(env)),
     siteHomeUrl: safeSiteUrl('/', siteBase),
-    logoUrl: logoPath ? safeSiteUrl(logoPath, siteBase) : '',
+    logoUrl,
     supportEmail: safeEmailHeaderText(getSupportEmail(env)),
     fontFamily: escapeHtml(getEmailFontFamily(env)),
     headingFontFamily: escapeHtml(getEmailHeadingFontFamily(env)),
-    textColor: getEmailTextColor(env),
-    mutedTextColor: getEmailMutedTextColor(env),
-    surfaceColor: getEmailSurfaceColor(env),
-    borderColor: getEmailBorderColor(env),
-    primaryColor: getEmailPrimaryColor(env),
-    buttonRadius: getEmailButtonRadius(env)
+    textColor: escapeHtml(getEmailTextColor(env)),
+    mutedTextColor: escapeHtml(getEmailMutedTextColor(env)),
+    surfaceColor: escapeHtml(getEmailSurfaceColor(env)),
+    borderColor: escapeHtml(getEmailBorderColor(env)),
+    primaryColor: escapeHtml(primaryColor),
+    buttonRadius: escapeHtml(getEmailButtonRadius(env)),
+    primaryTextColor: getAccessibleButtonTextColor(primaryColor)
   };
 }
 
@@ -211,16 +291,16 @@ function getEmailCardStyle(theme) {
 }
 
 function getEmailPrimaryButtonStyle(theme) {
-  return `display: inline-block; background: ${theme.primaryColor}; color: #111111; text-decoration: none; border-radius: ${theme.buttonRadius}; padding: 12px 18px; font-weight: 700;`;
+  return `display: inline-block; background: ${theme.primaryColor}; color: ${theme.primaryTextColor}; text-decoration: none; border-radius: ${theme.buttonRadius}; padding: 12px 18px; font-weight: 700;`;
 }
 
 function getEmailFooterStyle(theme) {
-  return `font-size: 13px; color: ${theme.mutedTextColor};`;
+  return `border-top: 1px solid ${theme.borderColor}; padding-top: 18px; font-size: 13px; color: ${theme.mutedTextColor};`;
 }
 
 function renderEmailHeader(theme, heading) {
   const logo = theme.logoUrl
-    ? `<img src="${escapeHtml(theme.logoUrl)}" alt="${escapeHtml(theme.platformName)}" width="56" height="56" style="display: block; width: 56px; height: 56px; object-fit: contain; margin: 0 0 16px 0;">`
+    ? `<a href="${escapeHtml(theme.siteHomeUrl)}" style="text-decoration: none;"><img src="${escapeHtml(theme.logoUrl)}" alt="${escapeHtml(theme.platformName)}" width="56" height="56" style="display: block; width: 56px; height: 56px; object-fit: contain; margin: 0 0 16px 0;"></a>`
     : '';
   return `
   <div style="margin-bottom: 24px;">
@@ -267,10 +347,10 @@ function getStoreFulfillmentLabel(item = {}, t = (_key, fallback) => fallback) {
 
 function getStoreFulfillmentNote(item = {}, t = (_key, fallback) => fallback) {
   const type = String(item.fulfillmentType || item.fulfillment_type || 'physical').trim().toLowerCase();
-  if (type === 'digital') return t('store_order.download_note', 'Download delivery will arrive by email when fulfillment is ready.');
-  if (type === 'ticket') return t('store_order.ticket_note', 'Ticket delivery will arrive by email.');
+  if (type === 'digital') return t('store_order.download_note', 'Open your order page to access your download.');
+  if (type === 'ticket') return t('store_order.ticket_note', 'Open your order page for your ticket.');
   if (type === 'rsvp') return t('store_order.rsvp_note', 'Your RSVP is confirmed.');
-  if (item.shippable === true) return t('store_order.shipping_note', 'We will email again when fulfillment or shipping updates are available.');
+  if (item.shippable === true) return t('store_order.shipping_note', 'Shipping updates will appear on your order page.');
   return '';
 }
 
@@ -357,23 +437,29 @@ export async function sendAdminLoginEmail(env, { email, loginUrl, lang } = {}) {
   const normalizedLang = normalizeLang(lang);
   const isSpanish = normalizedLang === 'es';
   const theme = getEmailTheme(env);
-  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getOrdersEmailFrom(env));
   const subject = safeEmailHeaderText(isSpanish
     ? buildEmailSubject('Tu enlace de administración', platformName)
-    : buildEmailSubject('Your admin sign-in link', platformName));
+    : buildEmailSubject('Admin sign-in link', platformName));
   const heading = isSpanish ? 'Inicia sesión en administración' : 'Sign in to admin';
   const body = isSpanish
-    ? 'Este enlace caduca en 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
-    : 'This link expires in 15 minutes. If you did not request it, you can ignore this email.';
+    ? 'Este enlace funciona por 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
+    : 'This link works for 15 minutes. If you did not ask for it, you can ignore this email.';
   const cta = isSpanish ? 'Abrir administración' : 'Open admin';
+  const footer = isSpanish
+    ? 'Alguien solicitó acceso al panel de administración con este correo.'
+    : 'Someone requested access to the admin dashboard with this email address.';
 
   const html = `
-<body style="${getEmailBodyStyle(theme)}">
+  <body style="${getEmailBodyStyle(theme)}">
   ${renderEmailHeader(theme, escapeHtml(heading))}
   <div style="${getEmailCardStyle(theme)}">
     <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(body)}</p>
     <p style="margin: 0;"><a href="${escapeHtml(safeExternalUrl(loginUrl, theme.siteBase))}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a></p>
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
   </div>
 </body>`;
 
@@ -394,7 +480,7 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
 
   const { t } = await getEmailTranslator(env, lang);
   const theme = getEmailTheme(env);
-  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getOrdersEmailFrom(env));
   const roleLabel = role === 'super_admin'
     ? t('admin_user_created.role_super_admin', 'super admin')
@@ -412,17 +498,21 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
     : '';
   const subject = buildEmailSubject(t('subjects.admin_user_created', 'Admin access added'), platformName);
   const heading = t('admin_user_created.heading', 'Admin access added');
+  const footer = t('admin_user_created.footer', 'Not expecting this access? Ignore this email or contact the site owner.');
 
   const html = `
 <body style="${getEmailBodyStyle(theme)}">
   ${renderEmailHeader(theme, escapeHtml(heading))}
   <div style="${getEmailCardStyle(theme)}">
     <p style="margin: 0 0 8px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.greeting', 'Hi %{name},', { name: displayName }))}</p>
-    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.intro', 'You have been added as a %{role} for %{platform}.', { role: roleLabel, platform: platformName }))}</p>
-    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.instructions', 'Use the admin sign-in page and enter this email address to receive a magic link. There is no password to set.'))}</p>
-    <p style="margin: 0;"><a href="${escapeHtml(adminUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('admin_user_created.cta', 'Open admin sign-in'))}</a></p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.intro', 'You now have %{role} access to %{platform}.', { role: roleLabel, platform: platformName }))}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.instructions', 'To sign in, open admin and enter this email address. We will send you a magic link.'))}</p>
+    <p style="margin: 0;"><a href="${escapeHtml(adminUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('admin_user_created.cta', 'Open admin'))}</a></p>
     ${accessBlock}
     ${createdByLine}
+  </div>
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(footer)}</p>
   </div>
 </body>`;
 
@@ -437,17 +527,28 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
   }
 }
 
-export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang } = {}) {
+function normalizeEmailAttachments(attachments = []) {
+  return (Array.isArray(attachments) ? attachments : [])
+    .map((attachment) => ({
+      filename: safeEmailHeaderText(attachment?.filename || ''),
+      content: String(attachment?.content || '')
+    }))
+    .filter((attachment) => attachment.filename && attachment.content)
+    .slice(0, 25);
+}
+
+export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [] } = {}) {
   configureEmailLogging(env);
   if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
 
   const { t, lang } = await getEmailTranslator(env, preferredLang || orderDraft.preferredLang);
   const theme = getEmailTheme(env);
-  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const orderId = safeEmailHeaderText(orderToken || orderDraft.orderToken || '');
   const orderUrl = safeSiteUrl(`${getLocalizedPath('/order-success/', lang)}?orderToken=${encodeURIComponent(orderId)}`, theme.siteBase);
   const totals = orderDraft.totals || {};
   const itemsHtml = renderStoreOrderItems(orderDraft.items || [], t, theme);
+  const safeAttachments = normalizeEmailAttachments(attachments);
   const hasShipping = orderDraft.fulfillment?.requiresShipping === true || totals.requiresShipping === true;
   const shippingAddress = orderDraft.shippingAddress || {};
   const addressLine = hasShipping
@@ -492,12 +593,13 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
   ${shippingBlock}
 
   <div style="margin-bottom: 32px;">
-    <p style="margin: 0 0 16px 0;">${escapeHtml(t('store_order.body', 'Thanks for your order. Save this email for your records.'))}</p>
-    <a href="${escapeHtml(orderUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_order.cta', 'View order status'))}</a>
+    <p style="margin: 0 0 16px 0;">${escapeHtml(t('store_order.body', 'Thanks for your order. Your order page has the latest details for tickets, downloads, shipping, and receipts.'))}</p>
+    ${safeAttachments.length ? `<p style="margin: 0 0 16px 0; color: ${theme.mutedTextColor};">${escapeHtml(t('store_order.attachments_note', 'Event tickets, check-in QR codes, and calendar files are attached when available.'))}</p>` : ''}
+    <a href="${escapeHtml(orderUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_order.cta', 'View order'))}</a>
   </div>
 
   <div style="${getEmailFooterStyle(theme)}">
-    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${theme.siteHomeUrl}" style="color: ${theme.primaryColor};">${theme.platformName}</a>.</p>
+    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${escapeHtml(theme.siteHomeUrl)}" style="color: ${theme.primaryColor};">${escapeHtml(theme.platformName)}</a>.</p>
   </div>
 </body>
 </html>`.trim();
@@ -506,12 +608,100 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
     from: getOrdersEmailFrom(env),
     to: email,
     subject: buildEmailSubject(t('subjects.store_order_confirmed', 'Order confirmed'), platformName),
-    html
+    html,
+    ...(safeAttachments.length ? { attachments: safeAttachments } : {})
   }, {
     errorLabel: 'Resend error (store order)',
     failureLabel: `Failed to send ${platformName} order email`
   });
   return { sent: true };
+}
+
+export async function sendStoreEventReminderEmail(env, {
+  email,
+  orderToken = '',
+  orderUrl = '',
+  eventTitle = '',
+  eventTime = '',
+  venue = '',
+  address = '',
+  reminderLabel = '',
+  preferredLang,
+  attachments = []
+} = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+
+  const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
+  const safeEmail = safeEmailHeaderText(email);
+  const safeOrderUrl = safeExternalUrl(orderUrl, theme.siteBase);
+  if (!safeEmail || !safeOrderUrl) return { sent: false, reason: 'Missing event reminder recipient or order URL' };
+
+  const title = safeEmailHeaderText(eventTitle) || t('store_event_reminder.fallback_title', 'Your event');
+  const when = safeEmailHeaderText(eventTime);
+  const where = [venue, address].map((value) => String(value || '').trim()).filter(Boolean).join(', ');
+  const safeAttachments = normalizeEmailAttachments(attachments);
+  const subject = buildEmailSubject(t('subjects.store_event_reminder', 'Event reminder'), `${title} | ${platformName}`);
+  const reminderLine = reminderLabel
+    ? t('store_event_reminder.reminder_label', 'This is your %{label} reminder.', { label: reminderLabel })
+    : t('store_event_reminder.body', 'This is a reminder for your ticket or RSVP.');
+  const detailsRows = [
+    [t('store_event_reminder.when', 'When'), when],
+    [t('store_event_reminder.where', 'Where'), where],
+    [t('store_event_reminder.order', 'Order'), orderToken]
+  ].filter(([, value]) => String(value || '').trim());
+  const detailsTable = detailsRows.length ? `
+    <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+      ${detailsRows.map(([label, value]) => `
+        <tr>
+          <td style="padding: 6px 12px 6px 0; color: ${theme.mutedTextColor}; width: 96px;">${escapeHtml(label)}</td>
+          <td style="padding: 6px 0; color: ${theme.textColor}; font-weight: 600;">${escapeHtml(value)}</td>
+        </tr>`).join('')}
+    </table>` : '';
+  const attachmentLine = safeAttachments.length
+    ? `<p style="margin: 16px 0 0 0; color: ${theme.mutedTextColor};">${escapeHtml(t('store_event_reminder.attachments', 'The calendar invite and check-in QR are attached when available.'))}</p>`
+    : '';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="${getEmailBodyStyle(theme)}">
+  ${renderEmailHeader(theme, escapeHtml(t('store_event_reminder.heading', '%{event} is coming up', { event: title })))}
+
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(reminderLine)}</p>
+    ${detailsTable}
+    ${attachmentLine}
+    <p style="margin: 18px 0 0 0;"><a href="${escapeHtml(safeOrderUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_event_reminder.cta', 'View order'))}</a></p>
+  </div>
+
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(t('store_event_reminder.footer', 'You are receiving this because this email address is attached to an event or RSVP order from %{platform}.', { platform: platformName }))}</p>
+  </div>
+</body>
+</html>`.trim();
+
+  try {
+    await sendResendEmail(env, {
+      from: getUpdatesEmailFrom(env) || getOrdersEmailFrom(env),
+      to: safeEmail,
+      subject,
+      html,
+      ...(safeAttachments.length ? { attachments: safeAttachments } : {})
+    }, {
+      errorLabel: 'Resend error (store event reminder)',
+      failureLabel: `Failed to send ${platformName} event reminder email`
+    });
+    return { sent: true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send event reminder email' };
+  }
 }
 
 export async function sendStoreOrderLookupEmail(env, { email, lookupUrl, orderCount = 0, preferredLang } = {}) {
@@ -520,14 +710,14 @@ export async function sendStoreOrderLookupEmail(env, { email, lookupUrl, orderCo
 
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
-  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const safeLookupUrl = safeExternalUrl(lookupUrl, theme.siteBase);
   if (!safeLookupUrl) return { sent: false, reason: 'Invalid lookup URL' };
 
   const count = Math.max(0, Math.floor(Number(orderCount || 0) || 0));
   const body = count === 1
-    ? t('store_order_lookup.body_one', 'Use this link within 15 minutes to view your %{platform} order.', { platform: platformName })
-    : t('store_order_lookup.body_other', 'Use this link within 15 minutes to view your %{platform} orders.', { platform: platformName });
+    ? t('store_order_lookup.body_one', 'Here is your secure link to view your %{platform} order. It works for 15 minutes.', { platform: platformName })
+    : t('store_order_lookup.body_other', 'Here is your secure link to view your %{platform} orders. It works for 15 minutes.', { platform: platformName });
 
   const html = `
 <!DOCTYPE html>
@@ -545,8 +735,8 @@ export async function sendStoreOrderLookupEmail(env, { email, lookupUrl, orderCo
   </div>
 
   <div style="${getEmailFooterStyle(theme)}">
-    <p style="margin: 0 0 8px 0;">${escapeHtml(t('store_order_lookup.expiry', 'This link expires after one use.'))}</p>
-    <p style="margin: 0;">${escapeHtml(t('store_order_lookup.ignore', 'If you did not request this email, you can ignore it.'))}</p>
+    <p style="margin: 0 0 8px 0;">${escapeHtml(t('store_order_lookup.expiry', 'This link works once.'))}</p>
+    <p style="margin: 0;">${escapeHtml(t('store_order_lookup.ignore', 'If you did not ask for this, you can ignore it.'))}</p>
   </div>
 </body>
 </html>`.trim();
@@ -554,7 +744,7 @@ export async function sendStoreOrderLookupEmail(env, { email, lookupUrl, orderCo
   await sendResendEmail(env, {
     from: getOrdersEmailFrom(env),
     to: email,
-    subject: buildEmailSubject(t('subjects.store_order_lookup', 'Order lookup link'), platformName),
+    subject: buildEmailSubject(t('subjects.store_order_lookup', 'Find your order'), platformName),
     html
   }, {
     errorLabel: 'Resend error (store order lookup)',
@@ -569,15 +759,16 @@ export async function sendStoreAbandonedCartEmail(env, { email, resumeUrl = '', 
 
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
-  const platformName = safeEmailHeaderText(getPlatformName(env) || 'Store') || 'Store';
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const safeResumeUrl = safeExternalUrl(resumeUrl, theme.siteBase) || theme.siteHomeUrl;
   const safeUnsubscribeUrl = safeExternalUrl(unsubscribeUrl, theme.siteBase);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(safeUnsubscribeUrl, theme.siteBase);
   const safeEmail = safeEmailHeaderText(email);
   const count = Math.max(0, Math.floor(Number(itemCount || 0) || 0));
   const amount = Math.max(0, Number(amountCents || 0) || 0);
   const subject = buildEmailSubject(t('subjects.store_abandoned_cart', 'Finish your checkout'), platformName);
   const itemLine = count > 0
-    ? t('store_abandoned_cart.item_count', '%{count} item%{plural} waiting', {
+    ? t('store_abandoned_cart.item_count', '%{count} item%{plural} in your cart', {
         count,
         plural: count === 1 ? '' : 's'
       })
@@ -591,7 +782,7 @@ export async function sendStoreAbandonedCartEmail(env, { email, resumeUrl = '', 
   ` : '';
   const unsubscribeBlock = safeUnsubscribeUrl ? `
     <p style="margin: 12px 0 0 0;">
-      <a href="${escapeHtml(safeUnsubscribeUrl)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(t('store_abandoned_cart.unsubscribe', 'Do not send me checkout reminders'))}</a>
+      <a href="${escapeHtml(safeUnsubscribeUrl)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(t('store_abandoned_cart.unsubscribe', 'Do not send checkout reminders'))}</a>
     </p>
   ` : '';
 
@@ -606,13 +797,13 @@ export async function sendStoreAbandonedCartEmail(env, { email, resumeUrl = '', 
   ${renderEmailHeader(theme, escapeHtml(t('store_abandoned_cart.heading', 'Finish your checkout')))}
 
   <div style="${getEmailCardStyle(theme)}">
-    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_abandoned_cart.body', 'You asked for one reminder if you left checkout before finishing your order. Your cart is ready when you are.'))}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_abandoned_cart.body', 'You asked for one reminder before leaving checkout. Your cart is still here when you are ready.'))}</p>
     ${summaryBlock}
-    <p style="margin: 0;"><a href="${escapeHtml(safeResumeUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_abandoned_cart.cta', 'Resume checkout'))}</a></p>
+    <p style="margin: 0;"><a href="${escapeHtml(safeResumeUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_abandoned_cart.cta', 'Finish checkout'))}</a></p>
   </div>
 
   <div style="${getEmailFooterStyle(theme)}">
-    <p style="margin: 0;">${escapeHtml(t('store_abandoned_cart.footer', 'You are receiving this because you opted into one checkout reminder for %{platform}.', { platform: platformName }))}</p>
+    <p style="margin: 0;">${escapeHtml(t('store_abandoned_cart.footer', 'You are receiving this because you asked for one checkout reminder before leaving %{platform}.', { platform: platformName }))}</p>
     ${unsubscribeBlock}
   </div>
 </body>
@@ -623,7 +814,8 @@ export async function sendStoreAbandonedCartEmail(env, { email, resumeUrl = '', 
       from: getUpdatesEmailFrom(env) || getOrdersEmailFrom(env),
       to: safeEmail,
       subject,
-      html
+      html,
+      ...(Object.keys(unsubscribeHeaders).length ? { headers: unsubscribeHeaders } : {})
     }, {
       errorLabel: 'Resend error (store abandoned checkout)',
       failureLabel: `Failed to send ${platformName} checkout reminder email`

@@ -986,6 +986,1142 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     },
     {
+      "id": "annihilation-1",
+      "slug": "dust-wave-annihilation",
+      "sku": "annihilation-1",
+      "name": "ANNIHILATION at the Guild Cinema",
+      "description": "**Dust Wave** presents ...\n\n## 🌿 ANNIHILATION 🐻\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on December 12th at 10:30pm** for a screening of the 2018 science fiction horror classic, [**_Annihilation!_**](https://www.imdb.com/title/tt0063522)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm. All tickets are will call at the door.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🌿 ANNIHILATION 🐻\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on December 12th at 10:30pm** for a screening of the 2018 science fiction horror classic, [**_Annihilation!_**](https://www.imdb.com/title/tt0063522)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm. All tickets are will call at the door.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/annihilation-guild.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-annihilation/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 160.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-annihilation/",
+        "es": "/es/products/dust-wave-annihilation/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-12-12T22:30:00-07:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "cure-1",
+      "slug": "dust-wave-cure-guild",
+      "sku": "cure-1",
+      "name": "CURE at the Guild Cinema!",
+      "description": "**Dust Wave** presents ...\n\n## ❌ CURE ❌\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on May 2nd at 10:30pm** for a screening of a seriously frightening J-Horror classic, 1997's **Cure**!\n\nBong Joon-ho really digs it apparently, putting Cure in his [**top 10 greatest films**](https://web.archive.org/web/20120825221053/http://explore.bfi.org.uk/sightandsoundpolls/2012/voter/902). Either way, Cure is a gnarly little one to share with your fellow film weirdos.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## ❌ CURE ❌\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on May 2nd at 10:30pm** for a screening of a seriously frightening J-Horror classic, 1997's **Cure**!\n\nBong Joon-ho really digs it apparently, putting Cure in his [**top 10 greatest films**](https://web.archive.org/web/20120825221053/http://explore.bfi.org.uk/sightandsoundpolls/2012/voter/902). Either way, Cure is a gnarly little one to share with your fellow film weirdos.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/cure-guild.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-cure-guild/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 165.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-cure-guild/",
+        "es": "/es/products/dust-wave-cure-guild/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-05-02T22:30:00-06:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "trainspotting-1",
+      "slug": "dust-wave-trainspotting-guild",
+      "sku": "trainspotting-1",
+      "name": "TRAINSPOTTING at the Guild Cinema!",
+      "description": "**Dust Wave** presents ...\n\n## 🚊 Trainspotting 🚽\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on June 20th at 10:30pm** for a screening of the demented black comedy classic, 1997's **_Trainspotting!_**\n\n[*Trainspotting*](https://www.imdb.com/title/tt0117951) is a visceral, anarchic masterpiece, launching Ewan McGregor into stardom and redefining cinema for a generation lost in addiction and rebellion. The film is propelled by Danny Boyle's kinetic direction and razor-sharp visual style, all set to one of the most iconic soundtracks in film history (from Iggy Pop and Lou Reed to Underworld). Hilarious, harrowing, and unforgettable, it's a wild ride through Scotland's underbelly that demands to be seen loud, large, and with a crowd.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🚊 Trainspotting 🚽\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on June 20th at 10:30pm** for a screening of the demented black comedy classic, 1997's **_Trainspotting!_**\n\n[*Trainspotting*](https://www.imdb.com/title/tt0117951) is a visceral, anarchic masterpiece, launching Ewan McGregor into stardom and redefining cinema for a generation lost in addiction and rebellion. The film is propelled by Danny Boyle's kinetic direction and razor-sharp visual style, all set to one of the most iconic soundtracks in film history (from Iggy Pop and Lou Reed to Underworld). Hilarious, harrowing, and unforgettable, it's a wild ride through Scotland's underbelly that demands to be seen loud, large, and with a crowd.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/trainspotting-guild.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-trainspotting-guild/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 170.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-trainspotting-guild/",
+        "es": "/es/products/dust-wave-trainspotting-guild/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-06-20T22:30:00-06:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "his-girl-1",
+      "slug": "dust-wave-his-girl-friday-studio",
+      "sku": "his-girl-1",
+      "name": "His Girl Friday at The Studio at WESST!",
+      "description": "**Dust Wave** presents ...\n\n## 📰 His Girl Friday 📞\n\n### Screening at The Studio at WESST!\n\nJoin us at **The Studio at WESST (609 Broadway Blvd NE) on June 7th at 6:30pm** for a screening of the 1940 screwball comedy classic **_His Girl Friday!_**\n\nHoward Hawks' [*His Girl Friday*](https://www.imdb.com/title/tt0032599) crackles with whip-smart dialogue, breakneck pacing, and two of the sharpest performances ever captured on screen from Cary Grant and Rosalind Russell. This is a rapid-fire and relentless film, setting a gold standard for screwball comedy that still feels electrifying today. With its razor wit, newsroom chaos, and romantic sparks flying at 100 miles an hour, *His Girl Friday* is best experienced the way it was meant to be: on the big screen, with a crowd laughing along.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 6:00pm, show starts at 6:30pm.**\n\n**Only 45 seats available!**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 📰 His Girl Friday 📞\n\n### Screening at The Studio at WESST!\n\nJoin us at **The Studio at WESST (609 Broadway Blvd NE) on June 7th at 6:30pm** for a screening of the 1940 screwball comedy classic **_His Girl Friday!_**\n\nHoward Hawks' [*His Girl Friday*](https://www.imdb.com/title/tt0032599) crackles with whip-smart dialogue, breakneck pacing, and two of the sharpest performances ever captured on screen from Cary Grant and Rosalind Russell. This is a rapid-fire and relentless film, setting a gold standard for screwball comedy that still feels electrifying today. With its razor wit, newsroom chaos, and romantic sparks flying at 100 miles an hour, *His Girl Friday* is best experienced the way it was meant to be: on the big screen, with a crowd laughing along.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 6:00pm, show starts at 6:30pm.**\n\n**Only 45 seats available!**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/friday-studio.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-his-girl-friday-studio/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 175.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-his-girl-friday-studio/",
+        "es": "/es/products/dust-wave-his-girl-friday-studio/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-06-07T18:30:00-06:00",
+        "venue": "The Studio at WESST",
+        "address": "609 Broadway Blvd NE, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "raiders-1",
+      "slug": "dust-wave-raiders-guild",
+      "sku": "raiders-1",
+      "name": "RAIDERS OF THE LOST ARK at the Guild Cinema!",
+      "description": "**Dust Wave** presents ...\n\n## 🤠 RAIDERS OF THE LOST ARK 🐍\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on July 4th at 10:30pm** for a screening of the Indiana Jones adventure classic, 1981's [**_Raiders of the Lost Ark!_**](https://www.imdb.com/title/tt0082971)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🤠 RAIDERS OF THE LOST ARK 🐍\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on July 4th at 10:30pm** for a screening of the Indiana Jones adventure classic, 1981's [**_Raiders of the Lost Ark!_**](https://www.imdb.com/title/tt0082971)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/raiders-guild.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-raiders-guild/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 180.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-raiders-guild/",
+        "es": "/es/products/dust-wave-raiders-guild/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-07-04T22:30:00-06:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "cloverfield-1",
+      "slug": "dust-wave-cloverfield-guild",
+      "sku": "cloverfield-1",
+      "name": "CLOVERFIELD at the Guild Cinema!",
+      "description": "**Dust Wave** presents ...\n\n## 🦎 Cloverfield 🗽\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on August 1st at 10:30pm** for a screening of the 2008 found-footage monster movie classic, [**_Cloverfield!_**](https://www.imdb.com/title/tt1060277)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🦎 Cloverfield 🗽\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on August 1st at 10:30pm** for a screening of the 2008 found-footage monster movie classic, [**_Cloverfield!_**](https://www.imdb.com/title/tt1060277)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/cloverfield-guild.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-cloverfield-guild/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 185.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-cloverfield-guild/",
+        "es": "/es/products/dust-wave-cloverfield-guild/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-08-01T22:30:00-06:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "airplane-1",
+      "slug": "dust-wave-airplane-guild",
+      "sku": "airplane-1",
+      "name": "AIRPLANE! at the Guild Cinema",
+      "description": "**Dust Wave** presents ...\n\n## ✈️ AIRPLANE! 👨🏼‍✈️\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on September 5th at 10:30pm** for a screening of the 1980 comedy classic, [**_Airplane!_**](https://www.imdb.com/title/tt0080339)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## ✈️ AIRPLANE! 👨🏼‍✈️\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on September 5th at 10:30pm** for a screening of the 1980 comedy classic, [**_Airplane!_**](https://www.imdb.com/title/tt0080339)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/airplane-guild.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-airplane-guild/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 190.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-airplane-guild/",
+        "es": "/es/products/dust-wave-airplane-guild/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-09-05T22:30:00-06:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "rosemary-1",
+      "slug": "dust-wave-rosemarys-baby",
+      "sku": "rosemary-1",
+      "name": "ROSEMARY'S BABY at the Guild Cinema",
+      "description": "**Dust Wave** presents ...\n\n## 🤰 ROSEMARY'S BABY 😈\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on November 7th at 10:30pm** for a screening of the 1967 psychological horror classic, [**_Rosemary's Baby!_**](https://www.imdb.com/title/tt0063522)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm. All tickets are will call at the door.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🤰 ROSEMARY'S BABY 😈\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on November 7th at 10:30pm** for a screening of the 1967 psychological horror classic, [**_Rosemary's Baby!_**](https://www.imdb.com/title/tt0063522)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm. All tickets are will call at the door.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/rosemary.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-rosemarys-baby/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 195.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-rosemarys-baby/",
+        "es": "/es/products/dust-wave-rosemarys-baby/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-11-07T22:30:00-07:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "frights-delights-1",
+      "slug": "dust-wave-frights-delights",
+      "sku": "frights-delights-1",
+      "name": "An Evening of Frights & Delights!",
+      "description": "## ONLINE SALES ARE NOW SOLD OUT! THERE WILL BE A FEW REMAINING TICKETS AT THE DOOR!\n\n**Space Age Daydream** & **Dust Wave** are proud to present ...\n\n## 🧟 Frights & Delights 😍\n\n### An Evening of Premieres at the Guild Cinema!\n\nJoin us at the **Guild Cinema on November 6 at 6pm** for a night of Space Age Daydream + Dust Wave + friends short film big screen premieres! Featuring:\n\n**Shellfish Knish**, By Camille Carlson\n\n**Movie Monsters**, By Brandon Carter\n\n**The Haunters**, By Kaidin Jarjusey\n\n**Softening**, By Jade Stokes\n\n**The North Wind**, By Dusty Deen\n\n**Cue Barb**, By Becca Elbrecht\n\nand more!\n\nPlus ... drumroll please ...\n\nThe world premiere of **The Hundred Voices of Harry Hoffman**, written and directed by the inimitable Brandon Carter! Followed by a **Q&A with the filmmakers!** We are thrilled to share this film with you, and can't wait to see you there.\n\nAlso -- **we're raffling off props from the films!** And -- **we're selling a special, limited run popcorn bucket** to celebrate! Plus more surprises!\n\n**Join us for a night of Frights & Delights! 🍿🎥🎃**\n\nTickets are **SOLD OUT online and $10 at the door. Doors open at 5:30pm, show starts at 6pm.**\n\nWe can't wait to see you there!",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "## ONLINE SALES ARE NOW SOLD OUT! THERE WILL BE A FEW REMAINING TICKETS AT THE DOOR!\n\n**Space Age Daydream** & **Dust Wave** are proud to present ...\n\n## 🧟 Frights & Delights 😍\n\n### An Evening of Premieres at the Guild Cinema!\n\nJoin us at the **Guild Cinema on November 6 at 6pm** for a night of Space Age Daydream + Dust Wave + friends short film big screen premieres! Featuring:\n\n**Shellfish Knish**, By Camille Carlson\n\n**Movie Monsters**, By Brandon Carter\n\n**The Haunters**, By Kaidin Jarjusey\n\n**Softening**, By Jade Stokes\n\n**The North Wind**, By Dusty Deen\n\n**Cue Barb**, By Becca Elbrecht\n\nand more!\n\nPlus ... drumroll please ...\n\nThe world premiere of **The Hundred Voices of Harry Hoffman**, written and directed by the inimitable Brandon Carter! Followed by a **Q&A with the filmmakers!** We are thrilled to share this film with you, and can't wait to see you there.\n\nAlso -- **we're raffling off props from the films!** And -- **we're selling a special, limited run popcorn bucket** to celebrate! Plus more surprises!\n\n**Join us for a night of Frights & Delights! 🍿🎥🎃**\n\nTickets are **SOLD OUT online and $10 at the door. Doors open at 5:30pm, show starts at 6pm.**\n\nWe can't wait to see you there!\n"
+        }
+      ],
+      "price": 8.0,
+      "price_cents": 800,
+      "currency": "USD",
+      "image": "/assets/images/frights-delights.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-frights-delights/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 200.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-frights-delights/",
+        "es": "/es/products/dust-wave-frights-delights/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2024-11-06T18:00:00-07:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "attack-1",
+      "slug": "dust-wave-attack",
+      "sku": "attack-1",
+      "name": "ATTACK OF THE FIFTY FOOT DUST WAVE! at the Guild Cinema",
+      "description": "## ONLINE SALES START SOON!\n\n**Dust Wave** and **Space Age Daydream** present ...\n\n## 🌪️ ATTACK OF THE 50 FOOT DUST WAVE! 👋\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on November 20th at 6:00pm** for a screening of the**latest short films from Dust Wave + Space Age Daydream + friends!** Featuring:\n\n**_The Pervasiveness of Circumstance_**, By Camille Carlson\n\n**_Red Razor on Soft Skin_**, By Luca Silver\n\n**_Pandora's Greenhouse_**, By Adrian Pijoan\n\n**_Immaculate Perception_**, By Anna Buan\n\n**_Long Night_**, By Bailey Grady\n\n**_Horseheads_**, By Noah Tucker\n\n**_First Time Sexpot_**, By Rhiannon Barela\n\n**_The Perfect Cut_**, By Felicia Allen\n\n**_Breakups Suck_**, By Ben Arndt\n\n*... and more!*\n\nPlus ... drumroll please ...\n\n**We're raffling off props from the films!** And more surprises await!\n\n**Doors open at 6:00pm, show starts at 6:30pm. All tickets are will call at the door.**\n\n**_See you there ... if you dare!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "## ONLINE SALES START SOON!\n\n**Dust Wave** and **Space Age Daydream** present ...\n\n## 🌪️ ATTACK OF THE 50 FOOT DUST WAVE! 👋\n\n### Screening at the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on November 20th at 6:00pm** for a screening of the**latest short films from Dust Wave + Space Age Daydream + friends!** Featuring:\n\n**_The Pervasiveness of Circumstance_**, By Camille Carlson\n\n**_Red Razor on Soft Skin_**, By Luca Silver\n\n**_Pandora's Greenhouse_**, By Adrian Pijoan\n\n**_Immaculate Perception_**, By Anna Buan\n\n**_Long Night_**, By Bailey Grady\n\n**_Horseheads_**, By Noah Tucker\n\n**_First Time Sexpot_**, By Rhiannon Barela\n\n**_The Perfect Cut_**, By Felicia Allen\n\n**_Breakups Suck_**, By Ben Arndt\n\n*... and more!*\n\nPlus ... drumroll please ...\n\n**We're raffling off props from the films!** And more surprises await!\n\n**Doors open at 6:00pm, show starts at 6:30pm. All tickets are will call at the door.**\n\n**_See you there ... if you dare!_**\n"
+        }
+      ],
+      "price": 0.0,
+      "price_cents": 0,
+      "currency": "USD",
+      "image": "/assets/images/attack-guild.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-attack/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 205.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-attack/",
+        "es": "/es/products/dust-wave-attack/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-11-20T18:00:00-07:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "cronos-1",
+      "slug": "dust-wave-cronos",
+      "sku": "cronos-1",
+      "name": "CRONOS at the Guild Cinema",
+      "description": "**Dust Wave** presents ...\n\n## 🐞 CRONOS 🐞\n\n### At the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on March 21st at 10:30pm** for a screening of Guillermo del Toro's classic debut [**_Cronos!_**](https://www.imdb.com/title/tt0104029/)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm. All tickets are will call at the door.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🐞 CRONOS 🐞\n\n### At the Guild Cinema!\n\nJoin us at **the Guild Cinema (3405 Central Ave NE) on March 21st at 10:30pm** for a screening of Guillermo del Toro's classic debut [**_Cronos!_**](https://www.imdb.com/title/tt0104029/)\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 10:00pm, show starts at 10:30pm. All tickets are will call at the door.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/cronos-guild.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-cronos/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 210.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-cronos/",
+        "es": "/es/products/dust-wave-cronos/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-03-21T22:30:00-06:00",
+        "venue": "The Guild Cinema",
+        "address": "3405 Central Ave NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "al1ce-1",
+      "slug": "dust-wave-al1ce-juno",
+      "sku": "al1ce-1",
+      "name": "AL1CE at Juno Brewery!",
+      "description": "**Dust Wave** presents ...\n\n## AL1CE -- the As Within Fall Tour\n\n### Concert at Juno Brewery!\n\nJoin us at **Juno Brewery (1501 1st St NW) on September 27th at 7:00pm** for [**_Al1ce_**](https://www.instagram.com/alicemusicofficial/) in concert for the As Within Fall Tour!\n\nFeaturing:\n\n[**NUDA**](https://www.instagram.com/nuda_music/)\n\n[**Cables & Lace**](https://www.instagram.com/cablesandlacemusic/)\n\n[**DOT WALL**](https://www.instagram.com/dotwall.wall_/)\n\n**DJ RED-209**\n\n**Show starts at 7:00pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## AL1CE -- the As Within Fall Tour\n\n### Concert at Juno Brewery!\n\nJoin us at **Juno Brewery (1501 1st St NW) on September 27th at 7:00pm** for [**_Al1ce_**](https://www.instagram.com/alicemusicofficial/) in concert for the As Within Fall Tour!\n\nFeaturing:\n\n[**NUDA**](https://www.instagram.com/nuda_music/)\n\n[**Cables & Lace**](https://www.instagram.com/cablesandlacemusic/)\n\n[**DOT WALL**](https://www.instagram.com/dotwall.wall_/)\n\n**DJ RED-209**\n\n**Show starts at 7:00pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 20.0,
+      "price_cents": 2000,
+      "currency": "USD",
+      "image": "/assets/images/al1ce.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-al1ce-juno/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 215.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-al1ce-juno/",
+        "es": "/es/products/dust-wave-al1ce-juno/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-09-27T19:00:00-06:00",
+        "venue": "Juno Brewery",
+        "address": "1501 1st St NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "dancewave-1",
+      "slug": "dust-wave-dancewave",
+      "sku": "dancewave-1",
+      "name": "DANCEWAVE at Juno Brewery!",
+      "description": "**Dust Wave** presents ...\n\n## 🪩 DANCEWAVE 💃 -- A Blast From the Past!\n\n### Prom party at Juno Brewery!\n\nJoin us at **Juno Brewery (1501 1st St NW) on September 6th at 7:00pm** for [**_Dancewave_**](https://www.instagram.com/alicemusicofficial/) -- a 21+ prom party!\n\nDancewave is an adults-only prom night where every era collides -- think retro hits, disco balls, and all your favorite prom anthems. Come dressed in your wildest vintage looks, relive your former glory (or redo it better), and dance the night away with friends old and new.\n\n**Prom starts at 7:00pm. 21+**\n\n**_Don’t miss this one-night-only prom party!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🪩 DANCEWAVE 💃 -- A Blast From the Past!\n\n### Prom party at Juno Brewery!\n\nJoin us at **Juno Brewery (1501 1st St NW) on September 6th at 7:00pm** for [**_Dancewave_**](https://www.instagram.com/alicemusicofficial/) -- a 21+ prom party!\n\nDancewave is an adults-only prom night where every era collides -- think retro hits, disco balls, and all your favorite prom anthems. Come dressed in your wildest vintage looks, relive your former glory (or redo it better), and dance the night away with friends old and new.\n\n**Prom starts at 7:00pm. 21+**\n\n**_Don’t miss this one-night-only prom party!_**\n"
+        }
+      ],
+      "price": 35.0,
+      "price_cents": 3500,
+      "currency": "USD",
+      "image": "/assets/images/dancewave.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-dancewave/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 220.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-dancewave/",
+        "es": "/es/products/dust-wave-dancewave/"
+      },
+      "variant_option_name": "Ticket Type",
+      "variants": [
+        {
+          "id": "standard-ticket",
+          "label": "Standard Ticket",
+          "sku": "dancewave-st1",
+          "price": 35.0,
+          "price_cents": 3500,
+          "inventory": 0,
+          "status": "archived"
+        },
+        {
+          "id": "two-standard-tickets",
+          "label": "2 Standard Tickets",
+          "sku": "dancewave-st2",
+          "price": 60.0,
+          "price_cents": 6000,
+          "inventory": 0,
+          "status": "archived"
+        }
+      ],
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-09-06T19:00:00-06:00",
+        "venue": "Juno Brewery",
+        "address": "1501 1st St NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "benefit-1",
+      "slug": "dust-wave-dustwave-benefit",
+      "sku": "benefit-1",
+      "name": "A Dust Wave Benefit at Studio 519!",
+      "description": "**THE FACULTY LOUNGE & FRIENDS** present ...\n\n### A Dust Wave benefit at Studio 519!\n\nJoin us at **Studio 519 (519 Central Ave NW) on April 17th** for a special night of improv comedy, community, and support for Dust Wave.\n\n**The Faculty Lounge** is the premiere improv group in New Mexico -- a dynamic network of exceptionally talented professional actors and improvisers who bring their passion to teaching and performing across the diverse landscapes of New Mexico. For this special benefit, **The Faculty Lounge & Friends** are bringing the laughs for a one-night-only show in support of Dust Wave!\n\nCome ready to enjoy a sharp, playful evening of live performance -- and **bring some extra cash for bidding** during the event. It’s a benefit, after all, so there will be chances to throw in a little more support while you’re there.\n\n**Doors open at 6:15PM, show starts at 7:00PM.**\n\n**_One night only -- come laugh, bid, and support Dust Wave._**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**THE FACULTY LOUNGE & FRIENDS** present ...\n\n### A Dust Wave benefit at Studio 519!\n\nJoin us at **Studio 519 (519 Central Ave NW) on April 17th** for a special night of improv comedy, community, and support for Dust Wave.\n\n**The Faculty Lounge** is the premiere improv group in New Mexico -- a dynamic network of exceptionally talented professional actors and improvisers who bring their passion to teaching and performing across the diverse landscapes of New Mexico. For this special benefit, **The Faculty Lounge & Friends** are bringing the laughs for a one-night-only show in support of Dust Wave!\n\nCome ready to enjoy a sharp, playful evening of live performance -- and **bring some extra cash for bidding** during the event. It’s a benefit, after all, so there will be chances to throw in a little more support while you’re there.\n\n**Doors open at 6:15PM, show starts at 7:00PM.**\n\n**_One night only -- come laugh, bid, and support Dust Wave._**\n"
+        }
+      ],
+      "price": 12.0,
+      "price_cents": 1200,
+      "currency": "USD",
+      "image": "/assets/images/benefit.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-dustwave-benefit/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 225.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-dustwave-benefit/",
+        "es": "/es/products/dust-wave-dustwave-benefit/"
+      },
+      "variant_option_name": "Ticket Type",
+      "variants": [
+        {
+          "id": "early-bird",
+          "label": "Early Bird",
+          "sku": "benefit-eb",
+          "price": 12.0,
+          "price_cents": 1200,
+          "inventory": 0,
+          "status": "archived"
+        },
+        {
+          "id": "same-day",
+          "label": "Same Day",
+          "sku": "dancewave-sd",
+          "price": 15.0,
+          "price_cents": 1500,
+          "inventory": 0,
+          "status": "archived"
+        }
+      ],
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-04-17T19:00:00-06:00",
+        "venue": "Studio 519",
+        "address": "519 Central Ave NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "frograiser-1",
+      "slug": "dust-wave-frograiser",
+      "sku": "frograiser-1",
+      "name": "Frograiser at Rio Bravo!",
+      "description": "**Dust Wave** presents ...\n\n## 🐸 Frograiser! 🎸\n\n### A Benefit Concert for No Good Reason\n\nJoin us at **[Rio Bravo](https://www.riobravobrewing.com) (1912 2nd Street NW) on November 8 at 7pm** for a night of melt-your-face New Mexico rock & roll! Featuring:\n\n[**The Heart Club**](https://www.instagram.com/the.heartclub)\n\n[**Fudosa**](https://www.instagram.com/fudosaband)\n\n[**Castle Doctor**](https://www.instagram.com/castle_doctor)\n\n[**eNero**](https://www.instagram.com/eneromusik)\n\n[**Rogues Beware**](https://www.instagram.com/roguesbeware)\n\nSponsored by [**Vault Studios!**](https://www.vaultstudiosabq.com)\n\nAll proceeds go to the filming of **_No Good Reason_**, the latest short film by Dust Wave member [**Michael Madrigal**](https://www.instagram.com/michaelmadrigal2k) 🐸🎸\n\n**Doors open at 7:00pm, show starts at 7:45pm.**\n\n**_We can't wait to see you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🐸 Frograiser! 🎸\n\n### A Benefit Concert for No Good Reason\n\nJoin us at **[Rio Bravo](https://www.riobravobrewing.com) (1912 2nd Street NW) on November 8 at 7pm** for a night of melt-your-face New Mexico rock & roll! Featuring:\n\n[**The Heart Club**](https://www.instagram.com/the.heartclub)\n\n[**Fudosa**](https://www.instagram.com/fudosaband)\n\n[**Castle Doctor**](https://www.instagram.com/castle_doctor)\n\n[**eNero**](https://www.instagram.com/eneromusik)\n\n[**Rogues Beware**](https://www.instagram.com/roguesbeware)\n\nSponsored by [**Vault Studios!**](https://www.vaultstudiosabq.com)\n\nAll proceeds go to the filming of **_No Good Reason_**, the latest short film by Dust Wave member [**Michael Madrigal**](https://www.instagram.com/michaelmadrigal2k) 🐸🎸\n\n**Doors open at 7:00pm, show starts at 7:45pm.**\n\n**_We can't wait to see you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/frograiser.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-frograiser/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 230.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-frograiser/",
+        "es": "/es/products/dust-wave-frograiser/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2024-11-08T19:00:00-07:00",
+        "venue": "Rio Bravo Brewing Company",
+        "address": "1912 2nd Street NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "giallo-1",
+      "slug": "dust-wave-giallo-disco",
+      "sku": "giallo-1",
+      "name": "GIALLO DISCO at Ren's Den!",
+      "description": "**Dust Wave** presents ...\n\n## 🩸 GIALLO DISCO 🩸\n\n### Party at Ren's Den!\n\nJoin us at **Ren's Den (900 4th St SW) on June 21st at 7:00pm** for **_Giallo Disco_** — a Technicolor Nightmare dance party. All to help fund [Luca Silver](https://www.instagram.com/lucasilver01/)’s upcoming horror film [*Red Razor on Soft Skin*](https://www.kickstarter.com/projects/dustwave/red-razor-on-soft-skin-a-barbershop-bloodbath-in-16mm). We’re spinning a lethal mix of Italo Disco, Synthwave, and Darkwave all night, courtesy of [Neuromancer](https://www.instagram.com/neuromancermusic/) and DJ Rif-Rat.\n\nDress to kill, dance in the fog, and help bring Luca’s blood-soaked vision to life.\n\n**Show starts at 7:00pm.**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🩸 GIALLO DISCO 🩸\n\n### Party at Ren's Den!\n\nJoin us at **Ren's Den (900 4th St SW) on June 21st at 7:00pm** for **_Giallo Disco_** — a Technicolor Nightmare dance party. All to help fund [Luca Silver](https://www.instagram.com/lucasilver01/)’s upcoming horror film [*Red Razor on Soft Skin*](https://www.kickstarter.com/projects/dustwave/red-razor-on-soft-skin-a-barbershop-bloodbath-in-16mm). We’re spinning a lethal mix of Italo Disco, Synthwave, and Darkwave all night, courtesy of [Neuromancer](https://www.instagram.com/neuromancermusic/) and DJ Rif-Rat.\n\nDress to kill, dance in the fog, and help bring Luca’s blood-soaked vision to life.\n\n**Show starts at 7:00pm.**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/giallo.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-giallo-disco/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 235.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-giallo-disco/",
+        "es": "/es/products/dust-wave-giallo-disco/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-06-21T19:00:00-06:00",
+        "venue": "Ren's Den",
+        "address": "900 4th St SW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "horse-1",
+      "slug": "dust-wave-horse-vs-vamp",
+      "sku": "horse-1",
+      "name": "Horse vs. Vamp!",
+      "description": "**Dust Wave** presents ...\n\n## 🐴 Horse vs. Vamp! 🧛\n\n### A Benefit Event for Horseheads + Breakups Suck\n\nJoin us at the **Black Cat (3011 Monte Vista Blvd. NE) on May 3rd at 6:30pm** for an evening where we settle the ultimate grudge match between two filmmaker warriors! Featuring:\n\n[**Noah Tucker**](https://www.instagram.com/noahboatproductions), director of the upcoming short film [Horseheads](https://www.instagram.com/horseheadsfilm)\n\nvs.\n\n[**Ben Arndt**](https://www.instagram.com/ben_carndt_), director of the upcoming short film [Breakups Suck!](https://www.instagram.com/breakups_suck_film)\n\ntesting their will and resolve in a series of mini-competitions, all in the pursuit of the ultimate prize: **$500** toward the post-production of their films. 🏆\n\nAlso, Dust Wave films and other surprises a plenty! 🎥 🎉\n\n**Doors open at 6:00pm, show starts at 6:30pm.**\n\n**_We can't wait to see you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🐴 Horse vs. Vamp! 🧛\n\n### A Benefit Event for Horseheads + Breakups Suck\n\nJoin us at the **Black Cat (3011 Monte Vista Blvd. NE) on May 3rd at 6:30pm** for an evening where we settle the ultimate grudge match between two filmmaker warriors! Featuring:\n\n[**Noah Tucker**](https://www.instagram.com/noahboatproductions), director of the upcoming short film [Horseheads](https://www.instagram.com/horseheadsfilm)\n\nvs.\n\n[**Ben Arndt**](https://www.instagram.com/ben_carndt_), director of the upcoming short film [Breakups Suck!](https://www.instagram.com/breakups_suck_film)\n\ntesting their will and resolve in a series of mini-competitions, all in the pursuit of the ultimate prize: **$500** toward the post-production of their films. 🏆\n\nAlso, Dust Wave films and other surprises a plenty! 🎥 🎉\n\n**Doors open at 6:00pm, show starts at 6:30pm.**\n\n**_We can't wait to see you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/horsevamp.jpg",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-horse-vs-vamp/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 240.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-horse-vs-vamp/",
+        "es": "/es/products/dust-wave-horse-vs-vamp/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-05-03T18:30:00-06:00",
+        "venue": "Black Cat",
+        "address": "3011 Monte Vista Blvd NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "redline-1",
+      "slug": "dust-wave-redline",
+      "sku": "redline-1",
+      "name": "REDLINE at the Black Cat!",
+      "description": "**Dust Wave** presents ...\n\n## 🏎️ REDLINE 🏎️\n\n### Screening at the Black Cat!\n\nJoin us at the **Black Cat (3011 Monte Vista Blvd NE) on May 16th at 7:00pm** for a screening of the most badass racing anime ever, the 2009 classic **_Redline!_**\n\n[*Redline*](https://www.imdb.com/title/tt1483797) is a jaw-dropping explosion of color, chaos, and pure anime adrenaline -- a film so visually ambitious it bankrupted the studio that made it. Directed by Takeshi Koike and hand-drawn over seven years, every frame bursts with impossible detail and kinetic energy, pushing the limits of what animation can do. Set against a blistering techno soundtrack and packed with intergalactic racers, surreal sci-fi worlds, and unrelenting speed, Redline is not just a movie. It’s a full-throttle experience. See it loud. See it big. And don’t blink.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 6:30pm, show starts at 7:00pm.**\n\n**Only 75 seats available!**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🏎️ REDLINE 🏎️\n\n### Screening at the Black Cat!\n\nJoin us at the **Black Cat (3011 Monte Vista Blvd NE) on May 16th at 7:00pm** for a screening of the most badass racing anime ever, the 2009 classic **_Redline!_**\n\n[*Redline*](https://www.imdb.com/title/tt1483797) is a jaw-dropping explosion of color, chaos, and pure anime adrenaline -- a film so visually ambitious it bankrupted the studio that made it. Directed by Takeshi Koike and hand-drawn over seven years, every frame bursts with impossible detail and kinetic energy, pushing the limits of what animation can do. Set against a blistering techno soundtrack and packed with intergalactic racers, surreal sci-fi worlds, and unrelenting speed, Redline is not just a movie. It’s a full-throttle experience. See it loud. See it big. And don’t blink.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 6:30pm, show starts at 7:00pm.**\n\n**Only 75 seats available!**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/redline.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-redline/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 245.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-redline/",
+        "es": "/es/products/dust-wave-redline/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-05-16T19:00:00-06:00",
+        "venue": "Black Cat",
+        "address": "3011 Monte Vista Blvd NE, Albuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "warriors-1",
+      "slug": "dust-wave-warriors-juno",
+      "sku": "warriors-1",
+      "name": "THE WARRIORS at Juno Brewery!",
+      "description": "**Dust Wave** presents ...\n\n## ❌ THE WARRIORS ❌\n\n### Screening at Juno Brewery!\n\nJoin us at **Juno Brewery (1501 1st St NW) on May 13th at 7:00pm** for a screening of 1979 classic **The Warriors**!\n\nOnly in 2025 Albuquerque can one truly appreciate the chaos, color, and unique brand of insanity of [The Warriors](https://www.imdb.com/title/tt0080120). Watch as street gangs battle their way through a night as crazy as a Burque Saturday.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 6:30pm, show starts at 7:00pm.**\n\n**21+**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## ❌ THE WARRIORS ❌\n\n### Screening at Juno Brewery!\n\nJoin us at **Juno Brewery (1501 1st St NW) on May 13th at 7:00pm** for a screening of 1979 classic **The Warriors**!\n\nOnly in 2025 Albuquerque can one truly appreciate the chaos, color, and unique brand of insanity of [The Warriors](https://www.imdb.com/title/tt0080120). Watch as street gangs battle their way through a night as crazy as a Burque Saturday.\n\nAlso, a Dust Wave short film right before! And a merch giveaway too! 🎥 🎉\n\n**Doors open at 6:30pm, show starts at 7:00pm.**\n\n**21+**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/default.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-warriors-juno/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 250.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-warriors-juno/",
+        "es": "/es/products/dust-wave-warriors-juno/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2025-05-13T19:00:00-06:00",
+        "venue": "Juno Brewery",
+        "address": "1501 1st St NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "whodonut-1",
+      "slug": "dust-wave-whodonut-fundraiser",
+      "sku": "whodonut-1",
+      "name": "Film Networking + WHODONUT Fundraiser at Rio Bravo",
+      "description": "**Sopapilla Productions & Dust Wave** present ...\n\n## 🎬 FILM NETWORKING + WHODONUT FUNDRAISER 🎬\n\nJoin us at **Rio Bravo Brewing Company (1912 2nd St NW, Albuquerque, NM 87102) on March 1st from 2–5 PM** for a film networking event and fundraiser!\n\nWe're raising funds for [Becca Elbrecht](https://www.instagram.com/becomingfilms_/)'s short film **_WHODONUT_** — a comedy shot in a single take! Every dollar raised goes directly toward supporting this Albuquerque filmmaker as she gears up to shoot at the end of March at [Fat Pipe](https://fatpipeabq.com).\n\n🎟️ Raffle prizes · 🎲 Games · 🎬 Film networking · 🍺 Great local brews\n\nWhether you're an actor, filmmaker, crew member, creative, or just someone who loves supporting local art — this is your chance to connect and be part of something fun and ambitious.\n\n**Let's help bring WHODONUT to life and show up for ABQ film in a big way!**\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Sopapilla Productions & Dust Wave** present ...\n\n## 🎬 FILM NETWORKING + WHODONUT FUNDRAISER 🎬\n\nJoin us at **Rio Bravo Brewing Company (1912 2nd St NW, Albuquerque, NM 87102) on March 1st from 2–5 PM** for a film networking event and fundraiser!\n\nWe're raising funds for [Becca Elbrecht](https://www.instagram.com/becomingfilms_/)'s short film **_WHODONUT_** — a comedy shot in a single take! Every dollar raised goes directly toward supporting this Albuquerque filmmaker as she gears up to shoot at the end of March at [Fat Pipe](https://fatpipeabq.com).\n\n🎟️ Raffle prizes · 🎲 Games · 🎬 Film networking · 🍺 Great local brews\n\nWhether you're an actor, filmmaker, crew member, creative, or just someone who loves supporting local art — this is your chance to connect and be part of something fun and ambitious.\n\n**Let's help bring WHODONUT to life and show up for ABQ film in a big way!**\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "currency": "USD",
+      "image": "/assets/images/whodonut.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-whodonut-fundraiser/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 255.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-whodonut-fundraiser/",
+        "es": "/es/products/dust-wave-whodonut-fundraiser/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-03-01T14:00:00-07:00",
+        "ends_at": "2026-03-01T17:00:00-07:00",
+        "venue": "Rio Bravo Brewing Company",
+        "address": "1912 2nd St NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "wto99-1",
+      "slug": "dust-wave-wto99",
+      "sku": "wto99-1",
+      "name": "WTO/99 at the Dust Wave Microcinema",
+      "description": "**Dust Wave** presents ...\n\n## 🌎 WTO/99 ✊\n\n### At the [Dust Wave Microcinema](https://dustwave.xyz/microcinema.html)!\n\nJoin us **on May 1st at 7:00pm at the Dust Wave Microcinema (709 Haines Ave NW)** for a screening of the 2025 award-winning documentary **[*WTO/99!*](https://www.wto99doc.com/)**\n\n*\"An immersive archival documentary that depicts the four-day clash between the then-emerging World Trade Organization (WTO) and the 40,000+ people who took to the streets of Seattle in 1999 to protest the WTO Conference and the WTO’s impact on human rights, labor, and the future effects of continued globalization.\"*\n\n**All tickets are will call at the door. *Only 30 available!***\n\n**_See you there!_**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🌎 WTO/99 ✊\n\n### At the [Dust Wave Microcinema](https://dustwave.xyz/microcinema.html)!\n\nJoin us **on May 1st at 7:00pm at the Dust Wave Microcinema (709 Haines Ave NW)** for a screening of the 2025 award-winning documentary **[*WTO/99!*](https://www.wto99doc.com/)**\n\n*\"An immersive archival documentary that depicts the four-day clash between the then-emerging World Trade Organization (WTO) and the 40,000+ people who took to the streets of Seattle in 1999 to protest the WTO Conference and the WTO’s impact on human rights, labor, and the future effects of continued globalization.\"*\n\n**All tickets are will call at the door. *Only 30 available!***\n\n**_See you there!_**\n"
+        }
+      ],
+      "price": 0.0,
+      "price_cents": 0,
+      "currency": "USD",
+      "image": "/assets/images/wto99.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-wto99/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 260.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/dust-wave-wto99/",
+        "es": "/es/products/dust-wave-wto99/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "ticket",
+      "shipping": {
+        "weight_oz": 0,
+        "packaging_weight_oz": 0,
+        "length_in": 0,
+        "width_in": 0,
+        "height_in": 0,
+        "stack_height_in": 0
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-05-01T19:00:00-06:00",
+        "venue": "Dust Wave Microcinema",
+        "address": "709 Haines Ave NW, Albuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "calendar-1",
+      "slug": "dust-wave-calendar-2026",
+      "sku": "calendar-1",
+      "name": "DUST WAVE After Dark 2026 Calendar",
+      "description": "**Dust Wave** presents ...\n\n## 🔥 THE DUST WAVE AFTER DARK 2026 CALENDAR 🔥\n\n### The thirstiest calendar of the year.\n\nTwelve sultry months featuring members of Dust Wave -- smoldering, mysterious, and somewhat clothed.\n\nWhether you’re marking your next shoot, your next sin, or just the days until festival season, this calendar’s got you covered ... *barely.* 💋\n\n**Limited run. Maximum heat.**\n\nPreorder yours before they’re gone forever.",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "**Dust Wave** presents ...\n\n## 🔥 THE DUST WAVE AFTER DARK 2026 CALENDAR 🔥\n\n### The thirstiest calendar of the year.\n\nTwelve sultry months featuring members of Dust Wave -- smoldering, mysterious, and somewhat clothed.\n\nWhether you’re marking your next shoot, your next sin, or just the days until festival season, this calendar’s got you covered ... *barely.* 💋\n\n**Limited run. Maximum heat.**\n\nPreorder yours before they’re gone forever.\n"
+        }
+      ],
+      "price": 35.0,
+      "price_cents": 3500,
+      "currency": "USD",
+      "image": "/assets/images/calendar-2026.png",
+      "url": "https://shop.dustwave.xyz/products/dust-wave-calendar-2026/",
+      "type": "physical",
+      "fulfillment_type": "physical",
+      "status": "archived",
+      "public": false,
+      "launch_test": false,
+      "order": 265.0,
+      "collection": "dustwave",
+      "category": "objects",
+      "localized_paths": {
+        "en": "/products/dust-wave-calendar-2026/",
+        "es": "/es/products/dust-wave-calendar-2026/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "standard",
+      "turnstile_required": false
+    },
+    {
       "id": "t-shirt-2",
       "slug": "fronteras-t-shirt",
       "sku": "t-shirt-2",
@@ -1565,7 +2701,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "6ded00f0b180293be05353e41db2fd24b4a2f0418e0c8405d28293b023f3ae9b"
+  "source_hash": "4a71c3dd574c13a2a287117e6e1abee556c471bf9165ff2e3dcb92030d419a0f"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

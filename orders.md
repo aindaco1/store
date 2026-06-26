@@ -5,11 +5,11 @@ description: Request a secure order lookup link.
 translation_key: orders
 indexable: false
 sitemap: false
+order_lookup_script: true
 ---
 
 <section class="storefront storefront--orders">
   <div class="storefront__header storefront__header--compact">
-    <p class="storefront__eyebrow">Orders</p>
     <h1>Find your order</h1>
   </div>
 
@@ -26,5 +26,3 @@ sitemap: false
     <div class="store-order-lookup__results" data-store-order-lookup-results hidden></div>
   </div>
 </section>
-
-<script src="/assets/js/order-lookup.js?v={{ site.time | date: '%s' }}" defer></script>

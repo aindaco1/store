@@ -4,6 +4,7 @@ title: Order Received
 description: Confirmation page for Store orders.
 translation_key: order_success
 indexable: false
+order_success_script: true
 ---
 
 <section class="storefront">
@@ -21,5 +22,3 @@ indexable: false
     </div>
   </div>
 </section>
-
-<script src="/assets/js/order-success.js?v={{ site.time | date: '%s' }}" defer></script>

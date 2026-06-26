@@ -191,7 +191,7 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
   id = present_string(product['identifier']) || present_string(product['id']) || filename_slug
   slug = present_string(product['slug']) || filename_slug
   status = present_string(product['status']) || 'active'
-  next if %w[archived archive].include?(status)
+  next if status == 'archive'
 
   type = present_string(product['fulfillment_type']) || present_string(product['type']) || 'physical'
   price = numeric(product['price'], 0)

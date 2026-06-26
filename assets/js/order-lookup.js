@@ -94,15 +94,85 @@
     return orderToken ? '/order-success/?orderToken=' + encodeURIComponent(orderToken) : '/orders/';
   }
 
+  function getOrderTokenLabel(order) {
+    return String(order?.orderToken || '').trim() || 'Unavailable';
+  }
+
+  function getOrderDateLine(order) {
+    if (order?.confirmedAt) return 'Confirmed ' + formatDate(order.confirmedAt);
+    if (order?.createdAt) return 'Created ' + formatDate(order.createdAt);
+    return '';
+  }
+
+  function getOrderItemLabel(item) {
+    return [
+      item?.name || 'Store item',
+      item?.variantLabel || '',
+      'Qty ' + (item?.quantity || 1)
+    ].filter(Boolean).join(' · ');
+  }
+
+  function getOrderItemsSummary(order, maxItems) {
+    var items = Array.isArray(order?.items) ? order.items : [];
+    var limit = Math.max(1, Number(maxItems || 3) || 3);
+    var labels = items.slice(0, limit).map(getOrderItemLabel);
+    if (items.length > limit) labels.push('+' + (items.length - limit) + ' more');
+    return labels.join('\n');
+  }
+
+  function appendTableCell(row, tagName, text, className) {
+    var cell = document.createElement(tagName || 'td');
+    if (className) cell.className = className;
+    cell.textContent = text || '';
+    row.append(cell);
+    return cell;
+  }
+
+  function renderOrderTable(orders) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'store-order-lookup__table-wrap';
+    var table = document.createElement('table');
+    table.className = 'store-order-lookup__table';
+    var caption = document.createElement('caption');
+    caption.className = 'sr-only';
+    caption.textContent = 'Orders found for this lookup link';
+    table.append(caption);
+    var thead = document.createElement('thead');
+    var header = document.createElement('tr');
+    ['Status', 'Order', 'Date', 'Items', 'Total', ''].forEach(function(label) {
+      appendTableCell(header, 'th', label);
+    });
+    thead.append(header);
+    table.append(thead);
+    var tbody = document.createElement('tbody');
+    orders.forEach(function(order) {
+      var row = document.createElement('tr');
+      appendTableCell(row, 'td', getOrderStatusLabel(order));
+      appendTableCell(row, 'td', getOrderTokenLabel(order), 'store-order-lookup__token-cell');
+      appendTableCell(row, 'td', getOrderDateLine(order));
+      appendTableCell(row, 'td', getOrderItemsSummary(order, 3), 'store-order-lookup__items-cell');
+      appendTableCell(row, 'td', formatMoney(order.totalCents, order.currency || 'USD'), 'store-order-lookup__total-cell');
+      var actionCell = document.createElement('td');
+      var link = document.createElement('a');
+      link.className = 'btn btn--small';
+      link.href = getOrderUrl(order);
+      link.textContent = 'View order';
+      actionCell.append(link);
+      row.append(actionCell);
+      tbody.append(row);
+    });
+    table.append(tbody);
+    wrapper.append(table);
+    return wrapper;
+  }
+
   function renderOrder(order) {
     var card = document.createElement('article');
     card.className = 'store-order__item store-order-lookup__order';
     appendText(card, 'h2', 'store-order__title', getOrderStatusLabel(order));
-    appendText(card, 'p', 'store-order__meta', 'Order ' + (order.orderToken || ''));
+    appendText(card, 'p', 'store-order__meta', 'Order ' + getOrderTokenLabel(order));
     appendText(card, 'p', 'store-order__total', formatMoney(order.totalCents, order.currency || 'USD'));
-    var dateLine = order.confirmedAt
-      ? 'Confirmed ' + formatDate(order.confirmedAt)
-      : (order.createdAt ? 'Created ' + formatDate(order.createdAt) : '');
+    var dateLine = getOrderDateLine(order);
     if (dateLine) appendText(card, 'p', 'store-order__meta', dateLine);
 
     var items = Array.isArray(order.items) ? order.items : [];
@@ -110,12 +180,7 @@
       var itemList = document.createElement('div');
       itemList.className = 'store-order-lookup__items';
       items.forEach(function(item) {
-        var label = [
-          item.name || 'Store item',
-          item.variantLabel || '',
-          'Qty ' + (item.quantity || 1)
-        ].filter(Boolean).join(' · ');
-        appendText(itemList, 'p', 'store-order__meta', label);
+        appendText(itemList, 'p', 'store-order__meta', getOrderItemLabel(item));
       });
       card.append(itemList);
     }
@@ -143,12 +208,39 @@
     }
 
     appendText(resultsNode, 'h2', 'store-order__title', 'Orders');
+    resultsNode.append(renderOrderTable(orders));
     var list = document.createElement('div');
     list.className = 'store-order-lookup__orders';
     orders.forEach(function(order) {
       list.append(renderOrder(order));
     });
     resultsNode.append(list);
+  }
+
+  function renderLookupRequestDiagnostics(data) {
+    if (!resultsNode) return;
+    resultsNode.replaceChildren();
+    var debug = data?.debug?.orderLookup || null;
+    if (!debug || (!debug.lookupUrl && debug.deliverySent !== false)) {
+      resultsNode.hidden = true;
+      return;
+    }
+    resultsNode.hidden = false;
+    var panel = document.createElement('div');
+    panel.className = 'store-order__panel store-order-lookup__debug';
+    if (debug.deliverySent === false) {
+      appendText(panel, 'p', 'store-order__note', 'Local email delivery failed: ' + (debug.deliveryError || debug.deliveryReason || 'not sent') + '.');
+    } else {
+      appendText(panel, 'p', 'store-order__note', 'Local lookup link generated.');
+    }
+    if (debug.lookupUrl) {
+      var link = document.createElement('a');
+      link.className = 'btn btn--secondary';
+      link.href = debug.lookupUrl;
+      link.textContent = 'Open local lookup';
+      panel.append(link);
+    }
+    resultsNode.append(panel);
   }
 
   async function requestLookup(email) {
@@ -187,10 +279,7 @@
     try {
       var data = await requestLookup(email);
       setStatus(data?.message || getGenericSentMessage());
-      if (resultsNode) {
-        resultsNode.hidden = true;
-        resultsNode.replaceChildren();
-      }
+      renderLookupRequestDiagnostics(data);
     } catch (error) {
       setStatus(error?.message || 'Unable to send lookup link.');
     } finally {
