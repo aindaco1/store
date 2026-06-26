@@ -3761,7 +3761,7 @@
                 class="store-first-party-cart__action${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? ' is-busy' : ''}"
                 data-cart-confirm-custom-checkout
                 aria-busy="${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting' ? 'true' : 'false'}"
-                ${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'submitting' || customCheckout?.mountStatus !== 'mounted' ? 'disabled' : ''}
+                ${checkoutUiState.status === 'confirming' || checkoutUiState.status === 'submitting' || !isCustomCheckoutConfirmable(customCheckout) ? 'disabled' : ''}
               >${renderBusyButtonLabel(
                 getCustomCheckoutConfirmButtonLabel(checkoutUiState.status, customCheckout),
                 checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting'
@@ -4203,6 +4203,17 @@
       return String(customCheckout?.checkoutUiMode || '').trim().toLowerCase() === 'payment_intent';
     }
 
+    function isCustomCheckoutConfirmable(customCheckout = checkoutUiState.customCheckout) {
+      if (!customCheckout || customCheckout.mountStatus !== 'mounted') return false;
+      if (isStorePaymentIntentCheckout(customCheckout)) {
+        return customCheckout.canConfirm === true;
+      }
+      if (Object.prototype.hasOwnProperty.call(customCheckout, 'canConfirm')) {
+        return customCheckout.canConfirm === true;
+      }
+      return true;
+    }
+
     function getCustomCheckoutConfirmButtonLabel(status, customCheckout = checkoutUiState.customCheckout) {
       const normalizedStatus = String(status || '').trim().toLowerCase();
       if (isStorePaymentIntentCheckout(customCheckout)) {
@@ -4229,8 +4240,7 @@
       const isConfirming = checkoutUiState.status === 'confirming';
       const isRedirecting = checkoutUiState.status === 'redirecting';
       const isSubmitting = checkoutUiState.status === 'submitting';
-      const isMounted = checkoutUiState.customCheckout?.mountStatus === 'mounted';
-      button.disabled = isConfirming || isRedirecting || isSubmitting || !isMounted;
+      button.disabled = isConfirming || isRedirecting || isSubmitting || !isCustomCheckoutConfirmable();
       button.classList.toggle('is-busy', isConfirming || isRedirecting);
       button.setAttribute('aria-busy', isConfirming || isRedirecting ? 'true' : 'false');
       button.innerHTML = renderBusyButtonLabel(
@@ -4562,6 +4572,86 @@
           country: (read('country') || 'US').toUpperCase()
         }
       };
+    }
+
+    function hasCheckoutAddressDetails(address) {
+      return Boolean(
+        address?.line1 ||
+        address?.city ||
+        address?.state ||
+        address?.postal_code ||
+        address?.postalCode
+      );
+    }
+
+    function buildStripeBillingAddress(address) {
+      const source = address && typeof address === 'object' ? address : {};
+      const country = String(source.country || DEFAULT_SHIPPING_COUNTRY).trim().toUpperCase();
+      const billingAddress = {
+        country: /^[A-Z]{2}$/.test(country) ? country : DEFAULT_SHIPPING_COUNTRY
+      };
+      const line1 = String(source.line1 || '').trim();
+      const line2 = String(source.line2 || '').trim();
+      const city = String(source.city || '').trim();
+      const state = String(source.state || '').trim();
+      const postalCode = String(source.postal_code || source.postalCode || '').trim();
+
+      if (line1) billingAddress.line1 = line1;
+      if (line2) billingAddress.line2 = line2;
+      if (city) billingAddress.city = city;
+      if (state) billingAddress.state = state;
+      if (postalCode) billingAddress.postal_code = postalCode;
+
+      return billingAddress;
+    }
+
+    function buildStorePaymentIntentConfirmOptions(emailValue) {
+      const email = String(emailValue || readCustomCheckoutEmailDraft() || '').trim();
+      const persistedShippingDraft = getPersistedCustomCheckoutShippingDraft();
+      const currentShippingDraft = readCustomCheckoutShippingDraft();
+      const storedShippingDraft = checkoutUiState.customCheckout?.shippingDraft || persistedShippingDraft;
+      const shippingDraftHasCurrentDetails = Boolean(
+        currentShippingDraft?.name ||
+        hasCheckoutAddressDetails(currentShippingDraft?.address)
+      );
+      const shippingDraft = shippingDraftHasCurrentDetails
+        ? mergeShippingDraftWithDefaults(
+            currentShippingDraft,
+            checkoutUiState.customCheckout?.shippingDraft,
+            persistedShippingDraft
+          )
+        : storedShippingDraft || currentShippingDraft;
+      const taxDestination = normalizeTaxDestination(getCurrentBillingAddress(store.getState()));
+      const shippingAddress = shippingDraft?.address || {};
+      const taxAddress = {
+        line1: taxDestination.line1,
+        line2: taxDestination.line2,
+        city: taxDestination.city,
+        state: taxDestination.state,
+        postal_code: taxDestination.postalCode,
+        country: taxDestination.country || DEFAULT_SHIPPING_COUNTRY
+      };
+      const addressSource = hasCheckoutAddressDetails(shippingAddress)
+        ? shippingAddress
+        : taxAddress;
+      const billingDetails = {
+        name: String(shippingDraft?.name || '').trim() || 'Customer',
+        address: buildStripeBillingAddress(addressSource)
+      };
+      if (email) {
+        billingDetails.email = email;
+      }
+
+      const confirmParams = {
+        payment_method_data: {
+          billing_details: billingDetails
+        }
+      };
+      if (email) {
+        confirmParams.receipt_email = email;
+      }
+
+      return { confirmParams };
     }
 
     function readCartShippingEstimateDraft() {
@@ -5131,9 +5221,22 @@
             checkoutUiState.customCheckout = {
               ...(checkoutUiState.customCheckout || {}),
               canConfirm: useStorePaymentIntent
-                ? event?.complete !== false
+                ? event?.complete === true
                 : Boolean(event?.session?.canConfirm)
             };
+            syncCustomCheckoutConfirmButton();
+          },
+          onLoadError: function(message) {
+            if (!isActiveCustomCheckoutFlow(flowToken)) return;
+            activeCustomCheckoutMount = null;
+            void abandonActiveCustomCheckoutIntent(getActiveCustomCheckoutOrderId());
+            checkoutUiState.status = 'idle';
+            checkoutUiState.customCheckout = {
+              ...(checkoutUiState.customCheckout || {}),
+              mountStatus: 'error',
+              canConfirm: false
+            };
+            setCheckoutUiError(message || getRuntimeMessage('cart.secureCheckoutMountError', 'Secure checkout could not be mounted.'));
             syncCustomCheckoutConfirmButton();
           }
         });
@@ -5165,7 +5268,8 @@
           error: error?.message || 'Secure checkout could not be mounted.',
           customCheckout: {
             ...(checkoutUiState.customCheckout || {}),
-            mountStatus: 'error'
+            mountStatus: 'error',
+            canConfirm: false
           }
         });
       }
@@ -5190,6 +5294,15 @@
       const flowToken = customCheckoutFlowToken;
       const orderId = String(checkoutUiState.customCheckout?.orderId || '');
       const confirmingStorePaymentIntent = isStorePaymentIntentCheckout();
+      if (!isCustomCheckoutConfirmable()) {
+        setCheckoutUiState({
+          ...checkoutUiState,
+          status: 'idle',
+          error: getRuntimeMessage('cart.secureCheckoutNotReady', 'Secure checkout is not ready yet.')
+        });
+        syncCustomCheckoutConfirmButton();
+        return;
+      }
 
       try {
         checkoutUiState.status = 'confirming';
@@ -5227,11 +5340,7 @@
         }
 
         const result = await mount.confirm(confirmingStorePaymentIntent
-          ? {
-              confirmParams: {
-                receipt_email: String(emailValue || '').trim() || undefined
-              }
-            }
+          ? buildStorePaymentIntentConfirmOptions(emailValue)
           : undefined);
         if (result?.type === 'error' || result?.error) {
           checkoutUiState.status = 'idle';

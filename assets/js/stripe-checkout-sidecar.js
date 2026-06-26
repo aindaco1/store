@@ -118,6 +118,15 @@
     return value instanceof HTMLElement;
   }
 
+  function getStripeElementErrorMessage(event, fallback) {
+    return String(
+      event?.error?.message ||
+      event?.message ||
+      fallback ||
+      'Secure checkout could not load.'
+    ).trim();
+  }
+
   function ensureStripeJs() {
     if (typeof window.Stripe === 'function') {
       return Promise.resolve(window.Stripe);
@@ -359,8 +368,21 @@
       throw new Error('Stripe Payment Element did not initialize correctly.');
     }
 
-    if (typeof paymentElement.on === 'function' && typeof options?.onChange === 'function') {
-      paymentElement.on('change', options.onChange);
+    let paymentElementLoadError = '';
+
+    if (typeof paymentElement.on === 'function') {
+      if (typeof options?.onChange === 'function') {
+        paymentElement.on('change', options.onChange);
+      }
+      if (typeof options?.onReady === 'function') {
+        paymentElement.on('ready', options.onReady);
+      }
+      paymentElement.on('loaderror', function(event) {
+        paymentElementLoadError = getStripeElementErrorMessage(event, 'Secure checkout could not load.');
+        if (typeof options?.onLoadError === 'function') {
+          options.onLoadError(paymentElementLoadError, event);
+        }
+      });
     }
 
     paymentElement.mount(paymentContainer);
@@ -377,6 +399,9 @@
         return Promise.resolve({});
       },
       confirm: function(params) {
+        if (paymentElementLoadError) {
+          return Promise.reject(new Error(paymentElementLoadError));
+        }
         const confirmParams = params && typeof params === 'object' ? params : {};
         const mergedConfirmParams = {
           return_url: options?.returnUrl || window.location.href,

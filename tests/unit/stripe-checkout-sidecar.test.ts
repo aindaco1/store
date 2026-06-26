@@ -304,7 +304,20 @@ describe('stripe checkout sidecar helper', () => {
 
     await result.confirm({
       confirmParams: {
-        receipt_email: 'buyer@example.com'
+        receipt_email: 'buyer@example.com',
+        payment_method_data: {
+          billing_details: {
+            name: 'Buyer Example',
+            email: 'buyer@example.com',
+            address: {
+              line1: '123 Main',
+              city: 'Albuquerque',
+              state: 'NM',
+              postal_code: '87101',
+              country: 'US'
+            }
+          }
+        }
       }
     });
     expect(stripeInstance.confirmPayment).toHaveBeenCalledWith({
@@ -312,13 +325,68 @@ describe('stripe checkout sidecar helper', () => {
       redirect: 'if_required',
       confirmParams: {
         return_url: 'https://shop.test/order-success/?orderToken=store-order-123',
-        receipt_email: 'buyer@example.com'
+        receipt_email: 'buyer@example.com',
+        payment_method_data: {
+          billing_details: {
+            name: 'Buyer Example',
+            email: 'buyer@example.com',
+            address: {
+              line1: '123 Main',
+              city: 'Albuquerque',
+              state: 'NM',
+              postal_code: '87101',
+              country: 'US'
+            }
+          }
+        }
       }
     });
 
     expect(result.supportsShippingAddressElement).toBe(false);
     result.unmount();
     expect(paymentUnmount).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks PaymentIntent confirmation after a Payment Element load error', async () => {
+    const handlers: Record<string, Function> = {};
+    const paymentElement = {
+      mount: vi.fn(),
+      unmount: vi.fn(),
+      on: vi.fn((eventName: string, handler: Function) => {
+        handlers[eventName] = handler;
+      })
+    };
+    const elements = {
+      create: vi.fn(() => paymentElement)
+    };
+    const stripeInstance = {
+      elements: vi.fn(() => elements),
+      confirmPayment: vi.fn(async () => ({ paymentIntent: { status: 'succeeded' } }))
+    };
+    const onLoadError = vi.fn();
+    (window as any).Stripe = vi.fn(() => stripeInstance);
+
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+
+    const paymentContainer = document.createElement('div');
+    document.body.append(paymentContainer);
+
+    const result = await (window as any).StoreStripeCheckoutSidecar.mountPaymentIntent({
+      publishableKey: 'pk_test_123',
+      clientSecret: 'pi_test_secret_123',
+      paymentContainer,
+      returnUrl: 'https://shop.test/order-success/?orderToken=store-order-123',
+      onLoadError
+    });
+
+    handlers.loaderror?.({ error: { message: 'The client_secret provided does not match this account.' } });
+
+    expect(onLoadError).toHaveBeenCalledWith(
+      'The client_secret provided does not match this account.',
+      { error: { message: 'The client_secret provided does not match this account.' } }
+    );
+    await expect(result.confirm()).rejects.toThrow('The client_secret provided does not match this account.');
+    expect(stripeInstance.confirmPayment).not.toHaveBeenCalled();
   });
 
   it('fails clearly when Stripe custom checkout actions do not load', async () => {

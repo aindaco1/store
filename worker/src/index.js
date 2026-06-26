@@ -1559,6 +1559,65 @@ function getStripePublishableKey(env) {
   return env.STRIPE_PUBLISHABLE_KEY || '';
 }
 
+function getStripeSecretKeyMode(key) {
+  const value = String(key || '').trim();
+  if (/^(?:sk|rk)_live_/i.test(value)) return 'live';
+  if (/^(?:sk|rk)_test_/i.test(value)) return 'test';
+  return value ? 'unknown' : '';
+}
+
+function getStripePublishableKeyMode(key) {
+  const value = String(key || '').trim();
+  if (/^pk_live_/i.test(value)) return 'live';
+  if (/^pk_test_/i.test(value)) return 'test';
+  return value ? 'unknown' : '';
+}
+
+function validateStripeCheckoutKeyPair(env, secretKey, publishableKey) {
+  if (!secretKey || !publishableKey) {
+    return {
+      ok: false,
+      status: 503,
+      error: 'Stripe checkout is not configured',
+      log: 'Stripe checkout is missing a secret key or publishable key.'
+    };
+  }
+
+  const secretMode = getStripeSecretKeyMode(secretKey);
+  const publishableMode = getStripePublishableKeyMode(publishableKey);
+  const appMode = getAppMode(env);
+  const publicError = 'Stripe checkout is misconfigured. Contact the shop if you need help completing the order.';
+
+  if (secretMode === 'unknown' || publishableMode === 'unknown') {
+    return {
+      ok: false,
+      status: 503,
+      error: publicError,
+      log: `Stripe checkout key mode could not be detected for app mode ${appMode}.`
+    };
+  }
+
+  if (secretMode && publishableMode && secretMode !== publishableMode) {
+    return {
+      ok: false,
+      status: 503,
+      error: publicError,
+      log: `Stripe checkout key mode mismatch: ${secretMode} secret key with ${publishableMode} publishable key.`
+    };
+  }
+
+  if (secretMode && secretMode !== appMode) {
+    return {
+      ok: false,
+      status: 503,
+      error: publicError,
+      log: `Stripe checkout app mode mismatch: ${appMode} Worker mode with ${secretMode} Stripe keys.`
+    };
+  }
+
+  return { ok: true };
+}
+
 function resolveCheckoutUiRuntime(env) {
   const requestedMode = getCheckoutUiMode(env);
   const stripePublishableKey = getStripePublishableKey(env);
@@ -9834,8 +9893,12 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
 
   const stripeSecretKey = getStripeKey(env);
   const stripePublishableKey = getStripePublishableKey(env);
-  if (!stripeSecretKey || !stripePublishableKey) {
-    return privateJsonResponse({ error: 'Stripe checkout is not configured' }, 503, env);
+  const stripeKeyValidation = validateStripeCheckoutKeyPair(env, stripeSecretKey, stripePublishableKey);
+  if (!stripeKeyValidation.ok) {
+    console.error('Stripe Store checkout configuration error:', stripeKeyValidation.log);
+    return privateJsonResponse({
+      error: stripeKeyValidation.error || 'Stripe checkout is not configured'
+    }, stripeKeyValidation.status || 503, env);
   }
 
   const inventoryReservationResult = await saveStoreInventoryReservation(env, orderToken, draftResult.validation.items);
