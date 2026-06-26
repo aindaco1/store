@@ -226,6 +226,7 @@ const STORE_INVENTORY_OVERRIDES_KEY = 'store-inventory-overrides:v1';
 const ADMIN_STORE_MARKETING_REFERRALS_KEY = 'admin-store-marketing-referrals:v1';
 const ADMIN_STORE_MARKETING_DRAFT_KEY = 'admin-store-marketing-draft:builder';
 const ADMIN_STORE_MARKETING_DRAFT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS = 20 * 1000;
 const ABANDONED_CART_PREFIX = 'abandoned-cart:';
 const ABANDONED_CART_RESUME_PREFIX = 'abandoned-cart-resume:';
 const ABANDONED_CART_SENT_PREFIX = 'abandoned-cart-sent:';
@@ -289,6 +290,12 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
+
+let adminStoreOrderScanCache = null;
+
+function invalidateAdminStoreOrderScanCache() {
+  adminStoreOrderScanCache = null;
+}
 
 
 
@@ -3445,7 +3452,10 @@ async function backfillStoreOrderCustomerFromStripe(env, storedOrder = {}, expec
       }
     };
     const key = storageKey || getStoreOrderStorageKey(updatedOrder.orderToken || updatedOrder.orderDraft?.orderToken);
-    if (key) await env.STORE_STATE.put(key, JSON.stringify(updatedOrder));
+    if (key) {
+      await env.STORE_STATE.put(key, JSON.stringify(updatedOrder));
+      invalidateAdminStoreOrderScanCache();
+    }
     return updatedOrder;
   } catch (error) {
     console.warn('Store order customer Stripe backfill failed:', {
@@ -3804,7 +3814,10 @@ async function handleStoreOrderLookupRequest(request, env, ctx = null) {
   }
 
   const emailHash = await getStoreOrderEmailHash(email);
-  const orders = await readStoreOrderEmailIndexOrders(env, emailHash, { rebuild: true });
+  let orders = await readStoreOrderEmailIndexOrders(env, emailHash);
+  if (orders.length === 0) {
+    orders = await readStoreOrderEmailIndexOrders(env, emailHash, { rebuild: true });
+  }
   const inlineDelivery = shouldDeliverStoreOrderLookupInline(request, env);
   let debug = inlineDelivery
     ? {
@@ -5866,6 +5879,65 @@ async function listAdminStoreOrderKeys(env) {
   } while (true);
 
   return { ok: true, keys: keys.slice(0, 5000), listCalls, truncated };
+}
+
+async function readAdminStoreOrderScan(env, options = {}) {
+  const nowMs = Date.now();
+  if (
+    options.force !== true &&
+    adminStoreOrderScanCache?.expiresAtMs > nowMs &&
+    adminStoreOrderScanCache?.data
+  ) {
+    return {
+      ok: true,
+      ...adminStoreOrderScanCache.data,
+      cache: {
+        hit: true,
+        ageMs: Math.max(0, nowMs - Number(adminStoreOrderScanCache.createdAtMs || nowMs)),
+        ttlMs: ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS
+      }
+    };
+  }
+
+  const listed = await listAdminStoreOrderKeys(env);
+  if (!listed.ok) return listed;
+
+  const orders = [];
+  let scanned = 0;
+  for (const key of listed.keys) {
+    const keyName = String(key?.name || '').trim();
+    if (!keyName) continue;
+    const storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
+    scanned += 1;
+    if (!storedOrder || typeof storedOrder !== 'object') continue;
+    const order = buildAdminStoreOrderRecord(storedOrder);
+    if (order.orderToken) orders.push(order);
+  }
+  orders.sort(compareAdminStoreOrders);
+
+  const data = {
+    orders,
+    scanned,
+    indexed: listed.keys.length,
+    listCalls: listed.listCalls || 1,
+    truncated: listed.truncated === true,
+    generatedAt: new Date().toISOString()
+  };
+  adminStoreOrderScanCache = {
+    createdAtMs: nowMs,
+    expiresAtMs: Date.now() + ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS,
+    data
+  };
+
+  return {
+    ok: true,
+    ...data,
+    cache: {
+      hit: false,
+      ageMs: 0,
+      ttlMs: ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS
+    }
+  };
 }
 
 async function buildStoreInventorySoldCounts(env) {
@@ -8463,26 +8535,16 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return { ok: false, response: auth.response };
 
-  const listed = await listAdminStoreOrderKeys(env);
-  if (!listed.ok) {
-    return { ok: false, response: privateJsonResponse({ error: listed.error }, listed.status || 503, env) };
+  const scannedOrders = await readAdminStoreOrderScan(env, {
+    force: options.forceScan === true
+  });
+  if (!scannedOrders.ok) {
+    return { ok: false, response: privateJsonResponse({ error: scannedOrders.error }, scannedOrders.status || 503, env) };
   }
 
   const url = new URL(request.url);
   const filters = storeAdminOrderFiltersFromUrl(url);
-  const orders = [];
-  let scanned = 0;
-  for (const key of listed.keys) {
-    const keyName = String(key?.name || '').trim();
-    if (!keyName) continue;
-    const storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
-    scanned += 1;
-    if (!storedOrder || typeof storedOrder !== 'object') continue;
-    const order = buildAdminStoreOrderRecord(storedOrder);
-    if (!order.orderToken || !adminStoreOrderMatchesFilters(order, filters)) continue;
-    orders.push(order);
-  }
-  orders.sort(compareAdminStoreOrders);
+  const orders = scannedOrders.orders.filter((order) => adminStoreOrderMatchesFilters(order, filters));
 
   const allFulfillmentRows = orders.flatMap((order) => (
     order.items
@@ -8530,12 +8592,17 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
         returned: pageOrders.length,
         matched: allFulfillmentRows.length,
         matchedOrders: matchedOrders.length,
-        scanned,
-        indexed: listed.keys.length,
-        truncated: listed.truncated === true
+        scanned: scannedOrders.scanned,
+        indexed: scannedOrders.indexed,
+        truncated: scannedOrders.truncated === true,
+        cache: scannedOrders.cache || null,
+        generatedAt: scannedOrders.generatedAt || ''
       },
       filters,
-      writeBudget: adminReadBudget({ kvListExpected: listed.listCalls || 1 }),
+      writeBudget: adminReadBudget({
+        kvListExpected: scannedOrders.cache?.hit ? 0 : (scannedOrders.listCalls || 1),
+        kvReadsExpected: scannedOrders.cache?.hit ? 0 : scannedOrders.scanned
+      }),
       generatedAt: new Date().toISOString()
     }
   };
@@ -8634,6 +8701,7 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}) {
       });
     }
   }
+  if (importedOrders.length > 0) invalidateAdminStoreOrderScanCache();
 
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'store_orders:snipcart_import',
@@ -9616,6 +9684,7 @@ async function handleAdminStoreOrderDownloadAccess(request, env, body = {}) {
   };
   const storageKey = getStoreOrderStorageKey(orderToken);
   await env.STORE_STATE.put(storageKey, JSON.stringify(updatedOrder));
+  invalidateAdminStoreOrderScanCache();
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'store_order:download_access',
     adminEmail: auth.user.email,
@@ -9723,6 +9792,7 @@ async function handleAdminStoreOrderCheckIn(request, env, body = {}) {
   };
   const storageKey = getStoreOrderStorageKey(orderToken);
   await env.STORE_STATE.put(storageKey, JSON.stringify(updatedOrder));
+  invalidateAdminStoreOrderScanCache();
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'store_order:check_in',
     adminEmail: auth.user.email,
@@ -10040,6 +10110,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       storeOrderStorageKey,
       JSON.stringify(storedOrder)
     );
+    invalidateAdminStoreOrderScanCache();
     queueStoreOrderEmailIndexUpsert(ctx, env, storedOrder);
     queueStoreOrderEmailDelivery(ctx, env, storedOrder);
     queueStoreEventRemindersQuietly(ctx, env, storedOrder);
@@ -10179,6 +10250,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     JSON.stringify(storedOrder),
     { expirationTtl: STORE_ORDER_DRAFT_TTL_SECONDS }
   );
+  invalidateAdminStoreOrderScanCache();
   if (abandonedCartReminder) {
     queueAbandonedCheckoutFollowupQuietly(ctx, env, storedOrder);
   }
@@ -10416,6 +10488,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   delete updatedOrder.orderDraft.failedAt;
 
   await env.STORE_STATE.put(loaded.storageKey, JSON.stringify(updatedOrder));
+  invalidateAdminStoreOrderScanCache();
   await deleteAbandonedCheckoutFollowup(env, metadata.orderToken, { reason: 'completed' });
   queueStoreOrderEmailIndexUpsert(ctx, env, updatedOrder);
   queueStoreOrderEmailDelivery(ctx, env, updatedOrder);
@@ -10484,6 +10557,7 @@ async function failStorePaymentIntentOrder(paymentIntent, env) {
     JSON.stringify(updatedOrder),
     { expirationTtl: STORE_ORDER_DRAFT_TTL_SECONDS }
   );
+  invalidateAdminStoreOrderScanCache();
 
   return {
     ok: true,
