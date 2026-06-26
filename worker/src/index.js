@@ -5780,6 +5780,14 @@ function isAdminStoreAnalyticsTicketRow(row = {}) {
     row.shippable !== true;
 }
 
+function isAdminStoreAnalyticsSettledOrder(order = {}) {
+  if (String(order.status || '').trim().toLowerCase() !== STORE_ORDER_STATUS_CONFIRMED) return false;
+  const payment = order.payment || {};
+  const paymentStatus = String(payment.status || '').trim().toLowerCase();
+  if (payment.required === true) return paymentStatus === 'succeeded';
+  return !paymentStatus || paymentStatus === 'not_required' || paymentStatus === 'succeeded';
+}
+
 function adminStoreAttendanceGroupKey(row = {}) {
   return [
     row.productId || row.sku || row.itemId,
@@ -8786,8 +8794,11 @@ function storeAnalyticsBreakdownRows(map, limit = 20) {
 }
 
 function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
-  const orders = Array.isArray(ordersPayload.orders) ? ordersPayload.orders : [];
-  const rows = Array.isArray(ordersPayload.fulfillments) ? ordersPayload.fulfillments : [];
+  const allOrders = Array.isArray(ordersPayload.orders) ? ordersPayload.orders : [];
+  const orders = allOrders.filter(isAdminStoreAnalyticsSettledOrder);
+  const settledOrderTokens = new Set(orders.map((order) => String(order.orderToken || '')).filter(Boolean));
+  const rows = (Array.isArray(ordersPayload.fulfillments) ? ordersPayload.fulfillments : [])
+    .filter((row) => settledOrderTokens.has(String(row.orderToken || '')));
   const fulfillmentBreakdown = new Map();
   const productBreakdown = new Map();
   const statusBreakdown = new Map();
@@ -8855,6 +8866,9 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
     },
     page: ordersPayload.page || null,
     filters: ordersPayload.filters || {},
+    excluded: {
+      unsettledOrders: Math.max(0, allOrders.length - orders.length)
+    },
     generatedAt: new Date().toISOString(),
     writeBudget: ordersPayload.writeBudget || adminReadBudget()
   };

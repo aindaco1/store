@@ -59,4 +59,63 @@ describe('Store admin analytics', () => {
     expect(payload.totals.checkedInQuantity).toBe(1);
     expect(payload.totals.uncheckedQuantity).toBe(5);
   });
+
+  it('excludes unsettled checkout attempts from sales analytics', () => {
+    const payload = buildAdminStoreAnalyticsPayload({
+      orders: [
+        {
+          orderToken: 'store-order-confirmed',
+          status: 'confirmed',
+          totals: { totalCents: 5232 },
+          payment: { required: true, status: 'succeeded' }
+        },
+        {
+          orderToken: 'store-order-pending-a',
+          status: 'payment_pending',
+          totals: { totalCents: 5232 },
+          payment: { required: true, status: 'requires_payment_method' }
+        },
+        {
+          orderToken: 'store-order-pending-b',
+          status: 'payment_pending',
+          totals: { totalCents: 5232 },
+          payment: { required: true, status: 'requires_payment_method' }
+        }
+      ],
+      fulfillments: [
+        {
+          orderToken: 'store-order-confirmed',
+          itemName: 'DUST WAVE Sticker',
+          fulfillmentType: 'physical',
+          quantity: 1,
+          subtotalCents: 300
+        },
+        {
+          orderToken: 'store-order-pending-a',
+          itemName: 'DUST WAVE Sticker',
+          fulfillmentType: 'physical',
+          quantity: 1,
+          subtotalCents: 300
+        },
+        {
+          orderToken: 'store-order-pending-b',
+          itemName: 'DUST WAVE Sticker',
+          fulfillmentType: 'physical',
+          quantity: 1,
+          subtotalCents: 300
+        }
+      ]
+    });
+
+    expect(payload.totals.orders).toBe(1);
+    expect(payload.totals.revenueCents).toBe(5232);
+    expect(payload.totals.physicalQuantity).toBe(1);
+    expect(payload.excluded.unsettledOrders).toBe(2);
+    expect(payload.breakdowns.status).toEqual([
+      { key: 'confirmed', count: 1, quantity: 1, revenueCents: 5232 }
+    ]);
+    expect(payload.breakdowns.payment).toEqual([
+      { key: 'succeeded', count: 1, quantity: 1, revenueCents: 5232 }
+    ]);
+  });
 });
