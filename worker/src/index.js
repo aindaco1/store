@@ -5569,6 +5569,7 @@ function buildAdminStoreFulfillmentItem(storedOrder = {}, item = {}, index = 0) 
     unitPriceCents: Math.max(0, Number(item.unitPriceCents || 0) || 0),
     subtotalCents: Math.max(0, Number(item.subtotalCents || 0) || 0),
     currency: item.currency || storedOrder.orderDraft?.currency || storedOrder.payment?.currency || 'USD',
+    taxCategory: item.taxCategory || '',
     fulfillmentType,
     shippable: item.shippable === true || fulfillmentType === 'physical',
     event,
@@ -5747,6 +5748,7 @@ function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
     variantLabel: item.variantLabel || '',
     quantity: item.quantity || 0,
     subtotalCents: item.subtotalCents || 0,
+    taxCategory: item.taxCategory || '',
     fulfillmentType: item.fulfillmentType || '',
     shippable: item.shippable === true,
     eventStartsAt: item.event?.startsAt || '',
@@ -5768,6 +5770,14 @@ function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
     downloadAccessUpdatedAt: item.downloadAccess?.updatedAt || '',
     downloadAccessUpdatedBy: item.downloadAccess?.updatedBy || ''
   };
+}
+
+function isAdminStoreAnalyticsTicketRow(row = {}) {
+  const fulfillmentType = String(row.fulfillmentType || '').trim().toLowerCase();
+  if (fulfillmentType === 'ticket' || fulfillmentType === 'rsvp') return true;
+  return fulfillmentType === 'legacy' &&
+    String(row.taxCategory || '').trim().toLowerCase() === 'admission' &&
+    row.shippable !== true;
 }
 
 function adminStoreAttendanceGroupKey(row = {}) {
@@ -8579,7 +8589,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
         orders: matchedOrders.length,
         fulfillmentRows: allFulfillmentRows.length,
         totalCents: matchedOrders.reduce((sum, order) => sum + Number(order.totals?.totalCents || 0), 0),
-        ticketQuantity: allFulfillmentRows.filter((row) => row.checkInAvailable).reduce((sum, row) => sum + Number(row.quantity || 0), 0),
+        ticketQuantity: allFulfillmentRows.filter(isAdminStoreAnalyticsTicketRow).reduce((sum, row) => sum + Number(row.quantity || 0), 0),
         checkedInQuantity: allFulfillmentRows.filter((row) => row.checkInAvailable).reduce((sum, row) => sum + Number(row.checkedInQuantity || 0), 0),
         physicalQuantity: allFulfillmentRows.filter((row) => row.shippable || row.fulfillmentType === 'physical').reduce((sum, row) => sum + Number(row.quantity || 0), 0),
         digitalQuantity: allFulfillmentRows.filter((row) => row.fulfillmentType === 'digital').reduce((sum, row) => sum + Number(row.quantity || 0), 0)
@@ -8790,7 +8800,7 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
   const revenueCents = orders.reduce((sum, order) => sum + Math.max(0, Number(order?.totals?.totalCents || 0) || 0), 0);
   const itemSubtotalCents = rows.reduce((sum, row) => sum + Math.max(0, Number(row.subtotalCents || 0) || 0), 0);
   const itemQuantity = rows.reduce((sum, row) => sum + Math.max(0, Number(row.quantity || 0) || 0), 0);
-  const ticketRows = rows.filter((row) => row.checkInAvailable === true);
+  const ticketRows = rows.filter(isAdminStoreAnalyticsTicketRow);
   const ticketQuantity = ticketRows.reduce((sum, row) => sum + Math.max(0, Number(row.quantity || 0) || 0), 0);
   const checkedInQuantity = ticketRows.reduce((sum, row) => sum + Math.max(0, Number(row.checkedInQuantity || 0) || 0), 0);
 
@@ -14083,6 +14093,7 @@ function corsResponse(env = null, isPublic = false) {
 }
 
 export {
+  buildAdminStoreAnalyticsPayload,
   buildStoreOrderEmailPayload,
   buildStoreOrderEventEmailAttachments,
   processStoreEventReminders,
