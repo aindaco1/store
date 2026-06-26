@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
+    "build": "bundle exec jekyll build && npm run assets:minify",
     "deploy:worker": "npm --prefix worker run deploy",
     "test": "vitest run && ./scripts/test-e2e.sh",
     "test:unit": "vitest run",
