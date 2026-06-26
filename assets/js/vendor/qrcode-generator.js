@@ -2295,3 +2295,7 @@ var qrcode = function() {
 }(function () {
     return qrcode;
 }));
+
+if (typeof window !== 'undefined' && typeof window.qrcode !== 'function' && typeof qrcode === 'function') {
+  window.qrcode = qrcode;
+}

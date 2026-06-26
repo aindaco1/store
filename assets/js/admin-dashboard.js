@@ -66,6 +66,9 @@
   var storeMarketingCurrentQrUrl = '';
   var storeMarketingEditingOriginalCode = '';
   var storeMarketingAbandonedHealthRoot = document.getElementById('admin-store-marketing-abandoned-health');
+  var storeMarketingReferralsLoaded = false;
+  var storeMarketingReferralsLoading = false;
+  var storeMarketingAbandonedHealthLoaded = false;
   var storeMarketingAbandonedHealthLoading = false;
 
   var labels = {
@@ -728,7 +731,10 @@
     syncMobileSelect(tabList, '[data-admin-tab]', key, 'Admin section', selectAdminTab);
     if (key === 'settings' && !settingsLoaded) loadSettings();
     if (key === 'store-analytics' && !storeAnalyticsLoaded) loadStoreAnalytics();
-    if (key === 'store-marketing') updateStoreMarketingBuilder();
+    if (key === 'store-marketing') {
+      updateStoreMarketingBuilder();
+      loadStoreMarketingData();
+    }
     if (key === 'store-orders' && !storeOrdersLoaded) loadStoreOrders();
     if (key === 'store-products' && !storeProductsLoaded) loadStoreProducts();
     if (key === 'store-coupons' && !storeCouponsLoaded) loadStoreCoupons();
@@ -2758,12 +2764,17 @@
   }
 
   function loadStoreMarketingReferrals() {
+    if (storeMarketingReferralsLoading) return Promise.resolve();
+    storeMarketingReferralsLoading = true;
     return requestJson('/admin/store/marketing/referrals').then(function(data) {
+      storeMarketingReferralsLoaded = true;
       renderStoreMarketingReferrals(data.referrals || []);
     }).catch(function(error) {
       logger.error('Failed to load Store marketing referrals', error);
       renderStoreMarketingReferrals([]);
       setStatus($('#admin-store-marketing-status'), formatError(error), true);
+    }).finally(function() {
+      storeMarketingReferralsLoading = false;
     });
   }
 
@@ -2913,10 +2924,11 @@
   }
 
   function loadStoreAbandonedHealth() {
-    if (!storeMarketingAbandonedHealthRoot || storeMarketingAbandonedHealthLoading) return;
+    if (!storeMarketingAbandonedHealthRoot || storeMarketingAbandonedHealthLoading) return Promise.resolve();
     storeMarketingAbandonedHealthLoading = true;
     setStatus(storeMarketingAbandonedHealthRoot, 'Loading abandoned-checkout health...');
     return requestJson('/admin/store/marketing/abandoned-checkout/health').then(function(data) {
+      storeMarketingAbandonedHealthLoaded = true;
       renderStoreAbandonedHealth(data);
     }).catch(function(error) {
       logger.error('Failed to load Store abandoned checkout health', error);
@@ -2957,6 +2969,16 @@
     });
   }
 
+  function canLoadStoreMarketingData() {
+    return Boolean(currentUser && currentUser.email && csrfToken);
+  }
+
+  function loadStoreMarketingData() {
+    if (!canLoadStoreMarketingData()) return;
+    if (!storeMarketingReferralsLoaded) loadStoreMarketingReferrals();
+    if (!storeMarketingAbandonedHealthLoaded) loadStoreAbandonedHealth();
+  }
+
   function saveStoreMarketingReferral() {
     updateStoreMarketingBuilder();
     var draft = currentStoreMarketingDraft();
@@ -2982,6 +3004,7 @@
       }
     }).then(function(data) {
       setStoreMarketingEditingState('');
+      storeMarketingReferralsLoaded = true;
       renderStoreMarketingReferrals(data.referrals || []);
       setStatus($('#admin-store-marketing-status'), 'Referral saved.');
     }).catch(function(error) {
@@ -2999,6 +3022,7 @@
       body: { code: code }
     }).then(function(data) {
       if (storeMarketingEditingOriginalCode === code) setStoreMarketingEditingState('');
+      storeMarketingReferralsLoaded = true;
       renderStoreMarketingReferrals(data.referrals || []);
       setStatus($('#admin-store-marketing-status'), 'Referral deleted.');
     }).catch(function(error) {
@@ -3098,8 +3122,6 @@
       });
     }
     resetStoreMarketingBuilder();
-    loadStoreMarketingReferrals();
-    loadStoreAbandonedHealth();
   }
 
   function renderStoreOrdersSummary(data) {

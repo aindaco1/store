@@ -114,7 +114,9 @@ describe('Store SEO templates', () => {
     expect(adminCsp).toContain('https://cloudflareinsights.com');
     expect(adminCsp).toContain("'sha256-fmTc2S1qBUoxMlQ5hNbPPGRCgGvoWqX2volGkiDGt3I='");
     expect(adminCsp).not.toContain("'unsafe-inline'");
-    expect(readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js')).toContain('QR Code Generator for JavaScript');
+    const qrVendor = readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js');
+    expect(qrVendor).toContain('QR Code Generator for JavaScript');
+    expect(qrVendor).toContain('window.qrcode = qrcode');
     expect(adminPage).toContain('indexable: false');
     expect(adminPage).toContain('sitemap: false');
     expect(orderLookup).toContain('indexable: false');
