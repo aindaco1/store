@@ -757,6 +757,53 @@ function storeSettingsSections() {
 function storeOrdersPayload() {
   return {
     scope: 'store',
+    orders: [{
+      orderToken: TICKET_ORDER_TOKEN,
+      status: 'confirmed',
+      createdAt: '2026-06-11T12:00:00.000Z',
+      confirmedAt: '2026-06-11T12:00:00.000Z',
+      customer: {
+        name: TICKET_BUYER_NAME,
+        email: TICKET_BUYER_EMAIL
+      },
+      totals: {
+        totalCents: 1200
+      },
+      payment: {
+        status: 'paid'
+      },
+      fulfillmentTypes: ['ticket'],
+      items: [{
+        id: TICKET_ITEM_ID,
+        name: 'Fronteras Screening',
+        variantLabel: 'General Admission',
+        quantity: 1,
+        fulfillmentType: 'ticket'
+      }]
+    }, {
+      orderToken: DIGITAL_ORDER_TOKEN,
+      status: 'confirmed',
+      createdAt: '2026-06-11T12:05:00.000Z',
+      confirmedAt: '2026-06-11T12:05:00.000Z',
+      customer: {
+        name: DIGITAL_BUYER_NAME,
+        email: DIGITAL_BUYER_EMAIL
+      },
+      totals: {
+        totalCents: 500
+      },
+      payment: {
+        status: 'paid'
+      },
+      fulfillmentTypes: ['digital'],
+      items: [{
+        id: DIGITAL_ITEM_ID,
+        name: 'Fronteras Download',
+        variantLabel: '',
+        quantity: 1,
+        fulfillmentType: 'digital'
+      }]
+    }],
     totals: {
       orders: 2,
       fulfillmentRows: 2,
@@ -1730,8 +1777,12 @@ test.describe('Admin Dashboard', () => {
       action: 'expire'
     });
     await expect(page.locator('#admin-store-orders-status')).toContainText('Download access expired.');
+    const storeOrderCallsBeforeSearch = calls.storeOrders.length;
     await page.locator('#admin-store-order-query').fill(TICKET_BUYER_NAME);
-    await expect.poll(() => calls.storeOrders.some((call) => call.q === TICKET_BUYER_NAME)).toBe(true);
+    await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
+    await expect(page.locator('#admin-store-orders-results')).not.toContainText(DIGITAL_ORDER_TOKEN);
+    await page.waitForTimeout(250);
+    expect(calls.storeOrders).toHaveLength(storeOrderCallsBeforeSearch);
     await page.locator('#admin-store-attendees-export').click();
     await expect.poll(() => calls.storeAttendeeCsv.length).toBe(1);
     expect(calls.storeAttendeeCsv[0]).toMatchObject({ q: TICKET_BUYER_NAME });

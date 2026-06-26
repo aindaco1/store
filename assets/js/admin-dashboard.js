@@ -56,8 +56,10 @@
   var storeProductPreviewRequestCounter = 0;
   var storeProductMediaCache = new Map();
   var SNIPCART_IMPORT_MAX_CSV_BYTES = 1024 * 1024;
+  var currentStoreOrdersPayload = null;
   var storeOrderNextCursor = null;
   var storeOrderLoadTimer = null;
+  var storeOrderRenderTimer = null;
   var adminFieldIdCounter = 0;
   var storeProductDescriptionEditorCounter = 0;
   var storeProductDescriptionUploadCounter = 0;
@@ -1866,11 +1868,12 @@
     return $all('[data-admin-user-card]', root).map(readAdminUserCard);
   }
 
-  function orderFilters(cursor) {
+  function orderFilters(cursor, options) {
+    var opts = options || {};
     return {
       status: ($('#admin-store-order-status') || {}).value || 'confirmed',
       fulfillment: ($('#admin-store-order-fulfillment') || {}).value || 'all',
-      q: ($('#admin-store-order-query') || {}).value || '',
+      q: opts.includeQuery === false ? '' : (($('#admin-store-order-query') || {}).value || ''),
       cursor: cursor || 0,
       limit: 25
     };
@@ -3269,6 +3272,268 @@
     }, {});
   }
 
+  function getStoreOrderSearchQuery() {
+    return String(($('#admin-store-order-query') || {}).value || '').trim().toLowerCase();
+  }
+
+  function getStoreOrdersFromPayload(data) {
+    if (Array.isArray(data?.orders) && data.orders.length) return data.orders;
+    var rowsByToken = getStoreOrderRowsByToken(data?.fulfillments || []);
+    return Object.keys(rowsByToken).map(function(token) {
+      var rows = rowsByToken[token] || [];
+      var first = rows[0] || {};
+      return {
+        orderToken: token,
+        status: first.status || '',
+        createdAt: first.createdAt || '',
+        confirmedAt: first.confirmedAt || '',
+        customer: {
+          name: first.customerName || '',
+          email: first.customerEmail || ''
+        },
+        payment: {
+          status: first.paymentStatus || ''
+        },
+        totals: {
+          totalCents: Math.max(0, Number(first.totalCents || 0) || 0)
+        },
+        fulfillmentTypes: Array.from(new Set(rows.map(function(row) {
+          return String(row.fulfillmentType || '').trim();
+        }).filter(Boolean))).sort(),
+        items: rows.map(function(row) {
+          return {
+            id: row.itemId || '',
+            productId: row.productId || '',
+            variantId: row.variantId || '',
+            sku: row.sku || '',
+            name: row.itemName || '',
+            variantLabel: row.variantLabel || '',
+            quantity: row.quantity || 0,
+            fulfillmentType: row.fulfillmentType || '',
+            checkInAvailable: row.checkInAvailable === true
+          };
+        })
+      };
+    });
+  }
+
+  function mergeStoreOrderPayload(existing, next) {
+    if (!existing || !next) return next || existing || null;
+    var ordersByToken = new Map();
+    getStoreOrdersFromPayload(existing).concat(getStoreOrdersFromPayload(next)).forEach(function(order) {
+      var token = String(order?.orderToken || '').trim();
+      if (token) ordersByToken.set(token, order);
+    });
+
+    var fulfillmentByKey = new Map();
+    (Array.isArray(existing.fulfillments) ? existing.fulfillments : [])
+      .concat(Array.isArray(next.fulfillments) ? next.fulfillments : [])
+      .forEach(function(row, index) {
+        var stableKey = [
+          row?.orderToken || '',
+          row?.itemId || '',
+          row?.productId || '',
+          row?.variantId || '',
+          row?.sku || ''
+        ].join('|');
+        var key = stableKey.replace(/\|/g, '') ? stableKey : String(index);
+        fulfillmentByKey.set(key, row);
+      });
+
+    return {
+      ...next,
+      orders: Array.from(ordersByToken.values()).sort(function(a, b) {
+        var aTime = Date.parse(a.confirmedAt || a.createdAt || '') || 0;
+        var bTime = Date.parse(b.confirmedAt || b.createdAt || '') || 0;
+        return bTime - aTime || String(b.orderToken || '').localeCompare(String(a.orderToken || ''));
+      }),
+      fulfillments: Array.from(fulfillmentByKey.values())
+    };
+  }
+
+  function storeOrderSearchText(order, rows) {
+    return [
+      order?.orderToken,
+      order?.status,
+      order?.customer?.name,
+      order?.customer?.email,
+      order?.payment?.status,
+      getStoreOrderFulfillmentLabel(order),
+      getStoreOrderItemsSummary(order),
+      ...(Array.isArray(rows) ? rows.flatMap(function(row) {
+        return [
+          row.orderToken,
+          row.status,
+          row.paymentStatus,
+          row.customerName,
+          row.customerEmail,
+          row.itemId,
+          row.productId,
+          row.variantId,
+          row.sku,
+          row.itemName,
+          row.variantLabel,
+          row.fulfillmentType,
+          row.eventStartsAt,
+          row.eventVenue,
+          row.eventAddress,
+          row.checkedIn ? 'checked in' : 'not checked in',
+          row.checkedInBy,
+          row.checkInUpdatedBy,
+          row.checkInNote
+        ];
+      }) : [])
+    ].filter(Boolean).join(' ').toLowerCase();
+  }
+
+  function isStoreOrdersTicketLikeRow(row) {
+    var fulfillmentType = String(row?.fulfillmentType || '').trim().toLowerCase();
+    if (fulfillmentType === 'ticket' || fulfillmentType === 'rsvp') return true;
+    return fulfillmentType === 'legacy' &&
+      String(row?.taxCategory || '').trim().toLowerCase() === 'admission' &&
+      row?.shippable !== true;
+  }
+
+  function buildStoreOrdersLocalTotals(orders, rows) {
+    var sourceOrders = Array.isArray(orders) ? orders : [];
+    var sourceRows = Array.isArray(rows) ? rows : [];
+    return {
+      orders: sourceOrders.length,
+      fulfillmentRows: sourceRows.length,
+      totalCents: sourceOrders.reduce(function(sum, order) {
+        return sum + Math.max(0, Number(order?.totals?.totalCents || 0) || 0);
+      }, 0),
+      ticketQuantity: sourceRows.filter(isStoreOrdersTicketLikeRow).reduce(function(sum, row) {
+        return sum + Math.max(0, Number(row.quantity || 0) || 0);
+      }, 0),
+      checkedInQuantity: sourceRows.filter(function(row) {
+        return row.checkInAvailable === true;
+      }).reduce(function(sum, row) {
+        return sum + Math.max(0, Number(row.checkedInQuantity || 0) || 0);
+      }, 0),
+      physicalQuantity: sourceRows.filter(function(row) {
+        return row.shippable === true || String(row.fulfillmentType || '').toLowerCase() === 'physical';
+      }).reduce(function(sum, row) {
+        return sum + Math.max(0, Number(row.quantity || 0) || 0);
+      }, 0),
+      digitalQuantity: sourceRows.filter(function(row) {
+        return String(row.fulfillmentType || '').toLowerCase() === 'digital';
+      }).reduce(function(sum, row) {
+        return sum + Math.max(0, Number(row.quantity || 0) || 0);
+      }, 0)
+    };
+  }
+
+  function buildStoreOrdersLocalAttendance(rows) {
+    var groups = new Map();
+    var orderTokens = new Set();
+    (Array.isArray(rows) ? rows : []).filter(isStoreOrdersTicketLikeRow).forEach(function(row) {
+      var key = [
+        row.productId || row.sku || row.itemId || '',
+        row.variantId || row.variantLabel || '',
+        row.fulfillmentType || '',
+        row.eventStartsAt || '',
+        row.eventVenue || '',
+        row.eventAddress || '',
+        row.itemName || ''
+      ].join('|');
+      var group = groups.get(key) || {
+        productId: row.productId || '',
+        variantId: row.variantId || '',
+        itemName: row.itemName || '',
+        variantLabel: row.variantLabel || '',
+        fulfillmentType: row.fulfillmentType || '',
+        eventStartsAt: row.eventStartsAt || '',
+        eventVenue: row.eventVenue || '',
+        eventAddress: row.eventAddress || '',
+        quantity: 0,
+        checkedInQuantity: 0,
+        orderTokens: new Set()
+      };
+      var quantity = Math.max(0, Number(row.quantity || 0) || 0);
+      group.quantity += quantity;
+      group.checkedInQuantity += Math.max(0, Number(row.checkedInQuantity || 0) || 0);
+      if (row.orderToken) {
+        group.orderTokens.add(row.orderToken);
+        orderTokens.add(row.orderToken);
+      }
+      groups.set(key, group);
+    });
+
+    var events = Array.from(groups.values()).map(function(group) {
+      var quantity = Math.max(0, Number(group.quantity || 0) || 0);
+      var checkedInQuantity = Math.max(0, Number(group.checkedInQuantity || 0) || 0);
+      return {
+        productId: group.productId,
+        variantId: group.variantId,
+        itemName: group.itemName,
+        variantLabel: group.variantLabel,
+        fulfillmentType: group.fulfillmentType,
+        eventStartsAt: group.eventStartsAt,
+        eventVenue: group.eventVenue,
+        eventAddress: group.eventAddress,
+        quantity: quantity,
+        checkedInQuantity: checkedInQuantity,
+        uncheckedQuantity: Math.max(0, quantity - checkedInQuantity),
+        checkedInRate: quantity > 0 ? Math.round((checkedInQuantity / quantity) * 100) : 0,
+        orderCount: group.orderTokens.size
+      };
+    }).sort(function(a, b) {
+      var aTime = Date.parse(a.eventStartsAt || '') || 0;
+      var bTime = Date.parse(b.eventStartsAt || '') || 0;
+      return aTime - bTime || String(a.itemName || '').localeCompare(String(b.itemName || ''));
+    });
+
+    return {
+      totals: {
+        eventCount: events.length,
+        orderCount: orderTokens.size,
+        quantity: events.reduce(function(sum, event) { return sum + Number(event.quantity || 0); }, 0),
+        checkedInQuantity: events.reduce(function(sum, event) { return sum + Number(event.checkedInQuantity || 0); }, 0),
+        uncheckedQuantity: events.reduce(function(sum, event) { return sum + Number(event.uncheckedQuantity || 0); }, 0)
+      },
+      events: events
+    };
+  }
+
+  function filterStoreOrdersPayloadForSearch(data, query) {
+    var source = data || {};
+    var orders = getStoreOrdersFromPayload(source);
+    var fulfillments = Array.isArray(source.fulfillments) ? source.fulfillments : [];
+    if (!query) {
+      return {
+        ...source,
+        orders: orders,
+        fulfillments: fulfillments
+      };
+    }
+
+    var rowsByToken = getStoreOrderRowsByToken(fulfillments);
+    var filteredOrders = orders.filter(function(order) {
+      var token = String(order?.orderToken || '').trim();
+      return storeOrderSearchText(order, rowsByToken[token] || []).includes(query);
+    });
+    var matchedTokens = new Set(filteredOrders.map(function(order) {
+      return String(order?.orderToken || '').trim();
+    }).filter(Boolean));
+    var filteredRows = fulfillments.filter(function(row) {
+      return matchedTokens.has(String(row?.orderToken || '').trim());
+    });
+    return {
+      ...source,
+      orders: filteredOrders,
+      fulfillments: filteredRows,
+      totals: buildStoreOrdersLocalTotals(filteredOrders, filteredRows),
+      attendance: buildStoreOrdersLocalAttendance(filteredRows),
+      page: {
+        ...(source.page || {}),
+        returned: filteredOrders.length,
+        matched: filteredRows.length,
+        matchedOrders: filteredOrders.length
+      }
+    };
+  }
+
   function appendStoreOrderActionControls(parent, order, rowsByToken) {
     var token = String(order?.orderToken || '').trim();
     var rows = rowsByToken[token] || [];
@@ -3338,20 +3603,47 @@
     });
   }
 
+  function renderCurrentStoreOrders() {
+    var status = $('#admin-store-orders-status');
+    var query = getStoreOrderSearchQuery();
+    var source = currentStoreOrdersPayload || {
+      orders: [],
+      fulfillments: [],
+      totals: {},
+      attendance: { totals: {}, events: [] }
+    };
+    var filtered = filterStoreOrdersPayloadForSearch(source, query);
+    renderStoreOrders(filtered, false);
+    var next = $('#admin-store-orders-next');
+    if (next) next.hidden = storeOrderNextCursor === null || storeOrderNextCursor === undefined;
+    if (query) {
+      var visible = Array.isArray(filtered.orders) ? filtered.orders.length : 0;
+      var loaded = getStoreOrdersFromPayload(source).length;
+      setStatus(status, 'Showing ' + formatNumber(visible) + ' of ' + formatNumber(loaded) + ' loaded orders.');
+    } else {
+      setStatus(status, '');
+    }
+  }
+
   function loadStoreOrders(options) {
     var opts = options || {};
     var status = $('#admin-store-orders-status');
     setStatus(status, opts.append ? 'Loading more orders...' : 'Loading Store orders...');
-    return requestJson('/admin/store/orders', { params: orderFilters(opts.cursor || 0) }).then(function(data) {
+    return requestJson('/admin/store/orders', { params: orderFilters(opts.cursor || 0, { includeQuery: false }) }).then(function(data) {
       storeOrdersLoaded = true;
       storeOrderNextCursor = data.page ? data.page.nextCursor : null;
-      renderStoreOrders(data, opts.append);
-      var next = $('#admin-store-orders-next');
-      if (next) next.hidden = storeOrderNextCursor === null || storeOrderNextCursor === undefined;
-      setStatus(status, '');
+      currentStoreOrdersPayload = opts.append
+        ? mergeStoreOrderPayload(currentStoreOrdersPayload, data)
+        : data;
+      renderCurrentStoreOrders();
     }).catch(function(error) {
       setStatus(status, formatError(error), true);
     });
+  }
+
+  function scheduleStoreOrderRender() {
+    clearTimeout(storeOrderRenderTimer);
+    storeOrderRenderTimer = setTimeout(renderCurrentStoreOrders, 75);
   }
 
   function scheduleStoreOrderLoad() {
@@ -3363,6 +3655,7 @@
 
   function downloadStoreCsv(path, fallbackFilename, loadingMessage, completeMessage) {
     clearTimeout(storeOrderLoadTimer);
+    clearTimeout(storeOrderRenderTimer);
     downloadAdminCsv({
       path: path,
       params: orderFilters(0),
@@ -3483,10 +3776,26 @@
     if (filters) {
       filters.addEventListener('submit', function(event) {
         event.preventDefault();
-        loadStoreOrders();
+        renderCurrentStoreOrders();
       });
-      filters.addEventListener('change', scheduleStoreOrderLoad);
-      filters.addEventListener('input', scheduleStoreOrderLoad);
+      filters.addEventListener('change', function(event) {
+        var name = event.target && event.target.name;
+        if (name === 'q') {
+          scheduleStoreOrderRender();
+          return;
+        }
+        scheduleStoreOrderLoad();
+      });
+      filters.addEventListener('input', function(event) {
+        var name = event.target && event.target.name;
+        if (name === 'q') {
+          scheduleStoreOrderRender();
+          return;
+        }
+        scheduleStoreOrderLoad();
+      });
+      var queryInput = $('#admin-store-order-query');
+      if (queryInput) queryInput.addEventListener('search', scheduleStoreOrderRender);
     }
     var exportButton = $('#admin-store-orders-export');
     if (exportButton) exportButton.addEventListener('click', downloadStoreOrdersCsv);
