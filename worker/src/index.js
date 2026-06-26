@@ -3371,6 +3371,7 @@ function buildStoreOrderLookupIndexEntry(storedOrder = {}) {
   const orderDraft = storedOrder.orderDraft || {};
   const orderToken = String(storedOrder.orderToken || orderDraft.orderToken || '').trim();
   if (!STORE_ORDER_TOKEN_PATTERN.test(orderToken)) return null;
+  if (!isStoreOrderFulfillmentReady(storedOrder)) return null;
 
   const totals = orderDraft.totals || {};
   const items = Array.isArray(orderDraft.items) ? orderDraft.items : [];
@@ -3390,6 +3391,81 @@ function buildStoreOrderLookupIndexEntry(storedOrder = {}) {
     itemCount: Math.max(0, Number(totals.itemCount || items.length || 0) || 0),
     items: buildCompactStoreOrderItems(items)
   };
+}
+
+async function collectStoreOrderLookupEntriesForEmailHash(env, emailHash) {
+  if (!env?.STORE_STATE || !getStoreOrderEmailIndexKey(emailHash)) return [];
+  const listed = await listAdminStoreOrderKeys(env);
+  if (!listed.ok) return [];
+
+  const entries = [];
+  for (const key of listed.keys || []) {
+    const keyName = String(key?.name || '').trim();
+    if (!keyName) continue;
+
+    const storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
+    if (!storedOrder || typeof storedOrder !== 'object') continue;
+
+    const email = normalizeStoreOrderLookupEmail(storedOrder.orderDraft?.customer?.email);
+    if (!email) continue;
+
+    const storedEmailHash = await getStoreOrderEmailHash(email);
+    if (storedEmailHash !== emailHash) continue;
+
+    const entry = buildStoreOrderLookupIndexEntry(storedOrder);
+    if (entry) entries.push(entry);
+  }
+
+  const ordersByToken = new Map();
+  for (const entry of entries) {
+    ordersByToken.set(entry.orderToken, entry);
+  }
+
+  return Array.from(ordersByToken.values())
+    .sort(compareStoreLookupEntries)
+    .slice(0, STORE_ORDER_EMAIL_INDEX_LIMIT);
+}
+
+async function readStoreOrderEmailIndexOrders(env, emailHash, options = {}) {
+  const indexKey = getStoreOrderEmailIndexKey(emailHash);
+  if (!env?.STORE_STATE || !indexKey) return [];
+
+  const index = await env.STORE_STATE.get(indexKey, { type: 'json' });
+  const indexedOrders = (Array.isArray(index?.orders) ? index.orders : [])
+    .filter((order) => {
+      if (!STORE_ORDER_TOKEN_PATTERN.test(String(order?.orderToken || ''))) return false;
+      if (order?.fulfillmentReady === false) return false;
+      const status = String(order?.status || '').trim().toLowerCase();
+      return !['draft', 'payment_pending', 'payment_failed'].includes(status);
+    });
+  if (indexedOrders.length > 0 && options.rebuild !== true) {
+    return indexedOrders
+      .sort(compareStoreLookupEntries)
+      .slice(0, STORE_ORDER_EMAIL_INDEX_LIMIT);
+  }
+
+  const rebuiltOrders = await collectStoreOrderLookupEntriesForEmailHash(env, emailHash);
+  const ordersByToken = new Map();
+  for (const order of indexedOrders) ordersByToken.set(order.orderToken, order);
+  for (const order of rebuiltOrders) ordersByToken.set(order.orderToken, order);
+  const mergedOrders = Array.from(ordersByToken.values())
+    .sort(compareStoreLookupEntries)
+    .slice(0, STORE_ORDER_EMAIL_INDEX_LIMIT);
+
+  if (rebuiltOrders.length > 0) {
+    const now = new Date().toISOString();
+    await env.STORE_STATE.put(indexKey, JSON.stringify({
+      version: 1,
+      emailHash,
+      createdAt: index?.createdAt || now,
+      updatedAt: now,
+      orders: mergedOrders
+    }), {
+      expirationTtl: STORE_ORDER_EMAIL_INDEX_TTL_SECONDS
+    });
+  }
+
+  return mergedOrders;
 }
 
 function compareStoreLookupEntries(a = {}, b = {}) {
@@ -3543,20 +3619,13 @@ async function consumeStoreOrderLookupToken(env, token) {
   const recordKey = getStoreOrderLookupTokenKey(verified.payload.jti);
   const record = await env.STORE_STATE.get(recordKey, { type: 'json' });
   if (!record) {
-    return { ok: false, status: 410, error: 'Order lookup link expired or already used' };
+    return { ok: false, status: 410, error: 'Order lookup link expired' };
   }
   if (record.emailHash !== verified.payload.emailHash) {
     return { ok: false, status: 403, error: 'Invalid order lookup link' };
   }
 
-  await env.STORE_STATE.delete(recordKey);
-
-  const indexKey = getStoreOrderEmailIndexKey(verified.payload.emailHash);
-  const index = indexKey
-    ? await env.STORE_STATE.get(indexKey, { type: 'json' })
-    : null;
-  const orders = (Array.isArray(index?.orders) ? index.orders : [])
-    .filter((order) => STORE_ORDER_TOKEN_PATTERN.test(String(order?.orderToken || '')))
+  const orders = (await readStoreOrderEmailIndexOrders(env, verified.payload.emailHash))
     .sort(compareStoreLookupEntries)
     .slice(0, STORE_ORDER_EMAIL_INDEX_LIMIT)
     .map((order) => {
@@ -3632,11 +3701,7 @@ async function handleStoreOrderLookupRequest(request, env, ctx = null) {
   }
 
   const emailHash = await getStoreOrderEmailHash(email);
-  const indexKey = getStoreOrderEmailIndexKey(emailHash);
-  const index = indexKey
-    ? await env.STORE_STATE.get(indexKey, { type: 'json' })
-    : null;
-  const orders = Array.isArray(index?.orders) ? index.orders : [];
+  const orders = await readStoreOrderEmailIndexOrders(env, emailHash, { rebuild: true });
   const inlineDelivery = shouldDeliverStoreOrderLookupInline(request, env);
   let debug = inlineDelivery
     ? {
@@ -8325,15 +8390,17 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   const matchedOrderTokens = new Set(allFulfillmentRows.map((row) => row.orderToken));
   const matchedOrders = orders.filter((order) => matchedOrderTokens.has(order.orderToken));
   const paginate = options.paginate !== false;
-  const limit = paginate ? clampAdminPageLimit(url.searchParams.get('limit')) : allFulfillmentRows.length || 0;
+  const limit = paginate ? clampAdminPageLimit(url.searchParams.get('limit')) : matchedOrders.length || 0;
   const cursorOffset = paginate ? Math.max(0, Number.parseInt(String(url.searchParams.get('cursor') || '0'), 10) || 0) : 0;
+  const pageOrders = paginate
+    ? matchedOrders.slice(cursorOffset, cursorOffset + limit)
+    : matchedOrders;
+  const pageOrderTokens = new Set(pageOrders.map((order) => order.orderToken));
   const fulfillmentRows = paginate
-    ? allFulfillmentRows.slice(cursorOffset, cursorOffset + limit)
+    ? allFulfillmentRows.filter((row) => pageOrderTokens.has(row.orderToken))
     : allFulfillmentRows;
-  const pageOrderTokens = new Set(fulfillmentRows.map((row) => row.orderToken));
-  const pageOrders = matchedOrders.filter((order) => pageOrderTokens.has(order.orderToken));
-  const nextCursor = paginate && allFulfillmentRows.length > cursorOffset + fulfillmentRows.length
-    ? cursorOffset + fulfillmentRows.length
+  const nextCursor = paginate && matchedOrders.length > cursorOffset + pageOrders.length
+    ? cursorOffset + pageOrders.length
     : null;
 
   return {
@@ -8357,7 +8424,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
         limit,
         cursor: cursorOffset,
         nextCursor,
-        returned: fulfillmentRows.length,
+        returned: pageOrders.length,
         matched: allFulfillmentRows.length,
         matchedOrders: matchedOrders.length,
         scanned,

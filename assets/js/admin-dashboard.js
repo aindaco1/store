@@ -1868,7 +1868,7 @@
 
   function orderFilters(cursor) {
     return {
-      status: ($('#admin-store-order-status') || {}).value || 'all',
+      status: ($('#admin-store-order-status') || {}).value || 'confirmed',
       fulfillment: ($('#admin-store-order-fulfillment') || {}).value || 'all',
       q: ($('#admin-store-order-query') || {}).value || '',
       cursor: cursor || 0,
@@ -3233,14 +3233,80 @@
     parent.appendChild(reissueButton);
   }
 
+  function getStoreOrderItemsSummary(order) {
+    var items = Array.isArray(order?.items) ? order.items : [];
+    if (!items.length) return 'No items';
+    var labels = items.slice(0, 3).map(function(item) {
+      return [
+        item.name || item.productId || item.sku || 'Store item',
+        item.variantLabel || '',
+        item.quantity ? 'Qty ' + item.quantity : ''
+      ].filter(Boolean).join(' - ');
+    });
+    if (items.length > labels.length) labels.push('+' + String(items.length - labels.length) + ' more');
+    return labels.join('\n');
+  }
+
+  function getStoreOrderFulfillmentLabel(order) {
+    var types = Array.isArray(order?.fulfillmentTypes) ? order.fulfillmentTypes : [];
+    return types.length ? types.join(', ') : 'none';
+  }
+
+  function getStoreOrderStatusLabel(order) {
+    return [
+      order?.status || '',
+      order?.payment?.status || ''
+    ].filter(Boolean).join(' / ') || 'unknown';
+  }
+
+  function getStoreOrderRowsByToken(rows) {
+    return (Array.isArray(rows) ? rows : []).reduce(function(map, row) {
+      var token = String(row?.orderToken || '').trim();
+      if (!token) return map;
+      if (!map[token]) map[token] = [];
+      map[token].push(row);
+      return map;
+    }, {});
+  }
+
+  function appendStoreOrderActionControls(parent, order, rowsByToken) {
+    var token = String(order?.orderToken || '').trim();
+    var rows = rowsByToken[token] || [];
+    var actionableRows = rows.filter(function(row) {
+      return row?.checkInAvailable || row?.downloadAccess || row?.fulfillmentType === 'digital';
+    });
+
+    if (actionableRows.length === 1) {
+      var row = actionableRows[0];
+      if (row.checkInAvailable) {
+        var button = createElement('button', 'btn btn--secondary', row.checkedIn ? 'Undo check-in' : 'Check in');
+        button.type = 'button';
+        button.dataset.orderToken = row.orderToken || '';
+        button.dataset.itemId = row.itemId || '';
+        button.dataset.storeOrderAction = 'check-in';
+        button.dataset.checkedIn = row.checkedIn ? 'false' : 'true';
+        button.dataset.quantity = String(row.quantity || 1);
+        parent.appendChild(button);
+        return;
+      }
+      appendStoreOrderDownloadAccessControls(parent, row);
+      return;
+    }
+
+    parent.textContent = actionableRows.length > 1
+      ? String(actionableRows.length) + ' item actions'
+      : 'Not available';
+  }
+
   function renderStoreOrders(data, append) {
     var root = $('#admin-store-orders-results');
     if (!root) return;
     if (!append) clear(root);
     renderStoreOrdersSummary(data);
     if (!append) renderStoreOrdersAttendance(data);
-    var rows = Array.isArray(data.fulfillments) ? data.fulfillments : [];
-    if (!rows.length && !append) {
+    var orders = Array.isArray(data.orders) ? data.orders : [];
+    var rowsByToken = getStoreOrderRowsByToken(data.fulfillments);
+    if (!orders.length && !append) {
       root.appendChild(createElement('p', 'admin-app__muted', 'No Store orders match these filters.'));
       return;
     }
@@ -3258,28 +3324,15 @@
       root.appendChild(table);
     }
     var tbody = $('tbody', table);
-    rows.forEach(function(row) {
+    orders.forEach(function(order) {
       var tr = document.createElement('tr');
-      tr.appendChild(createLabeledTableCell('Order', row.orderToken || ''));
-      tr.appendChild(createLabeledTableCell('Customer', [row.customerName, row.customerEmail].filter(Boolean).join(' / ')));
-      tr.appendChild(createLabeledTableCell('Item', [row.itemName, row.variantLabel].filter(Boolean).join(' - ')));
-      tr.appendChild(createLabeledTableCell('Status', [row.status, row.paymentStatus, row.fulfillmentType].filter(Boolean).join(' / ')));
-      tr.appendChild(createLabeledTableCell('Total', moneyFromCents(row.totalCents)));
+      tr.appendChild(createLabeledTableCell('Order', order.orderToken || ''));
+      tr.appendChild(createLabeledTableCell('Customer', [order.customer?.name, order.customer?.email].filter(Boolean).join(' / ')));
+      tr.appendChild(createLabeledTableCell('Item', getStoreOrderItemsSummary(order)));
+      tr.appendChild(createLabeledTableCell('Status', [getStoreOrderStatusLabel(order), getStoreOrderFulfillmentLabel(order)].filter(Boolean).join(' / ')));
+      tr.appendChild(createLabeledTableCell('Total', moneyFromCents(order.totals?.totalCents)));
       var action = createLabeledTableCell('Actions', null, 'admin-store-orders__actions');
-      if (row.checkInAvailable) {
-        var button = createElement('button', 'btn btn--secondary', row.checkedIn ? 'Undo check-in' : 'Check in');
-        button.type = 'button';
-        button.dataset.orderToken = row.orderToken || '';
-        button.dataset.itemId = row.itemId || '';
-        button.dataset.storeOrderAction = 'check-in';
-        button.dataset.checkedIn = row.checkedIn ? 'false' : 'true';
-        button.dataset.quantity = String(row.quantity || 1);
-        action.appendChild(button);
-      } else if (row.downloadAccess || row.fulfillmentType === 'digital') {
-        appendStoreOrderDownloadAccessControls(action, row);
-      } else {
-        action.textContent = 'Not available';
-      }
+      appendStoreOrderActionControls(action, order, rowsByToken);
       tr.appendChild(action);
       tbody.appendChild(tr);
     });
