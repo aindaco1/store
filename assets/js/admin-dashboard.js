@@ -7,6 +7,17 @@
     ? window.StoreLogger.createLogger('admin')
     : { error: function() {}, warn: function() {}, info: function() {}, debug: function() {} };
   var currentLang = (config.i18n && config.i18n.currentLang) || document.documentElement.lang || 'en';
+  var adminLoginForm = document.getElementById('admin-login-form');
+  var adminTurnstileSiteKey = String(
+    adminLoginForm && adminLoginForm.dataset
+      ? adminLoginForm.dataset.adminTurnstileSiteKey || ''
+      : ''
+  ).trim();
+  var adminTurnstileWidgetRoot = document.querySelector('[data-admin-turnstile-widget]');
+  var adminTurnstileLoadPromise = null;
+  var adminTurnstileWidgetId = null;
+  var adminTurnstileToken = '';
+  var adminLoginAttemptStarted = false;
   var workerBase = normalizeBase(
     (config.platform && config.platform.workerUrl) ||
     config.workerBase ||
@@ -225,6 +236,78 @@
     link.href = loginUrl;
     link.textContent = 'Open admin';
     status.appendChild(link);
+  }
+
+  function hasAdminTurnstile() {
+    return Boolean(adminTurnstileSiteKey && adminTurnstileWidgetRoot);
+  }
+
+  function renderAdminTurnstile() {
+    if (!hasAdminTurnstile() || adminTurnstileWidgetId !== null || !window.turnstile || !window.turnstile.render) {
+      return;
+    }
+    adminTurnstileWidgetId = window.turnstile.render(adminTurnstileWidgetRoot, {
+      sitekey: adminTurnstileSiteKey,
+      action: 'admin_login',
+      appearance: 'always',
+      execution: 'render',
+      size: 'flexible',
+      theme: 'light',
+      callback: function(token) {
+        adminTurnstileToken = String(token || '');
+      },
+      'expired-callback': function() {
+        if (adminLoginAttemptStarted) return;
+        adminTurnstileToken = '';
+        setStatus($('#admin-auth-status'), 'Security check expired. Please try again.', true);
+      },
+      'error-callback': function() {
+        if (adminLoginAttemptStarted) return;
+        adminTurnstileToken = '';
+        setStatus($('#admin-auth-status'), 'Security check failed. Please try again.', true);
+      }
+    });
+  }
+
+  function ensureAdminTurnstile() {
+    if (!hasAdminTurnstile()) return Promise.resolve();
+    if (adminTurnstileWidgetId !== null) return Promise.resolve();
+    if (window.turnstile && window.turnstile.render) {
+      renderAdminTurnstile();
+      return Promise.resolve();
+    }
+    if (adminTurnstileLoadPromise) return adminTurnstileLoadPromise;
+    adminTurnstileLoadPromise = new Promise(function(resolve, reject) {
+      var scriptNode = document.createElement('script');
+      scriptNode.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      scriptNode.async = true;
+      scriptNode.defer = true;
+      scriptNode.onload = function() {
+        renderAdminTurnstile();
+        resolve();
+      };
+      scriptNode.onerror = function() {
+        reject(new Error('Turnstile failed to load'));
+      };
+      document.head.appendChild(scriptNode);
+    });
+    return adminTurnstileLoadPromise;
+  }
+
+  function adminTurnstileTokenForSubmit() {
+    if (!hasAdminTurnstile()) return Promise.resolve('');
+    return ensureAdminTurnstile().then(function() {
+      if (!adminTurnstileToken && adminTurnstileWidgetId !== null && window.turnstile && window.turnstile.getResponse) {
+        adminTurnstileToken = String(window.turnstile.getResponse(adminTurnstileWidgetId) || '');
+      }
+      return adminTurnstileToken;
+    });
+  }
+
+  function resetAdminTurnstile() {
+    if (!hasAdminTurnstile() || adminTurnstileWidgetId === null || !window.turnstile || !window.turnstile.reset) return;
+    adminTurnstileToken = '';
+    window.turnstile.reset(adminTurnstileWidgetId);
   }
 
   function parseJsonSafely(text) {
@@ -716,21 +799,44 @@
   }
 
   function setupAuth() {
-    var form = $('#admin-login-form');
+    var form = adminLoginForm || $('#admin-login-form');
     if (!form) return;
+    if (hasAdminTurnstile()) {
+      ensureAdminTurnstile().catch(function(error) {
+        logger.warn('Admin challenge failed to load', error);
+        setStatus($('#admin-auth-status'), 'Security check failed. Please try again.', true);
+      });
+    }
     form.addEventListener('submit', function(event) {
       event.preventDefault();
       var emailField = $('#admin-email');
       var email = emailField ? emailField.value.trim() : '';
       if (!email) return;
       setStatus($('#admin-auth-status'), 'Sending login link...');
-      requestJson('/admin/auth/start', {
-        method: 'POST',
-        body: { email: email, preferredLang: preferredLang() }
-      }).then(function(data) {
-        setAdminLoginStartStatus(data);
+      adminTurnstileTokenForSubmit().then(function(challengeToken) {
+        if (hasAdminTurnstile() && !challengeToken) {
+          setStatus($('#admin-auth-status'), 'Complete the security check before requesting a sign-in link.', true);
+          return null;
+        }
+        adminLoginAttemptStarted = true;
+        return requestJson('/admin/auth/start', {
+          method: 'POST',
+          body: { email: email, preferredLang: preferredLang(), turnstileToken: challengeToken || undefined }
+        }).then(function(data) {
+          setAdminLoginStartStatus(data);
+        });
       }).catch(function(error) {
-        setStatus($('#admin-auth-status'), formatError(error), true);
+        var code = error && error.data ? String(error.data.code || '') : '';
+        if (code === 'admin_challenge_required') {
+          setStatus($('#admin-auth-status'), 'Complete the security check before requesting a sign-in link.', true);
+        } else if (code.indexOf('admin_challenge') === 0) {
+          setStatus($('#admin-auth-status'), 'Security check failed. Please try again.', true);
+        } else {
+          setStatus($('#admin-auth-status'), formatError(error), true);
+        }
+        resetAdminTurnstile();
+      }).finally(function() {
+        adminLoginAttemptStarted = false;
       });
     });
 
