@@ -98,6 +98,7 @@ describe('Store SEO templates', () => {
 
   it('marks private Store routes as noindex and keeps them out of crawl files', () => {
     const adminLayout = readRepoFile('_layouts', 'admin.html');
+    const adminCsp = readRepoFile('_includes', 'first-party-admin-csp.html');
     const adminPage = readRepoFile('admin.md');
     const spanishAdminPage = readOptionalRepoFile('es', 'admin.md');
     const orderLookup = readRepoFile('orders.md');
@@ -107,6 +108,13 @@ describe('Store SEO templates', () => {
 
     expect(adminLayout).toContain('indexable=false');
     expect(adminLayout).toContain('social=false');
+    expect(adminLayout).toContain('data-cfasync="false"');
+    expect(adminLayout).toContain('/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}');
+    expect(adminCsp).toContain('https://static.cloudflareinsights.com');
+    expect(adminCsp).toContain('https://cloudflareinsights.com');
+    expect(adminCsp).toContain("'sha256-fmTc2S1qBUoxMlQ5hNbPPGRCgGvoWqX2volGkiDGt3I='");
+    expect(adminCsp).not.toContain("'unsafe-inline'");
+    expect(readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js')).toContain('QR Code Generator for JavaScript');
     expect(adminPage).toContain('indexable: false');
     expect(adminPage).toContain('sitemap: false');
     expect(orderLookup).toContain('indexable: false');

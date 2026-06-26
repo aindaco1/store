@@ -272,6 +272,7 @@
   {% include site-footer.html lang=current_lang translation_key=page.translation_key %}
   <div id="aria-live-region" class="aria-live" aria-live="polite" aria-atomic="true"></div>
   <script
+    data-cfasync="false"
     src="/assets/js/store-config.js?v={{ asset_version }}"
     defer
     data-store-config-script="true"
@@ -293,11 +294,12 @@
     data-seo-x-handle="{{ site.seo.x_handle | default: '' | escape }}"
     data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
     data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
-  <script src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
-  <script src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
-  <script src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
-  <script src="/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
+  <script data-cfasync="false" src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
   <script
+    data-cfasync="false"
     src="/assets/js/admin-dashboard.js?v={{ asset_version }}"
     defer
     data-admin-dashboard-script="true"
