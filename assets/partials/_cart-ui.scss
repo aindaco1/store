@@ -696,6 +696,10 @@ body.store-cart-open {
   @include type-ui;
 }
 
+.store-first-party-cart__tip-label {
+  font-weight: 700;
+}
+
 .store-first-party-cart__tip-copy {
   margin: 0 0 12px;
   @include type-ui;

@@ -11,6 +11,7 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 - Coupons are stored in KV and applied server-side before tax, shipping, and optional tip calculations.
 - Product catalog changes are GitHub-backed and reviewable in `_products/*.md`.
 - Digital files live in `STORE_DOWNLOADS` R2 and are served through signed Worker routes.
+- Confirmed digital download entitlements do not expire unless an admin explicitly revokes access; signed fulfillment links remain short-lived.
 - Store admin mutations use `store_admin_session` plus `x-store-admin-csrf`.
 
 ## Catalog Workflow
@@ -100,6 +101,7 @@ On success, the Worker:
 - commits inventory reservations
 - stores Stripe financial snapshots when available
 - sends the Store order confirmation email
+- sends super-admin order notifications
 - indexes confirmed order email hashes for customer lookup
 - queues event reminder records when applicable
 - clears pending abandoned-checkout reminders for the completed order
@@ -126,6 +128,7 @@ On failure, the Worker:
 - Admin Downloads verifies whether the object exists in `STORE_DOWNLOADS`.
 - Admin Downloads can upload or replace the R2 object.
 - Confirmed order summaries show signed download actions.
+- Signed links expire, but the buyer's confirmed entitlement remains active unless an admin revokes it from Orders.
 - Download responses are token-scoped and no-store.
 
 ### Tickets And RSVPs

@@ -121,7 +121,7 @@ describe('Store event email attachments and reminders', () => {
     vi.unstubAllGlobals();
   });
 
-  it('adds calendar, ticket, and check-in QR attachments to event order emails', async () => {
+  it('adds calendar attachments to event order emails without attaching SVG tickets or QR codes', async () => {
     const env = buildEnv();
     const order = buildConfirmedEventOrder(new Date());
 
@@ -129,9 +129,7 @@ describe('Store event email attachments and reminders', () => {
 
     expect(payload?.email).toBe('alonso@dustwave.xyz');
     expect(payload?.attachments.map((attachment: { filename: string }) => attachment.filename)).toEqual([
-      'ticket-1.ics',
-      'ticket-1-ticket.svg',
-      'ticket-1-check-in-qr.svg'
+      'ticket-1.ics'
     ]);
     const calendar = Buffer.from(payload?.attachments[0].content || '', 'base64').toString('utf8');
     expect(calendar).toContain('METHOD:REQUEST');
@@ -139,7 +137,7 @@ describe('Store event email attachments and reminders', () => {
     expect(calendar).toContain('LOCATION:Sund Brewery\\, 4501 1st St NW\\, Albuquerque\\, NM 87107');
   });
 
-  it('sends due event reminders with calendar and QR attachments', async () => {
+  it('sends due event reminders with calendar attachments and order-page ticket links', async () => {
     const now = new Date();
     const storeState = new MockKVNamespace();
     const env = buildEnv(storeState);
@@ -159,10 +157,9 @@ describe('Store event email attachments and reminders', () => {
     expect(payload.subject).toBe('Event reminder | DANCEWAVE | Dust Wave Shop');
     expect(payload.html).toContain('This is your 1 week before reminder.');
     expect(payload.html).toContain('Sund Brewery, 4501 1st St NW, Albuquerque, NM 87107');
+    expect(payload.html).toContain('Open your <a href="https://shop.test/order-success/?orderToken=store-order-event123"');
     expect(payload.attachments.map((attachment: { filename: string }) => attachment.filename)).toEqual([
-      'ticket-1.ics',
-      'ticket-1-ticket.svg',
-      'ticket-1-check-in-qr.svg'
+      'ticket-1.ics'
     ]);
   });
 });

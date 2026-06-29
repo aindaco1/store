@@ -1850,14 +1850,89 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-store-orders__actions {
-  @include admin-action-row(8px);
+  align-content: start;
+  display: grid;
+  gap: 8px;
+  min-width: 11rem;
+}
+
+.admin-store-orders__download-access {
+  display: grid;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.admin-store-orders__download-control {
+  container-type: inline-size;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: min(100%, 11rem);
+}
+
+.admin-store-orders__download-control .btn {
+  justify-content: center;
+  width: 100%;
 }
 
 .admin-store-orders__action-note {
   color: $color--secondary;
-  flex-basis: 100%;
   font-size: 0.78rem;
   line-height: 1.3;
+}
+
+.admin-store-orders__action-list {
+  display: grid;
+  gap: 10px;
+  max-width: 14rem;
+  width: 100%;
+}
+
+.admin-store-orders__action-item {
+  border-top: 1px solid $border--default;
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.admin-store-orders__action-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.admin-store-orders__action-item-label {
+  color: $color--primary;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.admin-store-orders__action-item-controls {
+  container-type: inline-size;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-store-orders__actions .btn {
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  min-width: 0;
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+  white-space: nowrap;
+}
+
+@supports (font-size: 1cqw) {
+  .admin-store-orders__actions .btn {
+    font-size: clamp(0.58rem, 7cqw, 0.78rem);
+    padding-left: clamp(0.32rem, 5cqw, 0.72rem);
+    padding-right: clamp(0.32rem, 5cqw, 0.72rem);
+  }
+}
+
+.admin-store-orders__action-item-controls > .btn {
+  justify-content: center;
+  width: 100%;
 }
 
 .admin-store-analytics__summary,
@@ -3530,6 +3605,101 @@ textarea.admin-settings__input--readonly {
   }
 }
 
+@mixin admin-store-orders-card-layout {
+  .admin-store-orders__attendance,
+  .admin-store-orders__results {
+    overflow-x: visible;
+  }
+
+  .admin-store-orders__attendance-table,
+  .admin-store-orders__table {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-store-orders__attendance-table thead,
+  .admin-store-orders__table thead {
+    display: none;
+  }
+
+  .admin-store-orders__attendance-table tbody,
+  .admin-store-orders__table tbody {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .admin-store-orders__attendance-table tbody tr,
+  .admin-store-orders__table tbody tr {
+    background: $surface--base;
+    border: 1px solid $border--default;
+    border-radius: $radius--sm;
+    box-shadow: 0 8px 20px rgba($color--black, 0.04);
+    display: grid;
+    gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+    overflow: hidden;
+    padding: 10px;
+    width: 100%;
+  }
+
+  .admin-store-orders__attendance-table tbody tr > td,
+  .admin-store-orders__table tbody tr > td {
+    align-items: baseline;
+    border: 0;
+    border-top: 1px solid $border--default;
+    display: grid;
+    gap: 6px;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(6.75rem, auto) minmax(0, 1fr);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 8px 0 0;
+    width: auto;
+  }
+
+  .admin-store-orders__attendance-table tbody tr > td:first-child,
+  .admin-store-orders__table tbody tr > td:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .admin-store-orders__attendance-table tbody tr > td::before,
+  .admin-store-orders__table tbody tr > td::before {
+    @include admin-label;
+    content: attr(data-label);
+  }
+
+  .admin-store-orders__actions > * {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .admin-store-orders__actions {
+    min-width: 0;
+  }
+
+  .admin-store-orders__action-list {
+    max-width: 100%;
+  }
+
+  .admin-store-orders__download-access {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .admin-store-orders__download-control {
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    max-width: 100%;
+    width: 100%;
+  }
+}
+
 .admin-store-products__variants {
   grid-column: 1 / -1;
   max-width: 100%;
@@ -4329,8 +4499,6 @@ textarea.admin-settings__input--readonly {
 @media (max-width: 720px) {
   .admin-store-downloads__results,
   .admin-store-coupons__results,
-  .admin-store-orders__attendance,
-  .admin-store-orders__results,
   .admin-store-products__results {
     overflow-x: visible;
   }
@@ -4369,8 +4537,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-downloads__table,
   .admin-store-coupons__table,
-  .admin-store-orders__attendance-table,
-  .admin-store-orders__table,
   .admin-store-products__table {
     background: transparent;
     border: 0;
@@ -4382,16 +4548,12 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-downloads__table thead,
   .admin-store-coupons__table thead,
-  .admin-store-orders__attendance-table thead,
-  .admin-store-orders__table thead,
   .admin-store-products__table thead {
     display: none;
   }
 
   .admin-store-downloads__table tbody,
   .admin-store-coupons__table tbody,
-  .admin-store-orders__attendance-table tbody,
-  .admin-store-orders__table tbody,
   .admin-store-products__table tbody {
     display: grid;
     gap: 10px;
@@ -4400,8 +4562,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-downloads__table tbody tr,
   .admin-store-coupons__table tbody tr,
-  .admin-store-orders__attendance-table tbody tr,
-  .admin-store-orders__table tbody tr,
   .admin-store-products__table tbody tr[data-store-product-order-row] {
     background: $surface--base;
     border: 1px solid $border--default;
@@ -4418,8 +4578,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-downloads__table tbody tr > td,
   .admin-store-coupons__table tbody tr > td,
-  .admin-store-orders__attendance-table tbody tr > td,
-  .admin-store-orders__table tbody tr > td,
   .admin-store-products__table tbody tr[data-store-product-order-row] > td {
     border: 0;
     display: block;
@@ -4429,9 +4587,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr > td,
-  .admin-store-coupons__table tbody tr > td,
-  .admin-store-orders__attendance-table tbody tr > td,
-  .admin-store-orders__table tbody tr > td {
+  .admin-store-coupons__table tbody tr > td {
     align-items: baseline;
     border-top: 1px solid $border--default;
     display: grid;
@@ -4443,17 +4599,13 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-downloads__table tbody tr > td:first-child,
-  .admin-store-coupons__table tbody tr > td:first-child,
-  .admin-store-orders__attendance-table tbody tr > td:first-child,
-  .admin-store-orders__table tbody tr > td:first-child {
+  .admin-store-coupons__table tbody tr > td:first-child {
     border-top: 0;
     padding-top: 0;
   }
 
   .admin-store-downloads__table tbody tr > td::before,
-  .admin-store-coupons__table tbody tr > td::before,
-  .admin-store-orders__attendance-table tbody tr > td::before,
-  .admin-store-orders__table tbody tr > td::before {
+  .admin-store-coupons__table tbody tr > td::before {
     @include admin-label;
     content: attr(data-label);
   }
@@ -4490,11 +4642,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-downloads__upload {
     align-items: start;
-  }
-
-  .admin-store-orders__actions > * {
-    grid-column: 2;
-    justify-self: start;
   }
 
   .admin-store-products__table tbody tr[data-store-product-order-row] > td:first-child {
@@ -4612,6 +4759,14 @@ textarea.admin-settings__input--readonly {
 }
 
 @media (max-width: 560px) {
+  .admin-store-orders__download-control {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-store-orders__download-control .btn {
+    width: 100%;
+  }
+
   .admin-store-products__variants-table tbody tr {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -4705,6 +4860,8 @@ textarea.admin-settings__input--readonly {
 }
 
 @media (max-width: 900px) {
+  @include admin-store-orders-card-layout;
+
   .admin-settings__help-tooltip {
     bottom: 16px;
     left: 16px;
@@ -4730,6 +4887,16 @@ textarea.admin-settings__input--readonly {
 
   .admin-settings__variant-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-store-orders__actions > * {
+    grid-column: 1 / -1;
+  }
+
+  .admin-store-orders__download-control {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -34,7 +34,7 @@ describe('Store auth protection', () => {
       ['/admin/store/downloads/create', { filename: 'download.txt', content: 'data:text/plain;base64,AA==' }],
       ['/admin/store/downloads/delete', { fileKey: 'download-1' }],
       ['/admin/store/inventory', { action: 'set', productId: 't-shirt-2', inventory: 1 }],
-      ['/admin/store/orders/download-access', { orderToken: 'fake', itemId: 'fake', action: 'expire' }],
+      ['/admin/store/orders/download-access', { orderToken: 'fake', itemId: 'fake', action: 'revoke' }],
       ['/admin/store/orders/check-in', { orderToken: 'fake', itemId: 'fake', checkedIn: true, quantity: 1 }]
     ] as const;
 

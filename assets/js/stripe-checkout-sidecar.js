@@ -407,6 +407,7 @@
           return_url: options?.returnUrl || window.location.href,
           ...(confirmParams.confirmParams || {})
         };
+        delete mergedConfirmParams.receipt_email;
         return stripe.confirmPayment({
           elements,
           redirect: 'if_required',

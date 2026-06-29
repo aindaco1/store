@@ -270,6 +270,7 @@ function getEmailTheme(env = {}) {
   const logoUrl = logoPath ? safeEmailHostedAssetUrl(logoPath, siteBase) : '';
   return {
     siteBase,
+    companyName: safeEmailHeaderText(getPlatformCompanyName(env)),
     platformName: safeEmailHeaderText(getEmailPlatformDisplayName(env)),
     siteHomeUrl: safeSiteUrl('/', siteBase),
     logoUrl,
@@ -361,7 +362,20 @@ function getStoreFulfillmentNote(item = {}, t = (_key, fallback) => fallback) {
   return '';
 }
 
-function renderStoreOrderItems(items = [], t = (_key, fallback) => fallback, theme = getEmailTheme()) {
+function renderEmailTextWithLink(value, linkText, href, theme) {
+  const escaped = escapeHtml(value);
+  const phrase = String(linkText || '').trim();
+  const url = String(href || '').trim();
+  if (!phrase || !url || !escaped) return escaped;
+
+  const escapedPhrase = escapeHtml(phrase);
+  const linkedPhrase = `<a href="${escapeHtml(url)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapedPhrase}</a>`;
+  return escaped.split(escapedPhrase).join(linkedPhrase);
+}
+
+function renderStoreOrderItems(items = [], t = (_key, fallback) => fallback, theme = getEmailTheme(), options = {}) {
+  const orderUrl = String(options.orderUrl || '').trim();
+  const orderPageLabel = String(options.orderPageLabel || '').trim();
   const rows = (Array.isArray(items) ? items : []).map((item) => {
     const name = String(item.name || item.productId || item.sku || 'Item').trim();
     const variantLabel = String(item.variantLabel || '').trim();
@@ -375,7 +389,7 @@ function renderStoreOrderItems(items = [], t = (_key, fallback) => fallback, the
       : escapeHtml(name);
     const variant = variantLabel ? ` <span style="color: ${theme.mutedTextColor};">(${escapeHtml(variantLabel)})</span>` : '';
     const note = fulfillmentNote
-      ? `<p style="margin: 4px 0 0 0; color: ${theme.mutedTextColor}; font-size: 13px;">${escapeHtml(fulfillmentNote)}</p>`
+      ? `<p style="margin: 4px 0 0 0; color: ${theme.mutedTextColor}; font-size: 13px;">${renderEmailTextWithLink(fulfillmentNote, orderPageLabel, orderUrl, theme)}</p>`
       : '';
 
     return `
@@ -442,21 +456,15 @@ export async function sendAdminLoginEmail(env, { email, loginUrl, lang } = {}) {
   if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
 
   const normalizedLang = normalizeLang(lang);
-  const isSpanish = normalizedLang === 'es';
+  const { t } = await getEmailTranslator(env, normalizedLang);
   const theme = getEmailTheme(env);
   const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const from = safeEmailHeaderText(getUpdatesEmailFrom(env) || getOrdersEmailFrom(env));
-  const subject = safeEmailHeaderText(isSpanish
-    ? buildEmailSubject('Tu enlace de administración', platformName)
-    : buildEmailSubject('Admin sign-in link', platformName));
-  const heading = isSpanish ? 'Inicia sesión en administración' : 'Sign in to admin';
-  const body = isSpanish
-    ? 'Este enlace funciona por 15 minutos. Si no lo solicitaste, puedes ignorar este correo.'
-    : 'This link works for 15 minutes. If you did not ask for it, you can ignore this email.';
-  const cta = isSpanish ? 'Abrir administración' : 'Open admin';
-  const footer = isSpanish
-    ? 'Alguien solicitó acceso al panel de administración con este correo.'
-    : 'Someone requested access to the admin dashboard with this email address.';
+  const subject = safeEmailHeaderText(buildEmailSubject(t('subjects.admin_login', 'Admin sign-in link'), platformName));
+  const heading = t('admin_login.heading', 'Sign in to admin');
+  const body = t('admin_login.body', 'This link works for 15 minutes. If you did not ask for it, you can ignore this email.');
+  const cta = t('admin_login.cta', 'Open admin');
+  const footer = t('admin_login.footer', 'Someone requested access to the admin dashboard with this email address.');
 
   const html = `
   <body style="${getEmailBodyStyle(theme)}">
@@ -492,7 +500,7 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
   const roleLabel = role === 'super_admin'
     ? t('admin_user_created.role_super_admin', 'super admin')
     : t('admin_user_created.role_limited_admin', 'limited admin');
-  const adminUrl = safeSiteUrl(getLocalizedPath('/admin/', lang), theme.siteBase);
+  const adminUrl = safeSiteUrl(`${getLocalizedPath('/admin/', lang)}?tab=store-orders`, theme.siteBase);
   const displayName = String(name || '').trim() || email;
   const accessList = Array.isArray(accessNames)
     ? accessNames.map((accessName) => String(accessName || '').trim()).filter(Boolean)
@@ -544,18 +552,26 @@ function normalizeEmailAttachments(attachments = []) {
     .slice(0, 25);
 }
 
-export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [] } = {}) {
-  configureEmailLogging(env);
-  if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
-
-  const { t, lang } = await getEmailTranslator(env, preferredLang || orderDraft.preferredLang);
-  const theme = getEmailTheme(env);
-  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
+function buildStoreOrderEmailHtml({
+  t,
+  lang,
+  theme,
+  orderToken,
+  orderDraft = {},
+  payment = {},
+  attachments = [],
+  recipientType = 'customer'
+} = {}) {
+  const isAdminNotification = recipientType === 'admin';
   const orderId = safeEmailHeaderText(orderToken || orderDraft.orderToken || '');
   const orderUrl = safeSiteUrl(`${getLocalizedPath('/order-success/', lang)}?orderToken=${encodeURIComponent(orderId)}`, theme.siteBase);
+  const adminUrl = safeSiteUrl(`${getLocalizedPath('/admin/', lang)}?tab=store-orders`, theme.siteBase);
   const totals = orderDraft.totals || {};
-  const itemsHtml = renderStoreOrderItems(orderDraft.items || [], t, theme);
-  const safeAttachments = normalizeEmailAttachments(attachments);
+  const orderPageLabel = t('store_order.order_page_label', 'order page');
+  const itemsHtml = renderStoreOrderItems(orderDraft.items || [], t, theme, { orderUrl, orderPageLabel });
+  const safeAttachments = normalizeEmailAttachments(isAdminNotification ? [] : attachments);
+  const customerEmail = safeEmailHeaderText(orderDraft.customer?.email || '');
+  const customerName = safeEmailHeaderText(orderDraft.customer?.name || '');
   const hasShipping = orderDraft.fulfillment?.requiresShipping === true || totals.requiresShipping === true;
   const shippingAddress = orderDraft.shippingAddress || {};
   const addressLine = hasShipping
@@ -572,8 +588,40 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
       <p style="margin: 0 0 8px 0; font-weight: 700;">${escapeHtml(t('store_order.shipping_heading', 'Shipping'))}</p>
       <p style="margin: 0; color: ${theme.mutedTextColor};">${addressLine.map(escapeHtml).join('<br>')}</p>
     </div>` : '';
+  const customerRows = [
+    [t('store_order.customer_email', 'Customer email'), customerEmail],
+    [t('store_order.customer_name', 'Customer name'), customerName]
+  ].filter(([, value]) => String(value || '').trim());
+  const customerBlock = isAdminNotification && customerRows.length ? `
+    <div style="${getEmailCardStyle(theme)}">
+      <p style="margin: 0 0 8px 0; font-weight: 700;">${escapeHtml(t('store_order.customer_heading', 'Customer'))}</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        ${customerRows.map(([label, value]) => `
+          <tr>
+            <td style="padding: 4px 12px 4px 0; color: ${theme.mutedTextColor}; width: 128px;">${escapeHtml(label)}</td>
+            <td style="padding: 4px 0; color: ${theme.textColor}; font-weight: 600;">${escapeHtml(value)}</td>
+          </tr>`).join('')}
+      </table>
+    </div>` : '';
+  const heading = isAdminNotification
+    ? t('store_order.admin_heading', 'New order received')
+    : t('store_order.heading', 'Order confirmed! Thank you for supporting %{company}.', { company: theme.companyName || theme.platformName });
+  const body = isAdminNotification
+    ? t('store_order.admin_body', 'A new customer order is ready to review. Open the Orders tab for fulfillment, downloads, tickets, and shipping.')
+    : t('store_order.body', 'Thanks for your order. Use your order page for downloads, tickets, shipping updates, and receipts.');
+  const cta = isAdminNotification
+    ? t('store_order.admin_cta', 'Review order in admin')
+    : t('store_order.cta', 'View order');
+  const ctaUrl = isAdminNotification ? adminUrl : orderUrl;
+  const footer = isAdminNotification
+    ? t('store_order.admin_footer', 'Sent to super admins for %{platform}.', { platform: theme.platformName })
+    : `${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${escapeHtml(theme.siteHomeUrl)}" style="color: ${theme.primaryColor};">${escapeHtml(theme.platformName)}</a>.`;
+  const bodyHtml = isAdminNotification
+    ? escapeHtml(body)
+    : renderEmailTextWithLink(body, orderPageLabel, orderUrl, theme);
 
-  const html = `
+  return {
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -581,7 +629,7 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
   <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body style="${getEmailBodyStyle(theme)}">
-  ${renderEmailHeader(theme, escapeHtml(t('store_order.heading', 'Order confirmed')))}
+  ${renderEmailHeader(theme, escapeHtml(heading))}
 
   <div style="${getEmailCardStyle(theme)}">
     <p style="margin: 0 0 12px 0; color: ${theme.mutedTextColor};">${escapeHtml(t('store_order.order_label', 'Order'))}: ${escapeHtml(orderId)}</p>
@@ -597,29 +645,97 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
     ${itemsHtml}
   </div>
 
+  ${customerBlock}
   ${shippingBlock}
 
   <div style="margin-bottom: 32px;">
-    <p style="margin: 0 0 16px 0;">${escapeHtml(t('store_order.body', 'Thanks for your order. Your order page has the latest details for tickets, downloads, shipping, and receipts.'))}</p>
-    ${safeAttachments.length ? `<p style="margin: 0 0 16px 0; color: ${theme.mutedTextColor};">${escapeHtml(t('store_order.attachments_note', 'Event tickets, check-in QR codes, and calendar files are attached when available.'))}</p>` : ''}
-    <a href="${escapeHtml(orderUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_order.cta', 'View order'))}</a>
+    <p style="margin: 0 0 16px 0;">${bodyHtml}</p>
+    ${safeAttachments.length ? `<p style="margin: 0 0 16px 0; color: ${theme.mutedTextColor};">${renderEmailTextWithLink(t('store_order.attachments_note', 'Calendar files are attached when available. Open your order page for tickets and check-in QR codes.'), orderPageLabel, orderUrl, theme)}</p>` : ''}
+    <a href="${escapeHtml(ctaUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(cta)}</a>
   </div>
 
   <div style="${getEmailFooterStyle(theme)}">
-    <p style="margin: 0;">${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${escapeHtml(theme.siteHomeUrl)}" style="color: ${theme.primaryColor};">${escapeHtml(theme.platformName)}</a>.</p>
+    <p style="margin: 0;">${isAdminNotification ? escapeHtml(footer) : footer}</p>
   </div>
 </body>
-</html>`.trim();
+</html>`.trim(),
+    attachments: safeAttachments
+  };
+}
+
+async function buildStoreOrderEmailMessage(env, { orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [], recipientType = 'customer' } = {}) {
+  const { t, lang } = await getEmailTranslator(env, preferredLang || orderDraft.preferredLang);
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
+  const message = buildStoreOrderEmailHtml({
+    t,
+    lang,
+    theme,
+    orderToken,
+    orderDraft,
+    payment,
+    attachments,
+    recipientType
+  });
+  const subjectKey = recipientType === 'admin'
+    ? 'subjects.store_order_admin_notification'
+    : 'subjects.store_order_confirmed';
+  const subjectFallback = recipientType === 'admin' ? 'New order' : 'Order confirmed';
+  return {
+    from: getOrdersEmailFrom(env),
+    subject: safeEmailHeaderText(buildEmailSubject(t(subjectKey, subjectFallback), platformName)),
+    html: message.html,
+    attachments: message.attachments
+  };
+}
+
+export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [] } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+
+  const message = await buildStoreOrderEmailMessage(env, {
+    orderToken,
+    orderDraft,
+    payment,
+    preferredLang,
+    attachments,
+    recipientType: 'customer'
+  });
 
   await sendResendEmail(env, {
-    from: getOrdersEmailFrom(env),
+    from: message.from,
     to: email,
-    subject: buildEmailSubject(t('subjects.store_order_confirmed', 'Order confirmed'), platformName),
-    html,
-    ...(safeAttachments.length ? { attachments: safeAttachments } : {})
+    subject: message.subject,
+    html: message.html,
+    ...(message.attachments.length ? { attachments: message.attachments } : {})
   }, {
     errorLabel: 'Resend error (store order)',
-    failureLabel: `Failed to send ${platformName} order email`
+    failureLabel: `Failed to send ${safeEmailHeaderText(getEmailPlatformDisplayName(env)) || 'Store'} order email`
+  });
+  return { sent: true };
+}
+
+export async function sendStoreOrderAdminNotificationEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang } = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+
+  const message = await buildStoreOrderEmailMessage(env, {
+    orderToken,
+    orderDraft,
+    payment,
+    preferredLang,
+    attachments: [],
+    recipientType: 'admin'
+  });
+
+  await sendResendEmail(env, {
+    from: message.from,
+    to: email,
+    subject: message.subject,
+    html: message.html
+  }, {
+    errorLabel: 'Resend error (store order admin notification)',
+    failureLabel: `Failed to send ${safeEmailHeaderText(getEmailPlatformDisplayName(env)) || 'Store'} order admin notification email`
   });
   return { sent: true };
 }
@@ -651,6 +767,7 @@ export async function sendStoreEventReminderEmail(env, {
   const where = [venue, address].map((value) => String(value || '').trim()).filter(Boolean).join(', ');
   const safeAttachments = normalizeEmailAttachments(attachments);
   const subject = buildEmailSubject(t('subjects.store_event_reminder', 'Event reminder'), `${title} | ${platformName}`);
+  const orderPageLabel = t('store_order.order_page_label', 'order page');
   const reminderLine = reminderLabel
     ? t('store_event_reminder.reminder_label', 'This is your %{label} reminder.', { label: reminderLabel })
     : t('store_event_reminder.body', 'This is a reminder for your ticket or RSVP.');
@@ -668,7 +785,7 @@ export async function sendStoreEventReminderEmail(env, {
         </tr>`).join('')}
     </table>` : '';
   const attachmentLine = safeAttachments.length
-    ? `<p style="margin: 16px 0 0 0; color: ${theme.mutedTextColor};">${escapeHtml(t('store_event_reminder.attachments', 'The calendar invite and check-in QR are attached when available.'))}</p>`
+    ? `<p style="margin: 16px 0 0 0; color: ${theme.mutedTextColor};">${renderEmailTextWithLink(t('store_event_reminder.attachments', 'The calendar invite is attached when available. Open your order page for tickets and check-in QR codes.'), orderPageLabel, safeOrderUrl, theme)}</p>`
     : '';
 
   const html = `

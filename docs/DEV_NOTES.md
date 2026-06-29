@@ -83,7 +83,7 @@ The admin dashboard supports:
 - analytics and marketing referrals
 - abandoned-checkout reminder health/suppression
 - digital download readiness, reusable R2 library upload, replacement, and delete
-- digital download access expiry/reissue
+- digital download access revoke/refresh
 - inventory overrides
 - add-on inventory
 - readiness, plan usage, cron, and observability

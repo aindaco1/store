@@ -178,8 +178,10 @@ runtime:
     image_gallery: Image gallery
 email:
   subjects:
+    admin_login: Admin sign-in link
     admin_user_created: Admin access added
     store_order_confirmed: Order confirmed
+    store_order_admin_notification: New order
     store_order_lookup: Find your order
     store_abandoned_cart: Finish your checkout
     store_event_reminder: Event reminder
@@ -197,6 +199,7 @@ email:
     fulfillment_rsvp: RSVP
     fulfillment_service: Service
     fulfillment_physical: Physical item
+    order_page_label: order page
     download_note: Open your order page to access your download.
     ticket_note: Open your order page for your ticket.
     rsvp_note: Your RSVP is confirmed.
@@ -204,11 +207,18 @@ email:
     quantity_label: Qty
     items_heading: Items
     shipping_heading: Shipping
-    heading: Order confirmed
+    customer_heading: Customer
+    customer_email: Customer email
+    customer_name: Customer name
+    heading: Order confirmed! Thank you for supporting %{company}.
+    admin_heading: New order received
     order_label: Order
-    body: Thanks for your order. Your order page has the latest details for tickets, downloads, shipping, and receipts.
-    attachments_note: Event tickets, check-in QR codes, and calendar files are attached when available.
+    body: Thanks for your order. Use your order page for downloads, tickets, shipping updates, and receipts.
+    admin_body: A new customer order is ready to review. Open the Orders tab for fulfillment, downloads, tickets, and shipping.
+    attachments_note: Calendar files are attached when available. Open your order page for tickets and check-in QR codes.
     cta: View order
+    admin_cta: Review order in admin
+    admin_footer: Sent to super admins for %{platform}.
   store_event_reminder:
     fallback_title: Your event
     heading: "%{event} is coming up"
@@ -217,7 +227,7 @@ email:
     when: When
     where: Where
     order: Order
-    attachments: The calendar invite and check-in QR are attached when available.
+    attachments: The calendar invite is attached when available. Open your order page for tickets and check-in QR codes.
     cta: View order
     footer: You are receiving this because this email address is attached to an event or RSVP order from %{platform}.
   store_order_lookup:
@@ -246,3 +256,8 @@ email:
     access_heading: Access
     created_by: Added by %{email}
     footer: Not expecting this access? Ignore this email or contact the site owner.
+  admin_login:
+    heading: Sign in to admin
+    body: This link works for 15 minutes. If you did not ask for it, you can ignore this email.
+    cta: Open admin
+    footer: Someone requested access to the admin dashboard with this email address.

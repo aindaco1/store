@@ -69,6 +69,53 @@
     return node;
   }
 
+  function appendMoneyRow(parent, label, cents, currency, options) {
+    var row = document.createElement('div');
+    row.className = options?.strong ? 'store-order__breakdown-row store-order__breakdown-row--strong' : 'store-order__breakdown-row';
+    appendText(row, 'dt', '', label);
+    appendText(row, 'dd', '', (options?.negative ? '-' : '') + formatMoney(cents, currency));
+    parent.append(row);
+  }
+
+  function renderTotals(parent, totals, payment, currency) {
+    var subtotal = Number(totals?.subtotalCents || 0) || 0;
+    var discount = Math.max(0, Number(totals?.discountCents || 0) || 0);
+    var tip = Math.max(0, Number(totals?.tipAmountCents || 0) || 0);
+    var shipping = Math.max(0, Number(totals?.shippingCents || 0) || 0);
+    var tax = Math.max(0, Number(totals?.taxCents || 0) || 0);
+    var total = Number(totals?.totalCents ?? payment?.amountCents ?? 0) || 0;
+    var coupon = String(totals?.couponCode || totals?.coupon?.code || '').trim();
+    var breakdown = document.createElement('dl');
+    breakdown.className = 'store-order__breakdown';
+    appendMoneyRow(breakdown, 'Subtotal', subtotal, currency);
+    if (discount > 0) appendMoneyRow(breakdown, coupon ? 'Discount (' + coupon + ')' : 'Discount', discount, currency, { negative: true });
+    if (tip > 0) appendMoneyRow(breakdown, 'Tip', tip, currency);
+    if (shipping > 0 || totals?.requiresShipping) appendMoneyRow(breakdown, 'Shipping', shipping, currency);
+    appendMoneyRow(breakdown, 'Tax', tax, currency);
+    appendMoneyRow(breakdown, 'Total paid', total, currency, { strong: true });
+    parent.append(breakdown);
+  }
+
+  function appendAddressLine(parent, value) {
+    var text = String(value || '').trim();
+    if (text) appendText(parent, 'p', 'store-order__meta', text);
+  }
+
+  function renderShipping(parent, shipping) {
+    if (!shipping?.required || !shipping?.address) return;
+    var address = shipping.address || {};
+    var panel = document.createElement('section');
+    panel.className = 'store-order__panel';
+    appendText(panel, 'h2', 'store-order__title', 'Shipping');
+    if (shipping.option) appendText(panel, 'p', 'store-order__meta', 'Method: ' + shipping.option);
+    appendAddressLine(panel, address.name);
+    appendAddressLine(panel, address.line1 || address.address1);
+    appendAddressLine(panel, address.line2 || address.address2);
+    appendAddressLine(panel, [address.city, address.region || address.state || address.province, address.postalCode].filter(Boolean).join(', '));
+    appendAddressLine(panel, address.country);
+    parent.append(panel);
+  }
+
   function appendAction(parent, action, fallbackLabel, options) {
     if (!action) return;
     if (action.available === false) {
@@ -109,6 +156,7 @@
     appendText(overview, 'p', 'store-order__meta', 'Order ' + (data.orderToken || ''));
     appendText(overview, 'p', 'store-order__total', formatMoney(data?.totals?.totalCents || data?.payment?.amountCents || 0, currency));
     if (data.confirmedAt) appendText(overview, 'p', 'store-order__meta', 'Confirmed ' + formatDate(data.confirmedAt));
+    renderTotals(overview, data?.totals || {}, data?.payment || {}, currency);
     bodyNode.append(overview);
 
     var items = Array.isArray(data.items) ? data.items : [];
@@ -136,11 +184,18 @@
       if (item.event?.venue) {
         appendText(row, 'p', 'store-order__meta', item.event.venue);
       }
+      if (item.event?.address) {
+        appendText(row, 'p', 'store-order__meta', item.event.address);
+      }
       renderActions(row, item);
+      if (item.actions?.download?.available === true) {
+        appendText(row, 'p', 'store-order__note', 'Your download stays available from this order page.');
+      }
       list.append(row);
     });
 
     bodyNode.append(list);
+    renderShipping(bodyNode, data.shipping || {});
   }
 
   async function fetchOrder(orderToken) {

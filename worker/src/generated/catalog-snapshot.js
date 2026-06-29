@@ -2585,8 +2585,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "download": {
         "file_key": "dust-wave-digital-download",
         "filename": "dust-wave-constitution-code-of-conduct-safety-guidelines-v1.pdf",
-        "delivery": "signed_link",
-        "expires_hours": 72
+        "delivery": "signed_link"
       },
       "turnstile_required": false
     },
@@ -2701,7 +2700,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "4a71c3dd574c13a2a287117e6e1abee556c471bf9165ff2e3dcb92030d419a0f"
+  "source_hash": "e940b3be1424ada0dfbaac3224b78599da4ae0c937c55eaf83e6bc772a077810"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

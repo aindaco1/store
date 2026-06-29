@@ -4,6 +4,7 @@ import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
 const WORKER_BASE = 'http://127.0.0.1:8989';
+const CART_ROOT = '[data-store-cart-root]';
 
 async function runAxe(page: any) {
   await page.route('**/__axe-core.js', async (route: any) => {
@@ -85,6 +86,23 @@ test.describe('Public Page Accessibility', () => {
     await expect(addButton).toBeVisible();
     await addButton.scrollIntoViewIfNeeded();
     await expect(addButton).toBeInViewport();
+  });
+
+  test('cart and checkout panel have no obvious axe violations', async ({ page }) => {
+    await page.goto('/');
+    const productCard = page.locator('.store-product-card').filter({ hasText: 'Fronteras T-Shirt' });
+    await expect(productCard).toHaveCount(1);
+    await productCard.locator('button.store-add-item').click();
+
+    const cart = page.locator(CART_ROOT);
+    await expect(cart).toBeVisible();
+    await expect(cart).toContainText('Fronteras T-Shirt');
+    await expectNoAxeViolations(page);
+
+    await cart.getByRole('button', { name: 'Checkout' }).click();
+    await expect(cart.getByLabel('Email address')).toBeVisible();
+    await expect(cart).toContainText('Order summary');
+    await expectNoAxeViolations(page);
   });
 
   test('terms page has no obvious axe violations', async ({ page }) => {

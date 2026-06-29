@@ -19,6 +19,5 @@ download:
   file_key: dust-wave-digital-download
   filename: dust-wave-constitution-code-of-conduct-safety-guidelines-v1.pdf
   delivery: signed_link
-  expires_hours: 72
 ---
 A starter digital-download product for Store's post-payment signed-link flow.

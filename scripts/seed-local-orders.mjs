@@ -19,6 +19,8 @@ const STORE_ORDER_LOOKUP_TOKEN_PREFIX = 'store-order-lookup:';
 const LOOKUP_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 const EMAIL_INDEX_LIMIT = 50;
 const SITE_BASE_FALLBACK = 'http://127.0.0.1:4002';
+const LOCAL_R2_BUCKET = 'store-downloads-preview';
+const LOCAL_DEMO_DOWNLOAD_KEY = 'local-demo-digital-download.txt';
 
 function parseArgs(argv) {
   const values = {};
@@ -361,11 +363,198 @@ function kvPut(key, value, options = {}) {
   }
 }
 
+function r2PutTextObject(key, content, contentType = 'text/plain; charset=utf-8') {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'store-local-download-'));
+  const valuePath = path.join(tmpDir, 'download.txt');
+  fs.writeFileSync(valuePath, String(content || ''), 'utf8');
+  const args = [
+    'wrangler',
+    'r2',
+    'object',
+    'put',
+    `${LOCAL_R2_BUCKET}/${key}`,
+    '--local',
+    '--env',
+    'dev',
+    '--file',
+    valuePath,
+    '--content-type',
+    contentType
+  ];
+  const result = spawnSync(commandName('npx'), args, {
+    cwd: WORKER_DIR,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false
+  });
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`wrangler r2 object put ${key} failed: ${String(result.stderr || result.stdout || '').trim()}`);
+  }
+}
+
 async function buildOrders() {
   const downloadItemId = 'download-1';
+  const demoDownloadItemId = 'demo-download';
   const downloadIssuedAt = new Date().toISOString();
-  const downloadExpiresAt = addDaysIso(downloadIssuedAt, 30);
   return Promise.all([
+    buildStoredOrder({
+      orderToken: 'store-order-local-demo-all',
+      createdAt: '2026-06-29T17:30:00.000Z',
+      confirmedAt: '2026-06-29T17:32:00.000Z',
+      customer: {
+        email: 'demo@example.com',
+        name: 'Demo Customer'
+      },
+      shippingAddress: {
+        name: 'Demo Customer',
+        line1: '100 Central Ave NW',
+        line2: 'Suite 12',
+        city: 'Albuquerque',
+        region: 'NM',
+        postalCode: '87102'
+      },
+      items: [
+        baseItem({
+          productId: 'demo-physical-shirt',
+          variantId: 'black-m',
+          sku: 'demo-shirt-black-m',
+          name: 'Demo Physical Shirt',
+          variantLabel: 'Black / M',
+          quantity: 1,
+          unitPriceDollars: 30,
+          fulfillmentType: 'physical',
+          collection: 'demo',
+          category: 'apparel',
+          shippable: true,
+          shippingPreset: 'tshirt',
+          image: '/assets/images/dustwave-tshirt.png',
+          url: '/products/dust-wave-t-shirt/'
+        }),
+        baseItem({
+          productId: 'demo-digital-download',
+          sku: demoDownloadItemId,
+          name: 'Demo Digital Download',
+          quantity: 1,
+          unitPriceDollars: 12,
+          fulfillmentType: 'digital',
+          collection: 'demo',
+          category: 'downloads',
+          shippable: false,
+          taxCategory: 'digital',
+          image: '/assets/images/default.png',
+          url: '/products/dust-wave-digital-download/',
+          download: {
+            file_key: LOCAL_DEMO_DOWNLOAD_KEY,
+            filename: 'Local Demo Digital Download.txt',
+            delivery: 'signed_link'
+          }
+        }),
+        baseItem({
+          productId: 'demo-ticket',
+          variantId: 'general',
+          sku: 'demo-ticket-general',
+          name: 'Demo Event Ticket',
+          variantLabel: 'General Admission',
+          quantity: 2,
+          unitPriceDollars: 18,
+          fulfillmentType: 'ticket',
+          collection: 'demo',
+          category: 'tickets',
+          shippable: false,
+          taxCategory: 'admission',
+          image: '/assets/images/calendar-2026.png',
+          url: '/products/dust-wave-free-rsvp/',
+          eventDetails: {
+            title: 'Demo Event Ticket',
+            starts_at: '2026-08-15T02:00:00.000Z',
+            ends_at: '2026-08-15T05:00:00.000Z',
+            venue: 'Guild Cinema',
+            address: '3405 Central Ave NE, Albuquerque, NM 87106',
+            ticket_delivery: 'qr',
+            ics: true
+          }
+        }),
+        baseItem({
+          productId: 'demo-free-rsvp',
+          sku: 'demo-rsvp',
+          name: 'Demo Free RSVP',
+          quantity: 1,
+          unitPriceDollars: 0,
+          fulfillmentType: 'rsvp',
+          collection: 'demo',
+          category: 'tickets',
+          shippable: false,
+          taxCategory: 'admission',
+          image: '/assets/images/calendar-2026.png',
+          url: '/products/dust-wave-free-rsvp/',
+          eventDetails: {
+            title: 'Demo Free RSVP',
+            starts_at: '2026-08-16T01:00:00.000Z',
+            ends_at: '2026-08-16T03:00:00.000Z',
+            venue: 'Dust Wave',
+            address: 'Albuquerque, NM',
+            ticket_delivery: 'qr',
+            ics: true
+          }
+        }),
+        baseItem({
+          productId: 'demo-service',
+          sku: 'demo-service',
+          name: 'Demo Service Session',
+          quantity: 1,
+          unitPriceDollars: 45,
+          fulfillmentType: 'service',
+          collection: 'demo',
+          category: 'services',
+          shippable: false,
+          taxCategory: 'service',
+          image: '/assets/images/default.png',
+          url: '/'
+        })
+      ],
+      totals: {
+        discountCents: 1000,
+        couponCode: 'DEMO10',
+        coupon: {
+          id: 'demo10',
+          code: 'DEMO10',
+          description: 'Local all-variation demo discount',
+          discountType: 'amount',
+          percentOff: 0,
+          amountOffCents: 1000,
+          appliesTo: 'cart',
+          productIds: [],
+          discountCents: 1000
+        },
+        tipPercent: 5,
+        shippingCents: 750,
+        taxCents: 890
+      },
+      downloadAccess: {
+        [demoDownloadItemId]: {
+          status: 'active',
+          issuedAt: downloadIssuedAt,
+          updatedAt: downloadIssuedAt,
+          updatedBy: 'local-seed'
+        }
+      },
+      fulfillmentCheckIns: {
+        'demo-ticket-general': {
+          checkedIn: false,
+          quantity: 0,
+          updatedAt: '2026-06-29T17:32:00.000Z',
+          updatedBy: 'local-seed'
+        },
+        'demo-rsvp': {
+          checkedIn: false,
+          quantity: 0,
+          updatedAt: '2026-06-29T17:32:00.000Z',
+          updatedBy: 'local-seed'
+        }
+      }
+    }),
     buildStoredOrder({
       orderToken: 'store-order-local-alonso-001',
       createdAt: '2026-06-21T17:15:00.000Z',
@@ -503,8 +692,7 @@ async function buildOrders() {
           download: {
             file_key: 'dust-wave-constitution-code-of-conduct-safety-guidelines-v1.pdf',
             filename: 'Dust Wave Constitution + Code of Conduct + Safety Guidelines V1.pdf',
-            delivery: 'signed_link',
-            expires_hours: 720
+            delivery: 'signed_link'
           }
         }),
         baseItem({
@@ -538,8 +726,6 @@ async function buildOrders() {
         [downloadItemId]: {
           status: 'active',
           issuedAt: downloadIssuedAt,
-          expiresAt: downloadExpiresAt,
-          expiresHours: 720,
           updatedAt: downloadIssuedAt,
           updatedBy: 'local-seed'
         }
@@ -618,6 +804,16 @@ This command refuses to run unless worker/.dev.vars uses APP_MODE=test and local
     throw new Error('worker/.dev.vars needs MAGIC_LINK_SECRET or STORE_ORDER_LOOKUP_SECRET before lookup links can be seeded.');
   }
 
+  r2PutTextObject(
+    LOCAL_DEMO_DOWNLOAD_KEY,
+    [
+      'Store local demo download',
+      '',
+      'This file is seeded into local R2 for manual order-page testing.',
+      `Generated: ${new Date().toISOString()}`
+    ].join('\n')
+  );
+
   const siteBase = String(args['--site-base'] || env.SITE_BASE || SITE_BASE_FALLBACK).replace(/\/+$/, '');
   const orders = await buildOrders();
   const byEmailHash = new Map();
@@ -667,6 +863,9 @@ This command refuses to run unless worker/.dev.vars uses APP_MODE=test and local
   }
 
   console.log(`Seeded ${orders.length} local Store orders into ${STORE_STATE_BINDING}.`);
+  console.log(`Seeded local R2 download object: ${LOCAL_R2_BUCKET}/${LOCAL_DEMO_DOWNLOAD_KEY}`);
+  console.log('');
+  console.log(`All-variation demo: ${siteBase}/order-success/?orderToken=store-order-local-demo-all`);
   console.log('');
   console.log('Order lookup links are one-time links. Re-run this command after using one.');
   for (const link of lookupLinks.sort((a, b) => a.email.localeCompare(b.email))) {
