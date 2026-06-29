@@ -5,6 +5,7 @@ import {
   sendAdminUserCreatedEmail,
   sendStoreAbandonedCartEmail,
   sendStoreEventReminderEmail,
+  sendStoreOrderAdminNotificationEmail,
   sendStoreOrderEmail,
   sendStoreOrderLookupEmail
 } from '../../worker/src/email.js';
@@ -90,18 +91,20 @@ describe('Store email integration', () => {
     expect(payload.from).toBe('Simply Store <orders@shop.test>');
     expect(payload.reply_to).toBe('orders@shop.test');
     expect(payload.subject).toBe('Order confirmed | Simply Store');
+    expect(payload.html).toContain('Order confirmed! Thank you for supporting Dust Wave.');
     expect(payload.html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(payload.html).toContain('&lt;script&gt;alert(2)&lt;/script&gt;');
     expect(payload.html).not.toContain('javascript:alert(3)');
     expect(payload.html).toContain('$1.50');
-    expect(payload.html).toContain('Event tickets, check-in QR codes, and calendar files are attached when available.');
+    expect(payload.html).toContain('Shipping updates will appear on your <a href="https://shop.test/order-success/?orderToken=store-order-demo123"');
+    expect(payload.html).toContain('Calendar files are attached when available. Open your <a href="https://shop.test/order-success/?orderToken=store-order-demo123"');
     expect(payload.html).toContain('https://shop.test/order-success/?orderToken=store-order-demo123');
     expect(payload.attachments).toEqual([{
       filename: 'ticket.ics',
       content: 'QkVHSU46VkNBTEVOREFS'
     }]);
     expect(payload.html).toContain('color: #ffffff');
-    expect(payload.text).toContain('Order confirmed');
+    expect(payload.text).toContain('Order confirmed! Thank you for supporting Dust Wave.');
   });
 
   it('brands Store emails with the configured company and platform name when both are set', async () => {
@@ -123,6 +126,118 @@ describe('Store email integration', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.subject).toBe('Order confirmed | Dust & Wave Shop');
     expect(payload.html).toContain('Dust &amp; Wave Shop');
+    expect(payload.html).toContain('Thank you for supporting Dust &amp; Wave.');
+  });
+
+  it('sends super-admin order notifications with the shared order summary and no fulfillment attachments', async () => {
+    const fetchMock = mockResend();
+
+    await expect(sendStoreOrderAdminNotificationEmail(env, {
+      email: 'admin@example.com',
+      orderToken: 'store-order-demo123',
+      orderDraft: {
+        orderToken: 'store-order-demo123',
+        preferredLang: 'en',
+        customer: {
+          email: 'customer@example.com',
+          name: 'Ada Buyer'
+        },
+        totals: {
+          subtotalCents: 3500,
+          totalCents: 3500
+        },
+        items: [{
+          name: 'Fronteras Poster (Big)',
+          quantity: 1,
+          subtotalCents: 3500,
+          fulfillmentType: 'physical'
+        }]
+      }
+    })).resolves.toEqual({ sent: true });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.from).toBe('Simply Store <orders@shop.test>');
+    expect(payload.to).toBe('admin@example.com');
+    expect(payload.subject).toBe('New order | Simply Store');
+    expect(payload.html).toContain('New order received');
+    expect(payload.html).toContain('customer@example.com');
+    expect(payload.html).toContain('Ada Buyer');
+    expect(payload.html).toContain('Review order in admin');
+    expect(payload.html).toContain('https://shop.test/admin/?tab=store-orders');
+    expect(payload.html).not.toContain('Calendar files are attached');
+    expect(payload).not.toHaveProperty('attachments');
+  });
+
+  it('localizes Store order copy for Spanish digital, ticket, and RSVP fulfillment notes', async () => {
+    const fetchMock = mockResend();
+
+    await sendStoreOrderEmail({
+      ...env,
+      I18N_CATALOG_JSON: JSON.stringify({
+        en: { email: {} },
+        es: {
+          email: {
+            subjects: { store_order_confirmed: 'Pedido confirmado' },
+            store_order: {
+              heading: 'Pedido confirmado',
+              order_label: 'Pedido',
+              subtotal: 'Subtotal',
+              discount: 'Descuento',
+              tip: 'Propina',
+              shipping: 'Envío',
+              tax: 'Impuesto',
+              total_paid: 'Total pagado',
+              items_heading: 'Artículos',
+              fulfillment_digital: 'Entrega digital',
+              fulfillment_ticket: 'Boleto',
+              fulfillment_rsvp: 'RSVP',
+              order_page_label: 'página del pedido',
+              download_note: 'Abre la página del pedido para acceder a tu descarga.',
+              ticket_note: 'Abre la página del pedido para ver tu boleto.',
+              rsvp_note: 'Tu RSVP está confirmado.',
+              quantity_label: 'Cant.',
+              body: 'Gracias por tu pedido.',
+              cta: 'Ver pedido'
+            },
+            common: { questions_prefix: '¿Preguntas? Responde a este correo o visita' }
+          }
+        }
+      })
+    }, {
+      email: 'customer@example.com',
+      orderToken: 'store-order-demo123',
+      preferredLang: 'es',
+      orderDraft: {
+        orderToken: 'store-order-demo123',
+        preferredLang: 'es',
+        totals: { subtotalCents: 1000, totalCents: 1000 },
+        items: [{
+          name: 'Digital zine',
+          quantity: 1,
+          subtotalCents: 500,
+          fulfillmentType: 'digital'
+        }, {
+          name: 'Festival ticket',
+          quantity: 1,
+          subtotalCents: 500,
+          fulfillmentType: 'ticket'
+        }, {
+          name: 'Opening RSVP',
+          quantity: 1,
+          subtotalCents: 0,
+          fulfillmentType: 'rsvp'
+        }]
+      }
+    });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.subject).toBe('Pedido confirmado | Simply Store');
+    expect(payload.html).toContain('Entrega digital');
+    expect(payload.html).toContain('Abre la <a href="https://shop.test/es/order-success/?orderToken=store-order-demo123"');
+    expect(payload.html).toContain('Boleto');
+    expect(payload.html).toContain('para ver tu boleto.');
+    expect(payload.html).toContain('Tu RSVP está confirmado.');
+    expect(payload.html).toContain('https://shop.test/es/order-success/?orderToken=store-order-demo123');
   });
 
   it('surfaces sanitized Resend provider errors for platform-branded order emails', async () => {
@@ -159,6 +274,38 @@ describe('Store email integration', () => {
     expect(payload.from).toBe('Simply Store <updates@shop.test>');
     expect(payload.subject).toBe('Admin sign-in link | Simply Store');
     expect(payload.html).not.toContain('javascript:alert(1)');
+  });
+
+  it('localizes admin magic-link emails from the email catalog', async () => {
+    const fetchMock = mockResend();
+
+    await expect(sendAdminLoginEmail({
+      ...env,
+      I18N_CATALOG_JSON: JSON.stringify({
+        en: { email: {} },
+        es: {
+          email: {
+            subjects: { admin_login: 'Tu enlace de administración' },
+            admin_login: {
+              heading: 'Inicia sesión en administración',
+              body: 'Este enlace funciona por 15 minutos.',
+              cta: 'Abrir administración',
+              footer: 'Alguien solicitó acceso al panel de administración con este correo.'
+            }
+          }
+        }
+      })
+    }, {
+      email: 'admin@example.com',
+      loginUrl: 'https://shop.test/es/admin/?admin_login=magic-token',
+      lang: 'es'
+    })).resolves.toEqual({ sent: true });
+
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.subject).toBe('Tu enlace de administración | Simply Store');
+    expect(payload.html).toContain('Inicia sesión en administración');
+    expect(payload.html).toContain('Este enlace funciona por 15 minutos.');
+    expect(payload.html).toContain('Abrir administración');
   });
 
   it('renders admin login emails with Pool-style layout and an email-safe logo URL', async () => {

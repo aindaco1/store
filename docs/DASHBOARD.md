@@ -181,7 +181,7 @@ Current behavior:
 - Import historical Snipcart CSV exports into production Store order storage.
 - View order totals and fulfillment rows.
 - Mark ticket/RSVP rows checked in or unchecked.
-- Expire or reissue digital download access.
+- Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 
 Snipcart import:

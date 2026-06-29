@@ -1,6 +1,19 @@
 # Changelog
 
-## v1.0.3 - 2026-06-01
+## v1.0.4 - 2026-06-29
+
+- Added Store-owned customer order confirmation emails for physical, digital, ticket, RSVP, coupon, shipping, and total-breakdown scenarios, and stopped requesting Stripe receipt emails for Store PaymentIntents.
+- Added super-admin order notification emails after paid webhook settlement or free-order confirmation, using the shared transactional email renderer without ticket/QR attachments.
+- Updated event email deliverability behavior so calendar invites may be attached while ticket and check-in QR SVGs stay on the token-scoped order page.
+- Changed digital download access from expiring entitlement windows to durable customer entitlements with short-lived signed links and explicit admin revoke/refresh controls.
+- Updated the admin Orders UI to show item-level actions for mixed fulfillment orders, refresh attendance totals after check-in changes, and keep action buttons responsive across desktop, tablet, and mobile.
+- Improved Order Success with line-item totals, shipping details, event addresses, and durable-download copy.
+- Improved ticket/RSVP SVG generation so long product and variant names fit within the ticket layout.
+- Added an all-variation local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment states for manual testing.
+- Added i18n completeness checks and localized email/admin copy coverage for the new transactional paths.
+- Updated accessibility, i18n, security, digital download, email, dashboard, testing, performance, Podman, SEO, and roadmap documentation for the release audit.
+
+## v1.0.3 - 2026-06-26
 
 - Added configurable platform timezone handling across Jekyll campaign state, browser countdowns, Worker lifecycle automation, campaign-runner reports, dashboard settings, and Worker config mirroring. The default remains `America/Denver` for compatibility, and super admins can choose from supported IANA timezones.
 - Added upcoming-campaign launch reminders with a slim public signup form, Cloudflare Turnstile verification, campaign/email dedupe, signed unsubscribe links, bounded KV dispatch jobs, and Resend delivery through the existing shared email module.
@@ -23,14 +36,14 @@
 - Updated dashboard image/video uploads to dispatch the **Optimize dashboard media** workflow with `scope=changed` after the source-preserving GitHub commit succeeds; audio uploads remain source-preserved.
 - Added publish-time cleanup for dashboard-owned campaign content and diary media that is removed from published content and no longer referenced elsewhere in the same campaign.
 
-## v1.0.2 - 2026-06-01
+## v1.0.2 - 2026-06-24
 
 - Added public-page performance fixes from the PageSpeed review: remote-video campaign pages no longer preload hidden fallback hero images, tier images opt into lazy/async decoding, default brand logos reserve their intrinsic dimensions, and public pages avoid eager Stripe preconnects before cart intent.
 - Extended the dashboard media optimization pipeline to generate responsive WebP image variants for PNG, JPEG, and GIF source images, so public campaign templates can serve smaller browser assets while keeping original uploads as source-of-truth fallbacks.
 - Added a manual `scope=all` option to the **Optimize dashboard media** workflow so existing campaigns can be reprocessed through the same media pipeline used for new dashboard uploads.
 - Updated campaign, tier, card, gallery, and content-image templates to use generated responsive variants when they exist without changing visible page structure or campaign Markdown references.
 
-## v1.0.1 - 2026-05-29
+## v1.0.1 - 2026-06-23
 
 - Added actual Stripe balance transaction fee/net capture for newly charged pledges and a super-admin backfill path for older charged pledge records.
 - Updated dashboard Analytics to prefer stored actual Stripe fees when available, keep estimated fees only where needed, and label mixed/estimated values clearly.
@@ -39,7 +52,7 @@
 - Kept dashboard uploads source-preserving in the Worker while documenting the external optimization step for operators and forks.
 - Made Supporters and Analytics return empty read-only views for campaigns without pledge indexes instead of blocking new or empty campaign dashboards.
 
-## v1.0.0 - 2026-05-26
+## v1.0.0 - 2026-06-22
 
 - Added the private admin dashboard as the supported browser editing and operations surface at `/admin/` and `/es/admin/`.
 - Added role-scoped magic-link admin authentication for super admins and campaign users, with cookie-backed sessions, CSRF/origin checks, and browser-safe admin APIs that do not expose `ADMIN_SECRET`.

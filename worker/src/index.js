@@ -28,7 +28,7 @@
  *   GET  /admin/store/attendees.csv - Download Store ticket/RSVP attendee CSV
  *   GET  /admin/store/reconciliation.csv - Download Store order reconciliation CSV
  *   POST /admin/store/orders/import-snipcart - Import legacy Snipcart orders into production
- *   POST /admin/store/orders/download-access - Expire or reissue Store digital download access
+ *   POST /admin/store/orders/download-access - Revoke or refresh Store digital download access
  *   POST /admin/store/orders/check-in - Mark Store ticket/RSVP check-in state
  *   GET  /admin/store/products   - Read Store catalog products and variants
  *   GET  /admin/store/products/media - Read reusable Store product media references
@@ -52,7 +52,7 @@
  *   GET  /admin/cron/status      - Check cron heartbeat status
  */
 
-import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventReminderEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
+import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventReminderEmail, sendStoreOrderAdminNotificationEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
 import { verifyStripeSignature, createStripeClient } from './stripe.js';
 import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
@@ -314,10 +314,150 @@ function invalidateAdminStoreOrderScanCache(env = null, ctx = null) {
 
 
 
-function trimSvgText(value, maxLength = 140) {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 1).trimEnd() + '…';
+function normalizeSvgText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function estimateSvgTextWidth(value, fontSize = 16, fontWeight = 400) {
+  const weightScale = Number(fontWeight) >= 800 ? 1.08 : Number(fontWeight) >= 600 ? 1.04 : 1;
+  let units = 0;
+  for (const char of Array.from(normalizeSvgText(value))) {
+    if (char === ' ') {
+      units += 0.33;
+    } else if (/["'.,:;!|()[\]{}]/.test(char)) {
+      units += 0.28;
+    } else if (/[ijlrtf]/.test(char)) {
+      units += 0.34;
+    } else if (/[MW@#%&]/.test(char)) {
+      units += 0.9;
+    } else if (/[A-Z0-9]/.test(char)) {
+      units += 0.66;
+    } else {
+      units += 0.56;
+    }
+  }
+  return units * Number(fontSize || 16) * weightScale;
+}
+
+function splitSvgLongWord(word, maxWidth, fontSize, fontWeight) {
+  const chunks = [];
+  let current = '';
+  for (const char of Array.from(word)) {
+    const candidate = `${current}${char}`;
+    if (current && estimateSvgTextWidth(candidate, fontSize, fontWeight) > maxWidth) {
+      chunks.push(current);
+      current = char;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+function wrapSvgTextLines(value, { maxWidth = 500, fontSize = 16, fontWeight = 400 } = {}) {
+  const text = normalizeSvgText(value);
+  if (!text) return [];
+  const lines = [];
+  let current = '';
+  const words = text.split(' ');
+
+  for (const word of words) {
+    const chunks = estimateSvgTextWidth(word, fontSize, fontWeight) > maxWidth
+      ? splitSvgLongWord(word, maxWidth, fontSize, fontWeight)
+      : [word];
+
+    for (const chunk of chunks) {
+      const candidate = current ? `${current} ${chunk}` : chunk;
+      if (current && estimateSvgTextWidth(candidate, fontSize, fontWeight) > maxWidth) {
+        lines.push(current);
+        current = chunk;
+      } else {
+        current = candidate;
+      }
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines;
+}
+
+function truncateSvgTextToWidth(value, maxWidth, fontSize, fontWeight) {
+  const text = normalizeSvgText(value);
+  if (!text || estimateSvgTextWidth(text, fontSize, fontWeight) <= maxWidth) return text;
+  const chars = Array.from(text);
+  let low = 0;
+  let high = chars.length;
+  let best = '…';
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const candidate = `${chars.slice(0, mid).join('').trimEnd()}…`;
+    if (estimateSvgTextWidth(candidate, fontSize, fontWeight) <= maxWidth) {
+      best = candidate;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return best;
+}
+
+function fitSvgTextLines(value, {
+  maxWidth = 500,
+  maxLines = 2,
+  fontSizes = [32],
+  fontWeight = 400
+} = {}) {
+  const sizes = fontSizes.length ? fontSizes : [32];
+  for (const fontSize of sizes) {
+    const lines = wrapSvgTextLines(value, { maxWidth, fontSize, fontWeight });
+    if (lines.length <= maxLines) {
+      return { lines, fontSize, truncated: false };
+    }
+  }
+
+  const fontSize = sizes[sizes.length - 1];
+  const lines = wrapSvgTextLines(value, { maxWidth, fontSize, fontWeight });
+  if (lines.length <= maxLines) return { lines, fontSize, truncated: false };
+  const visibleLines = lines.slice(0, maxLines);
+  const overflow = lines.slice(maxLines).join(' ');
+  const lastIndex = Math.max(0, visibleLines.length - 1);
+  visibleLines[lastIndex] = truncateSvgTextToWidth(
+    `${visibleLines[lastIndex] || ''} ${overflow}`.trim(),
+    maxWidth,
+    fontSize,
+    fontWeight
+  );
+  return { lines: visibleLines, fontSize, truncated: true };
+}
+
+function renderSvgTextBlock(value, {
+  x = 0,
+  y = 0,
+  maxWidth = 500,
+  maxLines = 2,
+  fontSizes = [24],
+  fontWeight = 400,
+  fill = '#101215',
+  lineHeightFactor = 1.18,
+  letterSpacing = ''
+} = {}) {
+  const fit = fitSvgTextLines(value, { maxWidth, maxLines, fontSizes, fontWeight });
+  if (!fit.lines.length) {
+    return { markup: '', bottomY: y, lines: [], fontSize: fontSizes[fontSizes.length - 1] || 24 };
+  }
+  const lineHeight = Math.round(fit.fontSize * lineHeightFactor);
+  const letterSpacingAttr = letterSpacing ? ` letter-spacing="${escapeXml(letterSpacing)}"` : '';
+  const tspans = fit.lines.map((line, index) => (
+    `<tspan x="${x}" y="${y + (index * lineHeight)}">${escapeXml(line)}</tspan>`
+  )).join('\n    ');
+  return {
+    markup: `<text font-family="Inter, Arial, sans-serif" font-size="${fit.fontSize}" font-weight="${fontWeight}" fill="${fill}"${letterSpacingAttr}>\n    ${tspans}\n  </text>`,
+    bottomY: y + ((fit.lines.length - 1) * lineHeight),
+    lines: fit.lines,
+    fontSize: fit.fontSize,
+    truncated: fit.truncated
+  };
 }
 
 
@@ -2283,6 +2423,113 @@ function queueStoreOrderEmailDelivery(ctx, env, storedOrder = {}) {
   );
 }
 
+function getStoreOrderAdminEmailSentKey(orderToken, emailHash) {
+  return `store-order-admin-email-sent:${String(orderToken || '').trim()}:${String(emailHash || '').trim().toLowerCase()}`;
+}
+
+async function getStoreOrderSuperAdminRecipients(env) {
+  const users = await getEffectiveAdminUsers(env);
+  return Array.from(new Set((Array.isArray(users) ? users : [])
+    .filter((user) => user?.role === 'super_admin')
+    .map((user) => normalizeStoreOrderLookupEmail(user.email))
+    .filter(Boolean)));
+}
+
+async function buildStoreOrderAdminNotificationPayloads(env, storedOrder = {}) {
+  const recipients = await getStoreOrderSuperAdminRecipients(env);
+  const orderDraft = storedOrder.orderDraft || {};
+  return recipients.map((email) => ({
+    email,
+    orderToken: storedOrder.orderToken || orderDraft.orderToken || '',
+    orderDraft,
+    payment: storedOrder.payment || {},
+    preferredLang: orderDraft.preferredLang || storedOrder.preferredLang || DEFAULT_I18N_LANG
+  }));
+}
+
+async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {}) {
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  if (!env?.RESEND_API_KEY) {
+    return { ok: true, skipped: 'email_not_configured' };
+  }
+  if (!orderToken) {
+    return { ok: true, skipped: 'missing_order_token' };
+  }
+
+  const payloads = await buildStoreOrderAdminNotificationPayloads(env, storedOrder);
+  if (!payloads.length) {
+    return { ok: true, skipped: 'missing_super_admin_recipients' };
+  }
+
+  const sent = [];
+  const skipped = [];
+  const failed = [];
+
+  for (const payload of payloads) {
+    const emailHash = await sha256HexString(payload.email);
+    const sentKey = getStoreOrderAdminEmailSentKey(orderToken, emailHash);
+    if (env.STORE_STATE && await env.STORE_STATE.get(sentKey)) {
+      skipped.push(payload.email);
+      continue;
+    }
+
+    try {
+      const result = await sendStoreOrderAdminNotificationEmail(env, payload);
+      if (result?.sent === false) {
+        throw new Error(result.reason || 'Store order admin notification was not sent');
+      }
+      if (env.STORE_STATE) {
+        await env.STORE_STATE.put(sentKey, 'sent', { expirationTtl: 30 * 24 * 60 * 60 });
+      }
+      sent.push(payload.email);
+    } catch (err) {
+      failed.push({
+        email: payload.email,
+        error: err?.message || 'Unknown Store order admin notification error'
+      });
+    }
+  }
+
+  const notified = Array.from(new Set([...sent, ...skipped]));
+  const now = new Date().toISOString();
+  await updateStoreOrderEmailDeliveryState(env, orderToken, {
+    adminNotificationEmailSent: notified.length > 0 && failed.length === 0,
+    adminNotificationEmailRecipients: notified,
+    adminNotificationEmailSkippedRecipients: skipped,
+    adminNotificationEmailErrors: failed,
+    adminNotificationEmailAttemptedAt: now,
+    ...(sent.length ? { adminNotificationEmailSentAt: now } : {}),
+    updatedAt: now
+  });
+
+  if (failed.length) {
+    return {
+      ok: false,
+      error: failed.map((failure) => `${failure.email}: ${failure.error}`).join('; '),
+      sent,
+      failed
+    };
+  }
+
+  return { ok: true, sent, skipped };
+}
+
+function queueStoreOrderAdminNotificationDelivery(ctx, env, storedOrder = {}) {
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  queueBackgroundTask(
+    ctx,
+    attemptStoreOrderAdminNotificationDelivery(env, storedOrder).then((result) => {
+      if (result && result.ok === false) {
+        console.error('Store order admin notification failed:', {
+          orderToken,
+          error: result.error
+        });
+      }
+    }),
+    `store order admin notification (${orderToken || 'unknown'})`
+  );
+}
+
 const STORE_ORDER_TOKEN_PATTERN = /^store-order-[a-z0-9_-]+$/i;
 const STORE_ORDER_EMAIL_INDEX_TTL_SECONDS = 400 * 24 * 60 * 60;
 const STORE_ORDER_EMAIL_INDEX_LIMIT = 50;
@@ -2291,8 +2538,6 @@ const STORE_ORDER_LOOKUP_TOKEN_PREFIX = 'store-order-lookup:';
 const STORE_ORDER_LOOKUP_TOKEN_TTL_SECONDS = 15 * 60;
 const STORE_ORDER_LOOKUP_SCOPE = 'store_order_lookup';
 const STORE_FULFILLMENT_TOKEN_TTL_SECONDS = 72 * 60 * 60;
-const STORE_DOWNLOAD_ACCESS_DEFAULT_HOURS = 72;
-const STORE_DOWNLOAD_ACCESS_MAX_HOURS = 24 * 365;
 const STORE_EVENT_ADDRESS_LOOKUP_CACHE_PREFIX = 'store-event-address-lookup:';
 const STORE_EVENT_ADDRESS_LOOKUP_CACHE_TTL_SECONDS = 24 * 60 * 60;
 
@@ -4289,25 +4534,6 @@ function getStoreDownloadAccessRecords(storedOrder = {}) {
   return records && typeof records === 'object' && !Array.isArray(records) ? records : {};
 }
 
-function clampStoreDownloadAccessHours(value, fallback = STORE_DOWNLOAD_ACCESS_DEFAULT_HOURS) {
-  const parsed = Number(value);
-  const safeFallback = Math.max(1, Math.min(STORE_DOWNLOAD_ACCESS_MAX_HOURS, Math.floor(Number(fallback) || STORE_DOWNLOAD_ACCESS_DEFAULT_HOURS)));
-  if (!Number.isFinite(parsed) || parsed <= 0) return safeFallback;
-  return Math.max(1, Math.min(STORE_DOWNLOAD_ACCESS_MAX_HOURS, Math.floor(parsed)));
-}
-
-function getStoreDownloadAccessHours(item = {}, overrideHours = null) {
-  return clampStoreDownloadAccessHours(
-    overrideHours ?? item.download?.expires_hours ?? item.download?.expiresHours,
-    STORE_DOWNLOAD_ACCESS_DEFAULT_HOURS
-  );
-}
-
-function addHoursIso(baseIso, hours) {
-  const baseMs = parseTimestampMs(baseIso) || Date.now();
-  return new Date(baseMs + (getStoreDownloadAccessHours({}, hours) * 60 * 60 * 1000)).toISOString();
-}
-
 function getStoreDownloadAccessIssueTime(storedOrder = {}, nowIso = '') {
   return String(
     storedOrder.confirmedAt ||
@@ -4322,38 +4548,29 @@ function getStoreDownloadAccessIssueTime(storedOrder = {}, nowIso = '') {
 function getStoreDownloadAccessState(storedOrder = {}, itemId = '', item = {}, now = new Date()) {
   const normalizedItemId = normalizeStoreFulfillmentId(itemId);
   const nowDate = now instanceof Date ? now : new Date(String(now || ''));
-  const nowMs = Number.isFinite(nowDate.getTime()) ? nowDate.getTime() : Date.now();
-  const nowIso = new Date(nowMs).toISOString();
+  const nowIso = Number.isFinite(nowDate.getTime()) ? nowDate.toISOString() : new Date().toISOString();
   const records = getStoreDownloadAccessRecords(storedOrder);
   const record = records[normalizedItemId] && typeof records[normalizedItemId] === 'object'
     ? records[normalizedItemId]
     : {};
-  const expiresHours = getStoreDownloadAccessHours(item, record.expiresHours);
   const issuedAt = String(record.issuedAt || record.reissuedAt || getStoreDownloadAccessIssueTime(storedOrder, nowIso));
-  const expiresAt = String(record.expiresAt || addHoursIso(issuedAt, expiresHours));
-  const expiresAtMs = parseTimestampMs(expiresAt);
   const statusValue = String(record.status || '').trim().toLowerCase();
-  const forcedExpired = statusValue === 'expired';
-  const timedOut = !Number.isFinite(expiresAtMs) || expiresAtMs <= nowMs;
-  const expired = forcedExpired || timedOut;
-  const expiresInSeconds = !expired && Number.isFinite(expiresAtMs)
-    ? Math.max(0, Math.floor((expiresAtMs - nowMs) / 1000))
-    : 0;
+  const revoked = statusValue === 'revoked' || statusValue === 'expired';
+  const revokedAt = String(record.revokedAt || record.expiredAt || (revoked ? record.updatedAt : '') || '');
 
   return {
     itemId: normalizedItemId,
-    status: expired ? 'expired' : 'active',
-    available: isStoreOrderFulfillmentReady(storedOrder) && !expired && expiresInSeconds > 0,
+    status: revoked ? 'revoked' : 'active',
+    available: isStoreOrderFulfillmentReady(storedOrder) && !revoked,
     issuedAt,
-    expiresAt,
-    expiresInSeconds,
-    expiresHours,
+    expiresAt: '',
+    expiresInSeconds: 0,
+    expiresHours: 0,
     updatedAt: String(record.updatedAt || ''),
     updatedBy: String(record.updatedBy || ''),
     reissuedAt: String(record.reissuedAt || ''),
-    expiredAt: forcedExpired
-      ? String(record.expiredAt || record.updatedAt || expiresAt)
-      : (timedOut ? expiresAt : '')
+    revokedAt,
+    expiredAt: revokedAt
   };
 }
 
@@ -4361,40 +4578,41 @@ function summarizeStoreDownloadAccessForBuyer(access = {}) {
   return {
     status: access.status || '',
     available: access.available === true,
-    expiresAt: access.expiresAt || '',
-    expiresInSeconds: Math.max(0, Number(access.expiresInSeconds || 0) || 0),
-    expiresHours: Math.max(0, Number(access.expiresHours || 0) || 0)
+    expiresAt: '',
+    expiresInSeconds: 0,
+    expiresHours: 0,
+    revokedAt: access.revokedAt || access.expiredAt || ''
   };
 }
 
-function buildStoreDownloadAccessRecord(action, previousRecord = {}, item = {}, auth = {}, nowIso = new Date().toISOString(), overrideHours = null) {
-  const normalizedAction = String(action || '').trim().toLowerCase();
+function buildStoreDownloadAccessRecord(action, previousRecord = {}, _item = {}, auth = {}, nowIso = new Date().toISOString()) {
+  const requestedAction = String(action || '').trim().toLowerCase();
+  const normalizedAction = requestedAction === 'expire' ? 'revoke' : requestedAction;
   const previousHistory = Array.isArray(previousRecord.history) ? previousRecord.history : [];
-  const expiresHours = getStoreDownloadAccessHours(item, overrideHours);
   const updatedBy = String(auth.user?.email || auth.email || '').trim();
   const next = {
     ...previousRecord,
-    status: normalizedAction === 'expire' ? 'expired' : 'active',
-    expiresHours,
+    status: normalizedAction === 'revoke' ? 'revoked' : 'active',
+    expiresAt: '',
+    expiresHours: 0,
     updatedAt: nowIso,
     updatedBy
   };
 
-  if (normalizedAction === 'expire') {
+  if (normalizedAction === 'revoke') {
+    next.revokedAt = nowIso;
     next.expiredAt = nowIso;
-    next.expiresAt = nowIso;
   } else {
-    next.issuedAt = nowIso;
+    next.issuedAt = next.issuedAt || nowIso;
     next.reissuedAt = nowIso;
+    next.revokedAt = '';
     next.expiredAt = '';
-    next.expiresAt = addHoursIso(nowIso, expiresHours);
   }
 
   next.history = previousHistory.slice(-9).concat([{
     action: normalizedAction,
     at: nowIso,
-    by: updatedBy,
-    expiresAt: next.expiresAt
+    by: updatedBy
   }]);
   return next;
 }
@@ -4428,16 +4646,16 @@ async function buildStoreSummaryItem(request, env, storedOrder, item = {}, index
       summary.actions.download = {
         label: 'Download',
         available: false,
-        reason: access.available ? 'not_configured' : 'expired',
+        reason: access.available ? 'not_configured' : 'revoked',
         message: access.available
           ? 'Download is not available yet.'
-          : 'Download access expired. Contact support to request a new link.',
+          : 'Download access has been revoked. Contact support if this looks wrong.',
         access: summarizeStoreDownloadAccessForBuyer(access)
       };
       return summary;
     }
 
-    const tokenTtlSeconds = Math.min(STORE_FULFILLMENT_TOKEN_TTL_SECONDS, access.expiresInSeconds);
+    const tokenTtlSeconds = STORE_FULFILLMENT_TOKEN_TTL_SECONDS;
     const token = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'download' }, tokenTtlSeconds);
     if (token) {
       summary.actions.download = {
@@ -4575,7 +4793,7 @@ async function handleStoreOrderRoute(request, env, route) {
   if (route.kind === 'download') {
     const access = getStoreDownloadAccessState(loaded.storedOrder, match.itemId, match.item);
     if (!access.available) {
-      return privateJsonResponse({ error: 'Store download access expired' }, 410, env);
+      return privateJsonResponse({ error: 'Store download access revoked' }, 410, env);
     }
     return handleStoreDownload(request, env, loaded.storedOrder, match.item, match.itemId);
   }
@@ -5356,22 +5574,55 @@ function buildStoreTicketSvg(env, storedOrder = {}, item = {}, itemId = '', chec
   const heading = type === 'rsvp' ? 'RSVP' : 'Ticket';
   const title = item.name || heading;
   const variant = item.variantLabel ? ` (${item.variantLabel})` : '';
+  const ticketTitle = `${title}${variant}`;
   const quantity = Math.max(1, Number(item.quantity || 1) || 1);
   const event = summarizeStoreEventDetails(item.eventDetails);
   const eventTime = formatStoreEventDisplay(event, env);
   const holder = storedOrder.orderDraft?.customer?.name || storedOrder.orderDraft?.customer?.email || '';
   const qrDataUri = `data:image/svg+xml;base64,${base64EncodeString(qrSvg)}`;
+  const contentX = 88;
+  const contentWidth = 544;
+  const titleBlock = renderSvgTextBlock(ticketTitle, {
+    x: contentX,
+    y: 210,
+    maxWidth: contentWidth,
+    maxLines: 3,
+    fontSizes: [48, 44, 40, 36],
+    fontWeight: 900,
+    fill: '#101215',
+    lineHeightFactor: 1.12
+  });
+  const eventTimeY = titleBlock.bottomY + 56;
+  const venueY = eventTimeY + 50;
+  const addressBlock = renderSvgTextBlock(event?.address || '', {
+    x: contentX,
+    y: venueY + 38,
+    maxWidth: contentWidth,
+    maxLines: 2,
+    fontSizes: [20, 18],
+    fontWeight: 400,
+    fill: '#5d6573',
+    lineHeightFactor: 1.24
+  });
+  const maxQrBottom = 872;
+  let qrY = Math.max(430, addressBlock.bottomY + 64);
+  let qrSize = Math.min(360, maxQrBottom - qrY);
+  if (qrSize < 280) {
+    qrSize = 280;
+    qrY = Math.min(qrY, maxQrBottom - qrSize);
+  }
+  const qrX = Math.round((720 - qrSize) / 2);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1040" viewBox="0 0 720 1040" role="img" aria-label="${escapeXml(`${heading} ${title}`)}">
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1040" viewBox="0 0 720 1040" role="img" aria-label="${escapeXml(`${heading} ${ticketTitle}`)}">
   <rect width="720" height="1040" fill="#f0f1ed"/>
   <rect x="44" y="44" width="632" height="952" rx="18" fill="#ffffff" stroke="#101215" stroke-width="4"/>
   <text x="88" y="132" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="800" fill="#252930" letter-spacing="3">${escapeXml(heading.toUpperCase())}</text>
-  <text x="88" y="210" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="900" fill="#101215">${escapeXml(trimSvgText(`${title}${variant}`, 28))}</text>
-  <text x="88" y="274" font-family="Inter, Arial, sans-serif" font-size="25" fill="#252930">${escapeXml(eventTime || 'Event details pending')}</text>
-  <text x="88" y="324" font-family="Inter, Arial, sans-serif" font-size="24" fill="#252930">${escapeXml(event?.venue || '')}</text>
-  <text x="88" y="362" font-family="Inter, Arial, sans-serif" font-size="20" fill="#5d6573">${escapeXml(event?.address || '')}</text>
-  <image href="${qrDataUri}" x="150" y="430" width="420" height="420"/>
+  ${titleBlock.markup}
+  <text x="${contentX}" y="${eventTimeY}" font-family="Inter, Arial, sans-serif" font-size="25" fill="#252930">${escapeXml(eventTime || 'Event details pending')}</text>
+  <text x="${contentX}" y="${venueY}" font-family="Inter, Arial, sans-serif" font-size="24" fill="#252930">${escapeXml(event?.venue || '')}</text>
+  ${addressBlock.markup}
+  <image href="${qrDataUri}" x="${qrX}" y="${qrY}" width="${qrSize}" height="${qrSize}"/>
   <text x="88" y="908" font-family="Inter, Arial, sans-serif" font-size="22" fill="#252930">Order: ${escapeXml(storedOrder.orderToken || '')}</text>
   <text x="88" y="944" font-family="Inter, Arial, sans-serif" font-size="22" fill="#252930">Qty: ${quantity}${holder ? ` · ${escapeXml(holder)}` : ''}</text>
 </svg>`;
@@ -5500,19 +5751,6 @@ async function buildStoreEventEmailAttachments(env, storedOrder = {}, item = {},
     });
   }
 
-  const artifacts = await buildStoreTicketEmailArtifacts(env, storedOrder, item, itemId, options);
-  if (artifacts?.ticketSvg) {
-    attachments.push({
-      filename: sanitizeDownloadFilename(`${safeItemId}-ticket.svg`),
-      content: base64EncodeString(artifacts.ticketSvg)
-    });
-  }
-  if (artifacts?.qrSvg) {
-    attachments.push({
-      filename: sanitizeDownloadFilename(`${safeItemId}-check-in-qr.svg`),
-      content: base64EncodeString(artifacts.qrSvg)
-    });
-  }
   return attachments;
 }
 
@@ -5780,6 +6018,7 @@ function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
     downloadAccessStatus: item.downloadAccess?.status || '',
     downloadAccessExpiresAt: item.downloadAccess?.expiresAt || '',
     downloadAccessExpiresHours: item.downloadAccess?.expiresHours || 0,
+    downloadAccessRevokedAt: item.downloadAccess?.revokedAt || item.downloadAccess?.expiredAt || '',
     downloadAccessUpdatedAt: item.downloadAccess?.updatedAt || '',
     downloadAccessUpdatedBy: item.downloadAccess?.updatedBy || ''
   };
@@ -6533,7 +6772,6 @@ function serializeAdminStoreProductVariantsYaml(variants = []) {
       lines.push(`    file_key: ${yamlAdminValue(variant.downloadFileKey, 'string')}`);
       lines.push(`    filename: ${yamlAdminValue(variant.downloadFilename || variant.downloadFileKey, 'string')}`);
       lines.push('    delivery: "signed_link"');
-      lines.push('    expires_hours: 72');
     }
   }
   return lines.join('\n');
@@ -6546,8 +6784,7 @@ function serializeAdminStoreDownloadYaml(fileKey = '', filename = '') {
     'download:',
     `  file_key: ${yamlAdminValue(normalizedFileKey, 'string')}`,
     `  filename: ${yamlAdminValue(filename || normalizedFileKey, 'string')}`,
-    '  delivery: "signed_link"',
-    '  expires_hours: 72'
+    '  delivery: "signed_link"'
   ].join('\n');
 }
 
@@ -9360,6 +9597,7 @@ function storeFulfillmentRowsCsv(rows = []) {
     'download_access_status',
     'download_access_expires_at',
     'download_access_expires_hours',
+    'download_access_revoked_at',
     'download_access_updated_at',
     'download_access_updated_by'
   ];
@@ -9393,6 +9631,7 @@ function storeFulfillmentRowsCsv(rows = []) {
     row.downloadAccessStatus,
     row.downloadAccessExpiresAt,
     row.downloadAccessExpiresHours,
+    row.downloadAccessRevokedAt,
     row.downloadAccessUpdatedAt,
     row.downloadAccessUpdatedBy
   ]);
@@ -9750,17 +9989,15 @@ function normalizeAdminStoreCheckInIntent(body = {}, item = {}) {
   };
 }
 
-function normalizeAdminStoreDownloadAccessIntent(body = {}, item = {}) {
-  const action = String(body.action || '').trim().toLowerCase();
-  if (action !== 'expire' && action !== 'reissue') {
+function normalizeAdminStoreDownloadAccessIntent(body = {}, _item = {}) {
+  const requestedAction = String(body.action || '').trim().toLowerCase();
+  const action = requestedAction === 'expire' ? 'revoke' : requestedAction;
+  if (action !== 'revoke' && action !== 'reissue') {
     return { ok: false, error: 'Invalid download access action' };
   }
   return {
     ok: true,
-    action,
-    expiresHours: action === 'reissue'
-      ? getStoreDownloadAccessHours(item, body.expiresHours)
-      : getStoreDownloadAccessHours(item)
+    action
   };
 }
 
@@ -9799,7 +10036,7 @@ async function handleAdminStoreOrderDownloadAccess(request, env, body = {}, ctx 
     ? previousRecords[match.itemId]
     : {};
   const nextRecord = {
-    ...buildStoreDownloadAccessRecord(intent.action, previousRecord, match.item, auth, now, intent.expiresHours),
+    ...buildStoreDownloadAccessRecord(intent.action, previousRecord, match.item, auth, now),
     itemId: match.itemId
   };
   const updatedOrder = {
@@ -9820,23 +10057,23 @@ async function handleAdminStoreOrderDownloadAccess(request, env, body = {}, ctx 
     orderToken,
     itemId: match.itemId,
     mutation: intent.action,
-    expiresAt: nextRecord.expiresAt,
-    expiresHours: nextRecord.expiresHours
+    revokedAt: nextRecord.revokedAt || '',
+    linkTtlSeconds: STORE_FULFILLMENT_TOKEN_TTL_SECONDS
   });
 
   const order = buildAdminStoreOrderRecord(updatedOrder);
   const item = order.items.find((entry) => entry.id === match.itemId) || null;
   return privateJsonResponse({
     success: true,
-    message: intent.action === 'expire' ? 'Download access expired.' : 'Download access reissued.',
+    message: intent.action === 'revoke' ? 'Download access revoked.' : 'Download access refreshed.',
     order,
     fulfillment: item ? buildAdminStoreFulfillmentRow(order, item) : null,
     mutation: {
       orderToken,
       itemId: match.itemId,
       action: intent.action,
-      expiresAt: nextRecord.expiresAt,
-      expiresHours: nextRecord.expiresHours
+      revokedAt: nextRecord.revokedAt || '',
+      linkTtlSeconds: STORE_FULFILLMENT_TOKEN_TTL_SECONDS
     },
     auditKey,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 2 })
@@ -10241,6 +10478,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     invalidateAdminStoreOrderScanCache(env, ctx);
     queueStoreOrderEmailIndexUpsert(ctx, env, storedOrder);
     queueStoreOrderEmailDelivery(ctx, env, storedOrder);
+    queueStoreOrderAdminNotificationDelivery(ctx, env, storedOrder);
     queueStoreEventRemindersQuietly(ctx, env, storedOrder);
 
     return privateJsonResponse({
@@ -10325,10 +10563,6 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       requiresTurnstile: pendingOrderDraft.totals.requiresTurnstile ? 'true' : 'false'
     }
   };
-  if (pendingOrderDraft.customer.email) {
-    paymentIntentParams.receipt_email = pendingOrderDraft.customer.email;
-  }
-
   let paymentIntent;
   try {
     paymentIntent = await stripe.paymentIntents.create(paymentIntentParams, {
@@ -10620,6 +10854,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   await deleteAbandonedCheckoutFollowup(env, metadata.orderToken, { reason: 'completed' });
   queueStoreOrderEmailIndexUpsert(ctx, env, updatedOrder);
   queueStoreOrderEmailDelivery(ctx, env, updatedOrder);
+  queueStoreOrderAdminNotificationDelivery(ctx, env, updatedOrder);
   queueStoreEventRemindersQuietly(ctx, env, updatedOrder);
 
   return {
@@ -14211,7 +14446,10 @@ function corsResponse(env = null, isPublic = false) {
 }
 
 export {
+  attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
+  buildStoreTicketSvg,
+  buildStoreOrderAdminNotificationPayloads,
   buildStoreOrderEmailPayload,
   buildStoreOrderEventEmailAttachments,
   processStoreEventReminders,

@@ -325,7 +325,6 @@ describe('stripe checkout sidecar helper', () => {
       redirect: 'if_required',
       confirmParams: {
         return_url: 'https://shop.test/order-success/?orderToken=store-order-123',
-        receipt_email: 'buyer@example.com',
         payment_method_data: {
           billing_details: {
             name: 'Buyer Example',

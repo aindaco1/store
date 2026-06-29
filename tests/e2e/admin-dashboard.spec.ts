@@ -18,12 +18,18 @@ const OTHER_ADMIN_EMAIL = 'other-admin@example.com';
 const NEW_ADMIN_EMAIL = 'editor@example.com';
 const TICKET_ORDER_TOKEN = 'store-order-ticket-e2e';
 const DIGITAL_ORDER_TOKEN = 'store-order-digital-e2e';
+const DEMO_ORDER_TOKEN = 'store-order-local-demo-all';
 const TICKET_BUYER_NAME = 'Ticket Buyer';
 const TICKET_BUYER_EMAIL = 'ticket-buyer@example.com';
 const DIGITAL_BUYER_NAME = 'Download Buyer';
 const DIGITAL_BUYER_EMAIL = 'download-buyer@example.com';
+const DEMO_BUYER_NAME = 'Demo Customer';
+const DEMO_BUYER_EMAIL = 'demo@example.com';
 const TICKET_ITEM_ID = 'fronteras-ticket-general';
 const DIGITAL_ITEM_ID = 'fronteras-download';
+const DEMO_DIGITAL_ITEM_ID = 'demo-digital-download';
+const DEMO_TICKET_ITEM_ID = 'demo-ticket-general';
+const DEMO_RSVP_ITEM_ID = 'demo-rsvp';
 const RSVP_ITEM_ID = 'rsvp-1';
 
 function withFieldHelp<T extends { label: string; help?: string }>(row: T): T {
@@ -108,6 +114,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     role,
     accessScopes: role === 'super_admin' ? [] : ['store']
   };
+  const checkIns: Record<string, any> = {};
 
   await page.route(`${WORKER_BASE}/admin/**`, async (route: any) => {
     const request = route.request();
@@ -373,7 +380,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     if (url.pathname === '/admin/store/orders' && method === 'GET') {
       const params = Object.fromEntries(url.searchParams.entries());
       calls.storeOrders.push(params);
-      return fulfillJson(storeOrdersPayload(params));
+      return fulfillJson(storeOrdersPayload(params, checkIns));
     }
     if (url.pathname === '/admin/store/orders.csv' && method === 'GET') {
       calls.storeOrderCsv.push(Object.fromEntries(url.searchParams.entries()));
@@ -416,6 +423,10 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     }
     if (url.pathname === '/admin/store/orders/check-in' && method === 'POST') {
       calls.storeOrderCheckIns.push(body);
+      checkIns[`${body.orderToken}:${body.itemId}`] = {
+        checkedIn: body.checkedIn,
+        quantity: body.quantity
+      };
       return fulfillJson({
         success: true,
         mutation: {
@@ -431,13 +442,13 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       calls.storeOrderDownloadAccesses.push(body);
       return fulfillJson({
         success: true,
-        message: body.action === 'expire' ? 'Download access expired.' : 'Download access reissued.',
+        message: body.action === 'revoke' ? 'Download access revoked.' : 'Download access refreshed.',
         mutation: {
           orderToken: body.orderToken,
           itemId: body.itemId,
           action: body.action,
-          expiresHours: body.expiresHours || 72,
-          expiresAt: '2026-06-14T12:00:00.000Z'
+          revokedAt: body.action === 'revoke' ? '2026-06-14T12:00:00.000Z' : '',
+          linkTtlSeconds: 259200
         },
         writeBudget: { readOnly: false, kvWritesExpected: 2 }
       });
@@ -755,8 +766,49 @@ function storeSettingsSections() {
   }];
 }
 
-function storeOrdersPayload(params: Record<string, string> = {}) {
+function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Record<string, any> = {}) {
   const allOrders = [{
+      orderToken: DEMO_ORDER_TOKEN,
+      status: 'confirmed',
+      createdAt: '2026-06-11T12:10:00.000Z',
+      confirmedAt: '2026-06-11T12:10:00.000Z',
+      customer: {
+        name: DEMO_BUYER_NAME,
+        email: DEMO_BUYER_EMAIL
+      },
+      totals: {
+        totalCents: 13505
+      },
+      payment: {
+        status: 'paid'
+      },
+      fulfillmentTypes: ['digital', 'physical', 'rsvp', 'ticket'],
+      items: [{
+        id: 'demo-shirt',
+        name: 'Demo Physical Shirt',
+        variantLabel: 'Black / M',
+        quantity: 1,
+        fulfillmentType: 'physical'
+      }, {
+        id: DEMO_DIGITAL_ITEM_ID,
+        name: 'Demo Digital Download',
+        variantLabel: '',
+        quantity: 1,
+        fulfillmentType: 'digital'
+      }, {
+        id: DEMO_TICKET_ITEM_ID,
+        name: 'Demo Event Ticket',
+        variantLabel: 'General Admission',
+        quantity: 2,
+        fulfillmentType: 'ticket'
+      }, {
+        id: DEMO_RSVP_ITEM_ID,
+        name: 'Demo RSVP',
+        variantLabel: '',
+        quantity: 1,
+        fulfillmentType: 'rsvp'
+      }]
+    }, {
       orderToken: TICKET_ORDER_TOKEN,
       status: 'confirmed',
       createdAt: '2026-06-11T12:00:00.000Z',
@@ -803,7 +855,80 @@ function storeOrdersPayload(params: Record<string, string> = {}) {
         fulfillmentType: 'digital'
       }]
     }];
-  const allFulfillments = [{
+  const rawFulfillments = [{
+      orderToken: DEMO_ORDER_TOKEN,
+      createdAt: '2026-06-11T12:10:00.000Z',
+      confirmedAt: '2026-06-11T12:10:00.000Z',
+      customerName: DEMO_BUYER_NAME,
+      customerEmail: DEMO_BUYER_EMAIL,
+      itemId: DEMO_DIGITAL_ITEM_ID,
+      itemName: 'Demo Digital Download',
+      variantLabel: '',
+      sku: DEMO_DIGITAL_ITEM_ID,
+      fulfillmentType: 'digital',
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      totalCents: 1200,
+      quantity: 1,
+      checkInAvailable: false,
+      checkedIn: false,
+      checkedInQuantity: 0,
+      downloadAccessManageable: true,
+      downloadAccessStatus: 'active',
+      downloadAccessExpiresAt: '',
+      downloadAccessExpiresHours: 0,
+      downloadAccess: {
+        itemId: DEMO_DIGITAL_ITEM_ID,
+        status: 'active',
+        available: true,
+        issuedAt: '2026-06-11T12:10:00.000Z',
+        expiresAt: '',
+        expiresInSeconds: 0,
+        expiresHours: 0
+      }
+    }, {
+      orderToken: DEMO_ORDER_TOKEN,
+      createdAt: '2026-06-11T12:10:00.000Z',
+      confirmedAt: '2026-06-11T12:10:00.000Z',
+      customerName: DEMO_BUYER_NAME,
+      customerEmail: DEMO_BUYER_EMAIL,
+      itemId: DEMO_TICKET_ITEM_ID,
+      itemName: 'Demo Event Ticket',
+      variantLabel: 'General Admission',
+      sku: DEMO_TICKET_ITEM_ID,
+      fulfillmentType: 'ticket',
+      eventStartsAt: '2026-07-01T01:00:00.000Z',
+      eventVenue: 'Guild Cinema',
+      eventAddress: '3405 Central Ave NE, Albuquerque, NM',
+      status: 'confirmed',
+      paymentStatus: 'paid',
+      totalCents: 2400,
+      quantity: 2,
+      checkInAvailable: true,
+      checkedIn: false,
+      checkedInQuantity: 0
+    }, {
+      orderToken: DEMO_ORDER_TOKEN,
+      createdAt: '2026-06-11T12:10:00.000Z',
+      confirmedAt: '2026-06-11T12:10:00.000Z',
+      customerName: DEMO_BUYER_NAME,
+      customerEmail: DEMO_BUYER_EMAIL,
+      itemId: DEMO_RSVP_ITEM_ID,
+      itemName: 'Demo RSVP',
+      variantLabel: '',
+      sku: DEMO_RSVP_ITEM_ID,
+      fulfillmentType: 'rsvp',
+      eventStartsAt: '2026-07-01T01:00:00.000Z',
+      eventVenue: 'Guild Cinema',
+      eventAddress: '3405 Central Ave NE, Albuquerque, NM',
+      status: 'confirmed',
+      paymentStatus: 'not_required',
+      totalCents: 0,
+      quantity: 1,
+      checkInAvailable: true,
+      checkedIn: false,
+      checkedInQuantity: 0
+    }, {
       orderToken: TICKET_ORDER_TOKEN,
       createdAt: '2026-06-11T12:00:00.000Z',
       customerName: TICKET_BUYER_NAME,
@@ -843,18 +968,34 @@ function storeOrdersPayload(params: Record<string, string> = {}) {
       checkedInQuantity: 0,
       downloadAccessManageable: true,
       downloadAccessStatus: 'active',
-      downloadAccessExpiresAt: '2026-06-14T12:05:00.000Z',
-      downloadAccessExpiresHours: 72,
+      downloadAccessExpiresAt: '',
+      downloadAccessExpiresHours: 0,
       downloadAccess: {
         itemId: DIGITAL_ITEM_ID,
         status: 'active',
         available: true,
         issuedAt: '2026-06-11T12:05:00.000Z',
-        expiresAt: '2026-06-14T12:05:00.000Z',
-        expiresInSeconds: 259200,
-        expiresHours: 72
+        expiresAt: '',
+        expiresInSeconds: 0,
+        expiresHours: 0
       }
     }];
+  const allFulfillments = rawFulfillments.map((row) => {
+    const checkIn = checkIns[`${row.orderToken}:${row.itemId}`];
+    if (!checkIn) return row;
+    const quantity = Math.max(0, Number(row.quantity || 0) || 0);
+    const checkedIn = checkIn.checkedIn === true;
+    const checkedInQuantity = checkedIn
+      ? Math.min(quantity, Math.max(1, Number(checkIn.quantity || quantity) || quantity))
+      : 0;
+    return {
+      ...row,
+      checkedIn,
+      checkedInQuantity,
+      checkedInAt: checkedIn ? '2026-06-11T12:15:00.000Z' : '',
+      checkedInBy: checkedIn ? SUPER_ADMIN_EMAIL : ''
+    };
+  });
   const query = String(params.q || '').trim().toLowerCase();
   const rowsByToken = new Map<string, typeof allFulfillments>();
   for (const row of allFulfillments) {
@@ -868,14 +1009,20 @@ function storeOrdersPayload(params: Record<string, string> = {}) {
   const orderTokens = new Set(orders.map((order) => order.orderToken));
   const fulfillments = allFulfillments.filter((row) => orderTokens.has(row.orderToken));
   const ticketRows = fulfillments.filter((row) => row.fulfillmentType === 'ticket');
+  const fronterasCheckedInQuantity = ticketRows
+    .filter((row) => row.itemId === TICKET_ITEM_ID)
+    .reduce((sum, row) => sum + Math.max(0, Number(row.checkedInQuantity || 0) || 0), 0);
+  const checkedInQuantity = fulfillments
+    .filter((row) => row.checkInAvailable)
+    .reduce((sum, row) => sum + Math.max(0, Number(row.checkedInQuantity || 0) || 0), 0);
   const attendance = ticketRows.length
     ? {
         totals: {
           eventCount: 1,
           orderCount: 1,
           quantity: 1,
-          checkedInQuantity: 0,
-          uncheckedQuantity: 1
+          checkedInQuantity: fronterasCheckedInQuantity,
+          uncheckedQuantity: Math.max(0, 1 - fronterasCheckedInQuantity)
         },
         events: [{
           productId: 'fronteras-ticket',
@@ -887,9 +1034,9 @@ function storeOrdersPayload(params: Record<string, string> = {}) {
           eventVenue: 'Guild Cinema',
           eventAddress: '3405 Central Ave NE, Albuquerque, NM',
           quantity: 1,
-          checkedInQuantity: 0,
-          uncheckedQuantity: 1,
-          checkedInRate: 0,
+          checkedInQuantity: fronterasCheckedInQuantity,
+          uncheckedQuantity: Math.max(0, 1 - fronterasCheckedInQuantity),
+          checkedInRate: fronterasCheckedInQuantity > 0 ? 100 : 0,
           orderCount: 1,
           rowCount: 1
         }]
@@ -914,7 +1061,7 @@ function storeOrdersPayload(params: Record<string, string> = {}) {
       digitalQuantity: fulfillments.filter((row) => row.fulfillmentType === 'digital').reduce((sum, row) => sum + row.quantity, 0),
       ticketQuantity: ticketRows.reduce((sum, row) => sum + row.quantity, 0),
       rsvpQuantity: 0,
-      checkedInQuantity: 0
+      checkedInQuantity
     },
     page: {
       cursor: 0,
@@ -1771,13 +1918,28 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Search' })).toBeVisible();
     await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
+    await expect(page.locator('#admin-store-orders-results')).toContainText(DEMO_ORDER_TOKEN);
     await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
     await expect(page.locator('#admin-store-orders-results')).toContainText('Fronteras Download');
     await expect(page.locator('#admin-store-orders-summary')).toContainText('Checked in');
     await expect(page.locator('#admin-store-orders-attendance')).toContainText('Attendance');
     await expect(page.getByRole('button', { name: 'About Attendance' })).toBeVisible();
     await expect(page.locator('#admin-store-orders-attendance')).toContainText('Guild Cinema');
-    await page.locator('#admin-store-orders-results').getByRole('button', { name: 'Check in' }).click();
+    const demoRow = page.locator('#admin-store-orders-results tbody tr').filter({ hasText: DEMO_ORDER_TOKEN });
+    await expect(demoRow).not.toContainText('3 item actions');
+    await expect(demoRow).toContainText('Demo Digital Download');
+    await expect(demoRow.getByRole('button', { name: 'Refresh download access for Demo Digital Download' })).toBeVisible();
+    await expect(demoRow.getByRole('button', { name: 'Revoke download access for Demo Digital Download' })).toBeVisible();
+    await expect(demoRow.getByRole('button', { name: 'Check in' })).toHaveCount(2);
+    await expect.poll(() => demoRow.locator('.admin-store-orders__actions .btn').evaluateAll((buttons: HTMLElement[]) => {
+      return buttons.every((button) => {
+        var style = getComputedStyle(button);
+        return style.whiteSpace === 'nowrap' && button.scrollWidth <= button.clientWidth + 1;
+      });
+    })).toBe(true);
+    const ticketRow = page.locator('#admin-store-orders-results tbody tr').filter({ hasText: TICKET_ORDER_TOKEN });
+    const storeOrdersBeforeCheckIn = calls.storeOrders.length;
+    await ticketRow.getByRole('button', { name: 'Check in' }).click();
     await expect.poll(() => calls.storeOrderCheckIns.length).toBe(1);
     expect(calls.storeOrderCheckIns[0]).toMatchObject({
       orderToken: TICKET_ORDER_TOKEN,
@@ -1785,26 +1947,34 @@ test.describe('Admin Dashboard', () => {
       checkedIn: true,
       quantity: 1
     });
+    await expect.poll(() => calls.storeOrders.length).toBeGreaterThan(storeOrdersBeforeCheckIn);
     await expect(page.locator('#admin-store-orders-status')).toContainText('Check-in saved.');
+    await expect.poll(() => page.locator('#admin-store-orders-summary .admin-stat-card').filter({ hasText: 'Checked in' }).innerText()).toContain('1');
+    const attendanceRow = page.locator('#admin-store-orders-attendance tbody tr').filter({ hasText: 'Fronteras Screening' });
+    await expect(attendanceRow).toContainText('1 / 1');
+    await expect(attendanceRow).toContainText('100%');
     const digitalRow = page.locator('#admin-store-orders-results tbody tr').filter({ hasText: 'Fronteras Download' });
-    await expect(digitalRow).toContainText('Expires');
-    await digitalRow.getByRole('button', { name: 'Reissue 72h' }).click();
+    await expect(digitalRow).toContainText('Active entitlement');
+    await expect(digitalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
+    await expect(digitalRow.getByRole('button', { name: 'Refresh download access for Fronteras Download' })).toBeVisible();
+    await expect(digitalRow.getByRole('button', { name: 'Revoke download access for Fronteras Download' })).toBeVisible();
+    await digitalRow.getByRole('button', { name: 'Refresh download access for Fronteras Download' }).click();
     await expect.poll(() => calls.storeOrderDownloadAccesses.length).toBe(1);
     expect(calls.storeOrderDownloadAccesses[0]).toMatchObject({
       orderToken: DIGITAL_ORDER_TOKEN,
       itemId: DIGITAL_ITEM_ID,
-      action: 'reissue',
-      expiresHours: 72
+      action: 'reissue'
     });
-    await expect(page.locator('#admin-store-orders-status')).toContainText('Download access reissued.');
-    await digitalRow.getByRole('button', { name: 'Expire now' }).click();
+    expect(calls.storeOrderDownloadAccesses[0]).not.toHaveProperty('expiresHours');
+    await expect(page.locator('#admin-store-orders-status')).toContainText('Download access refreshed.');
+    await digitalRow.getByRole('button', { name: 'Revoke download access for Fronteras Download' }).click();
     await expect.poll(() => calls.storeOrderDownloadAccesses.length).toBe(2);
     expect(calls.storeOrderDownloadAccesses[1]).toMatchObject({
       orderToken: DIGITAL_ORDER_TOKEN,
       itemId: DIGITAL_ITEM_ID,
-      action: 'expire'
+      action: 'revoke'
     });
-    await expect(page.locator('#admin-store-orders-status')).toContainText('Download access expired.');
+    await expect(page.locator('#admin-store-orders-status')).toContainText('Download access revoked.');
     await page.locator('#admin-store-order-query').fill(TICKET_BUYER_NAME);
     await expect.poll(() => calls.storeOrders.some((call) => call.q === TICKET_BUYER_NAME)).toBe(true);
     await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
@@ -2617,13 +2787,20 @@ test.describe('Admin Dashboard', () => {
     })).toBe('none');
 
     const orderRows = ordersResults.locator('tbody > tr');
-    await expect(orderRows).toHaveCount(2);
+    await expect(orderRows).toHaveCount(3);
     await expect.poll(() => orderRows.first().evaluate((row: HTMLElement) => {
       return getComputedStyle(row).display === 'grid' && row.getBoundingClientRect().right <= window.innerWidth + 1;
     })).toBe(true);
     await expect.poll(() => orderRows.first().evaluate((row: HTMLElement) => {
       return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
     })).toEqual(['Order', 'Customer', 'Item', 'Status', 'Total', 'Actions']);
+    const demoMobileRow = orderRows.filter({ hasText: DEMO_ORDER_TOKEN });
+    await expect.poll(() => demoMobileRow.locator('.admin-store-orders__actions .btn').evaluateAll((buttons: HTMLElement[]) => {
+      return buttons.every((button) => {
+        var style = getComputedStyle(button);
+        return style.whiteSpace === 'nowrap' && button.scrollWidth <= button.clientWidth + 1;
+      });
+    })).toBe(true);
 
     const attendance = page.locator('#admin-store-orders-attendance');
     await expect.poll(() => attendance.locator('.admin-store-orders__attendance-table').evaluate((table: HTMLElement) => {
@@ -2636,7 +2813,8 @@ test.describe('Admin Dashboard', () => {
       return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
     })).toEqual(['Event', 'Venue', 'Orders', 'Checked in', 'Rate']);
 
-    await ordersResults.getByRole('button', { name: 'Check in' }).click();
+    const ticketRow = ordersResults.locator('tbody > tr').filter({ hasText: TICKET_ORDER_TOKEN });
+    await ticketRow.getByRole('button', { name: 'Check in' }).click();
     await expect.poll(() => calls.storeOrderCheckIns.length).toBe(1);
     await expect(page.locator('#admin-store-orders-status')).toContainText('Check-in saved.');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);

@@ -2,6 +2,10 @@
 
 Store includes a rootless Podman local development path for the two services that normally create host setup churn:
 
+## Release v1.0.4 Audit
+
+The documented Podman flow remains the fallback parity path for Store release validation. `npm run test:premerge` falls back to Podman-backed Jekyll builds when host gems are unavailable, and the Podman helpers cover Worker smoke, security, media, and headless E2E paths.
+
 - Jekyll storefront
 - Cloudflare Worker local dev server
 

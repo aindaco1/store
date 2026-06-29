@@ -93,10 +93,9 @@ Digital products must declare a private download key:
 download:
   file_key: dust-wave-digital-download
   delivery: signed_link
-  expires_hours: 72
 ```
 
-That key maps to a private `STORE_DOWNLOADS` R2 object or Worker-only fallback URL and is fulfilled through token-scoped signed links after the order is confirmed.
+That key maps to a private `STORE_DOWNLOADS` R2 object or Worker-only fallback URL and is fulfilled through token-scoped signed links after the order is confirmed. Confirmed digital entitlements do not expire unless an admin explicitly revokes access.
 
 ## Shipping And Tax
 

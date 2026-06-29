@@ -1,5 +1,7 @@
 # Testing
 
+Release `v1.0.4` adds regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, i18n completeness, admin order action responsiveness, and live order attendance refresh.
+
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
 ## Quick Commands
@@ -84,7 +86,7 @@ Before launch or after checkout/fulfillment changes:
 10. Check in a ticket/RSVP order from admin.
 11. Upload or replace a digital download in admin.
 12. Create and delete a reusable download library file.
-13. Expire and reissue a confirmed digital fulfillment item from admin.
+13. Revoke and refresh a confirmed digital fulfillment item from admin.
 14. Download a confirmed digital fulfillment item.
 15. Create, apply, and delete a coupon.
 16. Request an order lookup link and consume it.

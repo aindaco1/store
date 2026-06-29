@@ -4,6 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
+- Release target: `v1.0.4`.
 - Static Jekyll storefront target: `https://shop.dustwave.xyz`.
 - Cloudflare Worker target: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -12,7 +13,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Browser cart runtime is Store-owned: `store-add-item`, `STORE_CONFIG`, `StoreCartProvider`, `StoreCartRuntime`, `window.Store`, and `storecart.*` events.
 - Worker checkout validates carts through `/api/cart/validate`, creates paid/free order drafts through `/api/checkout/intent`, reserves positive-count SKU inventory through a Durable Object, and settles paid orders only from signed Stripe webhooks.
 - Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, check-in links, Resend receipts, abandoned-checkout reminders, and event reminders.
-- Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access reissue/expiry, ticket check-in, analytics, referrals, and reminder suppression.
+- Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
 ## Local Development

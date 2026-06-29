@@ -211,6 +211,9 @@
 
   function setStatus(element, message, prominent) {
     if (!element) return;
+    element.setAttribute('role', prominent ? 'alert' : 'status');
+    element.setAttribute('aria-live', prominent ? 'assertive' : 'polite');
+    element.setAttribute('aria-atomic', 'true');
     element.textContent = message || '';
     if (prominent) element.setAttribute('data-admin-prominent-status', 'true');
     else element.removeAttribute('data-admin-prominent-status');
@@ -717,6 +720,19 @@
     return active ? active.dataset.adminTab : '';
   }
 
+  function getRequestedAdminTab() {
+    var allowed = ['settings', 'store-products', 'store-coupons', 'store-downloads', 'store-orders', 'store-analytics', 'store-marketing'];
+    var requested = '';
+    try {
+      var params = new URLSearchParams(window.location.search);
+      requested = params.get('tab') || params.get('section') || '';
+      if (!requested && window.location.hash) requested = window.location.hash.replace(/^#/, '');
+    } catch (_error) {
+      requested = '';
+    }
+    return allowed.indexOf(requested) === -1 ? '' : requested;
+  }
+
   function selectAdminTab(key) {
     var tabList = $('[data-admin-tabs] > .admin-tabs__list');
     var target = $('[data-admin-tab="' + key + '"]');
@@ -754,7 +770,7 @@
       if (panel && !isSuperAdmin) panel.hidden = true;
     });
     setupAdminTabs();
-    selectAdminTab(isSuperAdmin ? 'settings' : 'store-orders');
+    selectAdminTab(getRequestedAdminTab() || (isSuperAdmin ? 'settings' : 'store-orders'));
   }
 
   function showAuth(message) {
@@ -3218,38 +3234,70 @@
   function formatStoreDownloadAccessNote(row) {
     var access = row.downloadAccess || {};
     var status = String(access.status || row.downloadAccessStatus || '').toLowerCase();
-    if (status === 'expired') {
-      return access.expiredAt ? 'Expired ' + formatDate(access.expiredAt) : 'Expired';
+    if (status === 'revoked' || status === 'expired') {
+      var revokedAt = access.revokedAt || access.expiredAt || row.downloadAccessRevokedAt || '';
+      return revokedAt ? 'Revoked ' + formatDate(revokedAt) : 'Revoked';
     }
-    if (access.expiresAt || row.downloadAccessExpiresAt) {
-      return 'Expires ' + formatDate(access.expiresAt || row.downloadAccessExpiresAt);
-    }
-    return 'Active';
+    if (access.reissuedAt) return 'Active - refreshed ' + formatDate(access.reissuedAt);
+    return 'Active entitlement';
   }
 
   function appendStoreOrderDownloadAccessControls(parent, row) {
     var access = row.downloadAccess || {};
+    var wrapper = createElement('div', 'admin-store-orders__download-access');
     var note = createElement('span', 'admin-store-orders__action-note', formatStoreDownloadAccessNote(row));
-    parent.appendChild(note);
+    wrapper.appendChild(note);
+    parent.appendChild(wrapper);
     if (!row.downloadAccessManageable) return;
 
-    if (String(access.status || row.downloadAccessStatus || '').toLowerCase() !== 'expired') {
-      var expireButton = createElement('button', 'btn btn--secondary', 'Expire now');
-      expireButton.type = 'button';
-      expireButton.dataset.storeOrderAction = 'download-expire';
-      expireButton.dataset.orderToken = row.orderToken || '';
-      expireButton.dataset.itemId = row.itemId || '';
-      parent.appendChild(expireButton);
+    var status = String(access.status || row.downloadAccessStatus || '').toLowerCase();
+    var isRevoked = status === 'revoked' || status === 'expired';
+    var control = createElement('div', 'admin-store-orders__download-control');
+    var itemLabel = row.itemName || row.itemId || 'item';
+    var refresh = createElement('button', 'btn btn--secondary', isRevoked ? 'Restore access' : 'Refresh access');
+    refresh.type = 'button';
+    refresh.dataset.storeOrderAction = 'download-access';
+    refresh.dataset.storeOrderDownloadAction = 'reissue';
+    refresh.dataset.orderToken = row.orderToken || '';
+    refresh.dataset.itemId = row.itemId || '';
+    refresh.setAttribute('aria-label', (isRevoked ? 'Restore download access for ' : 'Refresh download access for ') + itemLabel);
+    control.appendChild(refresh);
+    if (!isRevoked) {
+      var revoke = createElement('button', 'btn btn--secondary', 'Revoke access');
+      revoke.type = 'button';
+      revoke.dataset.storeOrderAction = 'download-access';
+      revoke.dataset.storeOrderDownloadAction = 'revoke';
+      revoke.dataset.orderToken = row.orderToken || '';
+      revoke.dataset.itemId = row.itemId || '';
+      revoke.setAttribute('aria-label', 'Revoke download access for ' + itemLabel);
+      control.appendChild(revoke);
     }
+    wrapper.appendChild(control);
+  }
 
-    var expiresHours = Number(access.expiresHours || row.downloadAccessExpiresHours || 72) || 72;
-    var reissueButton = createElement('button', 'btn btn--secondary', 'Reissue ' + expiresHours + 'h');
-    reissueButton.type = 'button';
-    reissueButton.dataset.storeOrderAction = 'download-reissue';
-    reissueButton.dataset.orderToken = row.orderToken || '';
-    reissueButton.dataset.itemId = row.itemId || '';
-    reissueButton.dataset.expiresHours = String(expiresHours);
-    parent.appendChild(reissueButton);
+  function getStoreOrderActionItemLabel(row) {
+    var label = [row?.itemName || row?.productId || row?.sku || row?.itemId || 'Store item', row?.variantLabel || ''].filter(Boolean).join(' - ');
+    var quantity = Number(row?.quantity || 0) || 0;
+    return quantity > 1 ? label + ' - Qty ' + formatNumber(quantity) : label;
+  }
+
+  function appendStoreOrderCheckInControl(parent, row) {
+    var button = createElement('button', 'btn btn--secondary', row.checkedIn ? 'Undo check-in' : 'Check in');
+    button.type = 'button';
+    button.dataset.orderToken = row.orderToken || '';
+    button.dataset.itemId = row.itemId || '';
+    button.dataset.storeOrderAction = 'check-in';
+    button.dataset.checkedIn = row.checkedIn ? 'false' : 'true';
+    button.dataset.quantity = String(row.quantity || 1);
+    parent.appendChild(button);
+  }
+
+  function appendStoreOrderFulfillmentAction(parent, row) {
+    if (row.checkInAvailable) {
+      appendStoreOrderCheckInControl(parent, row);
+      return;
+    }
+    appendStoreOrderDownloadAccessControls(parent, row);
   }
 
   function getStoreOrderItemsSummary(order) {
@@ -3375,25 +3423,25 @@
     });
 
     if (actionableRows.length === 1) {
-      var row = actionableRows[0];
-      if (row.checkInAvailable) {
-        var button = createElement('button', 'btn btn--secondary', row.checkedIn ? 'Undo check-in' : 'Check in');
-        button.type = 'button';
-        button.dataset.orderToken = row.orderToken || '';
-        button.dataset.itemId = row.itemId || '';
-        button.dataset.storeOrderAction = 'check-in';
-        button.dataset.checkedIn = row.checkedIn ? 'false' : 'true';
-        button.dataset.quantity = String(row.quantity || 1);
-        parent.appendChild(button);
-        return;
-      }
-      appendStoreOrderDownloadAccessControls(parent, row);
+      appendStoreOrderFulfillmentAction(parent, actionableRows[0]);
       return;
     }
 
-    parent.textContent = actionableRows.length > 1
-      ? String(actionableRows.length) + ' item actions'
-      : 'Not available';
+    if (!actionableRows.length) {
+      parent.textContent = 'Not available';
+      return;
+    }
+
+    var list = createElement('div', 'admin-store-orders__action-list');
+    actionableRows.forEach(function(row) {
+      var item = createElement('div', 'admin-store-orders__action-item');
+      item.appendChild(createElement('span', 'admin-store-orders__action-item-label', getStoreOrderActionItemLabel(row)));
+      var controls = createElement('div', 'admin-store-orders__action-item-controls');
+      appendStoreOrderFulfillmentAction(controls, row);
+      item.appendChild(controls);
+      list.appendChild(item);
+    });
+    parent.appendChild(list);
   }
 
   function renderStoreOrders(data, append) {
@@ -3684,16 +3732,17 @@
         if (!button) return;
         button.disabled = true;
         var action = button.dataset.storeOrderAction || 'check-in';
-        if (action === 'download-expire' || action === 'download-reissue') {
-          var mutationAction = action === 'download-expire' ? 'expire' : 'reissue';
+        if (action === 'download-access') {
+          var mutationAction = String(button.dataset.storeOrderDownloadAction || '');
+          if (!mutationAction) {
+            button.disabled = false;
+            return;
+          }
           var body = {
             orderToken: button.dataset.orderToken,
             itemId: button.dataset.itemId,
             action: mutationAction
           };
-          if (mutationAction === 'reissue') {
-            body.expiresHours = Number(button.dataset.expiresHours || 72) || 72;
-          }
           requestJson('/admin/store/orders/download-access', {
             method: 'POST',
             body: body
@@ -3720,9 +3769,9 @@
           }
         }).then(function() {
           clearStoreOrderCache();
-          setStatus($('#admin-store-orders-status'), 'Check-in saved.');
-          button.textContent = button.dataset.checkedIn === 'true' ? 'Undo check-in' : 'Check in';
-          button.dataset.checkedIn = button.dataset.checkedIn === 'true' ? 'false' : 'true';
+          return loadStoreOrders({ force: true }).then(function() {
+            setStatus($('#admin-store-orders-status'), 'Check-in saved.');
+          });
         }).catch(function(error) {
           setStatus($('#admin-store-orders-status'), formatError(error), true);
         }).finally(function() {

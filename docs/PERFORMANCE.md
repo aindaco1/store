@@ -2,6 +2,14 @@
 
 Store performance depends on static public pages, lazy cart loading, generated media derivatives, compact Worker payloads, and bounded admin reads.
 
+## Release v1.0.4 Audit
+
+- Public pages remain statically rendered and cart runtime loading remains lazy.
+- Store order lookup/admin reads use cached/indexed paths from the current Store mainline.
+- Order Success adds totals and fulfillment details without adding new public bundle dependencies.
+- Generated assets are verified with `npm run assets:minify:check` after build.
+- Formal route-level budgets and Lighthouse automation remain future work in [ROADMAP.md](ROADMAP.md).
+
 ## Public Site
 
 - Product pages are statically rendered by Jekyll.

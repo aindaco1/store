@@ -3665,7 +3665,7 @@
       const cartEstimateMarkup = items.length > 0 ? `
         <div class="store-first-party-cart__tip-box">
           <div class="store-first-party-cart__tip-header">
-            <strong id="store-cart-tip-label">${escapeHtml(getRuntimeMessage('cart.tipLabel', `Tip ${getPlatformCompanyName()} for platform maintenance.`))}</strong>
+            <label id="store-cart-tip-label" class="store-first-party-cart__tip-label" for="store-cart-tip-input">${escapeHtml(getRuntimeMessage('cart.tipLabel', `Tip ${getPlatformCompanyName()} for platform maintenance.`))}</label>
             <span id="store-cart-tip-amount" data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
           </div>
           <p class="store-first-party-cart__tip-copy" id="store-cart-tip-copy">${escapeHtml(getRuntimeMessage('cart.tipCopy', `Optional tips help keep ${getPlatformCompanyName()} doing its thing.`))}</p>
@@ -4660,9 +4660,6 @@
           billing_details: billingDetails
         }
       };
-      if (email) {
-        confirmParams.receipt_email = email;
-      }
 
       return { confirmParams };
     }

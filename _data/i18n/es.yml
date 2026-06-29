@@ -178,8 +178,10 @@ runtime:
     image_gallery: Galería de imágenes
 email:
   subjects:
+    admin_login: Tu enlace de administración
     admin_user_created: Acceso de administración agregado
     store_order_confirmed: Pedido confirmado
+    store_order_admin_notification: Nuevo pedido
     store_order_lookup: Busca tu pedido
     store_abandoned_cart: Termina tu compra
     store_event_reminder: Recordatorio de evento
@@ -197,6 +199,7 @@ email:
     fulfillment_rsvp: RSVP
     fulfillment_service: Servicio
     fulfillment_physical: Artículo físico
+    order_page_label: página del pedido
     download_note: Abre la página del pedido para acceder a tu descarga.
     ticket_note: Abre la página del pedido para ver tu boleto.
     rsvp_note: Tu RSVP está confirmado.
@@ -204,11 +207,18 @@ email:
     quantity_label: Cant.
     items_heading: Artículos
     shipping_heading: Envío
-    heading: Pedido confirmado
+    customer_heading: Cliente
+    customer_email: Correo del cliente
+    customer_name: Nombre del cliente
+    heading: "¡Pedido confirmado! Gracias por apoyar a %{company}."
+    admin_heading: Nuevo pedido recibido
     order_label: Pedido
-    body: Gracias por tu pedido. Tu página de pedido tiene los detalles más recientes de boletos, descargas, envíos y recibos.
-    attachments_note: Los boletos, codigos QR de registro y archivos de calendario se adjuntan cuando estan disponibles.
+    body: Gracias por tu pedido. Usa la página del pedido para descargas, boletos, novedades de envío y recibos.
+    admin_body: Un nuevo pedido de cliente está listo para revisar. Abre la pestaña Pedidos para cumplimiento, descargas, boletos y envíos.
+    attachments_note: Los archivos de calendario se adjuntan cuando están disponibles. Abre la página del pedido para boletos y códigos QR de registro.
     cta: Ver pedido
+    admin_cta: Revisar pedido en administración
+    admin_footer: Enviado a superadministradores de %{platform}.
   store_event_reminder:
     fallback_title: Tu evento
     heading: "%{event} se acerca"
@@ -217,7 +227,7 @@ email:
     when: Cuándo
     where: Dónde
     order: Pedido
-    attachments: La invitacion de calendario y el codigo QR de registro se adjuntan cuando estan disponibles.
+    attachments: La invitación de calendario se adjunta cuando está disponible. Abre la página del pedido para boletos y códigos QR de registro.
     cta: Ver pedido
     footer: Recibes esto porque este correo esta asociado a un pedido de evento o RSVP de %{platform}.
   store_order_lookup:
@@ -246,3 +256,8 @@ email:
     access_heading: Acceso
     created_by: Agregado por %{email}
     footer: ¿No esperabas este acceso? Ignora este correo o contacta a la persona responsable del sitio.
+  admin_login:
+    heading: Inicia sesión en administración
+    body: Este enlace funciona por 15 minutos. Si no lo solicitaste, puedes ignorar este correo.
+    cta: Abrir administración
+    footer: Alguien solicitó acceso al panel de administración con este correo.

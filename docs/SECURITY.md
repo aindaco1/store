@@ -1,5 +1,7 @@
 # Store Security Guide
 
+Release `v1.0.4` security posture: Store-owned order email replaces Stripe receipts, confirmed digital download entitlements are durable unless revoked, signed links remain short-lived/private/no-store, and super-admin order notifications reuse the transactional email pipeline without ticket/QR attachments.
+
 This document covers the active Store security model: static product pages, first-party cart runtime, Cloudflare Worker checkout APIs, Stripe, USPS/NM GRT integrations, Resend email, signed downloads, inventory, and the private admin dashboard.
 
 This guide describes the current Store security model and the launch target. Historical imported compatibility paths should be removed or kept returning `404`; do not preserve old campaign/Snipcart behavior as a security workaround.
@@ -90,10 +92,10 @@ Digital products use private R2 objects and signed fulfillment actions.
 - Admin download uploads/replacements require an authenticated Store admin session.
 - Admin library download create/delete operations require the same fulfillment permission and R2 object validation.
 - Order Success exposes download actions only for confirmed orders and token-scoped fulfillment items.
-- Per-order download access state enforces expiry and admin reissues server-side, so expired access blocks previously issued links.
-- Admin download expiry/reissue mutations require an authenticated Store admin session plus CSRF and write an audit event.
+- Per-order download access state enforces explicit admin revocation server-side, so revoked access blocks previously issued links.
+- Admin download revoke/refresh mutations require an authenticated Store admin session plus CSRF and write an audit event.
 - Order lookup requests return a generic response, email short-lived one-time tokens only when matching orders exist, and consume each token before returning order links.
-- Signed links should be short-lived and private/no-store.
+- Signed links should be short-lived and private/no-store, while confirmed digital entitlements remain permanent unless revoked.
 - Production launch requires real `STORE_DOWNLOADS` objects for all active digital products.
 
 ## Admin Dashboard

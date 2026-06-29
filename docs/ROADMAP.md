@@ -1,8 +1,65 @@
 # Store Roadmap
 
-Store's main code paths are implemented. The roadmap is focused on completing a clean first production launch for `shop.dustwave.xyz` and `checkout.dustwave.xyz`, then keeping future work scoped to operational hardening.
+Store's main product code paths are implemented. This roadmap now tracks the `v1.0.4` release state, the operational work still required for first production launch, and future hardening that should stay DRY with the existing Store docs.
 
-## Done
+## Release v1.0.4 Status
+
+`v1.0.4` is the local release target for the Store launch branch.
+
+Completed in this release:
+
+- Store-owned customer order confirmations through Resend for physical, digital, ticket, RSVP, coupon, shipping, and total-breakdown scenarios.
+- Super-admin order notification emails after paid webhook settlement or free-order confirmation.
+- Stripe receipt email suppression for Store PaymentIntents so customer receipt copy stays in one localized email path.
+- Deliverability-safe event email attachments: calendar invites may be attached; ticket/QR SVGs stay on the token-scoped order page.
+- Durable digital download entitlements for confirmed orders, with short-lived signed links and explicit admin revoke/refresh controls.
+- Admin Orders item-level controls for mixed fulfillment orders instead of inactive "item actions" summary text.
+- Admin Orders attendance refresh after ticket/RSVP check-in mutations.
+- Responsive Order action buttons across desktop, tablet, and mobile.
+- Ticket/RSVP SVG layout fitting for long product and variant names.
+- Order Success totals, shipping, event address, and durable-download copy improvements.
+- Admin status live-region normalization for async actions.
+- i18n completeness checks for supported locale files.
+- Local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment variations.
+
+## Audit Snapshot
+
+The release audit is anchored in these docs:
+
+- [Accessibility](ACCESSIBILITY.md)
+- [I18N](I18N.md)
+- [Security](SECURITY.md)
+- [Podman](PODMAN.md)
+- [SEO](SEO.md)
+- [Testing](TESTING.md)
+- [Performance](PERFORMANCE.md)
+
+Audit status for `v1.0.4`:
+
+- Accessibility: admin status regions, responsive order rows, long-content fixtures, and mobile/tablet order buttons are covered by E2E regression tests. Manual VoiceOver/NVDA launch passes remain a launch task.
+- I18N: email/admin copy additions are mirrored in English and Spanish, and `npm run test:i18n` is the locale completeness gate.
+- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
+- Podman: the documented Podman path remains the fallback and parity path for local Store/Worker smoke and headless E2E.
+- SEO: public SEO remains product/home/terms-focused; private admin, order lookup, Order Success, and tokenized routes remain noindex/excluded.
+- Testing: merge gate remains `npm run test:premerge`, with added focused unit/E2E coverage for this release.
+- Performance: static rendering, lazy cart loading, minified assets, bounded admin reads, and generated catalog snapshots remain the baseline; explicit performance budgets are future work.
+
+## Launch Blockers
+
+These are operational blockers, not known code blockers:
+
+- Upload real production digital download files to `STORE_DOWNLOADS` or configure Worker-only fallback URLs for externally hosted media.
+- Configure production Cloudflare Worker secrets, including dedicated signing secrets where appropriate.
+- Configure Stripe production webhook endpoint and signing secret.
+- Verify USPS and New Mexico GRT behavior against the production origin address.
+- Verify admin coupons, marketing referrals, reminder suppression, order lookup, and download library flows against production.
+- Run a paid physical checkout in Stripe test mode.
+- Run a paid digital checkout and download fulfillment.
+- Run a paid ticket checkout and admin check-in.
+- Run a free RSVP checkout and admin check-in.
+- Run manual VoiceOver and NVDA passes for the documented launch surfaces.
+
+## Done Before v1.0.4
 
 - Static Jekyll storefront with `_products/` catalog.
 - DUST WAVE products migrated into product markdown.
@@ -17,15 +74,13 @@ Store's main code paths are implemented. The roadmap is focused on completing a 
 - Stripe PaymentIntent confirmation flow.
 - Stripe webhook settlement for Store orders.
 - Store SKU inventory reservation/commit/release through Durable Objects.
-- Store order emails through Resend.
 - Order Success page with token-scoped fulfillment actions.
 - Signed digital download flow backed by `STORE_DOWNLOADS` R2.
 - Ticket/RSVP QR/check-in/.ics fulfillment actions.
-- Admin dashboard Store tabs for orders, products, downloads, and inventory.
+- Admin dashboard Store tabs for orders, products, downloads, coupons, analytics, marketing, and inventory through product controls.
 - Admin product edit/publish and product image uploads.
 - Admin inventory baselines.
 - Admin download readiness and upload/replace flow.
-- Admin digital download expiry/reissue controls.
 - Admin Store order CSV export and ticket/RSVP check-in.
 - Admin attendee search and ticket/RSVP attendee CSV export.
 - Store-focused default Playwright scope.
@@ -54,67 +109,54 @@ Store's main code paths are implemented. The roadmap is focused on completing a 
 - Multilingual product page URL/content model with generated language-prefixed product pages.
 - Production launch readiness CLI for repo-visible URLs, Worker config, admin bootstrap users, inventory baselines, downloads, and manual smoke checks.
 
-## Launch Blockers
+## Future Work
 
-- Upload real production digital download files to `STORE_DOWNLOADS` or configure Worker-only fallback URLs for externally hosted media.
-- Configure production Cloudflare Worker secrets, including dedicated signing secrets where appropriate.
-- Configure Stripe production webhook endpoint and signing secret.
-- Verify USPS and New Mexico GRT behavior against the production origin address.
-- Verify admin coupons, marketing referrals, reminder suppression, order lookup, and download library flows against production.
-- Run a full paid physical checkout in Stripe test mode.
-- Run a full paid digital checkout and download fulfillment.
-- Run a paid ticket checkout and admin check-in.
-- Run a free RSVP checkout and admin check-in.
-
-## Near-Term Cleanup
-
-- None before first production launch.
-
-## Product Roadmap
-
-- None before first production launch.
-
-## Cross-Cutting Roadmap
-
-These features are not separate product surfaces. They should land as part of normal Store hardening and be kept DRY with the existing docs:
-
-- [Performance](PERFORMANCE.md)
-- [Security](SECURITY.md)
-- [Accessibility](ACCESSIBILITY.md)
-- [I18N](I18N.md)
+Keep these scoped to operational hardening. Do not create duplicate systems when existing Store docs, email rendering, admin controls, and Worker observability can be extended.
 
 ### Performance
 
-- Add a lightweight performance budget for storefront, cart, checkout, and admin routes, with tracked limits for JavaScript size, CSS size, image weight, and Worker response time.
-- Add a repeatable Lighthouse/PageSpeed check for core public routes before production deploys.
-- Surface basic Worker timing percentiles in admin Plan Usage or a dedicated diagnostics view, using existing performance observation data.
-- Expand media optimization reporting so product image uploads clearly show original size, generated derivative size, and expected storefront dimensions.
-- Add cache-status checks for static assets, catalog JSON, and private/no-store routes to catch accidental caching regressions.
+- Add lightweight performance budgets for storefront, cart, checkout, and admin routes, including JavaScript size, CSS size, image weight, and Worker response time.
+- Add repeatable Lighthouse/PageSpeed checks for core public routes before production deploys.
+- Surface Worker timing percentiles in admin Plan Usage or diagnostics using existing performance observation data.
+- Expand media optimization reporting so uploads show original size, derivative size, and expected storefront dimensions.
+- Add cache-status checks for static assets, catalog JSON, and private/no-store routes.
 
 ### Security
 
 - Expand Store readiness so it mirrors the full security guide: secrets, webhook signatures, R2, CSP, admin users, Turnstile, production mode, coupons, reminders, and lookup token posture.
 - Add an admin session/device review screen with recent login metadata and explicit session revocation.
 - Expand audit events into a searchable admin audit view, not just CSV export.
-- Add signed-download abuse controls: per-order attempt counts, soft lockouts, and clearer admin reissue history.
+- Add signed-download abuse controls: per-order attempt counts, soft lockouts, and clearer admin refresh/revocation history.
 - Add scheduled secret/config posture checks that warn when production-required secrets, webhook endpoints, or allowed origins drift.
 
 ### Accessibility
 
-- Add an admin accessibility smoke-test checklist for keyboard, screen reader, reduced motion, focus order, and mobile overflow.
-- Add visible status summaries for async admin actions that are consistently announced to assistive technology.
-- Expand automated axe coverage to checkout, cart, order lookup, Order Success, product editing, and download creation.
-- Add regression fixtures for large text, long product names, long filenames, and high-zoom/tablet admin layouts.
-- Add a documented manual QA pass for VoiceOver and NVDA before launch.
+- Add the documented manual VoiceOver and NVDA launch pass to release procedure artifacts.
+- Expand automated axe coverage to the mounted checkout/payment surface when Stripe test fixtures are available locally.
+- Add high-zoom screenshots for cart, checkout, Order Success, product editing, and admin order controls.
+- Keep long product names, long filenames, and tablet/mobile admin rows in regression fixtures.
 
 ### I18N
 
-- Move remaining hardcoded public/admin runtime strings into `_data/i18n/*` and runtime message JSON.
-- Add localization coverage for download creation, product editing, order lookup, checkout errors, and fulfillment status copy.
-- Add a translation completeness check that compares every supported locale against English keys.
-- Add localized email template coverage for receipts, order lookup, digital downloads, tickets, RSVPs, and admin auth.
+- Move any remaining hardcoded public/admin runtime strings into `_data/i18n/*` and runtime message JSON as they are touched.
+- Add localized QA snapshots for download creation, product editing, order lookup, checkout errors, and fulfillment status copy.
 - Add localized product metadata QA for canonical URLs, alternate links, JSON-LD `availableLanguage`, and language switcher behavior.
+- Define a translator/native-speaker review loop before adding locales beyond English and Spanish.
 
-## Operational Roadmap
+### Podman
 
-- None before first production launch.
+- Keep Podman smoke coverage aligned with the host merge gate.
+- Add a short troubleshooting checklist for stale `gvproxy`, port conflicts, and first-run image rebuilds if those recur.
+- Consider making the Podman E2E path a scheduled CI job after launch.
+
+### SEO
+
+- Add a release checklist item that samples rendered canonical, alternate, Open Graph, and Product JSON-LD tags for active products.
+- Add regression coverage that private routes remain excluded from sitemap and robots.
+- Review localized product metadata after real translated product copy is added.
+
+### Testing
+
+- Keep `npm run test:premerge` as the local merge gate.
+- Add a dedicated release smoke script for paid physical, paid digital, paid ticket, and free RSVP flows once production test credentials are available.
+- Track manual launch smoke evidence for emails, downloads, check-in, lookup links, reminders, and CSV exports.
