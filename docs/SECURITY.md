@@ -1,6 +1,6 @@
 # Store Security Guide
 
-Release `v1.0.4` security posture: Store-owned order email replaces Stripe receipts, confirmed digital download entitlements are durable unless revoked, signed links remain short-lived/private/no-store, and super-admin order notifications reuse the transactional email pipeline without ticket/QR attachments.
+Release `v1.0.4` security posture: Store-owned order email replaces Stripe receipts, confirmed digital download entitlements are durable unless revoked, signed links remain short-lived/private/no-store, super-admin order notifications reuse the transactional email pipeline without ticket/QR attachments, and admin dashboard navigation persistence stores only sanitized non-sensitive tab state in browser storage.
 
 This document covers the active Store security model: static product pages, first-party cart runtime, Cloudflare Worker checkout APIs, Stripe, USPS/NM GRT integrations, Resend email, signed downloads, inventory, and the private admin dashboard.
 
@@ -60,6 +60,12 @@ Secret storage rules:
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
 
+Browser storage:
+
+- `store-admin-dashboard-state:v1` may persist the last selected admin tab and Settings section index in `localStorage`.
+- The stored values are sanitized client-side, contain no customer/order/session/CSRF data, and are ignored when a requested tab is not visible for the authenticated admin role.
+- Explicit `tab=` deep links, including authenticated super-admin order notification links, take precedence over the stored tab.
+
 ## Checkout And Cart Integrity
 
 The browser cart is convenience state only. The Worker recalculates and validates:
@@ -113,6 +119,7 @@ Required protections:
 - no inline scripts in the static admin shell
 - restrictive admin CSP and no public social/structured metadata
 - runtime admin users stored in KV, not `_config.yml`
+- local dashboard navigation persistence limited to non-sensitive tab identifiers
 
 Limited admins should see only the Store surfaces allowed by their access scopes. Super admins retain settings and user-management access.
 

@@ -2677,6 +2677,38 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
   });
 
+  test('restores the last admin tab and settings section after an authenticated reload', async ({ page }) => {
+    await routeAdminWorker(page);
+
+    await page.goto('/admin/?admin_login=persist-token-orders');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Orders');
+    await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('store-admin-dashboard-state:v1') || '{}').tab)).toBe('store-orders');
+
+    await page.goto('/admin/?admin_login=persist-token-orders-refresh');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect(page.locator('#admin-tab-store-orders')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
+
+    await selectAdminSection(page, 'Settings');
+    await selectSettingsSection(page, 'Shipping');
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('store-admin-dashboard-state:v1') || '{}'))).toMatchObject({
+      tab: 'settings',
+      settingsSection: expect.any(Number)
+    });
+
+    await page.goto('/admin/?admin_login=persist-token-settings-refresh');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect(page.locator('#admin-tab-settings')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#admin-settings-section-tabs [data-settings-section-label="Shipping"]')).toHaveAttribute('aria-selected', 'true');
+
+    await page.goto('/admin/?admin_login=persist-token-products&tab=store-products');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await expect(page.locator('#admin-tab-store-products')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#admin-panel-store-products')).toBeVisible();
+  });
+
   test('keeps Spanish admin tabs compact on tablet viewports', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     await page.setViewportSize({ width: 912, height: 1368 });

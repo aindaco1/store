@@ -28,7 +28,9 @@
   var currentUser = null;
   var settingsSections = [];
   var marketingSettingsSection = null;
-  var currentSettingsSection = 0;
+  var adminDashboardStateStorageKey = 'store-admin-dashboard-state:v1';
+  var adminDashboardState = readAdminDashboardState();
+  var currentSettingsSection = normalizedSettingsSectionIndex(adminDashboardState.settingsSection);
   var settingsLoaded = false;
   var storeAnalyticsLoaded = false;
   var storeOrdersLoaded = false;
@@ -177,6 +179,43 @@
 
   function $all(selector, root) {
     return Array.prototype.slice.call((root || document).querySelectorAll(selector));
+  }
+
+  function sanitizedAdminStateValue(value) {
+    var text = String(value || '').trim();
+    return /^[A-Za-z0-9_-]+$/.test(text) ? text : '';
+  }
+
+  function normalizedSettingsSectionIndex(value) {
+    var text = String(value ?? '').trim();
+    if (!/^\d+$/.test(text)) return 0;
+    return Math.max(0, Number(text) || 0);
+  }
+
+  function normalizedAdminDashboardState(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    return {
+      tab: sanitizedAdminStateValue(value.tab),
+      settingsSection: normalizedSettingsSectionIndex(value.settingsSection)
+    };
+  }
+
+  function readAdminDashboardState() {
+    try {
+      return normalizedAdminDashboardState(JSON.parse(localStorage.getItem(adminDashboardStateStorageKey) || '{}'));
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  function writeAdminDashboardState(patch) {
+    adminDashboardState = Object.assign({}, normalizedAdminDashboardState(Object.assign({}, adminDashboardState, patch || {})), {
+      updatedAt: new Date().toISOString()
+    });
+    try {
+      localStorage.setItem(adminDashboardStateStorageKey, JSON.stringify(adminDashboardState));
+    } catch (_error) {
+    }
   }
 
   function normalizeBase(value) {
@@ -733,7 +772,15 @@
     return allowed.indexOf(requested) === -1 ? '' : requested;
   }
 
-  function selectAdminTab(key) {
+  function restoredAdminTabForUser(user) {
+    var key = sanitizedAdminStateValue(adminDashboardState.tab);
+    if (!key) return '';
+    if (user && user.role !== 'super_admin' && key === 'settings') return '';
+    var target = $('[data-admin-tab="' + key + '"]');
+    return target && !target.hidden ? key : '';
+  }
+
+  function selectAdminTab(key, options) {
     var tabList = $('[data-admin-tabs] > .admin-tabs__list');
     var target = $('[data-admin-tab="' + key + '"]');
     if (!target || target.hidden) {
@@ -759,6 +806,7 @@
     if (key === 'store-products' && !storeProductsLoaded) loadStoreProducts();
     if (key === 'store-coupons' && !storeCouponsLoaded) loadStoreCoupons();
     if (key === 'store-downloads' && !storeDownloadsLoaded) loadStoreDownloads();
+    if (key && (!options || options.persist !== false)) writeAdminDashboardState({ tab: key });
   }
 
   function configureTabsForRole(user) {
@@ -770,7 +818,7 @@
       if (panel && !isSuperAdmin) panel.hidden = true;
     });
     setupAdminTabs();
-    selectAdminTab(getRequestedAdminTab() || (isSuperAdmin ? 'settings' : 'store-orders'));
+    selectAdminTab(getRequestedAdminTab() || restoredAdminTabForUser(user) || (isSuperAdmin ? 'settings' : 'store-orders'));
   }
 
   function showAuth(message) {
@@ -921,8 +969,9 @@
     return output;
   }
 
-  function selectSettingsSection(index) {
-    currentSettingsSection = Math.max(0, Number(index) || 0);
+  function selectSettingsSection(index, options) {
+    var lastIndex = Math.max(0, settingsSections.length - 1);
+    currentSettingsSection = Math.min(Math.max(0, Number(index) || 0), lastIndex);
     var tabList = $('#admin-settings-section-tabs');
     $all('[data-settings-section-index]', tabList).forEach(function(tab) {
       var selected = Number(tab.dataset.settingsSectionIndex) === currentSettingsSection;
@@ -933,6 +982,7 @@
       selectSettingsSection(Number(value));
     });
     renderSettingsSection(settingsSections[currentSettingsSection]);
+    if (!options || options.persist !== false) writeAdminDashboardState({ settingsSection: currentSettingsSection });
   }
 
   function renderSettingsTabs() {

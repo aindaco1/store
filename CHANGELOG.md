@@ -9,6 +9,7 @@
 - Updated event email deliverability behavior so calendar invites may be attached while ticket and check-in QR SVGs stay on the token-scoped order page.
 - Changed digital download access from expiring entitlement windows to durable customer entitlements with short-lived signed links and explicit admin revoke/refresh controls.
 - Updated the admin Orders UI to show item-level actions for mixed fulfillment orders, refresh attendance totals after check-in changes, and keep action buttons responsive across desktop, tablet, and mobile.
+- Added admin dashboard navigation persistence so authenticated reloads restore the last selected top-level tab and Settings section while explicit `tab=` deep links still take precedence.
 - Improved Order Success with line-item totals, shipping details, event addresses, and durable-download copy.
 - Improved ticket/RSVP SVG generation so long product and variant names fit within the ticket layout.
 - Added an all-variation local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment states for manual testing.

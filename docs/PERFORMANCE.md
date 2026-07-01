@@ -7,6 +7,7 @@ Store performance depends on static public pages, lazy cart loading, generated m
 - Public pages remain statically rendered and cart runtime loading remains lazy.
 - Store order lookup/admin reads use cached/indexed paths from the current Store mainline.
 - Order Success adds totals and fulfillment details without adding new public bundle dependencies.
+- Admin dashboard tab restoration reads and writes one small sanitized `localStorage` object only when an admin tab or Settings section changes; it does not add network calls or polling.
 - Generated assets are verified with `npm run assets:minify:check` after build.
 - Formal route-level budgets and Lighthouse automation remain future work in [ROADMAP.md](ROADMAP.md).
 

@@ -20,6 +20,8 @@ Top-level tabs appear in this order:
 
 There are no standalone Add-ons, Inventory, or Health tabs. Add-on settings live in Settings -> Platform, inventory is managed in Products, and launch/usage checks live in Settings -> Store readiness and Settings -> Plan usage.
 
+The dashboard remembers the last selected top-level tab and Settings section in `localStorage` under `store-admin-dashboard-state:v1`. The stored state contains only sanitized navigation identifiers, is ignored when a tab is not visible for the authenticated role, and never overrides explicit `tab=` links such as order-notification deep links.
+
 ## Authentication And Roles
 
 Admins sign in by email magic link. The browser receives:

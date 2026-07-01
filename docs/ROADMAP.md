@@ -18,6 +18,7 @@ Completed in this release:
 - Admin Orders item-level controls for mixed fulfillment orders instead of inactive "item actions" summary text.
 - Admin Orders attendance refresh after ticket/RSVP check-in mutations.
 - Responsive Order action buttons across desktop, tablet, and mobile.
+- Admin dashboard navigation persistence for the last selected top-level tab and Settings subtab after authenticated reloads.
 - Ticket/RSVP SVG layout fitting for long product and variant names.
 - Order Success totals, shipping, event address, and durable-download copy improvements.
 - Admin status live-region normalization for async actions.
@@ -41,11 +42,11 @@ Audit status for `v1.0.4`:
 
 - Accessibility: admin status regions, responsive order rows, long-content fixtures, mobile/tablet order buttons, and authenticated order-notification entry into the existing admin tab flow are covered by automated regression paths. Manual VoiceOver/NVDA launch passes remain a launch task.
 - I18N: email/admin copy additions are mirrored in English and Spanish, the authenticated order CTA reuses existing localized admin notification copy, and `npm run test:i18n` is the locale completeness gate.
-- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, one-time super-admin order CTAs, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
+- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, one-time super-admin order CTAs, non-sensitive sanitized admin navigation persistence, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
 - Podman: the documented Podman path remains the fallback and parity path for local Store/Worker smoke and headless E2E; the current macOS rootless Podman doctor pass is clean.
 - SEO: public SEO remains product/home/terms-focused; private admin, order lookup, Order Success, tokenized routes, test configs, and optimizer temp artifacts remain noindex/excluded or outside `_site`.
-- Testing: merge gate remains `npm run test:premerge`, with added focused unit coverage for authenticated order links, reconciliation CSV payment checks, and ESM Vitest config entrypoints.
-- Performance: static rendering, lazy cart loading, minified assets, bounded admin reads, generated catalog snapshots, and media optimizer checks remain the baseline; explicit performance budgets are future work.
+- Testing: merge gate remains `npm run test:premerge`, with added focused unit/E2E coverage for authenticated order links, reconciliation CSV payment checks, admin tab/subtab restoration, and ESM Vitest config entrypoints.
+- Performance: static rendering, lazy cart loading, minified assets, bounded admin reads, generated catalog snapshots, media optimizer checks, and a tiny local-only dashboard state read/write remain the baseline; explicit performance budgets are future work.
 
 ## Launch Blockers
 
