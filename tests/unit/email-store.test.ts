@@ -135,6 +135,7 @@ describe('Store email integration', () => {
     await expect(sendStoreOrderAdminNotificationEmail(env, {
       email: 'admin@example.com',
       orderToken: 'store-order-demo123',
+      adminUrl: 'https://shop.test/admin/?admin_login=magic-token&tab=store-orders',
       orderDraft: {
         orderToken: 'store-order-demo123',
         preferredLang: 'en',
@@ -163,7 +164,7 @@ describe('Store email integration', () => {
     expect(payload.html).toContain('customer@example.com');
     expect(payload.html).toContain('Ada Buyer');
     expect(payload.html).toContain('Review order in admin');
-    expect(payload.html).toContain('https://shop.test/admin/?tab=store-orders');
+    expect(payload.html).toContain('https://shop.test/admin/?admin_login=magic-token&amp;tab=store-orders');
     expect(payload.html).not.toContain('Calendar files are attached');
     expect(payload).not.toHaveProperty('attachments');
   });

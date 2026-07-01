@@ -560,12 +560,15 @@ function buildStoreOrderEmailHtml({
   orderDraft = {},
   payment = {},
   attachments = [],
-  recipientType = 'customer'
+  recipientType = 'customer',
+  adminUrl = ''
 } = {}) {
   const isAdminNotification = recipientType === 'admin';
   const orderId = safeEmailHeaderText(orderToken || orderDraft.orderToken || '');
   const orderUrl = safeSiteUrl(`${getLocalizedPath('/order-success/', lang)}?orderToken=${encodeURIComponent(orderId)}`, theme.siteBase);
-  const adminUrl = safeSiteUrl(`${getLocalizedPath('/admin/', lang)}?tab=store-orders`, theme.siteBase);
+  const defaultAdminUrl = safeSiteUrl(`${getLocalizedPath('/admin/', lang)}?tab=store-orders`, theme.siteBase);
+  const providedAdminUrl = adminUrl ? safeSiteUrl(adminUrl, theme.siteBase) : '';
+  const adminCtaUrl = providedAdminUrl && providedAdminUrl !== theme.siteBase ? providedAdminUrl : defaultAdminUrl;
   const totals = orderDraft.totals || {};
   const orderPageLabel = t('store_order.order_page_label', 'order page');
   const itemsHtml = renderStoreOrderItems(orderDraft.items || [], t, theme, { orderUrl, orderPageLabel });
@@ -612,7 +615,7 @@ function buildStoreOrderEmailHtml({
   const cta = isAdminNotification
     ? t('store_order.admin_cta', 'Review order in admin')
     : t('store_order.cta', 'View order');
-  const ctaUrl = isAdminNotification ? adminUrl : orderUrl;
+  const ctaUrl = isAdminNotification ? adminCtaUrl : orderUrl;
   const footer = isAdminNotification
     ? t('store_order.admin_footer', 'Sent to super admins for %{platform}.', { platform: theme.platformName })
     : `${escapeHtml(t('common.questions_prefix', 'Questions? Reply to this email or visit'))} <a href="${escapeHtml(theme.siteHomeUrl)}" style="color: ${theme.primaryColor};">${escapeHtml(theme.platformName)}</a>.`;
@@ -663,7 +666,7 @@ function buildStoreOrderEmailHtml({
   };
 }
 
-async function buildStoreOrderEmailMessage(env, { orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [], recipientType = 'customer' } = {}) {
+async function buildStoreOrderEmailMessage(env, { orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [], recipientType = 'customer', adminUrl = '' } = {}) {
   const { t, lang } = await getEmailTranslator(env, preferredLang || orderDraft.preferredLang);
   const theme = getEmailTheme(env);
   const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
@@ -675,7 +678,8 @@ async function buildStoreOrderEmailMessage(env, { orderToken, orderDraft = {}, p
     orderDraft,
     payment,
     attachments,
-    recipientType
+    recipientType,
+    adminUrl
   });
   const subjectKey = recipientType === 'admin'
     ? 'subjects.store_order_admin_notification'
@@ -715,7 +719,7 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
   return { sent: true };
 }
 
-export async function sendStoreOrderAdminNotificationEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang } = {}) {
+export async function sendStoreOrderAdminNotificationEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang, adminUrl = '' } = {}) {
   configureEmailLogging(env);
   if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
 
@@ -725,7 +729,8 @@ export async function sendStoreOrderAdminNotificationEmail(env, { email, orderTo
     payment,
     preferredLang,
     attachments: [],
-    recipientType: 'admin'
+    recipientType: 'admin',
+    adminUrl
   });
 
   await sendResendEmail(env, {

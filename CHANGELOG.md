@@ -4,6 +4,8 @@
 
 - Added Store-owned customer order confirmation emails for physical, digital, ticket, RSVP, coupon, shipping, and total-breakdown scenarios, and stopped requesting Stripe receipt emails for Store PaymentIntents.
 - Added super-admin order notification emails after paid webhook settlement or free-order confirmation, using the shared transactional email renderer without ticket/QR attachments.
+- Added authenticated super-admin order notification CTAs that mint a short-lived one-time admin login link directly into the Orders tab, avoiding a second sign-in email when reviewing a new order.
+- Expanded Store order reconciliation diagnostics with Stripe charge, balance transaction, and card verification outcome fields so issuer/CVC mismatches can be reviewed from exported order data.
 - Updated event email deliverability behavior so calendar invites may be attached while ticket and check-in QR SVGs stay on the token-scoped order page.
 - Changed digital download access from expiring entitlement windows to durable customer entitlements with short-lived signed links and explicit admin revoke/refresh controls.
 - Updated the admin Orders UI to show item-level actions for mixed fulfillment orders, refresh attendance totals after check-in changes, and keep action buttons responsive across desktop, tablet, and mobile.
@@ -11,6 +13,7 @@
 - Improved ticket/RSVP SVG generation so long product and variant names fit within the ticket layout.
 - Added an all-variation local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment states for manual testing.
 - Added i18n completeness checks and localized email/admin copy coverage for the new transactional paths.
+- Moved Vitest config entrypoints to ESM `.mts`, updated security test scripts to avoid Vite's CommonJS API deprecation path, and excluded test configs plus optimizer temp artifacts from static Jekyll output.
 - Updated accessibility, i18n, security, digital download, email, dashboard, testing, performance, Podman, SEO, and roadmap documentation for the release audit.
 
 ## v1.0.3 - 2026-06-26

@@ -80,6 +80,7 @@ import {
 } from './timezone.js';
 import {
   adminCorsResponse,
+  createAdminLoginUrl,
   getEffectiveAdminUsers,
   handleAdminAuthExchange,
   handleAdminAuthStart,
@@ -1227,6 +1228,30 @@ function getStripeBalanceTransaction(charge = {}) {
   return balanceTransaction && typeof balanceTransaction === 'object' ? balanceTransaction : null;
 }
 
+function normalizeStripeCheckResult(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ['pass', 'fail', 'unavailable', 'unchecked'].includes(normalized) ? normalized : '';
+}
+
+function extractStripePaymentIntentCardChecks(paymentIntent = {}) {
+  const charge = getStripePaymentIntentCharge(paymentIntent);
+  const card = charge?.payment_method_details?.card;
+  if (!card || typeof card !== 'object') return null;
+
+  const checks = card.checks && typeof card.checks === 'object' ? card.checks : {};
+  const outcome = charge.outcome && typeof charge.outcome === 'object' ? charge.outcome : {};
+  const result = {
+    addressLine1Check: normalizeStripeCheckResult(checks.address_line1_check),
+    addressPostalCodeCheck: normalizeStripeCheckResult(checks.address_postal_code_check),
+    cvcCheck: normalizeStripeCheckResult(checks.cvc_check),
+    networkStatus: String(outcome.network_status || '').trim(),
+    riskLevel: String(outcome.risk_level || '').trim(),
+    outcomeType: String(outcome.type || '').trim()
+  };
+
+  return Object.values(result).some(Boolean) ? result : null;
+}
+
 function extractStripePaymentIntentFinancials(paymentIntent = {}) {
   const paymentIntentId = stripeObjectId(paymentIntent);
   const charge = getStripePaymentIntentCharge(paymentIntent);
@@ -1264,6 +1289,35 @@ async function retrieveStripePaymentIntentFinancials(stripe, paymentIntentId) {
     expand: STRIPE_FINANCIAL_EXPAND
   });
   return extractStripePaymentIntentFinancials(paymentIntent);
+}
+
+async function retrieveStripePaymentIntentForSettlement(stripe, paymentIntentId) {
+  if (!stripe?.paymentIntents?.retrieve || !paymentIntentId) return null;
+  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+    expand: STRIPE_FINANCIAL_EXPAND
+  });
+  if (paymentIntent?.error || stripeObjectId(paymentIntent) !== paymentIntentId) return null;
+  return paymentIntent;
+}
+
+async function enrichStripePaymentIntentForSettlement(paymentIntent = {}, env = {}) {
+  const paymentIntentId = stripeObjectId(paymentIntent);
+  if (!paymentIntentId) return paymentIntent;
+
+  const existingFinancials = extractStripePaymentIntentFinancials(paymentIntent);
+  const existingChecks = extractStripePaymentIntentCardChecks(paymentIntent);
+  if (existingFinancials?.source === 'actual' && existingChecks) return paymentIntent;
+
+  const stripeSecretKey = getStripeKey(env);
+  if (!stripeSecretKey) return paymentIntent;
+
+  try {
+    const enriched = await retrieveStripePaymentIntentForSettlement(createStripeClient(stripeSecretKey), paymentIntentId);
+    return enriched || paymentIntent;
+  } catch (error) {
+    console.error('Stripe Store PaymentIntent enrichment failed:', stripeErrorLogContext(error));
+    return paymentIntent;
+  }
 }
 
 function allocateIntegerTotal(totalCents, items = []) {
@@ -2447,6 +2501,19 @@ async function buildStoreOrderAdminNotificationPayloads(env, storedOrder = {}) {
   }));
 }
 
+async function buildAuthenticatedStoreOrderAdminNotificationPayload(env, payload = {}) {
+  const adminUrl = await createAdminLoginUrl(env, {
+    email: payload.email,
+    preferredLang: payload.preferredLang || DEFAULT_I18N_LANG,
+    params: { tab: 'store-orders' },
+    source: 'store_order_admin_notification'
+  });
+  if (!adminUrl) {
+    throw new Error('Authenticated admin order link could not be created');
+  }
+  return { ...payload, adminUrl };
+}
+
 async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {}) {
   const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
   if (!env?.RESEND_API_KEY) {
@@ -2474,7 +2541,8 @@ async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {})
     }
 
     try {
-      const result = await sendStoreOrderAdminNotificationEmail(env, payload);
+      const authenticatedPayload = await buildAuthenticatedStoreOrderAdminNotificationPayload(env, payload);
+      const result = await sendStoreOrderAdminNotificationEmail(env, authenticatedPayload);
       if (result?.sent === false) {
         throw new Error(result.reason || 'Store order admin notification was not sent');
       }
@@ -5853,6 +5921,20 @@ function normalizeAdminStoreOrderAttribution(value = {}) {
   };
 }
 
+function normalizeAdminStorePaymentCardChecks(payment = {}) {
+  const source = payment.cardChecks && typeof payment.cardChecks === 'object'
+    ? payment.cardChecks
+    : {};
+  return {
+    addressLine1Check: String(source.addressLine1Check || source.address_line1_check || '').trim(),
+    addressPostalCodeCheck: String(source.addressPostalCodeCheck || source.address_postal_code_check || '').trim(),
+    cvcCheck: String(source.cvcCheck || source.cvc_check || '').trim(),
+    networkStatus: String(source.networkStatus || source.network_status || '').trim(),
+    riskLevel: String(source.riskLevel || source.risk_level || '').trim(),
+    outcomeType: String(source.outcomeType || source.outcome_type || '').trim()
+  };
+}
+
 function buildAdminStoreOrderRecord(storedOrder = {}) {
   const orderDraft = storedOrder.orderDraft || {};
   const attribution = normalizeAdminStoreOrderAttribution(orderDraft.attribution || storedOrder.attribution || {});
@@ -5895,7 +5977,8 @@ function buildAdminStoreOrderRecord(storedOrder = {}) {
       currency: storedOrder.payment?.currency || currency,
       paymentIntentId: storedOrder.payment?.paymentIntentId || storedOrder.stripePaymentIntentId || '',
       chargeId: storedOrder.payment?.chargeId || storedOrder.stripeChargeId || '',
-      balanceTransactionId: storedOrder.payment?.balanceTransactionId || storedOrder.stripeBalanceTransactionId || ''
+      balanceTransactionId: storedOrder.payment?.balanceTransactionId || storedOrder.stripeBalanceTransactionId || '',
+      cardChecks: normalizeAdminStorePaymentCardChecks(storedOrder.payment || {})
     },
     shipping: {
       required: orderDraft.fulfillment?.requiresShipping === true || orderDraft.totals?.requiresShipping === true,
@@ -9746,6 +9829,12 @@ function storeOrderReconciliationRowsCsv(orders = []) {
     'payment_intent_id',
     'charge_id',
     'balance_transaction_id',
+    'card_address_line1_check',
+    'card_address_postal_code_check',
+    'card_cvc_check',
+    'card_network_status',
+    'card_risk_level',
+    'card_outcome_type',
     'email_sent',
     'fulfillment_types',
     'physical_quantity',
@@ -9782,6 +9871,12 @@ function storeOrderReconciliationRowsCsv(orders = []) {
       payment.paymentIntentId,
       payment.chargeId,
       payment.balanceTransactionId,
+      payment.cardChecks?.addressLine1Check || '',
+      payment.cardChecks?.addressPostalCodeCheck || '',
+      payment.cardChecks?.cvcCheck || '',
+      payment.cardChecks?.networkStatus || '',
+      payment.cardChecks?.riskLevel || '',
+      payment.cardChecks?.outcomeType || '',
       order.emailSent ? 'yes' : 'no',
       Array.isArray(order.fulfillmentTypes) ? order.fulfillmentTypes.join('|') : '',
       order.counts?.physicalItems || 0,
@@ -10765,6 +10860,7 @@ function validateStorePaymentIntentForOrder(paymentIntent = {}, storedOrder = {}
 
 function buildStorePaymentSnapshot(storedOrder = {}, paymentIntent = {}, status, settledAt) {
   const financials = extractStripePaymentIntentFinancials(paymentIntent);
+  const cardChecks = extractStripePaymentIntentCardChecks(paymentIntent);
   const payment = {
     ...(storedOrder.payment || {}),
     required: true,
@@ -10789,6 +10885,9 @@ function buildStorePaymentSnapshot(storedOrder = {}, paymentIntent = {}, status,
     payment.stripeFinancials = financials;
     if (financials.chargeId) payment.chargeId = financials.chargeId;
     if (financials.balanceTransactionId) payment.balanceTransactionId = financials.balanceTransactionId;
+  }
+  if (cardChecks) {
+    payment.cardChecks = cardChecks;
   }
 
   return {
@@ -10827,8 +10926,9 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
     );
   }
 
-  const snapshot = buildStorePaymentSnapshot(loaded.storedOrder, paymentIntent, 'succeeded', confirmedAt);
-  const paymentCustomer = extractStorePaymentIntentCustomer(paymentIntent);
+  const settlementPaymentIntent = await enrichStripePaymentIntentForSettlement(paymentIntent, env);
+  const snapshot = buildStorePaymentSnapshot(loaded.storedOrder, settlementPaymentIntent, 'succeeded', confirmedAt);
+  const paymentCustomer = extractStorePaymentIntentCustomer(settlementPaymentIntent);
   const updatedOrder = {
     ...loaded.storedOrder,
     status: STORE_ORDER_STATUS_CONFIRMED,
@@ -10897,7 +10997,8 @@ async function failStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
     'failed Store payment inventory reservation',
     loaded.storedOrder.inventoryReservation
   );
-  const snapshot = buildStorePaymentSnapshot(loaded.storedOrder, paymentIntent, 'payment_failed', failedAt);
+  const settlementPaymentIntent = await enrichStripePaymentIntentForSettlement(paymentIntent, env);
+  const snapshot = buildStorePaymentSnapshot(loaded.storedOrder, settlementPaymentIntent, 'payment_failed', failedAt);
   const updatedOrder = {
     ...loaded.storedOrder,
     status: STORE_ORDER_STATUS_PAYMENT_FAILED,
@@ -14452,6 +14553,7 @@ export {
   buildStoreOrderAdminNotificationPayloads,
   buildStoreOrderEmailPayload,
   buildStoreOrderEventEmailAttachments,
+  storeOrderReconciliationRowsCsv,
   processStoreEventReminders,
   queueStoreEventReminders
 };

@@ -20,6 +20,7 @@ Sent to effective `super_admin` users after a new Store order is confirmed.
 - Paid orders notify admins after Stripe confirms the PaymentIntent through webhook settlement.
 - Limited Store admins do not receive this notification automatically.
 - Notifications use the existing Store order email renderer without ticket/calendar/QR attachments, keeping the admin message lightweight and transactional.
+- The admin CTA includes a short-lived one-time `admin_login` link for the Orders tab so super admins can open the order without requesting a second sign-in email.
 
 ### Admin Access
 

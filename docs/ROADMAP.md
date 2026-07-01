@@ -10,7 +10,9 @@ Completed in this release:
 
 - Store-owned customer order confirmations through Resend for physical, digital, ticket, RSVP, coupon, shipping, and total-breakdown scenarios.
 - Super-admin order notification emails after paid webhook settlement or free-order confirmation.
+- Authenticated super-admin order notification CTAs that reuse the one-time admin login flow and open the Orders tab directly.
 - Stripe receipt email suppression for Store PaymentIntents so customer receipt copy stays in one localized email path.
+- Stripe reconciliation diagnostics for charge IDs, balance transactions, and card verification outcomes.
 - Deliverability-safe event email attachments: calendar invites may be attached; ticket/QR SVGs stay on the token-scoped order page.
 - Durable digital download entitlements for confirmed orders, with short-lived signed links and explicit admin revoke/refresh controls.
 - Admin Orders item-level controls for mixed fulfillment orders instead of inactive "item actions" summary text.
@@ -20,6 +22,7 @@ Completed in this release:
 - Order Success totals, shipping, event address, and durable-download copy improvements.
 - Admin status live-region normalization for async actions.
 - i18n completeness checks for supported locale files.
+- ESM Vitest config entrypoints for unit/security runs, with static-build excludes for test configs and media optimizer temp candidates.
 - Local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment variations.
 
 ## Audit Snapshot
@@ -36,13 +39,13 @@ The release audit is anchored in these docs:
 
 Audit status for `v1.0.4`:
 
-- Accessibility: admin status regions, responsive order rows, long-content fixtures, and mobile/tablet order buttons are covered by E2E regression tests. Manual VoiceOver/NVDA launch passes remain a launch task.
-- I18N: email/admin copy additions are mirrored in English and Spanish, and `npm run test:i18n` is the locale completeness gate.
-- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
-- Podman: the documented Podman path remains the fallback and parity path for local Store/Worker smoke and headless E2E.
-- SEO: public SEO remains product/home/terms-focused; private admin, order lookup, Order Success, and tokenized routes remain noindex/excluded.
-- Testing: merge gate remains `npm run test:premerge`, with added focused unit/E2E coverage for this release.
-- Performance: static rendering, lazy cart loading, minified assets, bounded admin reads, and generated catalog snapshots remain the baseline; explicit performance budgets are future work.
+- Accessibility: admin status regions, responsive order rows, long-content fixtures, mobile/tablet order buttons, and authenticated order-notification entry into the existing admin tab flow are covered by automated regression paths. Manual VoiceOver/NVDA launch passes remain a launch task.
+- I18N: email/admin copy additions are mirrored in English and Spanish, the authenticated order CTA reuses existing localized admin notification copy, and `npm run test:i18n` is the locale completeness gate.
+- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, one-time super-admin order CTAs, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
+- Podman: the documented Podman path remains the fallback and parity path for local Store/Worker smoke and headless E2E; the current macOS rootless Podman doctor pass is clean.
+- SEO: public SEO remains product/home/terms-focused; private admin, order lookup, Order Success, tokenized routes, test configs, and optimizer temp artifacts remain noindex/excluded or outside `_site`.
+- Testing: merge gate remains `npm run test:premerge`, with added focused unit coverage for authenticated order links, reconciliation CSV payment checks, and ESM Vitest config entrypoints.
+- Performance: static rendering, lazy cart loading, minified assets, bounded admin reads, generated catalog snapshots, and media optimizer checks remain the baseline; explicit performance budgets are future work.
 
 ## Launch Blockers
 

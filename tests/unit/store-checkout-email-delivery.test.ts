@@ -35,6 +35,7 @@ function baseEnv(storeState = new MockKVNamespace(), ratelimit = new MockKVNames
     CORS_ALLOWED_ORIGIN: 'http://127.0.0.1:4002',
     STRIPE_SECRET_KEY: 'sk_test_store',
     STRIPE_PUBLISHABLE_KEY: 'pk_test_store',
+    ADMIN_SESSION_SECRET: 'test_admin_session_secret',
     RESEND_API_KEY: 'resend_test',
     ORDERS_EMAIL_FROM: 'Dust Wave Shop <orders@dustwave.xyz>',
     UPDATES_EMAIL_FROM: 'Dust Wave Shop <updates@dustwave.xyz>',
@@ -158,7 +159,11 @@ describe('Store checkout email delivery', () => {
     expect(payloads.map((payload) => payload.to)).toEqual(['owner@example.com', 'backup@example.com']);
     expect(payloads.map((payload) => payload.subject)).toEqual(['New order | Dust Wave Shop', 'New order | Dust Wave Shop']);
     expect(payloads[0].html).toContain('buyer@example.com');
+    expect(payloads[0].html).toContain('/admin/?admin_login=');
+    expect(payloads[0].html).toContain('tab=store-orders');
     expect(payloads[0]).not.toHaveProperty('attachments');
+    const loginKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'));
+    expect(loginKeys).toHaveLength(2);
 
     const updated = await storeState.get(`orders:${orderToken}`, { type: 'json' });
     expect(updated.adminNotificationEmailSent).toBe(true);
@@ -171,6 +176,8 @@ describe('Store checkout email delivery', () => {
       skipped: ['owner@example.com', 'backup@example.com']
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    const idempotentLoginKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'));
+    expect(idempotentLoginKeys).toHaveLength(2);
     const idempotentUpdate = await storeState.get(`orders:${orderToken}`, { type: 'json' });
     expect(idempotentUpdate.adminNotificationEmailSent).toBe(true);
     expect(idempotentUpdate.adminNotificationEmailRecipients).toEqual(['owner@example.com', 'backup@example.com']);

@@ -25,7 +25,11 @@ exclude:
   - package-lock.json
   - playwright.config.js
   - vitest.config.ts
+  - vitest.config.mts
   - vitest.security.config.ts
+  - vitest.security.config.mts
+  - assets/**/*.optimized
+  - assets/**/*.optimized.*
   - Containerfile.dev
   - Containerfile.playwright.dev
 platform:

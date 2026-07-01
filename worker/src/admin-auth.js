@@ -285,9 +285,14 @@ function getAdminPublicSiteBase(env = {}) {
   return DEFAULT_SITE_BASE;
 }
 
-function buildAdminUrl(env, token, lang) {
+function buildAdminUrl(env, token, lang, params = {}) {
   const url = new URL(getSiteAdminPath(lang), getAdminPublicSiteBase(env));
   url.searchParams.set('admin_login', token);
+  for (const [key, value] of Object.entries(params || {})) {
+    const normalizedKey = String(key || '').trim();
+    const normalizedValue = String(value ?? '').trim();
+    if (normalizedKey && normalizedKey !== 'admin_login' && normalizedValue) url.searchParams.set(normalizedKey, normalizedValue);
+  }
   return url.toString();
 }
 
@@ -375,6 +380,33 @@ async function verifyAdminTurnstile(request, env, token) {
 export async function verifyAdminAuthStartChallenge(request, env, body = {}) {
   const challenge = await verifyAdminTurnstile(request, env, body.turnstileToken || body['cf-turnstile-response']);
   return challenge.ok ? null : challenge.response;
+}
+
+export async function createAdminLoginUrl(env, {
+  email,
+  preferredLang = 'en',
+  params = {},
+  source = 'internal'
+} = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  const lang = normalizeLang(preferredLang);
+  if (!isValidEmail(normalizedEmail) || !env?.STORE_STATE || !getAdminSecret(env)) return '';
+
+  const user = await resolveAdminUser(env, normalizedEmail);
+  if (!user) return '';
+
+  const nonce = randomToken(24);
+  const token = await signLoginToken(env, nonce, normalizedEmail);
+  await env.STORE_STATE.put(`admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
+    email: normalizedEmail,
+    role: user.role,
+    accessScopes: user.accessScopes || [],
+    preferredLang: lang,
+    source: String(source || 'internal').trim() || 'internal',
+    createdAt: new Date().toISOString()
+  }), { expirationTtl: ADMIN_LOGIN_TTL_SECONDS });
+
+  return buildAdminUrl(env, token, lang, params);
 }
 
 function getSessionCookie(token, request, maxAge = ADMIN_SESSION_TTL_SECONDS) {

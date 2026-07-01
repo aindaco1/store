@@ -21,6 +21,7 @@ This guide describes the current Store security model and the launch target. His
 | Stripe webhook signature | `/webhooks/stripe` | Fails closed when the webhook secret is absent or invalid. |
 | Checkout intent nonce | `/api/checkout/intent` | Signed server-side intent for first-party checkout continuation. |
 | Admin magic link | `/admin/auth/*` | One-time login nonce, signed admin session cookie, and CSRF on mutations. |
+| Super-admin order CTA | Order notification email | Reuses the admin one-time login nonce with `tab=store-orders`; only generated for effective super admins. |
 | Admin CSRF | `x-store-admin-csrf` | Required for dashboard writes. |
 | Admin roles/scopes | Admin APIs | `super_admin` plus Store access scopes for limited admins. |
 | Optional Turnstile | Admin sign-in | Local/test bypasses are accepted only in local/test mode. |

@@ -10,8 +10,8 @@ export default defineConfig({
     pool: 'forks', // Use forks for network test isolation
     poolOptions: {
       forks: {
-        singleFork: true // Run sequentially to avoid overwhelming the Worker
-      }
-    }
+        singleFork: true, // Run sequentially to avoid overwhelming the Worker
+      },
+    },
   },
 });
