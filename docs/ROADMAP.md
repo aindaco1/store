@@ -1,10 +1,10 @@
 # Store Roadmap
 
-Store's main product code paths are implemented. This roadmap now tracks the `v1.0.4` release state, the operational work still required for first production launch, and future hardening that should stay DRY with the existing Store docs.
+Store's main product code paths are implemented and the production Store is live. This roadmap now tracks the `v1.0.4` release state, ongoing production operations, and future hardening that should stay DRY with the existing Store docs.
 
 ## Release v1.0.4 Status
 
-`v1.0.4` is the local release target for the Store launch branch.
+`v1.0.4` is the current post-launch release target for Store.
 
 Completed in this release:
 
@@ -19,12 +19,18 @@ Completed in this release:
 - Admin Orders attendance refresh after ticket/RSVP check-in mutations.
 - Responsive Order action buttons across desktop, tablet, and mobile.
 - Admin dashboard navigation persistence for the last selected top-level tab and Settings subtab after authenticated reloads.
+- Spanish public home, Terms, Orders, and Order Success routes, including localized runtime order status copy and machine-translated Terms copy pending legal/native review.
+- Shorter-lived authenticated super-admin order notification links and sessions, plus a regression test that consumed links cannot be reused by a second browser.
+- Admin Brand & SEO customization controls aligned with the public SEO metadata and merchant return policy configuration.
+- Comprehensive non-admin SEO pass for public routes, canonical/alternate metadata, sitemap exclusions, crawl controls, and product structured data.
+- iOS Safari styling guard for auto-detected text and mobile navigation controls so public/admin mobile UI does not inherit unexpected blue link/button styling.
 - Ticket/RSVP SVG layout fitting for long product and variant names.
 - Order Success totals, shipping, event address, and durable-download copy improvements.
 - Admin status live-region normalization for async actions.
 - i18n completeness checks for supported locale files.
 - ESM Vitest config entrypoints for unit/security runs, with static-build excludes for test configs and media optimizer temp candidates.
 - Local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment variations.
+- One-time production runbook content folded into the active production operations, testing, security, backup, and download docs, with the obsolete launch file removed.
 
 ## Audit Snapshot
 
@@ -40,28 +46,25 @@ The release audit is anchored in these docs:
 
 Audit status for `v1.0.4`:
 
-- Accessibility: admin status regions, responsive order rows, long-content fixtures, mobile/tablet order buttons, and authenticated order-notification entry into the existing admin tab flow are covered by automated regression paths. Manual VoiceOver/NVDA launch passes remain a launch task.
-- I18N: email/admin copy additions are mirrored in English and Spanish, the authenticated order CTA reuses existing localized admin notification copy, and `npm run test:i18n` is the locale completeness gate.
-- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, one-time super-admin order CTAs, non-sensitive sanitized admin navigation persistence, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
+- Accessibility: admin status regions, responsive order rows, long-content fixtures, mobile/tablet order buttons, iOS Safari color guards, and authenticated order-notification entry into the existing admin tab flow are covered by automated regression paths. Manual VoiceOver/NVDA passes remain required before major public releases and checkout/admin workflow changes.
+- I18N: email/admin copy additions are mirrored in English and Spanish, public home/Terms/order shells are localized without translating creator-authored product content, the authenticated order CTA reuses existing localized admin notification copy, and `npm run test:i18n` is the locale completeness gate.
+- Security: server-authoritative checkout, signed/no-store fulfillment, CSRF-protected admin mutations, one-time super-admin order CTAs with notification-specific TTLs, non-sensitive sanitized admin navigation persistence, explicit digital revocation, and Store-owned receipt delivery align with [SECURITY.md](SECURITY.md).
 - Podman: the documented Podman path remains the fallback and parity path for local Store/Worker smoke and headless E2E; the current macOS rootless Podman doctor pass is clean.
-- SEO: public SEO remains product/home/terms-focused; private admin, order lookup, Order Success, tokenized routes, test configs, and optimizer temp artifacts remain noindex/excluded or outside `_site`.
-- Testing: merge gate remains `npm run test:premerge`, with added focused unit/E2E coverage for authenticated order links, reconciliation CSV payment checks, admin tab/subtab restoration, and ESM Vitest config entrypoints.
+- SEO: public SEO remains product/home/terms-focused with localized alternates, configurable merchant return policy metadata, sitemap exclusions, noindex order shells, and rendered non-admin audits through `npm run test:seo`; admin/API routes stay robots-blocked.
+- Testing: merge gate remains `npm run test:premerge`, with added focused unit/E2E coverage for authenticated order links, reconciliation CSV payment checks, admin tab/subtab restoration, SEO metadata, and ESM Vitest config entrypoints.
 - Performance: static rendering, lazy cart loading, minified assets, bounded admin reads, generated catalog snapshots, media optimizer checks, and a tiny local-only dashboard state read/write remain the baseline; explicit performance budgets are future work.
 
-## Launch Blockers
+## Production Operations
 
-These are operational blockers, not known code blockers:
+These are ongoing production checks, not known code blockers:
 
-- Upload real production digital download files to `STORE_DOWNLOADS` or configure Worker-only fallback URLs for externally hosted media.
-- Configure production Cloudflare Worker secrets, including dedicated signing secrets where appropriate.
-- Configure Stripe production webhook endpoint and signing secret.
-- Verify USPS and New Mexico GRT behavior against the production origin address.
-- Verify admin coupons, marketing referrals, reminder suppression, order lookup, and download library flows against production.
-- Run a paid physical checkout in Stripe test mode.
-- Run a paid digital checkout and download fulfillment.
-- Run a paid ticket checkout and admin check-in.
-- Run a free RSVP checkout and admin check-in.
-- Run manual VoiceOver and NVDA passes for the documented launch surfaces.
+- Keep production digital download files in `STORE_DOWNLOADS`, or maintain approved Worker-only fallback URLs for externally hosted media.
+- Keep production Cloudflare Worker secrets, including dedicated signing secrets where appropriate, current in Cloudflare.
+- Keep the Stripe production webhook endpoint and signing secret aligned with the production Worker domain.
+- Re-verify USPS and New Mexico GRT behavior after shipping origin, product, or provider changes.
+- Re-verify admin coupons, marketing referrals, reminder suppression, order lookup, and download library flows after related releases.
+- Run paid physical, paid digital, paid ticket, and free RSVP smoke checks after checkout/fulfillment changes.
+- Run manual VoiceOver and NVDA passes for major public releases and checkout/admin workflow changes.
 
 ## Done Before v1.0.4
 
@@ -92,9 +95,9 @@ These are operational blockers, not known code blockers:
 - Product content security audit.
 - Store product SEO metadata and Product JSON-LD.
 - Store-native security, testing, workflow, shipping, Podman, and contributing docs.
-- Store-only admin/browser runtime cleanup with campaign, pledge, content-editor, and embed translation payloads removed.
+- Store-only admin/browser runtime cleanup with obsolete non-Store runtime and translation payloads removed.
 - Admin Store readiness/status panel for secrets, webhooks, R2 readiness, inventory baselines, cron heartbeat, and catalog snapshot posture.
-- Production launch runbook for Cloudflare, Stripe, Resend, USPS, NM GRT, R2, DNS, smoke tests, and rollback.
+- Production operations guidance for Cloudflare, Stripe, Resend, USPS, NM GRT, R2, DNS, smoke tests, and rollback folded into active docs.
 - Storefront product-card inventory warnings for pending imported counts and low-stock variant states.
 - Product admin bulk status publishing for active, draft, archived, and sold-out states.
 - Product draft/archive visibility controls for storefront listings, public product JSON, and SEO indexing.
@@ -104,14 +107,14 @@ These are operational blockers, not known code blockers:
 - Opt-in abandoned-checkout reminders with resume/unsubscribe links and admin suppression controls.
 - Event reminder queueing/delivery for ticket and RSVP orders.
 - Reusable digital download library create/replace/delete flow in R2.
-- Historical extraction and Snipcart migration notes separated from launch-facing docs.
+- Snipcart migration context folded into the active project overview, with Store-native catalog/admin/runtime rules as the source of truth.
 - Admin audit CSV export from recent KV-backed mutation events.
 - Backup/restore runbook for KV, R2, and product catalog Git history.
 - Post-launch order reconciliation CSV export.
 - Store admin fixture names reviewed and normalized around ticket/download scenarios.
 - Storefront collection/category taxonomy with filter controls and catalog metadata.
 - Multilingual product page URL/content model with generated language-prefixed product pages.
-- Production launch readiness CLI for repo-visible URLs, Worker config, admin bootstrap users, inventory baselines, downloads, and manual smoke checks.
+- Production readiness CLI for repo-visible URLs, Worker config, admin bootstrap users, inventory baselines, downloads, and manual smoke checks.
 
 ## Future Work
 
@@ -135,7 +138,7 @@ Keep these scoped to operational hardening. Do not create duplicate systems when
 
 ### Accessibility
 
-- Add the documented manual VoiceOver and NVDA launch pass to release procedure artifacts.
+- Add the documented manual VoiceOver and NVDA pass to release procedure artifacts.
 - Expand automated axe coverage to the mounted checkout/payment surface when Stripe test fixtures are available locally.
 - Add high-zoom screenshots for cart, checkout, Order Success, product editing, and admin order controls.
 - Keep long product names, long filenames, and tablet/mobile admin rows in regression fixtures.
@@ -151,16 +154,15 @@ Keep these scoped to operational hardening. Do not create duplicate systems when
 
 - Keep Podman smoke coverage aligned with the host merge gate.
 - Add a short troubleshooting checklist for stale `gvproxy`, port conflicts, and first-run image rebuilds if those recur.
-- Consider making the Podman E2E path a scheduled CI job after launch.
+- Consider making the Podman E2E path a scheduled CI job.
 
 ### SEO
 
-- Add a release checklist item that samples rendered canonical, alternate, Open Graph, and Product JSON-LD tags for active products.
-- Add regression coverage that private routes remain excluded from sitemap and robots.
+- Sample rendered canonical, alternate, Open Graph, and Product JSON-LD tags for active products during production QA.
 - Review localized product metadata after real translated product copy is added.
 
 ### Testing
 
 - Keep `npm run test:premerge` as the local merge gate.
 - Add a dedicated release smoke script for paid physical, paid digital, paid ticket, and free RSVP flows once production test credentials are available.
-- Track manual launch smoke evidence for emails, downloads, check-in, lookup links, reminders, and CSV exports.
+- Track manual production smoke evidence for emails, downloads, check-in, lookup links, reminders, and CSV exports.

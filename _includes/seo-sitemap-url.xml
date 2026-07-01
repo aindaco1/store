@@ -1,0 +1,33 @@
+{%- assign item = include.item -%}
+{%- assign site_base = site.platform.site_url | default: site.url -%}
+{%- assign default_lang = site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- assign supported_langs = site.i18n.supported_langs -%}
+{%- if supported_langs == nil or supported_langs.size == 0 -%}
+  {%- assign supported_langs = default_lang | split: "|" -%}
+{%- endif -%}
+{%- assign translation_key = item.translation_key -%}
+{%- assign localized_paths = item.localized_paths -%}
+{%- assign localized_page = nil -%}
+{%- if translation_key and site.i18n.pages -%}
+  {%- assign localized_page = site.i18n.pages[translation_key] -%}
+{%- endif -%}
+  <url>
+    <loc>{{ site_base }}{{ item.url | xml_escape }}</loc>
+    <lastmod>{{ site.time | date_to_xmlschema }}</lastmod>
+{%- if localized_paths or localized_page -%}
+  {%- for lang in supported_langs -%}
+    {%- assign has_alternate_path = false -%}
+    {%- if localized_paths and localized_paths[lang] -%}
+      {%- assign has_alternate_path = true -%}
+    {%- elsif localized_page and localized_page[lang] -%}
+      {%- assign has_alternate_path = true -%}
+    {%- endif -%}
+    {%- if has_alternate_path -%}
+      {%- capture alternate_path -%}{% include localized-url.html lang=lang translation_key=translation_key localized_paths=localized_paths %}{%- endcapture -%}
+    <xhtml:link rel="alternate" hreflang="{{ lang | xml_escape }}" href="{{ site_base }}{{ alternate_path | strip | xml_escape }}" />
+    {%- endif -%}
+  {%- endfor -%}
+  {%- capture default_path -%}{% include localized-url.html lang=default_lang translation_key=translation_key localized_paths=localized_paths %}{%- endcapture -%}
+    <xhtml:link rel="alternate" hreflang="x-default" href="{{ site_base }}{{ default_path | strip | xml_escape }}" />
+{%- endif -%}
+  </url>

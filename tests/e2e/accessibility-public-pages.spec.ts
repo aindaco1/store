@@ -112,7 +112,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Terms & Privacy"',
-      'paragraph: Effective June 20, 2026.'
+      'paragraph: Effective July 1, 2026.'
     ]);
   });
 

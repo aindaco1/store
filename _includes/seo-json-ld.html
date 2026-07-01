@@ -7,6 +7,10 @@
   {%- assign org_id = site_base | append: "/#organization" -%}
   {%- assign website_id = site_base | append: "/#website" -%}
   {%- assign default_image = site.platform.default_social_image_path | default: '/assets/images/logo.svg' -%}
+  {%- assign default_image_url = default_image -%}
+  {%- unless default_image_url contains '://' or default_image_url contains 'data:' -%}
+    {%- assign default_image_url = site_base | append: default_image_url -%}
+  {%- endunless -%}
   {%- assign default_description = site.description | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
   {%- assign jsonld_kind = include.kind -%}
   {%- assign is_store_product = false -%}
@@ -20,7 +24,25 @@
   {%- endif -%}
   {%- assign same_as = site.seo.same_as | default: empty -%}
   {%- capture localized_home_path -%}{% include localized-url.html lang=current_lang translation_key='home' %}{%- endcapture -%}
-  {%- assign available_languages = site.i18n.supported_langs | default: current_lang | split: '|' -%}
+  {%- assign localized_home_path = localized_home_path | strip -%}
+  {%- assign available_languages = site.i18n.supported_langs -%}
+  {%- if available_languages == nil or available_languages.size == 0 -%}
+    {%- assign available_languages = current_lang | split: '|' -%}
+  {%- endif -%}
+  {%- assign merchant_return_policy = site.seo.merchant_return_policy | default: empty -%}
+  {%- assign return_policy_country = merchant_return_policy.applicable_country | default: site.shipping.origin_country | default: "US" -%}
+  {%- assign return_policy_category = merchant_return_policy.return_policy_category | default: "https://schema.org/MerchantReturnFiniteReturnWindow" -%}
+  {%- assign return_policy_days = merchant_return_policy.merchant_return_days | default: 14 | plus: 0 -%}
+  {%- assign return_fees = merchant_return_policy.return_fees | default: "https://schema.org/ReturnFeesCustomerResponsibility" -%}
+  {%- assign return_method = merchant_return_policy.return_method | default: "https://schema.org/ReturnByMail" -%}
+  {%- assign finite_return_policy = false -%}
+  {%- if return_policy_category == "https://schema.org/MerchantReturnFiniteReturnWindow" -%}
+    {%- assign finite_return_policy = true -%}
+  {%- endif -%}
+  {%- assign returns_permitted = true -%}
+  {%- if return_policy_category == "https://schema.org/MerchantReturnNotPermitted" -%}
+    {%- assign returns_permitted = false -%}
+  {%- endif -%}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -28,22 +50,53 @@
     {%- if jsonld_kind == "product" -%}
     {%- assign product_name = page.product_name | default: page.name | default: page.title | default: platform_title -%}
     {%- assign product_sku = page.sku | default: page.identifier | default: page.slug | default: product_name -%}
+    {%- assign product_id = page.identifier | default: product_sku -%}
     {%- assign product_price = page.price | default: 0 | plus: 0 -%}
     {%- assign product_image = page.image | default: default_image -%}
+    {%- assign product_image_url = product_image -%}
+    {%- unless product_image_url contains '://' or product_image_url contains 'data:' -%}
+      {%- assign product_image_url = site_base | append: product_image_url -%}
+    {%- endunless -%}
     {%- assign product_description_source = page.description | default: page.excerpt | default: page.content | default: default_description -%}
     {%- assign product_description = product_description_source | strip_html | strip_newlines | replace: '  ', ' ' | strip -%}
     {%- assign product_status = page.status | default: "active" -%}
+    {%- assign product_inventory = page.inventory | default: 0 | plus: 0 -%}
+    {%- assign tracks_inventory = false -%}
+    {%- if page.inventory_tracking == true -%}
+      {%- assign tracks_inventory = true -%}
+    {%- endif -%}
     {%- assign product_availability = "https://schema.org/InStock" -%}
     {%- if product_status != "active" -%}
       {%- assign product_availability = "https://schema.org/OutOfStock" -%}
+    {%- elsif tracks_inventory and page.inventory != nil and product_inventory <= 0 -%}
+      {%- assign product_availability = "https://schema.org/OutOfStock" -%}
     {%- endif -%}
+    {%- assign product_variants = page.variants -%}
+    {%- assign has_variants = product_variants and product_variants != "" and product_variants.size > 0 -%}
+    {%- capture product_category_label -%}{% include product-taxonomy.html product=page mode="category_label" %}{%- endcapture -%}
+    {%- assign product_category_label = product_category_label | strip -%}
     {
       "@type": "Organization",
       "@id": {{ org_id | jsonify }},
       "name": {{ platform_title | jsonify }},
       "url": {{ site_base | jsonify }},
       "email": {{ site.platform.support_email | default: '' | jsonify }},
-      "logo": {{ site_base | append: default_image | jsonify }}{% if same_as and same_as.size > 0 %},
+      "logo": {{ default_image_url | jsonify }},
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "email": {{ site.platform.support_email | default: '' | jsonify }},
+        "availableLanguage": {{ available_languages | jsonify }}
+      },
+      "hasMerchantReturnPolicy": {
+        "@type": "MerchantReturnPolicy",
+        "@id": {{ site_base | append: "/terms/#returns-refunds" | jsonify }},
+        "applicableCountry": {{ return_policy_country | jsonify }},
+        "returnPolicyCategory": {{ return_policy_category | jsonify }}{% if finite_return_policy and return_policy_days > 0 %},
+        "merchantReturnDays": {{ return_policy_days | jsonify }}{% endif %}{% if returns_permitted and return_method != "" %},
+        "returnMethod": {{ return_method | jsonify }}{% endif %}{% if returns_permitted and return_fees != "" %},
+        "returnFees": {{ return_fees | jsonify }}{% endif %}
+      }{% if same_as and same_as.size > 0 %},
       "sameAs": {{ same_as | jsonify }}{% endif %}
     },
     {
@@ -52,13 +105,39 @@
       "url": {{ site_base | append: page.url | jsonify }},
       "name": {{ product_name | jsonify }},
       "description": {{ product_description | jsonify }},
-      "image": {{ site_base | append: product_image | jsonify }},
+      "image": {{ product_image_url | jsonify }},
       "sku": {{ product_sku | jsonify }},
+      "productID": {{ product_id | jsonify }},
+      "inLanguage": {{ current_lang | jsonify }}{% if product_category_label != "" %},
+      "category": {{ product_category_label | jsonify }}{% endif %},
       "brand": {
         "@type": "Brand",
         "name": {{ site.platform.company_name | default: platform_title | jsonify }}
       },
-      "offers": {
+      "offers": {% if has_variants %}[
+        {%- for variant in product_variants -%}
+          {%- assign variant_price = variant.price | default: product_price | plus: 0 -%}
+          {%- assign variant_status = variant.status | default: product_status -%}
+          {%- assign variant_inventory = variant.inventory | default: 0 | plus: 0 -%}
+          {%- assign variant_availability = "https://schema.org/InStock" -%}
+          {%- if variant_status != "active" -%}
+            {%- assign variant_availability = "https://schema.org/OutOfStock" -%}
+          {%- elsif tracks_inventory and variant.inventory != nil and variant_inventory <= 0 -%}
+            {%- assign variant_availability = "https://schema.org/OutOfStock" -%}
+          {%- endif -%}
+          {
+            "@type": "Offer",
+            "url": {{ site_base | append: page.url | jsonify }},
+            "priceCurrency": "USD",
+            "price": {{ variant_price | jsonify }},
+            "availability": {{ variant_availability | jsonify }},
+            "itemCondition": "https://schema.org/NewCondition",
+            "seller": {
+              "@id": {{ org_id | jsonify }}
+            }
+          }{% unless forloop.last %},{% endunless %}
+        {%- endfor -%}
+      ]{% else %}{
         "@type": "Offer",
         "url": {{ site_base | append: page.url | jsonify }},
         "priceCurrency": "USD",
@@ -68,7 +147,7 @@
         "seller": {
           "@id": {{ org_id | jsonify }}
         }
-      }
+      }{% endif %}
     },
     {
       "@type": "BreadcrumbList",
@@ -95,7 +174,22 @@
       "name": {{ platform_title | jsonify }},
       "url": {{ site_base | jsonify }},
       "email": {{ site.platform.support_email | default: '' | jsonify }},
-      "logo": {{ site_base | append: default_image | jsonify }}{% if same_as and same_as.size > 0 %},
+      "logo": {{ default_image_url | jsonify }},
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "customer support",
+        "email": {{ site.platform.support_email | default: '' | jsonify }},
+        "availableLanguage": {{ available_languages | jsonify }}
+      },
+      "hasMerchantReturnPolicy": {
+        "@type": "MerchantReturnPolicy",
+        "@id": {{ site_base | append: "/terms/#returns-refunds" | jsonify }},
+        "applicableCountry": {{ return_policy_country | jsonify }},
+        "returnPolicyCategory": {{ return_policy_category | jsonify }}{% if finite_return_policy and return_policy_days > 0 %},
+        "merchantReturnDays": {{ return_policy_days | jsonify }}{% endif %}{% if returns_permitted and return_method != "" %},
+        "returnMethod": {{ return_method | jsonify }}{% endif %}{% if returns_permitted and return_fees != "" %},
+        "returnFees": {{ return_fees | jsonify }}{% endif %}
+      }{% if same_as and same_as.size > 0 %},
       "sameAs": {{ same_as | jsonify }}{% endif %}
     },
     {

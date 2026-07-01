@@ -13,6 +13,7 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 - Digital files live in `STORE_DOWNLOADS` R2 and are served through signed Worker routes.
 - Confirmed digital download entitlements do not expire unless an admin explicitly revokes access; signed fulfillment links remain short-lived.
 - Store admin mutations use `store_admin_session` plus `x-store-admin-csrf`.
+- Public Spanish shells share the same Store workflows as English routes; creator/customer-authored content is not auto-translated.
 
 ## Catalog Workflow
 
@@ -149,6 +150,7 @@ On failure, the Worker:
 - Matching confirmed orders are indexed by email hash under `store-order-email:*`.
 - Lookup emails contain short-lived `store-order-lookup:*` tokens.
 - `GET /api/orders/lookup?token=...` consumes the token before returning order links.
+- `/es/orders/` uses the same API and tokens with localized page/runtime copy.
 
 ### Abandoned Checkout Reminders
 
@@ -234,6 +236,8 @@ Settings publish writes GitHub-backed config changes and triggers deploy. Runtim
 5. Mutating admin requests send `x-store-admin-csrf`.
 6. Limited admins are authorized by `accessScopes`, with `store` as the Store dashboard scope.
 
+Super-admin order notification emails use this same exchange but are source-tagged as order notifications. Those links open `tab=store-orders`, expire after 5 minutes, are consumed on first successful exchange, and create a 30-minute admin session. They remain bearer links until consumed or expired, so forwarded unused emails can still delegate access.
+
 ## Worker Storage Map
 
 | Key / Binding | Purpose |
@@ -256,24 +260,30 @@ Settings publish writes GitHub-backed config changes and triggers deploy. Runtim
 
 Store KV state should stay inside the documented order, inventory, coupon, admin, audit, lookup, reminder, marketing, observability, rate-limit, and email keys.
 
-Super admins can export recent admin mutation audit events from **Settings -> Store readiness**. The CSV is backed by bounded `admin-audit:` KV listing and is intended for launch/post-launch operational review, not permanent retention.
+Super admins can export recent admin mutation audit events from **Settings -> Store readiness**. The CSV is backed by bounded `admin-audit:` KV listing and is intended for production operational review, not permanent retention.
 
-Store admins can export an order reconciliation CSV from **Settings -> Store readiness**. It is one row per order and flags amount, currency, and payment/order status mismatches for launch and post-launch review.
+Store admins can export an order reconciliation CSV from **Settings -> Store readiness**. It is one row per order and flags amount, currency, and payment/order status mismatches for production review.
 
 ## Public Route Workflow
 
 Default Store routes:
 
 - `/`
+- `/es/`
 - `/products/:slug/`
+- `/es/products/:slug/`
 - `/terms/`
+- `/es/terms/`
+- `/orders/`
+- `/es/orders/`
 - `/order-success/`
+- `/es/order-success/`
 - `/api/products.json`
 - `/api/add-ons.json`
 
 Public document prefetch is intentionally narrow:
 
-- allowed: home, Terms, product detail pages
+- allowed: home, Terms, and product detail pages, including localized public equivalents
 - blocked: admin, checkout, cart, order-success, API, Worker, tokenized, external, and sensitive-query links
 
 ## Local Development Workflow
@@ -293,28 +303,46 @@ Current local URLs:
 Useful checks:
 
 ```bash
-bundle exec jekyll build --quiet
 npm run sync:worker-config
+npm run build
+npm run test:i18n
+npm run test:seo
 npx vitest run tests/unit/page-prefetch.test.ts tests/unit/cart-runtime-loader.test.ts tests/unit/seo-layouts.test.ts
 PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
 ```
 
 ## Deployment Workflow
 
-Use [PRODUCTION_LAUNCH.md](PRODUCTION_LAUNCH.md) for the full operator checklist.
-
 1. Merge catalog/settings/media changes.
 2. Generate catalog snapshot.
-3. Build Jekyll.
-4. Build Jekyll and minify generated `_site` assets.
-5. Deploy Worker to Cloudflare on pushes to `main`.
-6. Deploy static site to GitHub Pages.
-7. Optionally purge Cloudflare cache when enabled.
-8. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
+3. Build Jekyll and minify generated `_site` assets with `npm run build`.
+4. Deploy Worker to Cloudflare on pushes to `main`.
+5. Deploy static site to GitHub Pages.
+6. Optionally purge Cloudflare cache when enabled.
+7. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
 
-## Launch Readiness
+Before production deploys that touch Worker bindings or runtime config:
 
-Before launch:
+- confirm `worker/wrangler.toml` production bindings point at production `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` resources
+- set production Worker secrets with `wrangler secret put`
+- keep Cloudflare deploy tokens in GitHub or local operator environments only, not Worker runtime config
+- confirm DNS records for `shop.dustwave.xyz` and `checkout.dustwave.xyz`
+- confirm the cron trigger remains enabled for background maintenance
+- deploy the Worker with `npm run deploy:worker` when a manual deploy is needed
+
+Production non-secret config should match the intended public domains and providers unless an operator intentionally changes them:
+
+- `SITE_BASE=https://shop.dustwave.xyz`
+- `WORKER_BASE=https://checkout.dustwave.xyz`
+- `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`
+- `TAX_PROVIDER=nm_grt`
+- `SHIPPING_ORIGIN_ZIP=87120`
+- `SHIPPING_ORIGIN_COUNTRY=US`
+- `USPS_ENABLED=true`
+
+## Production Operations
+
+Keep these checks current in production and rerun them after checkout, fulfillment, catalog, admin, or settings changes:
 
 - upload real digital objects to `STORE_DOWNLOADS`
 - enter true inventory baselines
@@ -325,4 +353,38 @@ Before launch:
 - test admin product publish
 - test admin download replacement
 - test admin Store CSV export
-- replace draft Terms copy with production legal/policy copy
+- review the machine-translated Spanish Terms copy with legal/native-speaker review before treating it as final
+
+External provider checks:
+
+- Stripe production publishable/secret keys are configured and the production webhook endpoint is `https://checkout.dustwave.xyz/webhooks/stripe`.
+- Stripe webhook events include at least `payment_intent.succeeded` and `payment_intent.payment_failed`.
+- Resend sender domains and sender identities are verified for `ORDERS_EMAIL_FROM` and `UPDATES_EMAIL_FROM`.
+- USPS live credentials are configured and the flat-rate fallback remains available if USPS is unavailable.
+- New Mexico GRT behavior is verified for the production origin and destination cases.
+- Active digital products have `download.file_key` values that resolve to real R2 objects or Worker-only fallback URLs.
+
+When a product has a verified physical inventory count, add `inventory_baseline_source` or `inventory_verified_at` to its product front matter. This lets readiness checks distinguish a true zero-stock baseline from an untouched imported `0`. Use `inventory_tracking: false` for unlimited or made-to-order products.
+
+## Rollback Workflow
+
+If production smoke fails:
+
+1. Stop new public traffic when possible by removing promotional links or DNS/cache exposure.
+2. Revert the storefront deploy to the last known good GitHub Pages build.
+3. Revert the Worker to the previous deployed version.
+4. If checkout created bad order state, record the issue in KV notes or audit logs before deleting anything.
+5. If inventory reservations are stuck, inspect the order token first, then release through the Worker-controlled path.
+6. Do not rotate customer-facing order/download tokens unless a token leak is confirmed.
+
+## Production Review
+
+After material production changes and during the first day after release work:
+
+- review Stripe payments against Store orders with the admin reconciliation CSV
+- review Resend delivery and bounce events
+- review **Settings -> Store readiness** for webhook activity, R2 readiness, inventory baselines, cron heartbeat, and catalog snapshot posture
+- review abandoned-checkout and event reminder health after scheduled cron windows
+- export Store orders CSV for fulfillment reconciliation
+- export audit CSV for admin mutation review
+- back up configured resource IDs, coupon/referral changes, manual inventory adjustments, and release notes using [BACKUP_RESTORE.md](BACKUP_RESTORE.md)

@@ -80,9 +80,9 @@ npm run podman:self-check
 That runs:
 
 - `npm run podman:doctor`
-- `./scripts/dev.sh --podman`
-- `./scripts/test-worker.sh --podman`
-- `npm run test:e2e:headless:podman`
+- `SKIP_STRIPE=true ./scripts/dev.sh --podman` in detached mode
+- `./scripts/test-worker.sh` against the started Podman stack
+- `./scripts/podman-playwright-run.sh npx playwright test`
 
 The Worker smoke validates:
 
@@ -132,7 +132,7 @@ npm run test:e2e:headless:podman
 For focused admin browser coverage:
 
 ```bash
-npm run test:e2e:headless:podman -- tests/e2e/admin-dashboard.spec.ts --project=chromium
+./scripts/podman-playwright-run.sh npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium
 ```
 
 For host-side commands that need a temporary Podman-backed Storefront and Worker, use:

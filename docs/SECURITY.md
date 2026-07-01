@@ -4,7 +4,7 @@ Release `v1.0.4` security posture: Store-owned order email replaces Stripe recei
 
 This document covers the active Store security model: static product pages, first-party cart runtime, Cloudflare Worker checkout APIs, Stripe, USPS/NM GRT integrations, Resend email, signed downloads, inventory, and the private admin dashboard.
 
-This guide describes the current Store security model and the launch target. Historical imported compatibility paths should be removed or kept returning `404`; do not preserve old campaign/Snipcart behavior as a security workaround.
+This guide describes the current Store security model for production. Historical imported compatibility paths should be removed or kept returning `404`; do not preserve old non-Store behavior as a security workaround.
 
 ## Trust Boundaries
 
@@ -21,7 +21,7 @@ This guide describes the current Store security model and the launch target. His
 | Stripe webhook signature | `/webhooks/stripe` | Fails closed when the webhook secret is absent or invalid. |
 | Checkout intent nonce | `/api/checkout/intent` | Signed server-side intent for first-party checkout continuation. |
 | Admin magic link | `/admin/auth/*` | One-time login nonce, signed admin session cookie, and CSRF on mutations. |
-| Super-admin order CTA | Order notification email | Reuses the admin one-time login nonce with `tab=store-orders`; only generated for effective super admins. |
+| Super-admin order CTA | Order notification email | Reuses the admin one-time login nonce with `tab=store-orders`; only generated for effective super admins, expires after 5 minutes, and creates a 30-minute admin session. |
 | Admin CSRF | `x-store-admin-csrf` | Required for dashboard writes. |
 | Admin roles/scopes | Admin APIs | `super_admin` plus Store access scopes for limited admins. |
 | Optional Turnstile | Admin sign-in | Local/test bypasses are accepted only in local/test mode. |
@@ -66,6 +66,8 @@ Browser storage:
 - The stored values are sanitized client-side, contain no customer/order/session/CSRF data, and are ignored when a requested tab is not visible for the authenticated admin role.
 - Explicit `tab=` deep links, including authenticated super-admin order notification links, take precedence over the stored tab.
 
+Admin order notification links are bearer links. They are consumed on first successful exchange, so a second browser cannot reuse the same link after it has been opened, and the notification-specific link/session TTLs reduce the forwarded-email window. A recipient who receives an unused forwarded email can still authenticate until the link is consumed or expires; the stricter alternative is to remove authenticated CTAs from notification emails and require an existing admin session or a fresh admin magic-link request.
+
 ## Checkout And Cart Integrity
 
 The browser cart is convenience state only. The Worker recalculates and validates:
@@ -103,7 +105,7 @@ Digital products use private R2 objects and signed fulfillment actions.
 - Admin download revoke/refresh mutations require an authenticated Store admin session plus CSRF and write an audit event.
 - Order lookup requests return a generic response, email short-lived one-time tokens only when matching orders exist, and consume each token before returning order links.
 - Signed links should be short-lived and private/no-store, while confirmed digital entitlements remain permanent unless revoked.
-- Production launch requires real `STORE_DOWNLOADS` objects for all active digital products.
+- Production operation requires real `STORE_DOWNLOADS` objects for all active digital products, or an approved Worker-only fallback URL for externally hosted media.
 
 ## Admin Dashboard
 
@@ -147,8 +149,9 @@ Use Markdown for product descriptions; do not author raw HTML in product markdow
 - Admin, checkout, API, Worker, tokenized, order lookup, Order Success, and sensitive query routes are blocked from prefetch.
 - Cart recovery is limited to cart, checkout, and Order Success flows.
 - Abandoned-checkout resume/unsubscribe links are signed, scoped, expiring URLs and should not be crawled or logged with tokens intact.
-- `robots.txt` disallows admin, order lookup, and Order Success routes.
-- `sitemap.xml` includes public product URLs and excludes admin/tokenized/private pages.
+- `robots.txt` disallows admin and API routes.
+- Order lookup and Order Success routes are not listed in `robots.txt`; their HTML stays crawlable only so crawlers can observe `noindex,nofollow`, and they remain out of the sitemap.
+- `sitemap.xml` includes public active/sold-out product URLs and excludes admin, archived/private products, tokenized routes, and private pages.
 
 ## Verification
 
@@ -162,14 +165,14 @@ SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-w
 PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
 ```
 
-Before launch, also complete a real Stripe test checkout for each fulfillment class:
+For production smoke, also complete a real Stripe test checkout for each fulfillment class:
 
 - physical paid product with tax and shipping
 - digital paid product with signed download
 - ticket paid product with admin check-in
 - free RSVP/free-order path
 
-## Known Launch Preconditions
+## Production Preconditions
 
 - Real inventory baselines must be entered for finite-stock active products; unlimited or made-to-order products must use `inventory_tracking: false`.
 - Active digital products must have either real `STORE_DOWNLOADS` objects or Worker-only fallback URLs.

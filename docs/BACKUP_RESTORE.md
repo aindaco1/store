@@ -1,6 +1,6 @@
 # Backup And Restore
 
-This runbook covers Store-owned data that is not already recoverable from a normal deploy: Cloudflare KV state, R2 download objects, and Git product history.
+This runbook covers Store-owned data that is not already recoverable from a normal deploy: Cloudflare KV state, R2 download objects, and Git product/config history.
 
 Do not commit backup files to this repository. Store exports in an encrypted operator location with restricted access.
 
@@ -11,16 +11,16 @@ References:
 
 ## What To Back Up
 
-Back up these before launch, after launch smoke, before bulk admin changes, and before replacing production downloads:
+Back up these before major production releases, after production smoke, before bulk admin changes, and before replacing production downloads:
 
-- Git history: `_products/`, `_config.yml`, `api/products.json`, `worker/src/generated/catalog-snapshot.js`, and the commit hash deployed to the storefront and Worker.
-- `STORE_STATE` KV authoritative records: `orders:`, `admin-store-orders:index:v1`, `store-inventory-overrides:v1`, `store-inventory:v1:`, `store-coupons:v1`, `add-on-inventory-overrides`, `add-on-inventory-sold`, `admin-users:v1`, `admin-user:`, `admin-audit:`, `store-order-email:`, `store-order-email-sent:`, `admin-store-marketing-referrals:v1`, and reminder queue/sent records.
+- Git history: `_products/`, `_config.yml`, localized public source pages, `api/products.json`, `worker/src/generated/catalog-snapshot.js`, and the commit hash deployed to the storefront and Worker.
+- `STORE_STATE` KV authoritative records: `orders:`, `admin-store-orders:index:v1`, `store-inventory-overrides:v1`, `store-inventory:v1:`, `store-coupons:v1`, `add-on-inventory-overrides`, `add-on-inventory-sold:v1`, `admin-users:v1`, `admin-user:`, `admin-audit:`, `store-order-email:`, `store-order-email-sent:`, `admin-store-marketing-referrals:v1`, and reminder queue/sent records.
 - `STORE_DOWNLOADS` R2 objects referenced by active product `download.file_key` values.
-- Operator exports: Store orders CSV, attendee CSV, reconciliation CSV, audit CSV, launch notes, configured Cloudflare resource IDs, Stripe webhook endpoint ID, coupon/referral review notes, and manual inventory adjustments.
+- Operator exports: Store orders CSV, attendee CSV, reconciliation CSV, audit CSV, release notes, configured Cloudflare resource IDs, Stripe webhook endpoint ID, coupon/referral review notes, and manual inventory adjustments.
 
 Do not restore ephemeral records unless you are deliberately debugging an incident:
 
-- `admin-session:` and `admin-login:` records.
+- `admin-session:` and `admin-login:` records, including one-time super-admin order notification login links.
 - `rl:` rate-limit records.
 - `store-order-lookup:` one-time tokens.
 - `abandoned-cart-resume:` signed resume snapshots, unless you are reconstructing reminder behavior.
@@ -60,7 +60,7 @@ for prefix in \
   'store-inventory:v1:' \
   'store-coupons:v1' \
   'add-on-inventory-overrides' \
-  'add-on-inventory-sold' \
+  'add-on-inventory-sold:v1' \
   'admin-users:v1' \
   'admin-user:' \
   'admin-audit:' \
@@ -108,16 +108,16 @@ Restore production in this order:
 2. `orders:` records.
 3. `admin-store-orders:index:v1` only after order records are present, or let the Worker rebuild/index through normal admin reads.
 4. Inventory override records, then derived inventory projection records only if you are restoring a known-good production snapshot.
-5. Coupon and marketing referral records.
+5. Coupon, add-on inventory, and marketing referral records.
 6. Email index/sent records.
 7. Reminder records only after reviewing whether queued sends should still happen.
 8. `admin-audit:` records only when preserving historical audit context matters.
 
-After restore, use the admin dashboard to verify orders, inventory, downloads, and audit export. Run the Worker smoke script against the target environment before accepting new checkout traffic.
+After restore, use the admin dashboard to verify orders, inventory, downloads, marketing referrals, and audit export. Run the Worker smoke script against the target environment before accepting new checkout traffic.
 
 ## R2 Backup
 
-The production bucket is `store-downloads`; local/dev uses `store-downloads-preview`.
+The production bucket is `store-downloads`; local/dev uses `store-downloads-preview`. See [DOWNLOADS.md](DOWNLOADS.md) for the download entitlement and fallback-URL model.
 
 Build a manifest of configured download keys from `_products/` or the admin Downloads tab, then fetch each object:
 
@@ -188,6 +188,7 @@ After any restore:
 
 ```bash
 bundle exec jekyll build --config _config.yml,_config.local.yml
+npm run test:seo
 npm run test:content-security
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 ```

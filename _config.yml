@@ -8,6 +8,12 @@ seo:
   x_handle: ""
   same_as: []
   default_social_image_alt: Dust Wave Shop
+  merchant_return_policy:
+    applicable_country: US
+    return_policy_category: https://schema.org/MerchantReturnFiniteReturnWindow
+    merchant_return_days: 14
+    return_fees: https://schema.org/ReturnFeesCustomerResponsibility
+    return_method: https://schema.org/ReturnByMail
   og_locale_overrides:
     en: en_US
 debug:
@@ -30,6 +36,7 @@ exclude:
   - vitest.security.config.mts
   - assets/**/*.optimized
   - assets/**/*.optimized.*
+  - out-of-stock
   - Containerfile.dev
   - Containerfile.playwright.dev
 platform:
@@ -166,23 +173,50 @@ storefront:
   collections:
     - id: dustwave
       label: DUST WAVE
+      localized:
+        es:
+          label: DUST WAVE
     - id: fronteras
       label: Fronteras
+      localized:
+        es:
+          label: Fronteras
   categories:
     - id: apparel
       label: Apparel
+      localized:
+        es:
+          label: Ropa
     - id: prints
       label: Prints
+      localized:
+        es:
+          label: Impresiones
     - id: stickers
       label: Stickers
+      localized:
+        es:
+          label: Calcomanías
     - id: event-access
       label: Tickets & RSVPs
+      localized:
+        es:
+          label: Boletos y RSVPs
     - id: downloads
       label: Downloads
+      localized:
+        es:
+          label: Descargas
     - id: media
       label: Media
+      localized:
+        es:
+          label: Medios
     - id: objects
       label: Objects
+      localized:
+        es:
+          label: Objetos
 i18n:
   default_lang: en
   supported_langs:
@@ -197,10 +231,16 @@ i18n:
   pages:
     home:
       en: "/"
+      es: "/es/"
     orders:
       en: "/orders/"
+      es: "/es/orders/"
     terms:
       en: "/terms/"
+      es: "/es/terms/"
+    order_success:
+      en: "/order-success/"
+      es: "/es/order-success/"
     admin:
       en: "/admin/"
       es: "/es/admin/"

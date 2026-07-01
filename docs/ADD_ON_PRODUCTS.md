@@ -36,7 +36,7 @@ Supported fulfillment types:
 
 Optional storefront taxonomy fields:
 
-- `store_collection` groups products by campaign or event. When omitted, Store falls back to `event`, then `dustwave`.
+- `store_collection` groups products by collection, product line, or event. When omitted, Store falls back to `event`, then `dustwave`.
 - `storefront_category` or `product_category` powers storefront category filters. When omitted, Store derives a category from `fulfillment_type`, `type`, shipping preset, and product name.
 - `category` is still accepted for migrated catalog records. If it matches a configured `storefront.collections` id such as `dustwave` or `fronteras`, Store treats it as the collection. If it does not match a collection id, Store treats it as an explicit category.
 

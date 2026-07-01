@@ -29,6 +29,18 @@ admin:
   settings_intro: Revisa la configuración de %{platform}, checkout, envíos, impuestos, usuarios y operaciones de plataforma disponibles para esta cuenta de administración.
   settings_publish: Publicar
   settings_sections_label: Secciones de configuración
+  admin_section_label: Sección de administración
+  settings_section_label: Sección de configuración
+  upload_logo: Subir logo
+  upload_image: Subir imagen
+  logo_uploaded: Logo subido. Publica la configuración para usarlo.
+  image_uploaded: Imagen subida. Publica la configuración para usarla.
+  logo_type_error: Usa un logo PNG, JPEG o WebP.
+  image_type_error: Usa una imagen PNG, JPEG, WebP o GIF.
+  logo_size_error: El logo debe ser de 512 KB o menos.
+  image_size_error: La imagen debe ser de 8 MB o menos.
+  no_file_chosen: Ningún archivo seleccionado
+  no_image_selected: Ninguna imagen seleccionada.
   store_analytics_intro: Revisa ingresos, cumplimiento, boletos, pagos y rendimiento de productos de %{platform} desde los registros de pedidos.
   store_marketing_intro: Crea enlaces UTM y de referencia para %{platform}, guarda referencias reutilizables y descarga codigos QR para campanas o socios.
   marketing_destination_label: Ruta de destino
@@ -70,6 +82,13 @@ misc:
   skip_to_main: Saltar al contenido principal
   video_not_supported: Tu navegador no es compatible con la etiqueta de video.
 storefront:
+  filters:
+    product_collections: Colecciones de productos
+    collection: Colección
+    all: Todo
+    product_categories: Categorías de productos
+    category: Categoría
+    clear_filters: Borrar filtros
   option_label: Opción
   size_label: Talla
   quantity_label: Cantidad
@@ -176,6 +195,73 @@ runtime:
     checkout_title: Pagar
   gallery:
     image_gallery: Galería de imágenes
+  order_lookup:
+    generic_sent: Si ese correo tiene pedidos de %{platform}, se envió un enlace seguro de búsqueda.
+    orders_found_caption: Pedidos encontrados para este enlace de búsqueda
+    table_status: Estado
+    table_order: Pedido
+    table_date: Fecha
+    table_items: Artículos
+    table_total: Total
+    order_confirmed: Pedido confirmado
+    payment_failed: Pago fallido
+    order_processing: Pedido en proceso
+    unavailable: No disponible
+    confirmed: Confirmado
+    created: Creado
+    store_item: Artículo de la tienda
+    qty: Cant.
+    more: más
+    view_order: Ver pedido
+    order: Pedido
+    no_orders: No hay pedidos disponibles para este enlace.
+    orders: Pedidos
+    local_email_failed: "Falló el envío de correo local: %{reason}."
+    local_lookup_generated: Enlace de búsqueda local generado.
+    open_local_lookup: Abrir búsqueda local
+    unable_send: No se pudo enviar el enlace de búsqueda.
+    unable_load: No se pudieron cargar los pedidos.
+    email_required: Introduce una dirección de correo.
+    sending: Enviando enlace de búsqueda...
+    loading: Cargando pedidos...
+    verified: Enlace de búsqueda verificado.
+  order_success:
+    subtotal: Subtotal
+    discount: Descuento
+    discount_with_code: "Descuento (%{code})"
+    tip: Propina
+    shipping: Envío
+    tax: Impuesto
+    total_paid: Total pagado
+    shipping_heading: Envío
+    method: Método
+    download_unavailable: "%{label} aún no está disponible."
+    download: Descargar
+    open_rsvp: Abrir RSVP
+    open_ticket: Abrir boleto
+    add_calendar: Añadir al calendario
+    order_confirmed: Pedido confirmado
+    order_processing: Pedido en proceso
+    order: Pedido
+    confirmed: Confirmado
+    store_item: Artículo de la tienda
+    qty: Cant.
+    fulfillment_digital: Entrega digital
+    fulfillment_ticket: Boleto
+    fulfillment_rsvp: RSVP
+    fulfillment_service: Servicio
+    fulfillment_physical: Artículo físico
+    items: Artículos
+    download_note: Tu descarga permanece disponible desde esta página del pedido.
+    unable_load_order: No se pudo cargar el pedido.
+    still_processing: El pago sigue procesándose...
+    loading_order: Cargando pedido...
+    ready_fulfillment: Listo para cumplimiento.
+    confirmed_heading: Tu pedido está confirmado. Las acciones de cumplimiento están disponibles abajo.
+    payment_failed_status: Pago fallido.
+    payment_failed_heading: El pago no se completó. Vuelve a la tienda e inténtalo de nuevo.
+    payment_processing: El pago sigue procesándose.
+    missing_token: Falta el token del pedido.
 email:
   subjects:
     admin_login: Tu enlace de administración

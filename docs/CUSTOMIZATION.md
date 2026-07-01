@@ -18,6 +18,21 @@ Local overrides belong in `_config.local.yml`.
 
 Settings published from the admin dashboard write back to `_config.yml` in production through GitHub, or through the local repo sidecar during dev.
 
+## Public Routes And Localization
+
+English is the canonical locale. Spanish public shells currently exist for:
+
+- `/es/`
+- `/es/terms/`
+- `/es/orders/`
+- `/es/order-success/`
+- `/es/admin/`
+- generated `/es/products/:slug/` pages
+
+Route mappings live under `i18n.pages` and `i18n.product_path_prefixes` in `_config.yml`. UI strings live in `_data/i18n/{lang}.yml`. Do not machine-translate product titles, product descriptions, customer names, order contents, or other creator/user-authored content unless that content has an explicit `localized.{lang}` override.
+
+Storefront collection/category filter labels can be localized in `_config.yml` under `storefront.collections[].localized.{lang}.label` and `storefront.categories[].localized.{lang}.label`.
+
 ## Products
 
 Each sellable item lives in `_products/*.md`. Product records should define:
@@ -87,6 +102,16 @@ shipping:
 
 Coupons are managed in **Admin -> Coupons** and stored in Worker KV, not `_config.yml`. They are applied server-side before tax, shipping, and optional tip totals.
 
+## SEO And Policy Metadata
+
+The admin **Settings -> Brand & SEO** section can publish:
+
+- social image defaults and alt text
+- same-as/social profile URLs
+- merchant return policy values used in Product JSON-LD
+
+The Terms page is the source for customer-facing policy copy. The Spanish Terms route is currently machine translated and should receive legal/native review before production/legal-sensitive use.
+
 ## Admin Users
 
 Admins are managed through the dashboard or `_config.yml` during bootstrap:
@@ -119,3 +144,5 @@ npm run assets:minify:check
 Digital products should define a stable `download.file_key`. Upload or replace the matching object from the admin Downloads tab. Production downloads are served from the `STORE_DOWNLOADS` R2 binding through signed Worker routes.
 
 The Downloads tab is now a reusable file library. Create library files there, then attach the selected file key to a digital product or digital variant from the product editor.
+
+Confirmed digital entitlements stay available from the token-scoped order page unless an admin revokes access from Orders. Individual signed download URLs remain short-lived and can be refreshed while entitlement is active.

@@ -43,7 +43,7 @@ Settings is available to `super_admin` users only. It reads from `/admin/setting
 Current Settings sections:
 
 - Platform: site title, platform name, company, author, timezone, support/order/update email addresses, add-ons enabled, add-on product count, and read-only app mode.
-- Brand & SEO: logo, footer logo, favicon, default social image, X handle, social image alt text, and same-as links.
+- Brand & SEO: logo, footer logo, favicon, default social image, X handle, social image alt text, same-as links, and merchant return policy controls for Product/Organization JSON-LD.
 - Canonical URLs: production site URL and production Worker URL.
 - Checkout: Stripe publishable key.
 - Pricing: sales tax rate, default tip percent, and max tip percent.
@@ -88,7 +88,7 @@ Editor behavior:
 
 - Product-level fields include name, price, status, fulfillment, SKU, tax category, variant mode, media, description, and preview.
 - SKU is read-only. Existing product SKUs are preserved; new product SKUs derive from product name.
-- Description uses the full block content editor from The Pool baseline.
+- Description uses the Store block content editor with sandboxed preview output.
 - Preview renders a sandboxed static product page preview. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - The editor expands inline under the product row being edited.

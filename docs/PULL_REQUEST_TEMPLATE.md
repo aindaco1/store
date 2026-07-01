@@ -8,6 +8,7 @@
 ## Checks
 
 - [ ] `npm run test:unit`
+- [ ] `npm run test:seo`
 - [ ] `npm run test:content-security`
 - [ ] `npm run test:security`
 - [ ] `npm run sync:worker-config` when catalog/config changed

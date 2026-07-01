@@ -14,8 +14,14 @@
 - Improved ticket/RSVP SVG generation so long product and variant names fit within the ticket layout.
 - Added an all-variation local demo order seed covering physical, digital, ticket, RSVP, coupon, shipping, and fulfillment states for manual testing.
 - Added i18n completeness checks and localized email/admin copy coverage for the new transactional paths.
+- Added Spanish public routes for home, Terms, Orders, and Order Success, including localized runtime order lookup/confirmation copy while leaving product titles, descriptions, and creator-authored product content canonical.
+- Hardened authenticated super-admin order notification CTAs so notification links expire after 5 minutes, create a 30-minute admin session, and have regression coverage proving consumed links cannot be reused.
+- Added admin Brand & SEO customization controls that line up with public metadata, social image, and merchant return policy configuration.
+- Added a comprehensive non-admin SEO pass for public routes, canonical/alternate metadata, sitemap exclusions, crawl controls, and product structured data.
+- Fixed iOS Safari mobile styling where auto-detected text and the hamburger menu could inherit unexpected blue link/button styling.
 - Moved Vitest config entrypoints to ESM `.mts`, updated security test scripts to avoid Vite's CommonJS API deprecation path, and excluded test configs plus optimizer temp artifacts from static Jekyll output.
-- Updated accessibility, i18n, security, digital download, email, dashboard, testing, performance, Podman, SEO, and roadmap documentation for the release audit.
+- Folded the one-time production runbook into active production operations, testing, security, backup, and download docs, then removed the obsolete launch file.
+- Updated accessibility, i18n, security, digital download, email, dashboard, testing, performance, Podman, SEO, and roadmap documentation for the `v1.0.4` release audit.
 
 ## v1.0.3 - 2026-06-26
 

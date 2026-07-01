@@ -14,7 +14,7 @@ translation_key: terms
 <section class="storefront">
   <div class="storefront__header">
     <h1>Terms & Privacy</h1>
-    <p>Effective June 20, 2026.</p>
+    <p>Effective July 1, 2026.</p>
   </div>
 
   <div class="storefront__product-copy">
@@ -28,11 +28,11 @@ translation_key: terms
     <h2>Payments</h2>
     <p>Payments are processed by Stripe. We do not store complete card numbers on our servers. Stripe may collect and process payment, fraud-prevention, and billing information under its own terms and privacy policy.</p>
 
-    <h2>Shipping</h2>
+    <h2 id="shipping-policy">Shipping</h2>
     <p>Physical orders ship from New Mexico. Shipping options and estimated charges are shown at checkout. Delivery dates are estimates, not guarantees, because carrier delays, weather, address issues, and event schedules can affect timing.</p>
     <p>If an order cannot ship within the expected timeframe, we will contact you with an updated estimate or a refund option. Please contact us promptly if your shipping address is wrong; we cannot guarantee changes after fulfillment begins.</p>
 
-    <h2>Returns and Refunds</h2>
+    <h2 id="returns-refunds">Returns and Refunds</h2>
     <p>For physical merchandise, contact us within 14 days of delivery if you want to request a return or exchange. Returned items must be unused, unworn, unwashed, and in reasonably resaleable condition unless the issue is damage, defect, or our fulfillment error.</p>
     <p>Shipping charges are not refundable unless the return is caused by our mistake or a damaged/defective item. Return shipping is usually the buyer's responsibility unless we approve otherwise.</p>
     <p>Damaged, defective, or incorrect items should be reported within 7 days of delivery with the order number and photos. We may offer a replacement, repair, store credit, or refund depending on availability.</p>
@@ -43,7 +43,7 @@ translation_key: terms
     <p>If we cancel an event, we will offer a refund or replacement option when practical. If an event is postponed or moved, we will explain whether existing tickets remain valid, can be transferred, or can be refunded.</p>
 
     <h2>Digital Downloads</h2>
-    <p>Digital products are delivered through signed order links and may expire after the listed access window. If a download link fails, contact us and we can review or reissue access when appropriate.</p>
+    <p>Digital products are delivered through signed order links. Confirmed digital access remains available from the order page unless we revoke access for a refund, chargeback, fraud, support, rights, or legal reason. Individual download links may be short-lived for security and can be refreshed from the order page when access is still active.</p>
     <p>Unless a product page says otherwise, digital purchases are for personal use only and do not transfer copyright, resale rights, public performance rights, or commercial licensing rights.</p>
 
     <h2>Product Information</h2>

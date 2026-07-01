@@ -34,10 +34,7 @@ Read these first for Store work:
 - [DASHBOARD.md](DASHBOARD.md)
 - [TESTING.md](TESTING.md)
 - [SECURITY.md](SECURITY.md)
-- [PRODUCTION_LAUNCH.md](PRODUCTION_LAUNCH.md)
 - [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
-
-Historical extraction notes live in [history/](history/) and should not drive launch-facing behavior unless you are auditing the origin of an imported pattern.
 
 Use `/Users/aindaco1/Desktop/agents.md` as the product brief when working in Codex.
 
@@ -46,7 +43,7 @@ Use `/Users/aindaco1/Desktop/agents.md` as the product brief when working in Cod
 - Keep Store product data in `_products/`.
 - Prefer `store_collection` for collections and `storefront_category`/`product_category` for product-type categories; treat the existing `category: dustwave` and `category: fronteras` values as migrated collection data.
 - Do not reintroduce Snipcart.
-- Do not add Pool cart button classes; Store buttons use `store-add-item`.
+- Do not add legacy cart button classes; Store buttons use `store-add-item`.
 - Treat the Worker as authoritative for cart totals, inventory, tax, shipping, and order state.
 - Do not commit secrets. Local secrets belong in `worker/.dev.vars`; production secrets belong in Cloudflare Worker secrets.
 - Admin mutations must keep session, CSRF, role/scope, normalization, rate-limit, and audit boundaries intact.
@@ -64,6 +61,7 @@ npm run sync:worker-config
 Then run:
 
 ```bash
+npm run test:seo
 npm run test:content-security
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 ```
@@ -74,6 +72,7 @@ Default confidence path:
 
 ```bash
 bundle exec jekyll build --quiet
+npm run test:seo
 npm run test:content-security
 npm run test:unit
 PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1

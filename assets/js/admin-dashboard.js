@@ -438,6 +438,48 @@
     return currentLang || 'en';
   }
 
+  function localizedAdminText(key) {
+    var lang = String(preferredLang()).split('-')[0];
+    var runtimeAdminMessages = config.i18n && config.i18n.messages && config.i18n.messages.admin
+      ? config.i18n.messages.admin
+      : {};
+    var messages = {
+      en: {
+        about: 'About',
+        adminSection: 'Admin section',
+        settingsSection: 'Settings section',
+        uploadLogo: 'Upload logo',
+        uploadImage: 'Upload image',
+        logoUploaded: 'Logo uploaded. Publish settings to use it.',
+        imageUploaded: 'Image uploaded. Publish settings to use it.',
+        logoTypeError: 'Use a PNG, JPEG, or WebP logo.',
+        imageTypeError: 'Use a PNG, JPEG, WebP, or GIF image.',
+        logoSizeError: 'Logo must be 512 KB or smaller.',
+        imageSizeError: 'Image must be 8 MB or smaller.',
+        noFileChosen: 'No file chosen',
+        noImageSelected: 'No image selected.'
+      },
+      es: {
+        about: 'Acerca de',
+        adminSection: 'Seccion de administracion',
+        settingsSection: 'Seccion de configuracion',
+        uploadLogo: 'Subir logo',
+        uploadImage: 'Subir imagen',
+        logoUploaded: 'Logo subido. Publica la configuracion para usarlo.',
+        imageUploaded: 'Imagen subida. Publica la configuracion para usarla.',
+        logoTypeError: 'Usa un logo PNG, JPEG o WebP.',
+        imageTypeError: 'Usa una imagen PNG, JPEG, WebP o GIF.',
+        logoSizeError: 'El logo debe ser de 512 KB o menos.',
+        imageSizeError: 'La imagen debe ser de 8 MB o menos.',
+        noFileChosen: 'Ningun archivo seleccionado',
+        noImageSelected: 'Ninguna imagen seleccionada.'
+      }
+    };
+    if (runtimeAdminMessages[key]) return runtimeAdminMessages[key];
+    var langMessages = messages[lang] || messages.en;
+    return langMessages[key] || messages.en[key] || key;
+  }
+
   function formatError(error) {
     return error && error.message ? error.message : 'Something went wrong.';
   }
@@ -527,10 +569,10 @@
       allowedTypes: isLogo ? ['image/png', 'image/jpeg', 'image/webp'] : ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
       maxBytes: isLogo ? 512 * 1024 : 8 * 1024 * 1024,
       uploadPath: isLogo ? '/admin/settings/logo-upload' : '/admin/settings/image-upload',
-      uploadLabel: isLogo ? 'Upload logo' : 'Upload image',
-      uploadedText: isLogo ? 'Logo uploaded. Publish settings to use it.' : 'Image uploaded. Publish settings to use it.',
-      typeError: isLogo ? 'Use a PNG, JPEG, or WebP logo.' : 'Use a PNG, JPEG, WebP, or GIF image.',
-      sizeError: isLogo ? 'Logo must be 512 KB or smaller.' : 'Image must be 8 MB or smaller.',
+      uploadLabel: localizedAdminText(isLogo ? 'uploadLogo' : 'uploadImage'),
+      uploadedText: localizedAdminText(isLogo ? 'logoUploaded' : 'imageUploaded'),
+      typeError: localizedAdminText(isLogo ? 'logoTypeError' : 'imageTypeError'),
+      sizeError: localizedAdminText(isLogo ? 'logoSizeError' : 'imageSizeError'),
       uploadDataset: isLogo ? 'logoUploadInput' : 'settingsImageUploadInput'
     };
   }
@@ -539,7 +581,7 @@
     clear(preview);
     var value = String(path || '').trim();
     if (!value) {
-      preview.appendChild(createElement('span', '', 'No image selected.'));
+      preview.appendChild(createElement('span', '', localizedAdminText('noImageSelected')));
       return;
     }
     var image = document.createElement('img');
@@ -616,7 +658,7 @@
     uploadRow.appendChild(createAdminFilePicker(uploadInput, {
       buttonLabel: options.uploadLabel,
       className: 'admin-file-picker--full',
-      emptyLabel: 'No file chosen',
+      emptyLabel: localizedAdminText('noFileChosen'),
       idPrefix: 'admin-settings-image-upload'
     }));
     uploadRow.appendChild(uploadStatus);
@@ -751,7 +793,7 @@
         });
       }
     });
-    syncMobileSelect(tabList, '[data-admin-tab]', getActiveAdminTab(), 'Admin section', selectAdminTab);
+    syncMobileSelect(tabList, '[data-admin-tab]', getActiveAdminTab(), localizedAdminText('adminSection'), selectAdminTab);
   }
 
   function getActiveAdminTab() {
@@ -795,7 +837,7 @@
     $all('[data-admin-tab-panel]').forEach(function(panel) {
       panel.hidden = panel.dataset.adminTabPanel !== key;
     });
-    syncMobileSelect(tabList, '[data-admin-tab]', key, 'Admin section', selectAdminTab);
+    syncMobileSelect(tabList, '[data-admin-tab]', key, localizedAdminText('adminSection'), selectAdminTab);
     if (key === 'settings' && !settingsLoaded) loadSettings();
     if (key === 'store-analytics' && !storeAnalyticsLoaded) loadStoreAnalytics();
     if (key === 'store-marketing') {
@@ -978,7 +1020,7 @@
       tab.setAttribute('aria-selected', selected ? 'true' : 'false');
       tab.tabIndex = selected ? 0 : -1;
     });
-    syncMobileSelect(tabList, '[data-settings-section-index]', String(currentSettingsSection), 'Settings section', function(value) {
+    syncMobileSelect(tabList, '[data-settings-section-index]', String(currentSettingsSection), localizedAdminText('settingsSection'), function(value) {
       selectSettingsSection(Number(value));
     });
     renderSettingsSection(settingsSections[currentSettingsSection]);
@@ -1003,7 +1045,7 @@
       button.addEventListener('click', function() { selectSettingsSection(index); });
       tabList.appendChild(button);
     });
-    syncMobileSelect(tabList, '[data-settings-section-index]', String(currentSettingsSection), 'Settings section', function(value) {
+    syncMobileSelect(tabList, '[data-settings-section-index]', String(currentSettingsSection), localizedAdminText('settingsSection'), function(value) {
       selectSettingsSection(Number(value));
     });
   }
@@ -1181,7 +1223,7 @@
     var button = createElement('button', 'admin-settings__help-button');
     var help = createElement('span', 'admin-settings__help-tooltip');
     button.type = 'button';
-    button.setAttribute('aria-label', 'About ' + (row.label || 'setting'));
+    button.setAttribute('aria-label', localizedAdminText('about') + ' ' + (row.label || 'setting'));
     button.setAttribute('aria-describedby', id);
     button.appendChild(createHelpIcon());
     help.id = id;
@@ -1688,7 +1730,7 @@
   function loadSettings() {
     var status = $('#admin-settings-status');
     setStatus(status, 'Loading settings...');
-    return requestJson('/admin/settings').then(function(data) {
+    return requestJson('/admin/settings', { params: { preferredLang: preferredLang() } }).then(function(data) {
       settingsLoaded = true;
       currentUser = data.user || currentUser;
       var sections = Array.isArray(data.sections) ? data.sections : [];

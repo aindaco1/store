@@ -196,11 +196,11 @@ verify_build_artifacts() {
     echo "robots.txt is missing its sitemap pointer"
     return 1
   fi
-  if ! rg -n 'Disallow: /order-success/' _site/robots.txt >/dev/null; then
-    echo "robots.txt is missing the order-success route disallow"
+  if rg -n 'Disallow: /order-success/' _site/robots.txt >/dev/null; then
+    echo "robots.txt blocks order-success before crawlers can observe noindex"
     return 1
   fi
-  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9">' _site/sitemap.xml >/dev/null; then
+  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
     echo "sitemap.xml is missing the expected urlset root"
     return 1
   fi

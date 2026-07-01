@@ -14,4 +14,4 @@ tax_category: standard
 inventory_tracking: false
 inventory: 0
 ---
-18" x 24" First Time Sexpot poster.
+18" x 24" First Time Sexpot poster featuring Hot N' Dangerous artwork for wall display.

@@ -6,7 +6,7 @@ Store is a static-first storefront backed by a Cloudflare Worker. The public sit
 
 ```bash
 bundle exec jekyll serve --config _config.yml,_config.local.yml --host 127.0.0.1 --port 4002
-cd worker && npx wrangler dev --env dev --ip 127.0.0.1 --port 8989
+npm --prefix worker run dev
 ```
 
 - Storefront: `http://127.0.0.1:4002`
@@ -20,7 +20,10 @@ cd worker && npx wrangler dev --env dev --ip 127.0.0.1 --port 8989
 - `_products/`: product Markdown files.
 - `api/products.json`: generated public catalog endpoint.
 - `api/add-ons.json`: optional platform add-on catalog.
+- `es/`: localized public page shells for Spanish home, Terms, Orders, Order Success, and admin.
+- `_includes/storefront-home.html`: shared home/product-grid rendering used by English and Spanish home pages.
 - `assets/js/cart-provider.js`: Store cart and checkout UI runtime.
+- `assets/js/order-lookup.js` and `assets/js/order-success.js`: localized order lookup and order summary runtimes.
 - `assets/js/admin-dashboard.js`: browser admin dashboard.
 - `worker/src/catalog.js`: catalog validation.
 - `worker/src/orders.js`: order draft and fulfillment shaping.
@@ -45,6 +48,8 @@ This runs:
 
 Restart the Worker after syncing.
 
+Localization config lives under `i18n` in `_config.yml`, while translated UI/runtime strings live in `_data/i18n/{lang}.yml`. Product titles, descriptions, and bodies remain catalog-authored content unless a product defines explicit `localized.{lang}` overrides.
+
 ## Runtime Ports
 
 Local defaults are intentionally pinned:
@@ -61,7 +66,7 @@ Store checkout is order-based:
 3. Worker creates an `orders:<orderToken>` draft in `STORE_STATE`.
 4. Paid orders use Stripe PaymentIntents.
 5. Free RSVP-style orders confirm immediately.
-6. Stripe webhooks settle paid orders and send order emails.
+6. Stripe webhooks settle paid orders and send Store-owned customer/admin order emails.
 
 ## Inventory
 
@@ -90,11 +95,16 @@ The admin dashboard supports:
 
 Browser admin sessions use `store_admin_session`; mutations require `x-store-admin-csrf`.
 
+Super-admin order notification emails use the same one-time admin magic-link exchange, deep-link into `tab=store-orders`, expire after 5 minutes, and create a 30-minute admin session when consumed.
+
 Production admin writes use GitHub APIs and workflow dispatches. Local admin writes use `ADMIN_LOCAL_REPO_SERVICE` only when `APP_MODE=test` and `ADMIN_LOCAL_REPO_WRITES_ENABLED=true`.
 
 ## Test Path
 
 ```bash
+npm run build
+npm run test:i18n
+npm run test:seo
 npm run test:unit
 npm run test:content-security
 npm run test:security

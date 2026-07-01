@@ -21,6 +21,7 @@ Sent to effective `super_admin` users after a new Store order is confirmed.
 - Limited Store admins do not receive this notification automatically.
 - Notifications use the existing Store order email renderer without ticket/calendar/QR attachments, keeping the admin message lightweight and transactional.
 - The admin CTA includes a short-lived one-time `admin_login` link for the Orders tab so super admins can open the order without requesting a second sign-in email.
+- Order-notification admin links expire after 5 minutes and create a 30-minute admin session after successful exchange. They are bearer links, so forwarding an unused notification can still delegate access until the link is consumed or expires.
 
 ### Admin Access
 

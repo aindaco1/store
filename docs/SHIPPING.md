@@ -11,6 +11,7 @@ shipping:
   origin_zip: "87120"
   origin_country: "US"
   fallback_flat_rate: 3.00
+  free_shipping_default: false
   default_option: standard
   usps:
     enabled: true
@@ -24,6 +25,7 @@ The current default posture is:
 
 - USPS live quotes when configured and available
 - `$3.00` fallback flat rate
+- paid shipping by default unless an admin/config change enables free shipping
 - New Mexico origin ZIP `87120`
 - physical products use package presets
 - tickets, RSVPs, and downloads do not require shipping
@@ -61,9 +63,9 @@ The Worker derives the shipping requirement from the validated cart:
 - free RSVPs do not require shipping
 - mixed carts require shipping only for the physical subset
 
-For physical carts, the Worker calculates package inputs from product quantities and shipping presets, then attempts a USPS quote when configured. If USPS is disabled, missing credentials, cooling down, rate-limited, or unavailable, the Worker falls back to the configured flat rate.
+For physical carts, the Worker calculates package inputs from product quantities and shipping presets, then attempts a USPS quote when configured. If USPS is disabled, missing credentials, cooling down, rate-limited, or unavailable, the Worker falls back to the configured flat rate. Signature-required options are offered only when they can be priced and are compatible with the current shipping/free-shipping state.
 
-Paid domestic physical shipments can expose signature-required options when the quote path can price them. Free-shipping defaults suppress paid signature options.
+Free-shipping defaults suppress paid signature options.
 
 ## USPS Boundary
 
@@ -112,7 +114,7 @@ npx vitest run tests/unit/shipping.test.ts tests/unit/store-catalog.test.ts
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 ```
 
-Manual launch smoke:
+Manual production smoke:
 
 1. Add one physical product.
 2. Enter a U.S. ZIP/postal address in checkout.
@@ -125,4 +127,4 @@ Manual launch smoke:
 
 - Whether Store v1 should expose customer-selectable shipping service levels beyond the default option.
 - Whether label purchasing belongs in Store or in a separate fulfillment workflow.
-- Whether international shipping should be enabled at launch or held until real package/handling policies are finalized.
+- Whether international shipping should be enabled in production or held until real package/handling policies are finalized.

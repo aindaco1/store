@@ -15,11 +15,38 @@
   }
 
   function getGenericSentMessage() {
-    return 'If that email has ' + getPlatformName() + ' orders, a secure lookup link has been sent.';
+    return message('generic_sent', 'If that email has %{platform} orders, a secure lookup link has been sent.', {
+      platform: getPlatformName()
+    });
   }
 
   function getRuntimeConfig() {
     return window.STORE_CONFIG || window.StoreConfig || {};
+  }
+
+  function getCurrentLang() {
+    var config = getRuntimeConfig();
+    return String(config?.i18n?.currentLang || document.documentElement.lang || 'en').toLowerCase() === 'es' ? 'es' : 'en';
+  }
+
+  function getLocale() {
+    return getCurrentLang() === 'es' ? 'es-US' : 'en-US';
+  }
+
+  function getRuntimeMessages() {
+    var config = getRuntimeConfig();
+    return config?.i18n?.messages?.orderLookup || {};
+  }
+
+  function interpolate(template, values) {
+    return String(template || '').replace(/%\{([^}]+)\}/g, function(match, key) {
+      return Object.prototype.hasOwnProperty.call(values || {}, key) ? String(values[key]) : match;
+    });
+  }
+
+  function message(key, fallback, values) {
+    var value = getRuntimeMessages()[key] || fallback || '';
+    return interpolate(value, values || {});
   }
 
   function getWorkerBase() {
@@ -51,7 +78,7 @@
   function formatMoney(cents, currency) {
     var amount = Math.max(0, Number(cents || 0) || 0) / 100;
     try {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat(getLocale(), {
         style: 'currency',
         currency: currency || 'USD'
       }).format(amount);
@@ -65,7 +92,7 @@
     var date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
     try {
-      return new Intl.DateTimeFormat('en-US', {
+      return new Intl.DateTimeFormat(getLocale(), {
         dateStyle: 'medium',
         timeStyle: 'short'
       }).format(date);
@@ -83,9 +110,9 @@
   }
 
   function getOrderStatusLabel(order) {
-    if (order?.fulfillmentReady) return 'Order confirmed';
-    if (order?.status === 'payment_failed') return 'Payment failed';
-    return 'Order processing';
+    if (order?.fulfillmentReady) return message('order_confirmed', 'Order confirmed');
+    if (order?.status === 'payment_failed') return message('payment_failed', 'Payment failed');
+    return message('order_processing', 'Order processing');
   }
 
   function getOrderUrl(order) {
@@ -95,20 +122,20 @@
   }
 
   function getOrderTokenLabel(order) {
-    return String(order?.orderToken || '').trim() || 'Unavailable';
+    return String(order?.orderToken || '').trim() || message('unavailable', 'Unavailable');
   }
 
   function getOrderDateLine(order) {
-    if (order?.confirmedAt) return 'Confirmed ' + formatDate(order.confirmedAt);
-    if (order?.createdAt) return 'Created ' + formatDate(order.createdAt);
+    if (order?.confirmedAt) return message('confirmed', 'Confirmed') + ' ' + formatDate(order.confirmedAt);
+    if (order?.createdAt) return message('created', 'Created') + ' ' + formatDate(order.createdAt);
     return '';
   }
 
   function getOrderItemLabel(item) {
     return [
-      item?.name || 'Store item',
+      item?.name || message('store_item', 'Store item'),
       item?.variantLabel || '',
-      'Qty ' + (item?.quantity || 1)
+      message('qty', 'Qty') + ' ' + (item?.quantity || 1)
     ].filter(Boolean).join(' · ');
   }
 
@@ -116,7 +143,7 @@
     var items = Array.isArray(order?.items) ? order.items : [];
     var limit = Math.max(1, Number(maxItems || 3) || 3);
     var labels = items.slice(0, limit).map(getOrderItemLabel);
-    if (items.length > limit) labels.push('+' + (items.length - limit) + ' more');
+    if (items.length > limit) labels.push('+' + (items.length - limit) + ' ' + message('more', 'more'));
     return labels.join('\n');
   }
 
@@ -135,11 +162,18 @@
     table.className = 'store-order-lookup__table';
     var caption = document.createElement('caption');
     caption.className = 'sr-only';
-    caption.textContent = 'Orders found for this lookup link';
+    caption.textContent = message('orders_found_caption', 'Orders found for this lookup link');
     table.append(caption);
     var thead = document.createElement('thead');
     var header = document.createElement('tr');
-    ['Status', 'Order', 'Date', 'Items', 'Total', ''].forEach(function(label) {
+    [
+      message('table_status', 'Status'),
+      message('table_order', 'Order'),
+      message('table_date', 'Date'),
+      message('table_items', 'Items'),
+      message('table_total', 'Total'),
+      ''
+    ].forEach(function(label) {
       appendTableCell(header, 'th', label);
     });
     thead.append(header);
@@ -156,7 +190,7 @@
       var link = document.createElement('a');
       link.className = 'btn btn--small';
       link.href = getOrderUrl(order);
-      link.textContent = 'View order';
+      link.textContent = message('view_order', 'View order');
       actionCell.append(link);
       row.append(actionCell);
       tbody.append(row);
@@ -170,7 +204,7 @@
     var card = document.createElement('article');
     card.className = 'store-order__item store-order-lookup__order';
     appendText(card, 'h2', 'store-order__title', getOrderStatusLabel(order));
-    appendText(card, 'p', 'store-order__meta', 'Order ' + getOrderTokenLabel(order));
+    appendText(card, 'p', 'store-order__meta', message('order', 'Order') + ' ' + getOrderTokenLabel(order));
     appendText(card, 'p', 'store-order__total', formatMoney(order.totalCents, order.currency || 'USD'));
     var dateLine = getOrderDateLine(order);
     if (dateLine) appendText(card, 'p', 'store-order__meta', dateLine);
@@ -190,7 +224,7 @@
     var link = document.createElement('a');
     link.className = 'btn';
     link.href = getOrderUrl(order);
-    link.textContent = 'View order';
+    link.textContent = message('view_order', 'View order');
     actions.append(link);
     card.append(actions);
     return card;
@@ -203,11 +237,11 @@
 
     var orders = Array.isArray(data?.orders) ? data.orders : [];
     if (orders.length === 0) {
-      appendText(resultsNode, 'p', 'store-order__note', 'No orders are available for this link.');
+      appendText(resultsNode, 'p', 'store-order__note', message('no_orders', 'No orders are available for this link.'));
       return;
     }
 
-    appendText(resultsNode, 'h2', 'store-order__title', 'Orders');
+    appendText(resultsNode, 'h2', 'store-order__title', message('orders', 'Orders'));
     resultsNode.append(renderOrderTable(orders));
     var list = document.createElement('div');
     list.className = 'store-order-lookup__orders';
@@ -229,15 +263,17 @@
     var panel = document.createElement('div');
     panel.className = 'store-order__panel store-order-lookup__debug';
     if (debug.deliverySent === false) {
-      appendText(panel, 'p', 'store-order__note', 'Local email delivery failed: ' + (debug.deliveryError || debug.deliveryReason || 'not sent') + '.');
+      appendText(panel, 'p', 'store-order__note', message('local_email_failed', 'Local email delivery failed: %{reason}.', {
+        reason: debug.deliveryError || debug.deliveryReason || 'not sent'
+      }));
     } else {
-      appendText(panel, 'p', 'store-order__note', 'Local lookup link generated.');
+      appendText(panel, 'p', 'store-order__note', message('local_lookup_generated', 'Local lookup link generated.'));
     }
     if (debug.lookupUrl) {
       var link = document.createElement('a');
       link.className = 'btn btn--secondary';
       link.href = debug.lookupUrl;
-      link.textContent = 'Open local lookup';
+      link.textContent = message('open_local_lookup', 'Open local lookup');
       panel.append(link);
     }
     resultsNode.append(panel);
@@ -251,7 +287,7 @@
       body: JSON.stringify({ email: email })
     });
     var data = await response.json().catch(function() { return {}; });
-    if (!response.ok) throw new Error(data.error || 'Unable to send lookup link.');
+    if (!response.ok) throw new Error(data.error || message('unable_send', 'Unable to send lookup link.'));
     return data;
   }
 
@@ -261,7 +297,7 @@
       cache: 'no-store'
     });
     var data = await response.json().catch(function() { return {}; });
-    if (!response.ok) throw new Error(data.error || 'Unable to load orders.');
+    if (!response.ok) throw new Error(data.error || message('unable_load', 'Unable to load orders.'));
     return data;
   }
 
@@ -269,32 +305,33 @@
     event.preventDefault();
     var email = String(emailField?.value || '').trim();
     if (!email) {
-      setStatus('Enter an email address.');
+      setStatus(message('email_required', 'Enter an email address.'));
       emailField?.focus();
       return;
     }
 
     setSubmitting(true);
-    setStatus('Sending lookup link...');
+    setStatus(message('sending', 'Sending lookup link...'));
     try {
       var data = await requestLookup(email);
-      setStatus(data?.message || getGenericSentMessage());
+      var serverMessage = String(data?.message || '').trim();
+      setStatus(getCurrentLang() === 'en' && serverMessage ? serverMessage : getGenericSentMessage());
       renderLookupRequestDiagnostics(data);
     } catch (error) {
-      setStatus(error?.message || 'Unable to send lookup link.');
+      setStatus(error?.message || message('unable_send', 'Unable to send lookup link.'));
     } finally {
       setSubmitting(false);
     }
   }
 
   async function loadToken(token) {
-    setStatus('Loading orders...');
+    setStatus(message('loading', 'Loading orders...'));
     try {
       var data = await consumeLookup(token);
       renderLookupResults(data);
-      setStatus('Lookup link verified.');
+      setStatus(message('verified', 'Lookup link verified.'));
     } catch (error) {
-      setStatus(error?.message || 'Unable to load orders.');
+      setStatus(error?.message || message('unable_load', 'Unable to load orders.'));
     }
   }
 

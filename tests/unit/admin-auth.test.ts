@@ -1,6 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createAdminLoginUrl, handleAdminAuthStart } from '../../worker/src/admin-auth.js';
+import { createAdminLoginUrl, handleAdminAuthExchange, handleAdminAuthStart } from '../../worker/src/admin-auth.js';
+
+class MockKVNamespace {
+  store = new Map<string, string>();
+  put = vi.fn(async (key: string, value: string, _options?: unknown) => {
+    this.store.set(key, value);
+  });
+  get = vi.fn(async (key: string, options?: { type?: string }) => {
+    if (!this.store.has(key)) return null;
+    const value = this.store.get(key) as string;
+    return options?.type === 'json' ? JSON.parse(value) : value;
+  });
+  delete = vi.fn(async (key: string) => {
+    this.store.delete(key);
+  });
+}
 
 describe('admin auth links', () => {
   it('builds exposed admin login links from the canonical public site base', async () => {
@@ -69,6 +84,50 @@ describe('admin auth links', () => {
       role: 'super_admin',
       source: 'store_order_admin_notification'
     });
-    expect(options).toMatchObject({ expirationTtl: 900 });
+    expect(options).toMatchObject({ expirationTtl: 300 });
+  });
+
+  it('consumes authenticated order notification links once and creates a shorter admin session', async () => {
+    const storeState = new MockKVNamespace();
+    const env = {
+      SITE_BASE: 'http://127.0.0.1:4002',
+      CANONICAL_SITE_BASE: 'https://shop.dustwave.xyz',
+      ADMIN_BOOTSTRAP_EMAILS: 'admin@example.com',
+      ADMIN_SESSION_SECRET: 'test_admin_session_secret',
+      STORE_STATE: storeState
+    };
+    const loginUrl = await createAdminLoginUrl(env, {
+      email: 'admin@example.com',
+      preferredLang: 'en',
+      params: { tab: 'store-orders' },
+      source: 'store_order_admin_notification'
+    });
+    const token = new URL(loginUrl).searchParams.get('admin_login') || '';
+
+    const firstResponse = await handleAdminAuthExchange(
+      new Request('https://shop.dustwave.xyz/admin/auth/exchange', { method: 'POST' }),
+      env,
+      { token }
+    );
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstResponse.headers.get('Set-Cookie')).toContain('Max-Age=1800');
+    expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'))).toHaveLength(0);
+    const sessionKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-session:'));
+    expect(sessionKeys).toHaveLength(1);
+    expect(JSON.parse(storeState.store.get(sessionKeys[0]) || '{}')).toMatchObject({
+      email: 'admin@example.com',
+      role: 'super_admin',
+      source: 'store_order_admin_notification'
+    });
+    const sessionPut = storeState.put.mock.calls.find(([key]) => String(key).startsWith('admin-session:'));
+    expect(sessionPut?.[2]).toMatchObject({ expirationTtl: 1800 });
+
+    const secondResponse = await handleAdminAuthExchange(
+      new Request('https://shop.dustwave.xyz/admin/auth/exchange', { method: 'POST' }),
+      env,
+      { token }
+    );
+    expect(secondResponse.status).toBe(401);
   });
 });

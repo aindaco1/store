@@ -11774,11 +11774,11 @@ function stringifyAdminSettingValue(value) {
   return String(value);
 }
 
-function adminSettingsSection(title, entries) {
+function adminSettingsSection(title, entries, lang = DEFAULT_I18N_LANG) {
   return {
-    title,
+    title: localizedAdminSectionTitle(title, lang),
     rows: entries.map(([label, value, options = {}]) => ({
-      label,
+      label: options.label || label,
       value: stringifyAdminSettingValue(value),
       rawValue: value ?? '',
       editable: Boolean(options.editable),
@@ -11801,6 +11801,112 @@ function adminSettingsSection(title, entries) {
       help: options.help || ''
     }))
   };
+}
+
+const ADMIN_SETTING_LOCALIZATIONS = {
+  es: {
+    fields: {
+      'platform.favicon_path': {
+        label: 'Favicon',
+        help: 'Icono pequeno que aparece en la pestana del navegador. Usa una imagen cuadrada simple para mejor compatibilidad.'
+      },
+      'platform.default_social_image_path': {
+        label: 'Imagen social predeterminada',
+        help: 'Imagen de respaldo para tarjetas sociales cuando una pagina o producto no tiene su propia imagen.'
+      },
+      'seo.x_handle': {
+        label: 'Usuario de X'
+      },
+      'seo.default_social_image_alt': {
+        label: 'Texto alternativo de imagen social'
+      },
+      'seo.same_as': {
+        label: 'Enlaces same-as'
+      },
+      'seo.merchant_return_policy.applicable_country': {
+        label: 'Pais de politica de devoluciones',
+        help: 'Codigo de pais de dos letras para la politica de devoluciones en los datos estructurados de producto.'
+      },
+      'seo.merchant_return_policy.return_policy_category': {
+        label: 'Tipo de politica de devoluciones',
+        help: 'Categoria de politica de devoluciones de Google Merchant emitida en el JSON-LD de Organization.'
+      },
+      'seo.merchant_return_policy.merchant_return_days': {
+        label: 'Dias para devoluciones',
+        help: 'Obligatorio cuando el tipo de politica usa una ventana de devolucion finita.'
+      },
+      'seo.merchant_return_policy.return_fees': {
+        label: 'Costos de devolucion',
+        help: 'Como se representan los costos de envio de devolucion en los datos estructurados cuando se permiten devoluciones.'
+      },
+      'seo.merchant_return_policy.return_method': {
+        label: 'Metodo de devolucion',
+        help: 'Metodo de devolucion representado en los datos estructurados cuando se permiten devoluciones.'
+      }
+    },
+    options: {
+      US: 'Estados Unidos',
+      CA: 'Canada',
+      GB: 'Reino Unido',
+      AU: 'Australia',
+      NZ: 'Nueva Zelanda',
+      MX: 'Mexico',
+      FR: 'Francia',
+      DE: 'Alemania',
+      ES: 'Espana',
+      IT: 'Italia',
+      NL: 'Paises Bajos',
+      SE: 'Suecia',
+      'https://schema.org/MerchantReturnFiniteReturnWindow': 'Ventana de devolucion finita',
+      'https://schema.org/MerchantReturnUnlimitedWindow': 'Ventana de devolucion ilimitada',
+      'https://schema.org/MerchantReturnNotPermitted': 'No se permiten devoluciones',
+      'https://schema.org/ReturnFeesCustomerResponsibility': 'Cliente cubre envio de devolucion',
+      'https://schema.org/FreeReturn': 'Devoluciones gratis',
+      'https://schema.org/ReturnShippingFees': 'Comercio cobra envio de devolucion',
+      'https://schema.org/ReturnByMail': 'Devolucion por correo',
+      'https://schema.org/ReturnInStore': 'Devolucion en tienda',
+      'https://schema.org/ReturnAtKiosk': 'Devolucion en kiosco'
+    }
+  }
+};
+
+function adminLocaleKey(lang = DEFAULT_I18N_LANG) {
+  return normalizePreferredLang(lang).split('-')[0];
+}
+
+function localizedAdminOptions(options = [], lang = DEFAULT_I18N_LANG) {
+  const localization = ADMIN_SETTING_LOCALIZATIONS[adminLocaleKey(lang)];
+  if (!localization?.options || !Array.isArray(options)) return options;
+  return options.map((option) => ({
+    ...option,
+    label: localization.options[String(option.value)] || option.label
+  }));
+}
+
+function localizedAdminSettingSchema(path, schema, lang = DEFAULT_I18N_LANG) {
+  if (!schema) return schema;
+  const localization = ADMIN_SETTING_LOCALIZATIONS[adminLocaleKey(lang)];
+  const field = localization?.fields?.[path] || {};
+  return {
+    ...schema,
+    ...field,
+    options: localizedAdminOptions(schema.options, lang)
+  };
+}
+
+function localizedAdminSectionTitle(title, lang = DEFAULT_I18N_LANG) {
+  const key = adminLocaleKey(lang);
+  if (key === 'es' && title === 'Brand & SEO') return 'Marca y SEO';
+  return title;
+}
+
+function preferredAdminSettingsLang(request) {
+  try {
+    const url = new URL(request.url);
+    return normalizePreferredLang(url.searchParams.get('preferredLang') || url.searchParams.get('lang'));
+  } catch {
+    return DEFAULT_I18N_LANG;
+  }
 }
 
 const ADMIN_TAX_PROVIDER_OPTIONS = [
@@ -11832,6 +11938,24 @@ const ADMIN_SHIPPING_DEFAULT_OPTION_OPTIONS = [
   { value: 'adult_signature_required', label: 'Adult signature required' }
 ];
 
+const ADMIN_RETURN_POLICY_CATEGORY_OPTIONS = [
+  { value: 'https://schema.org/MerchantReturnFiniteReturnWindow', label: 'Finite return window' },
+  { value: 'https://schema.org/MerchantReturnUnlimitedWindow', label: 'Unlimited return window' },
+  { value: 'https://schema.org/MerchantReturnNotPermitted', label: 'Returns not permitted' }
+];
+
+const ADMIN_RETURN_FEES_OPTIONS = [
+  { value: 'https://schema.org/ReturnFeesCustomerResponsibility', label: 'Customer handles return shipping' },
+  { value: 'https://schema.org/FreeReturn', label: 'Free returns' },
+  { value: 'https://schema.org/ReturnShippingFees', label: 'Merchant charges return shipping fee' }
+];
+
+const ADMIN_RETURN_METHOD_OPTIONS = [
+  { value: 'https://schema.org/ReturnByMail', label: 'Return by mail' },
+  { value: 'https://schema.org/ReturnInStore', label: 'Return in store' },
+  { value: 'https://schema.org/ReturnAtKiosk', label: 'Return at kiosk' }
+];
+
 const ADMIN_TIME_ZONE_OPTIONS = getTimeZoneOptions();
 
 const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
@@ -11852,6 +11976,11 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['seo.x_handle', { label: 'X handle', layoutGroup: 'brand-x-social-alt' }],
   ['seo.default_social_image_alt', { label: 'Default social image alt', layoutGroup: 'brand-x-social-alt' }],
   ['seo.same_as', { label: 'Same-as links', type: 'list', input: 'url-list' }],
+  ['seo.merchant_return_policy.applicable_country', { label: 'Return policy country', input: 'select', options: ADMIN_ORIGIN_COUNTRY_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Two-letter country code for the merchant return policy in product structured data.' }],
+  ['seo.merchant_return_policy.return_policy_category', { label: 'Return policy type', input: 'select', options: ADMIN_RETURN_POLICY_CATEGORY_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Google merchant-listing return policy category emitted under Organization JSON-LD.' }],
+  ['seo.merchant_return_policy.merchant_return_days', { label: 'Return window days', type: 'number', input: 'integer', min: 1, max: 3650, step: 1, layoutGroup: 'brand-return-policy', visibleWhen: { path: 'seo.merchant_return_policy.return_policy_category', value: 'https://schema.org/MerchantReturnFiniteReturnWindow' }, help: 'Required when the return policy type is a finite return window.' }],
+  ['seo.merchant_return_policy.return_fees', { label: 'Return fees', input: 'select', options: ADMIN_RETURN_FEES_OPTIONS, layoutGroup: 'brand-return-policy', help: 'How return shipping costs are represented in merchant listing structured data when returns are permitted.' }],
+  ['seo.merchant_return_policy.return_method', { label: 'Return method', input: 'select', options: ADMIN_RETURN_METHOD_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Return method represented in merchant listing structured data when returns are permitted.' }],
   ['platform.site_url', { label: 'Production site URL', input: 'url', layoutGroup: 'canonical-urls' }],
   ['platform.worker_url', { label: 'Production Worker URL', input: 'url', layoutGroup: 'canonical-urls' }],
   ['checkout.stripe_publishable_key', { label: 'Stripe publishable key', input: 'stripe-publishable-key' }],
@@ -11903,9 +12032,10 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['debug.verbose_console_logging', { label: 'Verbose console logging', type: 'boolean', layoutGroup: 'debug' }]
 ]);
 
-function editableAdminSetting(path, type = 'string') {
-  const schema = ADMIN_PLATFORM_SETTING_SCHEMA.get(path);
+function editableAdminSetting(path, type = 'string', lang = DEFAULT_I18N_LANG) {
+  const schema = localizedAdminSettingSchema(path, ADMIN_PLATFORM_SETTING_SCHEMA.get(path), lang);
   return {
+    label: schema?.label,
     editable: true,
     path,
     type: schema?.type || type,
@@ -12655,6 +12785,7 @@ async function handleAdminSettings(request, env) {
   if (!auth.ok) return auth.response;
 
   const sections = [];
+  const adminLang = preferredAdminSettingsLang(request);
   const canonicalSiteBase = env.CANONICAL_SITE_BASE || env.SITE_BASE;
   const canonicalWorkerBase = env.CANONICAL_WORKER_BASE || env.WORKER_BASE;
   const seoSameAs = parseAdminDelimitedList(env.SEO_SAME_AS);
@@ -12662,6 +12793,11 @@ async function handleAdminSettings(request, env) {
   const platformFooterLogoPath = env.PLATFORM_FOOTER_LOGO_PATH || platformLogoPath;
   const platformFaviconPath = env.PLATFORM_FAVICON_PATH || '/assets/icons/favicon.png';
   const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH || platformLogoPath;
+  const seoReturnPolicyCountry = env.SEO_RETURN_POLICY_APPLICABLE_COUNTRY || env.SHIPPING_ORIGIN_COUNTRY || 'US';
+  const seoReturnPolicyCategory = env.SEO_RETURN_POLICY_CATEGORY || 'https://schema.org/MerchantReturnFiniteReturnWindow';
+  const seoMerchantReturnDays = Number.parseInt(String(env.SEO_MERCHANT_RETURN_DAYS || '14'), 10) || 14;
+  const seoReturnFees = env.SEO_RETURN_FEES || 'https://schema.org/ReturnFeesCustomerResponsibility';
+  const seoReturnMethod = env.SEO_RETURN_METHOD || 'https://schema.org/ReturnByMail';
   const defaultMarketingShareTitle = env.MARKETING_SHARE_TITLE || env.PLATFORM_NAME || env.SITE_TITLE || 'Store';
   const defaultMarketingShareText = env.MARKETING_SHARE_TEXT || env.SITE_DESCRIPTION || '';
   const addOnsEnabled = String(env.ADD_ONS_ENABLED ?? 'true').toLowerCase() !== 'false';
@@ -12687,12 +12823,17 @@ async function handleAdminSettings(request, env) {
       adminSettingsSection('Brand & SEO', [
         ['Logo', platformLogoPath, editableAdminSetting('platform.logo_path')],
         ['Footer logo', platformFooterLogoPath, editableAdminSetting('platform.footer_logo_path')],
-        ['Favicon', platformFaviconPath, editableAdminSetting('platform.favicon_path')],
-        ['Default social image', platformDefaultSocialImagePath, editableAdminSetting('platform.default_social_image_path')],
-        ['X handle', env.SEO_X_HANDLE, editableAdminSetting('seo.x_handle')],
-        ['Default social image alt', env.SEO_DEFAULT_SOCIAL_IMAGE_ALT || env.PLATFORM_NAME, editableAdminSetting('seo.default_social_image_alt')],
-        ['Same-as links', seoSameAs, editableAdminSetting('seo.same_as', 'list')]
-      ]),
+        ['Favicon', platformFaviconPath, editableAdminSetting('platform.favicon_path', 'string', adminLang)],
+        ['Default social image', platformDefaultSocialImagePath, editableAdminSetting('platform.default_social_image_path', 'string', adminLang)],
+        ['X handle', env.SEO_X_HANDLE, editableAdminSetting('seo.x_handle', 'string', adminLang)],
+        ['Default social image alt', env.SEO_DEFAULT_SOCIAL_IMAGE_ALT || env.PLATFORM_NAME, editableAdminSetting('seo.default_social_image_alt', 'string', adminLang)],
+        ['Same-as links', seoSameAs, editableAdminSetting('seo.same_as', 'list', adminLang)],
+        ['Return policy country', seoReturnPolicyCountry, editableAdminSetting('seo.merchant_return_policy.applicable_country', 'string', adminLang)],
+        ['Return policy type', seoReturnPolicyCategory, editableAdminSetting('seo.merchant_return_policy.return_policy_category', 'string', adminLang)],
+        ['Return window days', seoMerchantReturnDays, editableAdminSetting('seo.merchant_return_policy.merchant_return_days', 'number', adminLang)],
+        ['Return fees', seoReturnFees, editableAdminSetting('seo.merchant_return_policy.return_fees', 'string', adminLang)],
+        ['Return method', seoReturnMethod, editableAdminSetting('seo.merchant_return_policy.return_method', 'string', adminLang)]
+      ], adminLang),
       adminSettingsSection('Canonical URLs', [
         ['Production site URL', canonicalSiteBase, editableAdminSetting('platform.site_url')],
         ['Production Worker URL', canonicalWorkerBase, editableAdminSetting('platform.worker_url')]

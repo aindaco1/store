@@ -155,9 +155,11 @@
       justify-content: center;
       background: none;
       border: none;
+      color: $color--primary;
       cursor: pointer;
       padding: $space-xs;
       position: relative;
+      -webkit-tap-highlight-color: transparent;
       
       svg {
         width: $space-xl;

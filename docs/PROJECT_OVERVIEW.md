@@ -4,7 +4,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 
 Current release target: `v1.0.4`.
 
-The current repository is launch-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Remaining first-launch work is operational account setup and production smoke testing.
+The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 
 ## Architecture
 
@@ -30,6 +30,17 @@ At this sweep the source catalog contains:
 
 Current product front matter still uses `category: dustwave` and `category: fronteras` as collection-compatible legacy values. `_includes/product-taxonomy.html` maps those values to Store collections and derives merchandising categories from fulfillment/type/shipping metadata.
 
+## Migration Context
+
+Store succeeds the old DUST WAVE Snipcart shop while keeping the repo-backed catalog source.
+
+- `_products/*.md` remain the editable product catalog.
+- `identifier` is the Store product ID; explicit `sku`, `fulfillment_type`, `status`, `shipping_preset`, `tax_category`, `inventory_tracking`, and `inventory` fields now drive checkout validation.
+- Shirt sizes and other options use explicit variants with their own SKU, price, and inventory values.
+- Public buttons use `store-add-item`; Snipcart `data-item-*` markup is not part of the Store runtime.
+- Pages CMS and archive/unarchive workflows are replaced by the Store admin dashboard and product status publishing.
+- Imported catalog inventory values should be treated as placeholders until live baselines are entered in admin.
+
 ## Local URLs
 
 - Storefront: `http://127.0.0.1:4002`
@@ -40,11 +51,12 @@ Current product front matter still uses `category: dustwave` and `category: fron
 - Storefront: `https://shop.dustwave.xyz`
 - Worker: `https://checkout.dustwave.xyz`
 
-## Launch Operations
+## Production Operations
 
-- Production runbook: [PRODUCTION_LAUNCH.md](PRODUCTION_LAUNCH.md)
+- Workflows and deployment: [WORKFLOWS.md](WORKFLOWS.md)
+- Testing and smoke checks: [TESTING.md](TESTING.md)
 - Backup and restore runbook: [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
-- Digital downloads: [STORE_DOWNLOADS.md](STORE_DOWNLOADS.md)
+- Downloads: [DOWNLOADS.md](DOWNLOADS.md)
 - Admin operations: [DASHBOARD.md](DASHBOARD.md)
 
 ## Guardrails

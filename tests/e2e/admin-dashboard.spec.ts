@@ -318,12 +318,13 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       });
     }
     if (url.pathname === '/admin/settings') {
-      calls.settings.push({ method });
+      const params = Object.fromEntries(url.searchParams.entries());
+      calls.settings.push({ method, params });
       return fulfillJson({
         user,
         scope: role === 'super_admin' ? 'platform' : 'store',
         campaigns: [],
-        sections: role === 'super_admin' ? storeSettingsSections() : [],
+        sections: role === 'super_admin' ? storeSettingsSections(params.preferredLang || 'en') : [],
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
       });
     }
@@ -625,8 +626,53 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
   return calls;
 }
 
-function storeSettingsSections() {
-  return [{
+const ES_BRAND_SEO_SETTING_LABELS: Record<string, string> = {
+  'platform.favicon_path': 'Favicon',
+  'platform.default_social_image_path': 'Imagen social predeterminada',
+  'seo.x_handle': 'Usuario de X',
+  'seo.default_social_image_alt': 'Texto alternativo de imagen social',
+  'seo.same_as': 'Enlaces same-as',
+  'seo.merchant_return_policy.applicable_country': 'Pais de politica de devoluciones',
+  'seo.merchant_return_policy.return_policy_category': 'Tipo de politica de devoluciones',
+  'seo.merchant_return_policy.merchant_return_days': 'Dias para devoluciones',
+  'seo.merchant_return_policy.return_fees': 'Costos de devolucion',
+  'seo.merchant_return_policy.return_method': 'Metodo de devolucion'
+};
+
+const ES_BRAND_SEO_OPTION_LABELS: Record<string, string> = {
+  US: 'Estados Unidos',
+  CA: 'Canada',
+  'https://schema.org/MerchantReturnFiniteReturnWindow': 'Ventana de devolucion finita',
+  'https://schema.org/MerchantReturnNotPermitted': 'No se permiten devoluciones',
+  'https://schema.org/ReturnFeesCustomerResponsibility': 'Cliente cubre envio de devolucion',
+  'https://schema.org/FreeReturn': 'Devoluciones gratis',
+  'https://schema.org/ReturnByMail': 'Devolucion por correo',
+  'https://schema.org/ReturnInStore': 'Devolucion en tienda'
+};
+
+function localizeStoreSettingsSections(sections: any[], lang = 'en') {
+  if (!String(lang || '').toLowerCase().startsWith('es')) return sections;
+  return sections.map((section) => ({
+    ...section,
+    title: section.title === 'Brand & SEO' ? 'Marca y SEO' : section.title,
+    rows: (section.rows || []).map((row: any) => {
+      const label = ES_BRAND_SEO_SETTING_LABELS[row.path] || row.label;
+      return {
+        ...row,
+        label,
+        options: Array.isArray(row.options)
+          ? row.options.map((option: any) => ({
+            ...option,
+            label: ES_BRAND_SEO_OPTION_LABELS[String(option.value)] || option.label
+          }))
+          : row.options
+      };
+    })
+  }));
+}
+
+function storeSettingsSections(lang = 'en') {
+  const sections = [{
     title: 'Platform',
     rows: [
       settingsRow({ label: 'Site title', value: 'Shop', rawValue: 'Shop', editable: true, path: 'title', type: 'string', input: 'text' }),
@@ -643,7 +689,16 @@ function storeSettingsSections() {
     rows: [
       settingsRow({ label: 'Logo', value: '/assets/images/defaults/dust-wave-square.png', rawValue: '/assets/images/defaults/dust-wave-square.png', editable: true, path: 'platform.logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' }),
       settingsRow({ label: 'Footer logo', value: '/assets/images/defaults/dust-wave-square.png', rawValue: '/assets/images/defaults/dust-wave-square.png', editable: true, path: 'platform.footer_logo_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo' }),
-      settingsRow({ label: 'X handle', value: '', rawValue: '', editable: true, path: 'seo.x_handle', type: 'string', input: 'text' })
+      settingsRow({ label: 'Favicon', value: '/assets/icons/favicon.png', rawValue: '/assets/icons/favicon.png', editable: true, path: 'platform.favicon_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-favicon-social-image' }),
+      settingsRow({ label: 'Default social image', value: '/assets/images/defaults/dust-wave-square.png', rawValue: '/assets/images/defaults/dust-wave-square.png', editable: true, path: 'platform.default_social_image_path', type: 'string', input: 'image-upload', layoutGroup: 'brand-favicon-social-image' }),
+      settingsRow({ label: 'X handle', value: '', rawValue: '', editable: true, path: 'seo.x_handle', type: 'string', input: 'text', layoutGroup: 'brand-x-social-alt' }),
+      settingsRow({ label: 'Default social image alt', value: 'Dust Wave Shop', rawValue: 'Dust Wave Shop', editable: true, path: 'seo.default_social_image_alt', type: 'string', input: 'text', layoutGroup: 'brand-x-social-alt' }),
+      settingsRow({ label: 'Same-as links', value: '', rawValue: [], editable: true, path: 'seo.same_as', type: 'list', input: 'url-list' }),
+      settingsRow({ label: 'Return policy country', value: 'US', rawValue: 'US', editable: true, path: 'seo.merchant_return_policy.applicable_country', type: 'string', input: 'select', layoutGroup: 'brand-return-policy', options: [{ value: 'US', label: 'United States' }, { value: 'CA', label: 'Canada' }] }),
+      settingsRow({ label: 'Return policy type', value: 'Finite return window', rawValue: 'https://schema.org/MerchantReturnFiniteReturnWindow', editable: true, path: 'seo.merchant_return_policy.return_policy_category', type: 'string', input: 'select', layoutGroup: 'brand-return-policy', options: [{ value: 'https://schema.org/MerchantReturnFiniteReturnWindow', label: 'Finite return window' }, { value: 'https://schema.org/MerchantReturnNotPermitted', label: 'Returns not permitted' }] }),
+      settingsRow({ label: 'Return window days', value: '14', rawValue: 14, editable: true, path: 'seo.merchant_return_policy.merchant_return_days', type: 'number', input: 'integer', min: 1, max: 3650, step: 1, layoutGroup: 'brand-return-policy', visibleWhen: { path: 'seo.merchant_return_policy.return_policy_category', value: 'https://schema.org/MerchantReturnFiniteReturnWindow' } }),
+      settingsRow({ label: 'Return fees', value: 'Customer handles return shipping', rawValue: 'https://schema.org/ReturnFeesCustomerResponsibility', editable: true, path: 'seo.merchant_return_policy.return_fees', type: 'string', input: 'select', layoutGroup: 'brand-return-policy', options: [{ value: 'https://schema.org/ReturnFeesCustomerResponsibility', label: 'Customer handles return shipping' }, { value: 'https://schema.org/FreeReturn', label: 'Free returns' }] }),
+      settingsRow({ label: 'Return method', value: 'Return by mail', rawValue: 'https://schema.org/ReturnByMail', editable: true, path: 'seo.merchant_return_policy.return_method', type: 'string', input: 'select', layoutGroup: 'brand-return-policy', options: [{ value: 'https://schema.org/ReturnByMail', label: 'Return by mail' }, { value: 'https://schema.org/ReturnInStore', label: 'Return in store' }] })
     ]
   }, {
     title: 'Canonical URLs',
@@ -764,6 +819,7 @@ function storeSettingsSections() {
       settingsRow({ label: 'CORS allowed origin', value: SITE_BASE })
     ]
   }];
+  return localizeStoreSettingsSections(sections, lang);
 }
 
 function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Record<string, any> = {}) {
@@ -1585,10 +1641,16 @@ function storeDownloadsPayload() {
 
 async function selectSettingsSection(page: any, name: string) {
   const tab = page.locator('#admin-settings-section-tabs button').filter({ hasText: name }).first();
+  const mobileSelect = page.locator('#admin-settings-section-tabs + .admin-mobile-tab-select select');
+  await expect.poll(async () => {
+    const tabVisible = await tab.isVisible().catch(() => false);
+    const selectVisible = await mobileSelect.isVisible().catch(() => false);
+    return tabVisible || selectVisible;
+  }).toBe(true);
   if (await tab.isVisible().catch(() => false)) {
     await tab.click();
   } else {
-    await page.locator('#admin-settings-section-tabs + .admin-mobile-tab-select select').selectOption({ label: name });
+    await mobileSelect.selectOption({ label: name });
   }
   await expect(tab).toHaveAttribute('aria-selected', 'true');
 }
@@ -1645,6 +1707,7 @@ test.describe('Admin Dashboard', () => {
 	    await expect(page.locator('#admin-settings-section-tabs [data-settings-section-label="Analytics"]')).toHaveCount(0);
 	    await expect(page.getByRole('button', { name: 'About Dashboard' })).toHaveCount(0);
 	    await expect(page.locator('#admin-overview-title')).toHaveCSS('font-family', /gambado-sans/);
+	    await expect(calls.settings[0].params).toMatchObject({ preferredLang: 'en' });
 
 	    await selectSettingsSection(page, 'Platform');
 	    await expect(page.locator('[data-settings-section-panel="Platform"] .admin-settings__section-title')).toHaveCount(0);
@@ -1659,12 +1722,20 @@ test.describe('Admin Dashboard', () => {
 
     await selectSettingsSection(page, 'Brand & SEO');
     const brandPanel = page.locator('[data-settings-section-panel="Brand & SEO"]');
-    await expect(brandPanel.locator('.admin-settings__field-grid')).toHaveCount(1);
-    await expect(brandPanel.locator('.admin-settings__field-grid .admin-settings__field-grid-item')).toHaveCount(2);
-    await expect(brandPanel.locator('.admin-settings__image-preview img')).toHaveCount(2);
+    await expect(brandPanel.locator('.admin-settings__field-grid')).toHaveCount(4);
+    await expect(brandPanel.locator('.admin-settings__field-grid .admin-settings__field-grid-item')).toHaveCount(11);
+    await expect(brandPanel.locator('.admin-settings__image-preview img')).toHaveCount(4);
     const logoRow = page.locator('[data-settings-row-label="Logo"]');
     await expect(page.locator('[data-settings-path="platform.logo_path"]')).toHaveValue('/assets/images/defaults/dust-wave-square.png');
     await expect(page.locator('[data-settings-path="platform.logo_path"]')).toBeHidden();
+    await expect(page.locator('[data-settings-path="platform.favicon_path"]')).toHaveValue('/assets/icons/favicon.png');
+    await expect(page.locator('[data-settings-path="platform.default_social_image_path"]')).toHaveValue('/assets/images/defaults/dust-wave-square.png');
+    await expect(page.locator('[data-settings-path="seo.default_social_image_alt"]')).toHaveValue('Dust Wave Shop');
+    await expect(page.locator('[data-settings-path="seo.merchant_return_policy.applicable_country"]')).toHaveValue('US');
+    await expect(page.locator('[data-settings-path="seo.merchant_return_policy.return_policy_category"]')).toHaveValue('https://schema.org/MerchantReturnFiniteReturnWindow');
+    await expect(page.locator('[data-settings-path="seo.merchant_return_policy.merchant_return_days"]')).toHaveValue('14');
+    await expect(page.locator('[data-settings-path="seo.merchant_return_policy.return_fees"]')).toHaveValue('https://schema.org/ReturnFeesCustomerResponsibility');
+    await expect(page.locator('[data-settings-path="seo.merchant_return_policy.return_method"]')).toHaveValue('https://schema.org/ReturnByMail');
     await expect(logoRow.locator('input[type="text"]')).toHaveCount(0);
     await expect(logoRow.locator('.admin-settings__image-preview img')).toHaveAttribute('src', /\/assets\/images\/defaults\/dust-wave-square\.png$/);
     await logoRow.locator('[data-logo-upload-input]').setInputFiles({
@@ -2716,6 +2787,17 @@ test.describe('Admin Dashboard', () => {
     await page.goto('/es/admin/?admin_login=admin-token-es-tablet');
     await expect(page.locator('#admin-app')).toBeVisible();
     await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
+    await expect(calls.settings[0].params).toMatchObject({ preferredLang: 'es' });
+
+    await selectSettingsSection(page, 'Marca y SEO');
+    await expect(page.locator('[data-settings-row-label="Imagen social predeterminada"]')).toBeVisible();
+    await expect(page.locator('[data-settings-row-label="Pais de politica de devoluciones"]')).toBeVisible();
+    await expect(page.locator('[data-settings-path="seo.merchant_return_policy.return_policy_category"] option')).toHaveText([
+      'Ventana de devolucion finita',
+      'No se permiten devoluciones'
+    ]);
+    await expect(page.getByRole('button', { name: 'Acerca de Pais de politica de devoluciones' })).toBeVisible();
 
     const tabs = page.locator('[data-admin-tabs] > .admin-tabs__list');
     await expect(tabs).toBeVisible();

@@ -25,6 +25,7 @@ describe('Store SEO templates', () => {
     const pagePrefetch = readRepoFile('_includes', 'page-prefetch.html');
     const responsiveImage = readRepoFile('_includes', 'responsive-image.html');
     const homePage = readRepoFile('index.html');
+    const storefrontHome = readRepoFile('_includes', 'storefront-home.html');
     const localizedProductPages = readRepoFile('_plugins', 'localized_product_pages.rb');
 
     expect(defaultLayout).toContain('{% include seo-meta.html');
@@ -38,10 +39,11 @@ describe('Store SEO templates', () => {
     expect(productLayout).toContain('image_loading="eager"');
     expect(productLayout).toContain('{{ content | sanitize_markdown_links: site.url }}');
     expect(productLayout).toContain('store-product-options.js');
-    expect(homePage).toContain('site.products | sort: "order"');
-    expect(homePage).toContain('visible_product_index < 3');
-    expect(homePage).toContain('image_loading=product_image_loading');
-    expect(homePage).toContain('store-product-options.js');
+    expect(homePage).toContain('{% include storefront-home.html');
+    expect(storefrontHome).toContain('site.products | sort: "order"');
+    expect(storefrontHome).toContain('visible_product_index < 3');
+    expect(storefrontHome).toContain('image_loading=product_image_loading');
+    expect(storefrontHome).toContain('store-product-options.js');
     expect(localizedProductPages).toContain("Jekyll::PageWithoutAFile");
     expect(localizedProductPages).toContain("data['localized_paths'] = paths");
     expect(localizedProductPages).toContain("data['store_product'] = true");
@@ -87,6 +89,9 @@ describe('Store SEO templates', () => {
     expect(seoMeta).toContain('assign image_alt_source = product_display_name');
     expect(seoMeta).toContain('og:image:alt');
     expect(seoMeta).toContain('twitter:image:alt');
+    expect(seoMeta).toContain('assign og_type = "product"');
+    expect(seoMeta).toContain('product:price:amount');
+    expect(seoMeta).toContain('product:retailer_item_id');
     expect(seoJsonLd).toContain('page.store_product == true');
     expect(seoJsonLd).toContain('page.product_name | default: page.name');
     expect(seoJsonLd).toContain('assign jsonld_kind = "product"');
@@ -94,8 +99,16 @@ describe('Store SEO templates', () => {
     expect(seoJsonLd).toContain('"@type": "Offer"');
     expect(seoJsonLd).toContain('"priceCurrency": "USD"');
     expect(seoJsonLd).toContain('"sku": {{ product_sku | jsonify }}');
+    expect(seoJsonLd).toContain('"productID": {{ product_id | jsonify }}');
+    expect(seoJsonLd).toContain('"inLanguage": {{ current_lang | jsonify }}');
     expect(seoJsonLd).toContain('"availability": {{ product_availability | jsonify }}');
     expect(seoJsonLd).toContain('"itemCondition": "https://schema.org/NewCondition"');
+    expect(seoJsonLd).toContain('"@type": "MerchantReturnPolicy"');
+    expect(seoJsonLd).toContain('"/terms/#returns-refunds"');
+    expect(seoJsonLd).toContain('site.seo.merchant_return_policy');
+    expect(seoJsonLd).toContain('"applicableCountry": {{ return_policy_country | jsonify }}');
+    expect(seoJsonLd).toContain('"returnPolicyCategory": {{ return_policy_category | jsonify }}');
+    expect(seoJsonLd).toContain('"returnFees": {{ return_fees | jsonify }}');
   });
 
   it('marks private Store routes as noindex and keeps them out of crawl files', () => {
@@ -130,18 +143,26 @@ describe('Store SEO templates', () => {
     }
     expect(robots).toContain('Disallow: /admin/');
     expect(robots).toContain('Disallow: /es/admin/');
-    expect(robots).toContain('Disallow: /orders/');
-    expect(robots).toContain('Disallow: /order-success/');
+    expect(robots).not.toContain('Disallow: /orders/');
+    expect(robots).not.toContain('Disallow: /order-success/');
     expect(robots).toContain('Disallow: /api/');
-    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
     expect(sitemap).toContain('assign sitemap_products = site.products');
     expect(sitemap).toContain('assign sitemap_localized_products = site.pages');
     expect(sitemap).toContain("item.sitemap != false");
     expect(sitemap).toContain("item.indexable != false");
     expect(sitemap).toContain("item.test_only != true");
+    expect(sitemap).toContain('assign product_public = true');
+    expect(sitemap).toContain('assign product_sitemap_status = false');
+    expect(sitemap).toContain('product_status == "active" or product_status == "sold_out"');
+    expect(sitemap).toContain('seo-sitemap-url.xml');
     expect(sitemap).toContain('{%- for item in sitemap_products -%}');
     expect(sitemap).toContain('{%- for item in sitemap_localized_products -%}');
     expect(sitemap).not.toContain('site.campaigns');
+    const sitemapUrlInclude = readRepoFile('_includes', 'seo-sitemap-url.xml');
+    expect(sitemapUrlInclude).toContain('xhtml:link rel="alternate"');
+    expect(sitemapUrlInclude).toContain('hreflang="x-default"');
+    expect(sitemapUrlInclude).toContain('localized-url.html lang=lang');
   });
 
   it('keeps locale and navigation plumbing on canonical Store pages', () => {
@@ -163,11 +184,41 @@ describe('Store SEO templates', () => {
     expect(seoJsonLd).toContain('availableLanguage');
     expect(seoJsonLd).toContain('"inLanguage": {{ current_lang | jsonify }}');
     expect(config).toContain('product_path_prefixes:');
+    expect(config).toContain('merchant_return_policy:');
+    expect(config).toContain('return_policy_category: https://schema.org/MerchantReturnFiniteReturnWindow');
+    expect(config).toContain('return_fees: https://schema.org/ReturnFeesCustomerResponsibility');
     expect(config).toMatch(/es:\s*["']?\/es\/products\/["']?/);
     expect(config).toContain('pages:');
     expect(config).toContain('home:');
     expect(config).not.toContain('about:');
     expect(config).toContain('orders:');
     expect(config).toContain('admin:');
+  });
+
+  it('exposes current SEO customization fields in the admin settings pipeline', () => {
+    const worker = readRepoFile('worker', 'src', 'index.js');
+    const syncWorkerConfig = readRepoFile('scripts', 'sync-worker-config.rb');
+    const dashboardSpec = readRepoFile('tests', 'e2e', 'admin-dashboard.spec.ts');
+    const dashboardDocs = readRepoFile('docs', 'DASHBOARD.md');
+
+    expect(worker).toContain('ADMIN_RETURN_POLICY_CATEGORY_OPTIONS');
+    expect(worker).toContain('ADMIN_SETTING_LOCALIZATIONS');
+    expect(worker).toContain('seo.merchant_return_policy.applicable_country');
+    expect(worker).toContain('seo.merchant_return_policy.return_policy_category');
+    expect(worker).toContain('seo.merchant_return_policy.merchant_return_days');
+    expect(worker).toContain('seo.merchant_return_policy.return_fees');
+    expect(worker).toContain('seo.merchant_return_policy.return_method');
+    expect(syncWorkerConfig).toContain('SEO_RETURN_POLICY_APPLICABLE_COUNTRY');
+    expect(syncWorkerConfig).toContain('SEO_RETURN_POLICY_CATEGORY');
+    expect(syncWorkerConfig).toContain('SEO_MERCHANT_RETURN_DAYS');
+    expect(syncWorkerConfig).toContain('SEO_RETURN_FEES');
+    expect(syncWorkerConfig).toContain('SEO_RETURN_METHOD');
+    expect(dashboardSpec).toContain('Return policy country');
+    expect(dashboardSpec).toContain('Pais de politica de devoluciones');
+    const adminDashboardRuntime = readRepoFile('assets', 'js', 'admin-dashboard.js');
+    expect(adminDashboardRuntime).toContain("params: { preferredLang: preferredLang() }");
+    expect(adminDashboardRuntime).toContain("about: 'Acerca de'");
+    expect(dashboardSpec).toContain('seo.merchant_return_policy.return_fees');
+    expect(dashboardDocs).toContain('merchant return policy controls');
   });
 });

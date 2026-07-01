@@ -29,6 +29,18 @@ admin:
   settings_intro: Review %{platform} configuration, checkout settings, shipping, tax, users, and platform operations available to this admin account.
   settings_publish: Publish
   settings_sections_label: Settings sections
+  admin_section_label: Admin section
+  settings_section_label: Settings section
+  upload_logo: Upload logo
+  upload_image: Upload image
+  logo_uploaded: Logo uploaded. Publish settings to use it.
+  image_uploaded: Image uploaded. Publish settings to use it.
+  logo_type_error: Use a PNG, JPEG, or WebP logo.
+  image_type_error: Use a PNG, JPEG, WebP, or GIF image.
+  logo_size_error: Logo must be 512 KB or smaller.
+  image_size_error: Image must be 8 MB or smaller.
+  no_file_chosen: No file chosen
+  no_image_selected: No image selected.
   store_analytics_intro: Review %{platform} revenue, fulfillment, ticket, payment, and product performance from Store order records.
   store_marketing_intro: Build %{platform} UTM and referral links, save reusable referrals, and download QR codes for campaigns or partners.
   marketing_destination_label: Destination path
@@ -70,6 +82,13 @@ misc:
   skip_to_main: Skip to main content
   video_not_supported: Your browser does not support the video tag.
 storefront:
+  filters:
+    product_collections: Product collections
+    collection: Collection
+    all: All
+    product_categories: Product categories
+    category: Category
+    clear_filters: Clear filters
   option_label: Option
   size_label: Size
   quantity_label: Quantity
@@ -176,6 +195,73 @@ runtime:
     checkout_title: Checkout
   gallery:
     image_gallery: Image gallery
+  order_lookup:
+    generic_sent: If that email has %{platform} orders, a secure lookup link has been sent.
+    orders_found_caption: Orders found for this lookup link
+    table_status: Status
+    table_order: Order
+    table_date: Date
+    table_items: Items
+    table_total: Total
+    order_confirmed: Order confirmed
+    payment_failed: Payment failed
+    order_processing: Order processing
+    unavailable: Unavailable
+    confirmed: Confirmed
+    created: Created
+    store_item: Store item
+    qty: Qty
+    more: more
+    view_order: View order
+    order: Order
+    no_orders: No orders are available for this link.
+    orders: Orders
+    local_email_failed: "Local email delivery failed: %{reason}."
+    local_lookup_generated: Local lookup link generated.
+    open_local_lookup: Open local lookup
+    unable_send: Unable to send lookup link.
+    unable_load: Unable to load orders.
+    email_required: Enter an email address.
+    sending: Sending lookup link...
+    loading: Loading orders...
+    verified: Lookup link verified.
+  order_success:
+    subtotal: Subtotal
+    discount: Discount
+    discount_with_code: "Discount (%{code})"
+    tip: Tip
+    shipping: Shipping
+    tax: Tax
+    total_paid: Total paid
+    shipping_heading: Shipping
+    method: Method
+    download_unavailable: "%{label} is not available yet."
+    download: Download
+    open_rsvp: Open RSVP
+    open_ticket: Open ticket
+    add_calendar: Add to calendar
+    order_confirmed: Order confirmed
+    order_processing: Order processing
+    order: Order
+    confirmed: Confirmed
+    store_item: Store item
+    qty: Qty
+    fulfillment_digital: Digital delivery
+    fulfillment_ticket: Ticket
+    fulfillment_rsvp: RSVP
+    fulfillment_service: Service
+    fulfillment_physical: Physical item
+    items: Items
+    download_note: Your download stays available from this order page.
+    unable_load_order: Unable to load order.
+    still_processing: Still processing payment...
+    loading_order: Loading order...
+    ready_fulfillment: Ready for fulfillment.
+    confirmed_heading: Your order is confirmed. Fulfillment actions are available below.
+    payment_failed_status: Payment failed.
+    payment_failed_heading: The payment did not complete. Please return to the store and try again.
+    payment_processing: Payment is still processing.
+    missing_token: Missing order token.
 email:
   subjects:
     admin_login: Admin sign-in link

@@ -5,14 +5,15 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 ## Current State
 
 - Release target: `v1.0.4`.
-- Static Jekyll storefront target: `https://shop.dustwave.xyz`.
-- Cloudflare Worker target: `https://checkout.dustwave.xyz`.
+- Static Jekyll storefront: `https://shop.dustwave.xyz`.
+- Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
 - Source catalog: 49 `_products/*.md` records at this sweep, with 27 active and 22 archived products across physical merch, event tickets, one digital product, and one free RSVP fixture.
 - Current public catalog grouping uses `category: dustwave` and `category: fronteras` as collection-compatible legacy values; the taxonomy include derives product-type categories such as apparel, prints, stickers, downloads, event access, media, and objects.
 - Browser cart runtime is Store-owned: `store-add-item`, `STORE_CONFIG`, `StoreCartProvider`, `StoreCartRuntime`, `window.Store`, and `storecart.*` events.
 - Worker checkout validates carts through `/api/cart/validate`, creates paid/free order drafts through `/api/checkout/intent`, reserves positive-count SKU inventory through a Durable Object, and settles paid orders only from signed Stripe webhooks.
 - Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, check-in links, Resend receipts, abandoned-checkout reminders, and event reminders.
+- Public Spanish shells exist for home, Terms, Orders, and Order Success; product titles/descriptions stay creator-authored unless a product defines localized overrides.
 - Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
@@ -38,6 +39,7 @@ Useful checks:
 ```bash
 npm run sync:worker-config
 bundle exec jekyll build --quiet
+npm run test:seo
 npm run test:content-security
 npm run test:unit
 npm run test:security
@@ -72,11 +74,9 @@ npm run setup:deploy -- --mode=production --dry-run
 - [Worker README](worker/README.md)
 - [Testing](docs/TESTING.md)
 - [Security](docs/SECURITY.md)
-- [Production launch](docs/PRODUCTION_LAUNCH.md)
 - [Backup and restore](docs/BACKUP_RESTORE.md)
-- [Digital downloads](docs/STORE_DOWNLOADS.md)
-- [History](docs/history/)
+- [Downloads](docs/DOWNLOADS.md)
 
-## Remaining Launch Work
+## Production Operations
 
-The main code paths are implemented. The remaining first-launch work is operational: configure production Worker secrets and external accounts, upload real `STORE_DOWNLOADS` objects or approved Worker-only fallback URLs, verify USPS/NM GRT from the production origin, run paid physical/digital/ticket and free RSVP smoke tests, and confirm real inventory baselines for finite-stock products.
+Store is live on the production storefront and Worker domains. Ongoing production work is operational: keep Cloudflare Worker secrets and external accounts current, verify Stripe webhooks, Resend senders, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, and real inventory baselines, and rerun the production smoke/reconciliation path after checkout, fulfillment, admin, or catalog changes.

@@ -1,6 +1,6 @@
 # Testing
 
-Release `v1.0.4` adds regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, i18n completeness, admin order action responsiveness, and live order attendance refresh.
+Release `v1.0.4` adds regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -9,6 +9,7 @@ The default test path is Store-only. It covers product pages, cart behavior, fir
 ```bash
 bundle exec jekyll build --quiet
 npm run test:unit
+npm run test:seo
 npm run test:content-security
 npm run test:security
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
@@ -62,6 +63,15 @@ npm run test:security:podman
 
 The security suite checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior.
 
+## SEO
+
+```bash
+bundle exec jekyll build --quiet
+npm run test:seo
+```
+
+The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, social metadata, JSON-LD, sitemap URLs, localized alternates, and crawl-control rules for `noindex` routes.
+
 ## Pre-Merge
 
 ```bash
@@ -70,9 +80,32 @@ npm run test:premerge
 
 The pre-merge script runs secret/content audits, syntax checks, focused Store unit tests, full unit tests, build artifact checks, Worker security tests, Worker smoke tests, asset minification checks, and the headless Playwright suite. When host Jekyll gems are unavailable it can fall back to a Podman-backed build path.
 
+## Production Preflight
+
+Before deploys that affect checkout, fulfillment, admin publishing, product inventory, or production settings, run from the repository root:
+
+```bash
+npm run sync:worker-config
+npm run catalog:generate
+npm run launch:readiness
+bundle exec jekyll build --config _config.yml,_config.local.yml
+npm run assets:minify:check
+npm run test:unit
+```
+
+For checkout, admin, or Worker changes, also run:
+
+```bash
+npm run test:security
+CI=1 npx playwright test tests/e2e/admin-dashboard.spec.ts --workers=1
+SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+```
+
+`npm run launch:readiness` checks repo-visible production inputs. It does not prove Cloudflare secrets, Stripe webhooks, USPS credentials, Resend sender verification, R2 objects, or production DNS exist in external accounts; verify those manually in the provider consoles and admin readiness views.
+
 ## Manual Store Smoke
 
-Before launch or after checkout/fulfillment changes:
+After checkout, fulfillment, email, admin, inventory, or catalog changes:
 
 1. Add a physical product to cart.
 2. Change quantity in the cart.
@@ -92,21 +125,35 @@ Before launch or after checkout/fulfillment changes:
 16. Request an order lookup link and consume it.
 17. Verify abandoned-checkout reminder suppression/resume behavior in a controlled test.
 18. Set an inventory baseline and verify checkout respects it.
+19. Replay or send an equivalent Stripe webhook test event for paid settlement.
+20. Confirm failed/canceled payments release reservations.
 
-## Launch Checklist
+## Production Checklist
 
-Use [PRODUCTION_LAUNCH.md](PRODUCTION_LAUNCH.md) for the full production runbook.
+Provider and runtime checks:
 
-- Physical paid checkout works with tax and shipping.
-- Digital paid checkout produces a signed download action.
-- Ticket paid checkout produces ticket/check-in actions.
+- Cloudflare routes or custom domains serve `https://shop.dustwave.xyz` and `https://checkout.dustwave.xyz`.
+- `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` point at production Cloudflare resources.
+- Worker secrets are set in Cloudflare, not in Git, including Stripe, Resend, admin session/login, checkout intent, magic link, download/order lookup, Turnstile, and USPS secrets as applicable.
+- Production runtime config uses `SITE_BASE=https://shop.dustwave.xyz`, `WORKER_BASE=https://checkout.dustwave.xyz`, `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`, `TAX_PROVIDER=nm_grt`, `SHIPPING_ORIGIN_ZIP=87120`, `SHIPPING_ORIGIN_COUNTRY=US`, and `USPS_ENABLED=true` unless intentionally changed.
+- Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes at least to `payment_intent.succeeded` and `payment_intent.payment_failed`.
+- Resend sender domains and `ORDERS_EMAIL_FROM` / `UPDATES_EMAIL_FROM` are verified.
+- USPS live credentials and New Mexico GRT behavior are verified from the production origin address.
+- Real `STORE_DOWNLOADS` objects or approved Worker-only fallback URLs exist for active digital products.
+- Finite-stock products have true inventory baselines or `inventory_baseline_source` / `inventory_verified_at`; unlimited or made-to-order products use `inventory_tracking: false`.
+
+Production smoke:
+
+- Paid physical checkout works with tax and shipping.
+- Paid digital checkout produces a signed download action.
+- Paid ticket checkout produces ticket/check-in actions.
 - Free RSVP checkout confirms without Stripe.
 - Stripe webhooks confirm paid orders.
 - Failed payments release reservations.
-- Production `STORE_DOWNLOADS` objects exist.
-- Real inventory baselines are entered for finite-stock products, and unlimited/made-to-order products use `inventory_tracking: false`.
 - Admin product publish triggers deploy.
+- Admin download replacement works on a non-public test product.
+- Admin coupon create/apply/delete works on a harmless test cart.
 - Admin user scopes are correct.
-- Coupons discount only eligible carts.
 - Customer order lookup links are generic on request and token-scoped on consume.
 - Reminder cron heartbeat and queue health are visible.
+- Store orders, audit, attendee, and reconciliation CSV exports download and match the expected production order state.

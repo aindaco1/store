@@ -515,7 +515,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "slug": "sexpot-poster",
       "sku": "poster-3",
       "name": "First Time Sexpot Poster",
-      "description": "18\" x 24\" First Time Sexpot poster.",
+      "description": "18\" x 24\" First Time Sexpot poster featuring Hot N' Dangerous artwork for wall display.",
       "price": 35.0,
       "price_cents": 3500,
       "currency": "USD",
@@ -2395,7 +2395,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "slug": "fronteras-print-large",
       "sku": "print-1",
       "name": "Fronteras Print (Big)",
-      "description": "12\" X 18\" silk coverstock fine print.",
+      "description": "12\" x 18\" silk coverstock fine print featuring Fronteras artwork, sized for framing or wall display.",
       "price": 20.0,
       "price_cents": 2000,
       "currency": "USD",
@@ -2432,7 +2432,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "slug": "fronteras-print-medium",
       "sku": "print-2",
       "name": "Fronteras Print (Medium)",
-      "description": "8\" X 12\" silk coverstock fine print.",
+      "description": "8\" x 12\" silk coverstock fine print featuring Fronteras artwork in a compact display size.",
       "price": 15.0,
       "price_cents": 1500,
       "currency": "USD",
@@ -2469,7 +2469,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "slug": "fronteras-print-small",
       "sku": "print-3",
       "name": "Fronteras Print (Small)",
-      "description": "4\" X 6\" silk coverstock fine print.",
+      "description": "4\" x 6\" silk coverstock fine print featuring Fronteras artwork, made for small frames or desk display.",
       "price": 10.0,
       "price_cents": 1000,
       "currency": "USD",
@@ -2700,7 +2700,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "e940b3be1424ada0dfbaac3224b78599da4ae0c937c55eaf83e6bc772a077810"
+  "source_hash": "7016a3307e14e2680d11ef2657f570df623169c8321bb087292a0290708b09ac"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

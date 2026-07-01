@@ -14,4 +14,4 @@ tax_category: standard
 inventory_tracking: false
 inventory: 0
 ---
-4" X 6" silk coverstock fine print.
+4" x 6" silk coverstock fine print featuring Fronteras artwork, made for small frames or desk display.

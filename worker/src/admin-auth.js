@@ -9,6 +9,9 @@ const ADMIN_CORS_ALLOWED_HEADERS = 'Content-Type, Authorization, x-admin-key, x-
 
 const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
 const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
+const ADMIN_ORDER_NOTIFICATION_SOURCE = 'store_order_admin_notification';
+const ADMIN_ORDER_NOTIFICATION_LOGIN_TTL_SECONDS = 5 * 60;
+const ADMIN_ORDER_NOTIFICATION_SESSION_TTL_SECONDS = 30 * 60;
 const ADMIN_TURNSTILE_ACTION = 'admin_login';
 
 function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders = {}) {
@@ -166,11 +169,11 @@ async function hmacSign(secret, data) {
   return base64urlEncode(new Uint8Array(signature));
 }
 
-async function signLoginToken(env, nonce, email) {
+async function signLoginToken(env, nonce, email, ttlSeconds = ADMIN_LOGIN_TTL_SECONDS) {
   const payload = {
     nonce,
     email,
-    exp: Math.floor(Date.now() / 1000) + ADMIN_LOGIN_TTL_SECONDS
+    exp: Math.floor(Date.now() / 1000) + Math.max(60, Number(ttlSeconds || ADMIN_LOGIN_TTL_SECONDS) || ADMIN_LOGIN_TTL_SECONDS)
   };
   const payloadJson = JSON.stringify(payload);
   const payloadB64 = btoa(payloadJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -319,6 +322,22 @@ function shouldExposeAdminLoginUrl(env) {
   return isLocalAdminUrl(env?.SITE_BASE) || isLocalAdminUrl(env?.WORKER_BASE) || isLocalAdminUrl(env?.CORS_ALLOWED_ORIGIN);
 }
 
+function normalizeLoginSource(source) {
+  return String(source || 'internal').trim() || 'internal';
+}
+
+function getAdminLoginTtlSeconds(source) {
+  return normalizeLoginSource(source) === ADMIN_ORDER_NOTIFICATION_SOURCE
+    ? ADMIN_ORDER_NOTIFICATION_LOGIN_TTL_SECONDS
+    : ADMIN_LOGIN_TTL_SECONDS;
+}
+
+function getAdminSessionTtlSeconds(loginRecord = {}) {
+  return normalizeLoginSource(loginRecord.source) === ADMIN_ORDER_NOTIFICATION_SOURCE
+    ? ADMIN_ORDER_NOTIFICATION_SESSION_TTL_SECONDS
+    : ADMIN_SESSION_TTL_SECONDS;
+}
+
 function getAdminTurnstileSecret(env) {
   return getTurnstileSecret(env, ['TURNSTILE_SECRET_KEY', 'ADMIN_TURNSTILE_SECRET_KEY']);
 }
@@ -396,15 +415,17 @@ export async function createAdminLoginUrl(env, {
   if (!user) return '';
 
   const nonce = randomToken(24);
-  const token = await signLoginToken(env, nonce, normalizedEmail);
+  const normalizedSource = normalizeLoginSource(source);
+  const loginTtlSeconds = getAdminLoginTtlSeconds(normalizedSource);
+  const token = await signLoginToken(env, nonce, normalizedEmail, loginTtlSeconds);
   await env.STORE_STATE.put(`admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
     email: normalizedEmail,
     role: user.role,
     accessScopes: user.accessScopes || [],
     preferredLang: lang,
-    source: String(source || 'internal').trim() || 'internal',
+    source: normalizedSource,
     createdAt: new Date().toISOString()
-  }), { expirationTtl: ADMIN_LOGIN_TTL_SECONDS });
+  }), { expirationTtl: loginTtlSeconds });
 
   return buildAdminUrl(env, token, lang, params);
 }
@@ -547,6 +568,7 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
   if (!loginRecord || normalizeEmail(loginRecord.email) !== normalizeEmail(payload.email)) {
     return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
   }
+  await env.STORE_STATE.delete(nonceKey);
 
   const user = await resolveAdminUser(env, loginRecord.email);
   if (!user) {
@@ -555,17 +577,18 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
 
   const sessionToken = randomToken(32);
   const csrfToken = randomToken(24);
-  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000).toISOString();
-  await env.STORE_STATE.delete(nonceKey);
+  const sessionTtlSeconds = getAdminSessionTtlSeconds(loginRecord);
+  const expiresAt = new Date(Date.now() + sessionTtlSeconds * 1000).toISOString();
   await env.STORE_STATE.put(`admin-session:${await sha256Hex(sessionToken)}`, JSON.stringify({
     email: user.email,
     role: user.role,
     accessScopes: user.accessScopes || [],
     csrfToken,
     preferredLang: normalizeLang(loginRecord.preferredLang),
+    source: normalizeLoginSource(loginRecord.source),
     createdAt: new Date().toISOString(),
     expiresAt
-  }), { expirationTtl: ADMIN_SESSION_TTL_SECONDS });
+  }), { expirationTtl: sessionTtlSeconds });
 
   return privateAdminJsonResponse({
     success: true,
@@ -573,7 +596,7 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
     csrfToken,
     expiresAt
   }, 200, env, {
-    'Set-Cookie': getSessionCookie(sessionToken, request)
+    'Set-Cookie': getSessionCookie(sessionToken, request, sessionTtlSeconds)
   });
 }
 
