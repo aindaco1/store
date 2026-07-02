@@ -4,7 +4,7 @@ Store includes a rootless Podman local development path for the two services tha
 
 ## Release v1.0.4 Audit
 
-The documented Podman flow remains the fallback parity path for Store release validation. `npm run test:premerge` falls back to Podman-backed Jekyll builds when host gems are unavailable, and the Podman helpers cover Worker smoke, security, media, and headless E2E paths.
+The documented Podman flow remains the fallback parity path for Store release validation. `npm run test:premerge` falls back to Podman-backed Jekyll builds when host gems are unavailable, and it also runs a Podman Store Worker smoke phase even when the host path succeeds. Podman helpers cover Worker smoke, security, media, and headless E2E paths.
 
 - Jekyll storefront
 - Cloudflare Worker local dev server
@@ -28,6 +28,7 @@ Included:
 - optional host Stripe CLI webhook forwarding
 - headless Playwright in a dedicated Podman container
 - Podman-aware Worker smoke, security, media, and E2E helpers
+- merge-gate Podman Worker smoke coverage even when host Jekyll/Worker smoke succeeds
 
 Not included:
 

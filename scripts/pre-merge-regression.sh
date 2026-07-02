@@ -248,6 +248,10 @@ verify_build_artifacts() {
     echo "sitemap.xml unexpectedly includes the order-success route"
     return 1
   fi
+  if ! SEO_SITE_DIR=_site node ./scripts/audit-seo.mjs >/dev/null; then
+    echo "SEO audit failed for generated build artifacts"
+    return 1
+  fi
 }
 
 reset_podman_dev_artifacts() {
@@ -369,6 +373,12 @@ run_phase() {
   return "${status}"
 }
 
+host_site_ready() {
+  local body
+  body="$(curl -fsS "http://127.0.0.1:4002/admin/" 2>/dev/null || true)"
+  [[ "${body}" == *'id="admin-auth-panel"'* ]]
+}
+
 echo "==> Pre-merge regression checks"
 echo ""
 
@@ -390,14 +400,16 @@ run_phase "1. Secret audit" npm run test:secrets
 
 run_phase "2. Product content audit" npm run test:content-security
 
-run_phase "3. Syntax checks" bash -lc '
+run_phase "3. I18N completeness" npm run test:i18n
+
+run_phase "4. Syntax checks" bash -lc '
   node --check worker/src/index.js
   node --check worker/src/tier-inventory-do.js
   node --check worker/src/catalog.js
   node --check worker/src/orders.js
 '
 
-run_phase "4. Focused Store regression suites" npx vitest run \
+run_phase "5. Focused Store regression suites" npx vitest run \
   tests/unit/product-content-security.test.ts \
   tests/unit/store-catalog.test.ts \
   tests/unit/shipping.test.ts \
@@ -406,15 +418,15 @@ run_phase "4. Focused Store regression suites" npx vitest run \
   tests/unit/page-prefetch.test.ts \
   tests/unit/cart-runtime-loader.test.ts
 
-run_phase "5. Full unit suite" npm run test:unit
+run_phase "6. Full unit suite" npm run test:unit
 
 USE_PODMAN_JEKYLL=false
 if prepare_host_jekyll; then
-  run_phase "6. Store build artifact checks" bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'
+  run_phase "7. Store build artifact checks" bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'
 else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true
-  run_phase "6. Store build artifact checks" bash -lc '
+  run_phase "7. Store build artifact checks" bash -lc '
     for candidate in "$HOME"/.nvm/versions/node/v24.*/bin "$HOME"/.nvm/versions/node/v22.*/bin; do
       if [[ -x "$candidate/node" ]]; then
         PATH="$candidate:$PATH"
@@ -478,42 +490,44 @@ fi
 
 start_worker || exit 1
 
-run_phase "7. Security suite" npm run test:security
+run_phase "8. Security suite" npm run test:security
 
 stop_worker
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   reset_podman_dev_artifacts || exit 1
-  run_phase "8. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
+  run_phase "9. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
 else
   start_worker || exit 1
 
-  if ! curl -s "http://127.0.0.1:4002" >/dev/null 2>&1; then
+  if ! host_site_ready; then
     bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
     JEKYLL_PID=$!
   fi
 
   for _ in {1..60}; do
-    if curl -s "http://127.0.0.1:4002" >/dev/null 2>&1; then
+    if host_site_ready; then
       break
     fi
     sleep 1
   done
 
-  if ! curl -s "http://127.0.0.1:4002" >/dev/null 2>&1; then
+  if ! host_site_ready; then
     echo "Jekyll failed to start. See /tmp/store-premerge-jekyll.log"
     exit 1
   fi
 
-  run_phase "8. Host Store Worker smoke" env SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+  run_phase "9a. Host Store Worker smoke" env SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
   stop_worker
+  reset_podman_dev_artifacts || exit 1
+  run_phase "9b. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
 fi
 
 if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   reset_podman_dev_artifacts || exit 1
-  run_phase "9. Podman E2E suite" env CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
+  run_phase "10. Podman E2E suite" env CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
 else
-  run_phase "9. Headless E2E suite" npm run test:e2e:headless
+  run_phase "10. Headless E2E suite" npm run test:e2e:headless
 fi
 
 echo "Pre-merge regression checks completed."

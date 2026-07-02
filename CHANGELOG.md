@@ -19,6 +19,7 @@
 - Added admin Brand & SEO customization controls that line up with public metadata, social image, and merchant return policy configuration.
 - Added a comprehensive non-admin SEO pass for public routes, canonical/alternate metadata, sitemap exclusions, crawl controls, and product structured data.
 - Fixed iOS Safari mobile styling where auto-detected text and the hamburger menu could inherit unexpected blue link/button styling.
+- Hardened the merge gate with Store-native CI ports, i18n completeness, generated-site SEO audit, real admin-page readiness checks, Podman Worker smoke on the host-success path, and Store-specific Podman fallback names.
 - Moved Vitest config entrypoints to ESM `.mts`, updated security test scripts to avoid Vite's CommonJS API deprecation path, and excluded test configs plus optimizer temp artifacts from static Jekyll output.
 - Folded the one-time production runbook into active production operations, testing, security, backup, and download docs, then removed the obsolete launch file.
 - Updated accessibility, i18n, security, digital download, email, dashboard, testing, performance, Podman, SEO, and roadmap documentation for the `v1.0.4` release audit.

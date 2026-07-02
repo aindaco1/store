@@ -78,7 +78,7 @@ The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, soci
 npm run test:premerge
 ```
 
-The pre-merge script runs secret/content audits, syntax checks, focused Store unit tests, full unit tests, build artifact checks, Worker security tests, Worker smoke tests, asset minification checks, and the headless Playwright suite. When host Jekyll gems are unavailable it can fall back to a Podman-backed build path.
+The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, host Worker smoke, Podman Worker smoke, asset minification checks, and the headless Playwright suite. It waits for the real admin shell before host smoke so a stale listener cannot count as a ready site. When host Jekyll gems are unavailable it falls back to a Podman-backed build, smoke, and browser path.
 
 ## Production Preflight
 

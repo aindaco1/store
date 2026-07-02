@@ -104,7 +104,7 @@ function renderFilterInPodman(script: string, input: string, provider: string) {
   try {
     const runningState = execFileSync(
       podman,
-      ['inspect', '--format', '{{.State.Running}}', 'pool-dev-site'],
+      ['inspect', '--format', '{{.State.Running}}', 'store-dev-site'],
       {
         cwd: repoRoot,
         encoding: 'utf8',
@@ -120,14 +120,14 @@ function renderFilterInPodman(script: string, input: string, provider: string) {
   if (!canExecInRunningContainer) {
     if (!podmanSiteImageReady) {
       try {
-        execFileSync(podman, ['image', 'exists', 'localhost/pool-dev-site:latest'], {
+        execFileSync(podman, ['image', 'exists', 'localhost/store-dev-site:latest'], {
           cwd: repoRoot,
           encoding: 'utf8',
           stdio: 'pipe',
           env: podmanEnv
         });
       } catch {
-        execFileSync(podman, ['build', '-t', 'localhost/pool-dev-site:latest', '-f', 'Containerfile.dev', '.'], {
+        execFileSync(podman, ['build', '-t', 'localhost/store-dev-site:latest', '-f', 'Containerfile.dev', '.'], {
           cwd: repoRoot,
           encoding: 'utf8',
           stdio: 'pipe',
@@ -135,14 +135,14 @@ function renderFilterInPodman(script: string, input: string, provider: string) {
         });
       }
       try {
-        execFileSync(podman, ['volume', 'exists', 'pool-dev-bundle'], {
+        execFileSync(podman, ['volume', 'exists', 'store-dev-bundle'], {
           cwd: repoRoot,
           encoding: 'utf8',
           stdio: 'ignore',
           env: podmanEnv
         });
       } catch {
-        execFileSync(podman, ['volume', 'create', 'pool-dev-bundle'], {
+        execFileSync(podman, ['volume', 'create', 'store-dev-bundle'], {
           cwd: repoRoot,
           encoding: 'utf8',
           stdio: 'pipe',
@@ -160,14 +160,14 @@ function renderFilterInPodman(script: string, input: string, provider: string) {
         '-v',
         `${repoRoot}:/workspace`,
         '-v',
-        'pool-dev-bundle:/usr/local/bundle',
+        'store-dev-bundle:/usr/local/bundle',
         '-e',
         `FILTER_SCRIPT=${script}`,
         '-e',
         `FILTER_INPUT=${input}`,
         '-e',
         `FILTER_PROVIDER=${provider}`,
-        'localhost/pool-dev-site:latest',
+        'localhost/store-dev-site:latest',
         'bash',
         '-lc',
         'cd /workspace && bundle exec ruby -e "$FILTER_SCRIPT" "$FILTER_INPUT" "$FILTER_PROVIDER"'
@@ -191,7 +191,7 @@ function renderFilterInPodman(script: string, input: string, provider: string) {
       `FILTER_INPUT=${input}`,
       '-e',
       `FILTER_PROVIDER=${provider}`,
-      'pool-dev-site',
+      'store-dev-site',
       'bash',
       '-lc',
       'cd /workspace && bundle exec ruby -e "$FILTER_SCRIPT" "$FILTER_INPUT" "$FILTER_PROVIDER"'
@@ -212,7 +212,7 @@ require 'liquid'
 require File.join(root, '_plugins', 'content_safety_filter')
 site = Jekyll::Site.new(Jekyll.configuration({
   'source' => root,
-  'destination' => '/tmp/pool-filter-dest',
+  'destination' => '/tmp/store-filter-dest',
   'url' => 'https://shop.dustwave.xyz',
   'quiet' => true
 }))
