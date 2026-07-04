@@ -101,6 +101,8 @@ CI=1 npx playwright test tests/e2e/admin-dashboard.spec.ts --workers=1
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 ```
 
+Payment-specific setup, webhook, and reconciliation checks are documented in [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md).
+
 `npm run launch:readiness` checks repo-visible production inputs. It does not prove Cloudflare secrets, Stripe webhooks, USPS credentials, Resend sender verification, R2 objects, or production DNS exist in external accounts; verify those manually in the provider consoles and admin readiness views.
 
 ## Manual Store Smoke

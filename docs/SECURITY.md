@@ -82,6 +82,8 @@ The browser cart is convenience state only. The Worker recalculates and validate
 
 Tampered carts must fail closed with `422` before Stripe work begins. Paid Store orders become confirmed only through a valid Stripe `payment_intent.succeeded` webhook whose metadata and order hash match the stored draft. Failed/canceled payments release reservations.
 
+For the payment processor setup and settlement model, see [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md).
+
 ## Inventory
 
 Inventory truth for scarce Store SKUs is coordinated by `STORE_INVENTORY_COORDINATOR`.

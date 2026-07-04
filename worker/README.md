@@ -109,6 +109,8 @@ Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in
 8. Success commits inventory, stores the confirmed order, indexes order lookup, queues email/reminder work, and enables fulfillment actions.
 9. Failure releases inventory reservations and records the private failure state.
 
+Payment setup, settlement, reconciliation, and Stripe operations are documented in [Payment Processor](../docs/PAYMENT_PROCESSOR.md).
+
 ## Scheduled Work
 
 `worker/wrangler.toml` runs a minute cron. The handler records a bounded heartbeat, processes opted-in abandoned-checkout reminders, sends due event reminders, and records recent error state in `STORE_STATE`. Queue-state markers keep idle cron ticks cheap.

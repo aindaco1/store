@@ -72,6 +72,7 @@ npm run setup:deploy -- --mode=production --dry-run
 - [Workflows](docs/WORKFLOWS.md)
 - [Admin dashboard](docs/DASHBOARD.md)
 - [Worker README](worker/README.md)
+- [Payment processor](docs/PAYMENT_PROCESSOR.md)
 - [Testing](docs/TESTING.md)
 - [Security](docs/SECURITY.md)
 - [Backup and restore](docs/BACKUP_RESTORE.md)

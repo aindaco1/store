@@ -87,6 +87,8 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 
 Stripe webhooks are the source of truth for paid order confirmation.
 
+See [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md) for setup, Stripe webhook, PaymentIntent, and reconciliation details.
+
 Webhook settlement validates:
 
 - order token
