@@ -26,7 +26,7 @@ Do not restore ephemeral records unless you are deliberately debugging an incide
 - `abandoned-cart-resume:` signed resume snapshots, unless you are reconstructing reminder behavior.
 - `abandoned-cart-suppressed:` suppression records are usually user preference records; restore them only when preserving suppression state is required and privacy review has approved it.
 - Stripe webhook idempotency markers, unless replay behavior is the incident being repaired.
-- `cron:lastRun` and `cron:lastError`, unless restoring a staging clone for diagnostics.
+- `cron:lastRun` and `cron:lastError`, unless restoring an isolated local/Podman rehearsal namespace for diagnostics.
 - `observability:` summaries, unless restoring them for incident review.
 
 Durable Object inventory state should be treated as derived live state. Restore orders and inventory overrides first, then verify inventory through the admin dashboard rather than writing Durable Object storage directly.
@@ -90,7 +90,7 @@ done
 
 Always take a fresh backup before restoring over an existing namespace.
 
-Restore into staging first:
+Rehearse the transform and restore shape against an isolated local/Podman namespace first when possible:
 
 ```bash
 values_file="$STORE_BACKUP_DIR/kv/orders_.values.json"
@@ -99,6 +99,12 @@ restore_file="$STORE_BACKUP_DIR/kv/orders_.restore.json"
 jq 'to_entries | map({ key: .key, value: (.value.value // "") } + (if .value.metadata then { metadata: .value.metadata } else {} end))' \
   "$values_file" > "$restore_file"
 
+npx wrangler kv bulk put "$restore_file" --env dev --local --binding STORE_STATE
+```
+
+Only after that rehearsal and operator review should you restore a production binding:
+
+```bash
 npx wrangler kv bulk put "$restore_file" --remote --binding STORE_STATE
 ```
 

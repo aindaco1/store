@@ -116,3 +116,9 @@ For the full local gate:
 ```bash
 npm run test:premerge
 ```
+
+For the release evidence gate:
+
+```bash
+npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
+```

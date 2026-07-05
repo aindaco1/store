@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 
+const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
+
 const CART_ROOT = '[data-store-cart-root]';
 const PRODUCT_CARD = '[data-store-product-card]';
 const LEGACY_CART_SELECTORS = [
@@ -313,7 +315,7 @@ test.describe('Store Public Page Controls', () => {
         status,
         headers: {
           'content-type': 'application/json',
-          'access-control-allow-origin': 'http://127.0.0.1:4002',
+          'access-control-allow-origin': SITE_BASE,
           'access-control-allow-credentials': 'true'
         },
         body: JSON.stringify(payload)

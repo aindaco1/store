@@ -3,7 +3,7 @@ import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
-const WORKER_BASE = 'http://127.0.0.1:8989';
+const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
 const CART_ROOT = '[data-store-cart-root]';
 
 async function runAxe(page: any) {
@@ -39,6 +39,22 @@ async function expectAriaSnapshotToContain(locator: any, fragments: string[]) {
   for (const fragment of fragments) {
     expect(snapshot).toContain(fragment);
   }
+}
+
+async function applyTextScale(page: any, percent = 200) {
+  const stylesheetPath = `/__store-text-scale-${percent}.css`;
+  await page.route(`**${stylesheetPath}`, async (route: any) => {
+    await route.fulfill({
+      contentType: 'text/css',
+      body: `:root { font-size: ${percent}% !important; }`
+    });
+  });
+  await page.addStyleTag({ url: stylesheetPath });
+  await page.evaluate(async () => {
+    await document.fonts?.ready;
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  });
 }
 
 test.describe('Public Page Accessibility', () => {
@@ -117,12 +133,12 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('order lookup page has no obvious axe violations', async ({ page }) => {
-    await page.route(`${WORKER_BASE}/api/orders/lookup`, async (route) => {
+    await page.route('**/api/orders/lookup', async (route) => {
       await route.fulfill({
         status: 200,
         headers: {
           'content-type': 'application/json',
-          'access-control-allow-origin': 'http://127.0.0.1:4002',
+          'access-control-allow-origin': SITE_BASE,
           'access-control-allow-credentials': 'true'
         },
         body: JSON.stringify({
@@ -180,5 +196,59 @@ test.describe('Public Page Accessibility', () => {
       'heading "Fronteras Poster (Big)"',
       'link "Return to the store"'
     ]);
+  });
+
+  test('release checkout and order surfaces tolerate 200% text scaling', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 900 });
+    await page.goto('/');
+    await applyTextScale(page);
+    await expect(page.locator('main')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    const productCard = page.locator('.store-product-card').filter({ hasText: 'Fronteras T-Shirt' });
+    await expect(productCard).toHaveCount(1);
+    await productCard.locator('button.store-add-item').click();
+
+    const cart = page.locator(CART_ROOT);
+    await expect(cart).toBeVisible();
+    await expect(cart.getByRole('button', { name: 'Checkout' })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await cart.getByRole('button', { name: 'Checkout' }).click();
+    await expect(cart.getByLabel('Email address')).toBeVisible();
+    await expect(cart).toContainText('Order summary');
+    await expectNoHorizontalOverflow(page);
+
+    await page.goto('/orders/');
+    await applyTextScale(page);
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Email lookup link' })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.route('**/api/orders/store-order-zoom', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          orderToken: 'store-order-zoom',
+          status: 'confirmed',
+          fulfillmentReady: true,
+          confirmedAt: '2026-06-11T18:00:00.000Z',
+          totals: { totalCents: 3500, currency: 'USD' },
+          items: [{
+            name: 'Fronteras Poster (Big)',
+            sku: 'poster-1',
+            quantity: 1,
+            subtotalCents: 3500,
+            fulfillmentType: 'physical'
+          }]
+        })
+      });
+    });
+    await page.goto('/order-success/?orderToken=store-order-zoom');
+    await applyTextScale(page);
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('[data-store-order-status]')).toContainText('Ready for fulfillment.');
+    await expectNoHorizontalOverflow(page);
   });
 });

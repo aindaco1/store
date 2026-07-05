@@ -115,6 +115,16 @@ Payment setup, settlement, reconciliation, and Stripe operations are documented 
 
 `worker/wrangler.toml` runs a minute cron. The handler records a bounded heartbeat, processes opted-in abandoned-checkout reminders, sends due event reminders, and records recent error state in `STORE_STATE`. Queue-state markers keep idle cron ticks cheap.
 
+## Release Evidence And Dry Runs
+
+Worker-backed release evidence is split by risk:
+
+- `npm run release:fulfillment-evidence` runs the Worker in process with mock KV/R2 data to verify signed downloads, revoke/refresh behavior, ticket/RSVP check-in, and admin CSV exports without external providers.
+- `npm run release:providers` is read-only and can use shell credentials, authenticated `gh`/`wrangler`/`stripe` CLIs, or `worker/.dev.vars` defaults unless `--no-dev-vars` is passed.
+- `npm run release:payment-smoke` runs payment contract checks. With `PAYMENT_SMOKE_ALLOW_MUTATION=1 -- --direct-webhook`, it targets only a local/non-production Worker, signs local Stripe webhook events, and verifies Store settlement.
+
+Set `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` on the target Worker when running the direct payment matrix. The Worker records email delivery markers so release smoke can prove customer/admin order emails would render without calling Resend.
+
 ## Config Sync
 
 Run this after `_config.yml`, `_config.local.yml`, `_products/`, shipping, tax, pricing, URL, add-on, marketing, or design settings change:

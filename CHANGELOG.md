@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.0.5 - 2026-07-05
+
+- Added a Store release smoke wrapper that records evidence across the pre-merge gate, launch readiness, Podman E2E, accessibility coverage, optional VoiceOver/Whisper transcript evidence, rendered i18n/SEO checks, Worker fulfillment checks, provider readiness, and payment readiness.
+- Added focused release evidence commands for accessibility, screen-reader transcripts, rendered i18n/SEO, Worker fulfillment, provider readiness, and payment smoke so release-critical checks can be rerun independently.
+- Added a Store merge smoke checklist with local/Podman production-like rehearsal replacing nonexistent staging targets.
+- Added cross-repo parity rules to the roadmap so Store and Pool can share reusable implementation patterns without copying project-specific surfaces.
+- Added a Store payment processor guide covering the Stripe PaymentIntent boundary, signed webhook settlement, fulfillment, reconciliation, provider checks, and no-send email evidence.
+- Added direct local signed-webhook payment evidence for paid digital, paid physical, paid ticket, free RSVP, and failed-payment paths, including customer/admin order email dry-run verification without calling Resend.
+- Added Worker email dry-run support through `STORE_EMAIL_DRY_RUN` / `RESEND_EMAIL_DRY_RUN`, including delivery markers in order summaries for release verification.
+- Added release fulfillment evidence for signed downloads, private download headers, revoke/refresh behavior, ticket/RSVP check-in, and admin order/attendee/reconciliation/audit CSV exports with in-process Worker mocks.
+- Added rendered i18n/SEO release evidence for English/Spanish public, order, admin, sitemap, robots, canonical, hreflang, noindex, route-copy, and product metadata behavior.
+- Added release accessibility coverage for axe checks, keyboard add-to-cart, visible focus order, order lookup live status updates, reduced motion, 200% text scaling, and mobile overflow.
+- Added optional macOS VoiceOver plus Whisper transcript evidence for releases that require assistive-technology speech evidence.
+- Added scheduled, non-deploying Podman E2E drift detection in GitHub Actions.
+- Added a GitHub Actions workflow for strict production Cloudflare DNS API evidence using repository secrets after the workflow is available on `main`.
+- Hardened SEO auditing with localized Product JSON-LD `inLanguage` checks and BreadcrumbList validation for product pages.
+- Improved Store admin responsiveness under high text scaling by relaxing the product editor action-row grid constraints.
+- Removed the old staging-oriented security test script and updated release docs to use local/Podman rehearsal, read-only provider probes, and GitHub Actions DNS evidence instead.
+- Kept the headed checkout helper as standalone exploratory desktop evidence instead of a required release-smoke phase, because automated payment, signed-webhook, and fulfillment evidence now cover release-critical checkout/payment behavior.
+
 ## v1.0.4 - 2026-06-29
 
 - Added Store-owned customer order confirmation emails for physical, digital, ticket, RSVP, coupon, shipping, and total-breakdown scenarios, and stopped requesting Stripe receipt emails for Store PaymentIntents.
@@ -22,7 +42,6 @@
 - Hardened the merge gate with Store-native CI ports, i18n completeness, generated-site SEO audit, real admin-page readiness checks, Podman Worker smoke on the host-success path, and Store-specific Podman fallback names.
 - Moved Vitest config entrypoints to ESM `.mts`, updated security test scripts to avoid Vite's CommonJS API deprecation path, and excluded test configs plus optimizer temp artifacts from static Jekyll output.
 - Folded the one-time production runbook into active production operations, testing, security, backup, and download docs, then removed the obsolete launch file.
-- Updated accessibility, i18n, security, digital download, email, dashboard, testing, performance, Podman, SEO, and roadmap documentation for the `v1.0.4` release audit.
 
 ## v1.0.3 - 2026-06-26
 

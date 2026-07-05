@@ -1,6 +1,6 @@
 # Downloads
 
-Release `v1.0.4` treats confirmed digital purchases as durable customer entitlements. Access stays available from the order page unless an admin explicitly revokes it.
+Since `v1.0.4`, confirmed digital purchases are durable customer entitlements. Access stays available from the order page unless an admin explicitly revokes it.
 
 Digital products should keep private file details out of the public catalog. Product records store a stable object key only:
 

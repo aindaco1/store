@@ -4,7 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Release target: `v1.0.4`.
+- Release target: `v1.0.5`.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -44,6 +44,7 @@ npm run test:content-security
 npm run test:unit
 npm run test:security
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+npm run test:premerge
 ```
 
 For release environment setup:
@@ -51,6 +52,7 @@ For release environment setup:
 ```bash
 npm run setup:deploy -- --mode=local
 npm run setup:deploy -- --mode=production --dry-run
+npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 ```
 
 ## Key Paths
@@ -74,6 +76,8 @@ npm run setup:deploy -- --mode=production --dry-run
 - [Worker README](worker/README.md)
 - [Payment processor](docs/PAYMENT_PROCESSOR.md)
 - [Testing](docs/TESTING.md)
+- [Merge smoke checklist](docs/MERGE_SMOKE_CHECKLIST.md)
+- [Release evidence](docs/release-evidence/v1.0.5.md)
 - [Security](docs/SECURITY.md)
 - [Backup and restore](docs/BACKUP_RESTORE.md)
 - [Downloads](docs/DOWNLOADS.md)

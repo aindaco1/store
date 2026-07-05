@@ -2,7 +2,7 @@
 
 Store performance depends on static public pages, lazy cart loading, generated media derivatives, compact Worker payloads, and bounded admin reads.
 
-## Release v1.0.4 Audit
+## Current Baseline
 
 - Public pages remain statically rendered and cart runtime loading remains lazy.
 - Store order lookup/admin reads use cached/indexed paths from the current Store mainline.

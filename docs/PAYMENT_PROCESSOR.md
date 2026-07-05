@@ -463,6 +463,8 @@ There is no Store recovery route that bypasses Stripe webhook settlement. Store 
 
 After checkout, fulfillment, or payment changes:
 
+- Run `npm run release:providers` for read-only provider checks. It can use authenticated `gh`, `wrangler`, and `stripe` CLIs to prove GitHub deploy secret names, Cloudflare KV/R2 resources, and live Stripe webhook endpoints without printing secrets.
+- Run `npm run release:payment-smoke` for payment contract checks. Local/test variables are read from `worker/.dev.vars` by default; pass `--no-dev-vars` only for clean-shell CI probes. For non-production direct signed-webhook settlement, run `PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook` against a Worker that has `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`; the direct matrix covers paid digital, paid physical, paid ticket, free RSVP, and failed-payment paths and verifies customer/admin order emails render without calling Resend. For local/non-production test-mode PaymentIntent creation against explicit URLs, set `PAYMENT_SMOKE_ALLOW_MUTATION=1`, `PAYMENT_SMOKE_WORKER_URL`, `PAYMENT_SMOKE_SITE_URL`, and `STRIPE_SECRET_KEY_TEST`; add `PAYMENT_SMOKE_CONFIRM=1` only when the non-production webhook endpoint is expected to settle the order.
 - Confirm `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` point at the intended environment.
 - Confirm Stripe publishable/secret keys match the selected app mode.
 - Confirm the Stripe webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` in production.

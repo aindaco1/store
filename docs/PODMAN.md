@@ -2,9 +2,9 @@
 
 Store includes a rootless Podman local development path for the two services that normally create host setup churn:
 
-## Release v1.0.4 Audit
+## Current Release Baseline
 
-The documented Podman flow remains the fallback parity path for Store release validation. `npm run test:premerge` falls back to Podman-backed Jekyll builds when host gems are unavailable, and it also runs a Podman Store Worker smoke phase even when the host path succeeds. Podman helpers cover Worker smoke, security, media, and headless E2E paths.
+The documented Podman flow remains the local production-like rehearsal path for Store release validation. `npm run test:premerge` falls back to Podman-backed Jekyll builds when host gems are unavailable, and it also runs a Podman Store Worker smoke phase even when the host path succeeds. `npm run release:smoke` runs Podman headless E2E when Podman is available, and `.github/workflows/podman-e2e.yml` provides scheduled non-deploying drift detection. Podman helpers cover Worker smoke, security, media, and headless E2E paths.
 
 - Jekyll storefront
 - Cloudflare Worker local dev server
@@ -141,6 +141,18 @@ For host-side commands that need a temporary Podman-backed Storefront and Worker
 ```bash
 ./scripts/podman-stack-run.sh <command...>
 ```
+
+## CI And Release Evidence
+
+`.github/workflows/podman-e2e.yml` runs the headless Podman E2E path on a weekly schedule and by manual dispatch. The workflow is read-only and non-deploying; it installs Podman, runs `npm run podman:doctor`, then runs `npm run test:e2e:headless:podman`.
+
+For release evidence, run:
+
+```bash
+npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
+```
+
+Use [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md) to record Podman doctor, local stack, Worker smoke, headless E2E, stale `gvproxy`/port cleanup, and image rebuild decisions. When Podman E2E passes inside `npm run release:smoke`, the release wrapper records that pass as the automated accessibility evidence source because the suite includes axe and 200% text-scaling checks.
 
 ## Stripe Webhooks
 

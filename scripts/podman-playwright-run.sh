@@ -100,6 +100,8 @@ exec podman run --rm \
   -w /workspace \
   -e CI="${CI:-1}" \
   -e PLAYWRIGHT_EXTERNAL_SERVER=1 \
+  -e PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://127.0.0.1:4000}" \
+  -e PLAYWRIGHT_WORKER_BASE_URL="${PLAYWRIGHT_WORKER_BASE_URL:-http://127.0.0.1:8787}" \
   -e PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-1}" \
   "$PLAYWRIGHT_IMAGE" \
   bash /workspace/scripts/podman-playwright-entrypoint.sh "$@"

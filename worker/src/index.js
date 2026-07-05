@@ -2415,7 +2415,7 @@ async function updateStoreOrderEmailDeliveryState(env, orderToken, updates = {})
 
 async function attemptStoreOrderEmailDelivery(env, storedOrder = {}) {
   const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
-  if (!env?.RESEND_API_KEY) {
+  if (!env?.RESEND_API_KEY && !storeEmailDryRunEnabled(env)) {
     return { ok: true, skipped: 'email_not_configured' };
   }
 
@@ -2441,6 +2441,7 @@ async function attemptStoreOrderEmailDelivery(env, storedOrder = {}) {
     }
     await updateStoreOrderEmailDeliveryState(env, orderToken, {
       emailSent: true,
+      emailDryRun: result?.dryRun === true,
       emailError: null,
       emailSentAt: sentAt,
       updatedAt: sentAt
@@ -2474,6 +2475,36 @@ function queueStoreOrderEmailDelivery(ctx, env, storedOrder = {}) {
       }
     }),
     `store order email (${orderToken || 'unknown'})`
+  );
+}
+
+function logStoreOrderEmailDeliveryFailure(label, orderToken, result) {
+  if (result && result.ok === false) {
+    console.error(`${label} failed:`, {
+      orderToken,
+      error: result.error
+    });
+  }
+}
+
+function queueStoreOrderEmailDeliveries(ctx, env, storedOrder = {}) {
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  queueBackgroundTask(
+    ctx,
+    (async () => {
+      const customerResult = await attemptStoreOrderEmailDelivery(env, storedOrder).catch((err) => ({
+        ok: false,
+        error: err?.message || 'Unknown Store order email error'
+      }));
+      logStoreOrderEmailDeliveryFailure('Store order email', orderToken, customerResult);
+
+      const adminResult = await attemptStoreOrderAdminNotificationDelivery(env, storedOrder).catch((err) => ({
+        ok: false,
+        error: err?.message || 'Unknown Store order admin notification error'
+      }));
+      logStoreOrderEmailDeliveryFailure('Store order admin notification', orderToken, adminResult);
+    })(),
+    `store order email deliveries (${orderToken || 'unknown'})`
   );
 }
 
@@ -2516,7 +2547,7 @@ async function buildAuthenticatedStoreOrderAdminNotificationPayload(env, payload
 
 async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {}) {
   const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
-  if (!env?.RESEND_API_KEY) {
+  if (!env?.RESEND_API_KEY && !storeEmailDryRunEnabled(env)) {
     return { ok: true, skipped: 'email_not_configured' };
   }
   if (!orderToken) {
@@ -2549,7 +2580,10 @@ async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {})
       if (env.STORE_STATE) {
         await env.STORE_STATE.put(sentKey, 'sent', { expirationTtl: 30 * 24 * 60 * 60 });
       }
-      sent.push(payload.email);
+      sent.push({
+        email: payload.email,
+        dryRun: result?.dryRun === true
+      });
     } catch (err) {
       failed.push({
         email: payload.email,
@@ -2558,7 +2592,8 @@ async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {})
     }
   }
 
-  const notified = Array.from(new Set([...sent, ...skipped]));
+  const sentEmails = sent.map((entry) => entry.email);
+  const notified = Array.from(new Set([...sentEmails, ...skipped]));
   const now = new Date().toISOString();
   await updateStoreOrderEmailDeliveryState(env, orderToken, {
     adminNotificationEmailSent: notified.length > 0 && failed.length === 0,
@@ -2566,6 +2601,7 @@ async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {})
     adminNotificationEmailSkippedRecipients: skipped,
     adminNotificationEmailErrors: failed,
     adminNotificationEmailAttemptedAt: now,
+    ...(sent.length ? { adminNotificationEmailDryRun: sent.every((entry) => entry.dryRun === true) } : {}),
     ...(sent.length ? { adminNotificationEmailSentAt: now } : {}),
     updatedAt: now
   });
@@ -2579,7 +2615,7 @@ async function attemptStoreOrderAdminNotificationDelivery(env, storedOrder = {})
     };
   }
 
-  return { ok: true, sent, skipped };
+  return { ok: true, sent: sentEmails, skipped };
 }
 
 function queueStoreOrderAdminNotificationDelivery(ctx, env, storedOrder = {}) {
@@ -4780,6 +4816,12 @@ function summarizeStoreEventDetails(eventDetails = null) {
   };
 }
 
+function storeEmailDryRunEnabled(env = {}) {
+  const storeRaw = String(env.STORE_EMAIL_DRY_RUN || '').trim().toLowerCase();
+  const resendRaw = String(env.RESEND_EMAIL_DRY_RUN || '').trim().toLowerCase();
+  return storeRaw === '1' || storeRaw === 'true' || resendRaw === '1' || resendRaw === 'true';
+}
+
 async function buildStoreOrderSummary(request, env, storedOrder = {}) {
   const orderDraft = storedOrder.orderDraft || {};
   const fulfillmentReady = isStoreOrderFulfillmentReady(storedOrder);
@@ -4787,7 +4829,7 @@ async function buildStoreOrderSummary(request, env, storedOrder = {}) {
     (item, index) => buildStoreSummaryItem(request, env, storedOrder, item, index, fulfillmentReady)
   ));
 
-  return {
+  const summary = {
     ok: true,
     orderToken: storedOrder.orderToken || orderDraft.orderToken || '',
     status: storedOrder.status || orderDraft.status || STORE_ORDER_STATUS_DRAFT,
@@ -4821,6 +4863,30 @@ async function buildStoreOrderSummary(request, env, storedOrder = {}) {
         }
       : { required: false }
   };
+
+  if (storeEmailDryRunEnabled(env)) {
+    summary.emailDelivery = {
+      customer: {
+        sent: storedOrder.emailSent === true,
+        dryRun: storedOrder.emailDryRun === true,
+        attempted: Boolean(storedOrder.emailSentAt || storedOrder.emailAttemptedAt),
+        error: storedOrder.emailError || ''
+      },
+      admin: {
+        sent: storedOrder.adminNotificationEmailSent === true,
+        dryRun: storedOrder.adminNotificationEmailDryRun === true,
+        attempted: Boolean(storedOrder.adminNotificationEmailSentAt || storedOrder.adminNotificationEmailAttemptedAt),
+        recipientCount: Array.isArray(storedOrder.adminNotificationEmailRecipients)
+          ? storedOrder.adminNotificationEmailRecipients.length
+          : 0,
+        errorCount: Array.isArray(storedOrder.adminNotificationEmailErrors)
+          ? storedOrder.adminNotificationEmailErrors.length
+          : 0
+      }
+    };
+  }
+
+  return summary;
 }
 
 async function handleStoreOrderRoute(request, env, route) {
@@ -10572,8 +10638,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     );
     invalidateAdminStoreOrderScanCache(env, ctx);
     queueStoreOrderEmailIndexUpsert(ctx, env, storedOrder);
-    queueStoreOrderEmailDelivery(ctx, env, storedOrder);
-    queueStoreOrderAdminNotificationDelivery(ctx, env, storedOrder);
+    queueStoreOrderEmailDeliveries(ctx, env, storedOrder);
     queueStoreEventRemindersQuietly(ctx, env, storedOrder);
 
     return privateJsonResponse({
@@ -10953,8 +11018,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   invalidateAdminStoreOrderScanCache(env, ctx);
   await deleteAbandonedCheckoutFollowup(env, metadata.orderToken, { reason: 'completed' });
   queueStoreOrderEmailIndexUpsert(ctx, env, updatedOrder);
-  queueStoreOrderEmailDelivery(ctx, env, updatedOrder);
-  queueStoreOrderAdminNotificationDelivery(ctx, env, updatedOrder);
+  queueStoreOrderEmailDeliveries(ctx, env, updatedOrder);
   queueStoreEventRemindersQuietly(ctx, env, updatedOrder);
 
   return {

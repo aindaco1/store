@@ -107,6 +107,53 @@ describe('Store email integration', () => {
     expect(payload.text).toContain('Order confirmed! Thank you for supporting Dust Wave.');
   });
 
+  it('renders Store order emails in dry-run mode without calling Resend', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(sendStoreOrderEmail({
+      ...env,
+      RESEND_API_KEY: '',
+      STORE_EMAIL_DRY_RUN: 'true'
+    }, {
+      email: 'customer@example.com',
+      orderToken: 'store-order-dry-run123',
+      orderDraft: {
+        orderToken: 'store-order-dry-run123',
+        totals: { subtotalCents: 500, totalCents: 500 },
+        items: [{
+          name: 'DUST WAVE Digital Download',
+          quantity: 1,
+          subtotalCents: 500,
+          fulfillmentType: 'digital'
+        }]
+      }
+    })).resolves.toEqual({ sent: true, dryRun: true });
+
+    await expect(sendStoreOrderAdminNotificationEmail({
+      ...env,
+      RESEND_API_KEY: '',
+      STORE_EMAIL_DRY_RUN: 'true'
+    }, {
+      email: 'admin@example.com',
+      orderToken: 'store-order-dry-run123',
+      adminUrl: 'https://shop.test/admin/?admin_login=magic-token&tab=store-orders',
+      orderDraft: {
+        orderToken: 'store-order-dry-run123',
+        customer: { email: 'customer@example.com' },
+        totals: { subtotalCents: 500, totalCents: 500 },
+        items: [{
+          name: 'DUST WAVE Digital Download',
+          quantity: 1,
+          subtotalCents: 500,
+          fulfillmentType: 'digital'
+        }]
+      }
+    })).resolves.toEqual({ sent: true, dryRun: true });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('brands Store emails with the configured company and platform name when both are set', async () => {
     const fetchMock = mockResend();
 
@@ -154,7 +201,7 @@ describe('Store email integration', () => {
           fulfillmentType: 'physical'
         }]
       }
-    })).resolves.toEqual({ sent: true });
+    })).resolves.toMatchObject({ sent: true });
 
     const payload = getEmailPayload(fetchMock);
     expect(payload.from).toBe('Simply Store <orders@shop.test>');
@@ -309,7 +356,7 @@ describe('Store email integration', () => {
     expect(payload.html).toContain('Abrir administración');
   });
 
-  it('renders admin login emails with Pool-style layout and an email-safe logo URL', async () => {
+  it('renders admin login emails with Store email layout and an email-safe logo URL', async () => {
     const fetchMock = mockResend();
 
     await expect(sendAdminLoginEmail({

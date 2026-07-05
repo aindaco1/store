@@ -28,4 +28,19 @@ describe('workflow security posture', () => {
     expect(workflow).not.toMatch(/git push\s+origin\s+main/);
     expect(workflow).not.toMatch(/git push\s+origin\s+HEAD:main/);
   });
+
+  it('keeps scheduled Podman E2E read-only and local', () => {
+    const workflow = readWorkflow('podman-e2e.yml');
+
+    expect(workflow).toContain('schedule:');
+    expect(workflow).toContain("cron: '17 9 * * 1'");
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toContain('npm run podman:doctor');
+    expect(workflow).toContain('npm run test:e2e:headless:podman');
+    expect(workflow).toContain('SKIP_STRIPE: "true"');
+    expect(workflow).not.toContain('contents: write');
+    expect(workflow).not.toContain('pull-requests: write');
+    expect(workflow).not.toMatch(/git push|gh pr create|wrangler deploy|deploy:worker|npm run deploy/);
+    expect(workflow).not.toMatch(/CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|STRIPE_LIVE_SECRET_KEY/);
+  });
 });

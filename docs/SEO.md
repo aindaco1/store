@@ -2,7 +2,7 @@
 
 Store SEO focuses on public product, terms, and home pages. Admin pages are excluded from crawl-oriented metadata and audit coverage. Private order and fulfillment shells remain `noindex`.
 
-## Release v1.0.4 Audit
+## Current Coverage
 
 - Store-owned order emails and Order Success changes do not add indexable fulfillment URLs.
 - Ticket/download/check-in links remain token-scoped Worker routes outside the sitemap.
@@ -10,6 +10,7 @@ Store SEO focuses on public product, terms, and home pages. Admin pages are excl
 - `sitemap.xml` emits only canonical, indexable public pages and active/sold-out public products; archived and `public: false` products are excluded.
 - Sitemap and page metadata include reciprocal `hreflang` alternates for generated localized product routes and localized public shells such as home and Terms.
 - Product SEO still depends on `_products/*` fields, generated localized product routes, and Store's Product/Offer JSON-LD.
+- `v1.0.5` release evidence samples rendered canonical, hreflang, Open Graph, Twitter card, Product/Offer/Breadcrumb JSON-LD, sitemap, robots, and private-route `noindex` behavior.
 
 ## Public Metadata
 
@@ -23,6 +24,8 @@ Shared includes generate:
 - sitemap entries
 
 Product pages emit Product JSON-LD from `_products/` metadata, including Product, Offer, BreadcrumbList, Organization, and merchant return policy data. Product pages with variants emit multiple Offer entries so each variant price/availability state can be represented. Super admins can customize social defaults, same-as links, and merchant return policy values from **Settings -> Brand & SEO**.
+
+The rendered SEO audit checks localized product `inLanguage` against the HTML language and requires product BreadcrumbList entries with stable positions and absolute Store URLs.
 
 ## Private Routes
 
@@ -56,3 +59,5 @@ bundle exec jekyll build --quiet
 npm run test:seo
 npm run test:content-security
 ```
+
+For release evidence, run `npm run release:smoke -- --evidence-file <path>` and complete the SEO section in [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md). Record sampled canonical, alternate, Open Graph, Twitter, Product JSON-LD, sitemap inclusion/exclusion, robots, and private-route `noindex` checks.

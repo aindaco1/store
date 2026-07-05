@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { expectNoHorizontalOverflow } from './helpers/mobile';
 
-const WORKER_BASE = 'http://127.0.0.1:8989';
+const WORKER_BASE = process.env.PLAYWRIGHT_WORKER_BASE_URL || 'http://127.0.0.1:8989';
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
 const JSON_HEADERS = {
   'content-type': 'application/json',
@@ -9,6 +10,22 @@ const JSON_HEADERS = {
   'access-control-allow-credentials': 'true'
 };
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
+
+async function applyTextScale(page: any, percent = 200) {
+  const stylesheetPath = `/__store-text-scale-${percent}.css`;
+  await page.route(`**${stylesheetPath}`, async (route: any) => {
+    await route.fulfill({
+      contentType: 'text/css',
+      body: `:root { font-size: ${percent}% !important; }`
+    });
+  });
+  await page.addStyleTag({ url: stylesheetPath });
+  await page.evaluate(async () => {
+    await document.fonts?.ready;
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+  });
+}
 
 type AdminRole = 'super_admin' | 'limited_admin';
 
@@ -116,7 +133,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
   };
   const checkIns: Record<string, any> = {};
 
-  await page.route(`${WORKER_BASE}/admin/**`, async (route: any) => {
+  await page.route(/^http:\/\/127\.0\.0\.1:(8989|8787)\/admin\//, async (route: any) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
@@ -484,7 +501,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         scope: 'store',
         productId: body.productId,
         preview: {
-          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"><script>window.__storePreviewHeadScriptRan = true;</script></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview onclick="window.__storePreviewInlineHandlerRan = true"><div class="storefront__header storefront__header--compact"><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card store-product-card--purchase-only" data-store-product-card><a class="store-product-card__media" href="javascript:window.__storePreviewHrefRan=true" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}" loading="eager" decoding="async" fetchpriority="high"></a><div class="store-product-card__body"><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Pool preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section><script>window.__storePreviewBodyScriptRan = true;</script></body></html>`,
+          html: `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><base href="https://shop.dustwave.xyz/"><link rel="stylesheet" href="https://shop.dustwave.xyz/assets/main.css"><script>window.__storePreviewHeadScriptRan = true;</script></head><body class="admin-store-product-preview-body"><section class="storefront storefront--product admin-store-product-preview" data-admin-store-product-preview onclick="window.__storePreviewInlineHandlerRan = true"><div class="storefront__header storefront__header--compact"><h1>${previewName}</h1></div><div class="storefront__product-detail"><article class="store-product-card store-product-card--purchase-only" data-store-product-card><a class="store-product-card__media" href="javascript:window.__storePreviewHrefRan=true" tabindex="-1" aria-disabled="true"><img class="store-product-card__image" src="${previewImage}" alt="${previewName}" loading="eager" decoding="async" fetchpriority="high"></a><div class="store-product-card__body"><div class="store-product-card__purchase"><p class="store-product-card__price">$35</p><p class="store-product-card__availability" data-store-inventory-state="none"></p><div class="store-product-card__controls store-product-card__controls--simple"><div class="store-product-card__field store-product-card__field--quantity"><label class="store-product-card__label">Quantity</label><div class="store-product-card__stepper"><button class="store-product-card__stepper-button" type="button" disabled>-</button><input class="store-product-card__qty" type="number" value="1" disabled><button class="store-product-card__stepper-button" type="button" disabled>+</button></div></div><button class="store-add-item store-product-card__button" type="button" disabled>Add to cart - $35</button></div></div></div></article><div class="storefront__product-copy"><p>${previewDescription}</p><p>Preview copy extends beyond the first fold so the admin iframe can scroll like the Store preview surface.</p><p>Second preview paragraph.</p><p>Third preview paragraph.</p></div></div></section><script>window.__storePreviewBodyScriptRan = true;</script></body></html>`,
           generatedAt: '2026-06-11T12:00:00.000Z'
         },
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
@@ -3008,5 +3025,35 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.storeDownloadCreates.length).toBe(1);
     await expect(page.locator('#admin-store-downloads-status')).toContainText('fronteras-download-mobile.pdf uploaded.');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+  });
+
+  test('keeps Store admin release surfaces usable with 200% text scaling', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    await page.goto('/admin/?admin_login=admin-token-text-scale');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await applyTextScale(page);
+    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    await expectNoHorizontalOverflow(page);
+
+    await selectAdminSection(page, 'Products');
+    await expect.poll(() => calls.storeProducts.length).toBe(1);
+    await expect(page.locator('#admin-store-products-results')).toContainText('Fronteras Poster (Big)');
+    await expectNoHorizontalOverflow(page);
+
+    await selectAdminSection(page, 'Orders');
+    await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
+    await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
+    await expectNoHorizontalOverflow(page);
+
+    await selectAdminSection(page, 'Downloads');
+    await expect.poll(() => calls.storeDownloads.length).toBe(1);
+    await expect(page.locator('#admin-store-downloads-results')).toContainText('fronteras-download.pdf');
+    await expectNoHorizontalOverflow(page);
+
+    await selectAdminSection(page, 'Marketing');
+    await expect(page.locator('#admin-store-marketing-builder')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
   });
 });

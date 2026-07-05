@@ -428,18 +428,38 @@ async function parseResendError(response) {
   return safeEmailHeaderText(detail).slice(0, 240);
 }
 
+function emailDryRunValueEnabled(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true';
+}
+
+function emailDryRunEnabled(env = {}) {
+  return emailDryRunValueEnabled(env.STORE_EMAIL_DRY_RUN) || emailDryRunValueEnabled(env.RESEND_EMAIL_DRY_RUN);
+}
+
 async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
+  const preparedPayload = {
+    ...payload,
+    text: payload.text || buildPlainTextFromHtml(payload.html || ''),
+    reply_to: payload.reply_to || getSupportEmail(env)
+  };
+
+  if (emailDryRunEnabled(env)) {
+    return {
+      id: `email_dry_run_${Date.now()}`,
+      dryRun: true,
+      to: preparedPayload.to,
+      subject: preparedPayload.subject
+    };
+  }
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      ...payload,
-      text: payload.text || buildPlainTextFromHtml(payload.html || ''),
-      reply_to: payload.reply_to || getSupportEmail(env)
-    })
+    body: JSON.stringify(preparedPayload)
   });
 
   if (!response.ok) {
@@ -695,7 +715,7 @@ async function buildStoreOrderEmailMessage(env, { orderToken, orderDraft = {}, p
 
 export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang, attachments = [] } = {}) {
   configureEmailLogging(env);
-  if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  if (!env?.RESEND_API_KEY && !emailDryRunEnabled(env)) return { sent: false, reason: 'RESEND_API_KEY not configured' };
 
   const message = await buildStoreOrderEmailMessage(env, {
     orderToken,
@@ -706,7 +726,7 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
     recipientType: 'customer'
   });
 
-  await sendResendEmail(env, {
+  const result = await sendResendEmail(env, {
     from: message.from,
     to: email,
     subject: message.subject,
@@ -716,12 +736,12 @@ export async function sendStoreOrderEmail(env, { email, orderToken, orderDraft =
     errorLabel: 'Resend error (store order)',
     failureLabel: `Failed to send ${safeEmailHeaderText(getEmailPlatformDisplayName(env)) || 'Store'} order email`
   });
-  return { sent: true };
+  return { sent: true, dryRun: result?.dryRun === true };
 }
 
 export async function sendStoreOrderAdminNotificationEmail(env, { email, orderToken, orderDraft = {}, payment = {}, preferredLang, adminUrl = '' } = {}) {
   configureEmailLogging(env);
-  if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  if (!env?.RESEND_API_KEY && !emailDryRunEnabled(env)) return { sent: false, reason: 'RESEND_API_KEY not configured' };
 
   const message = await buildStoreOrderEmailMessage(env, {
     orderToken,
@@ -733,7 +753,7 @@ export async function sendStoreOrderAdminNotificationEmail(env, { email, orderTo
     adminUrl
   });
 
-  await sendResendEmail(env, {
+  const result = await sendResendEmail(env, {
     from: message.from,
     to: email,
     subject: message.subject,
@@ -742,7 +762,7 @@ export async function sendStoreOrderAdminNotificationEmail(env, { email, orderTo
     errorLabel: 'Resend error (store order admin notification)',
     failureLabel: `Failed to send ${safeEmailHeaderText(getEmailPlatformDisplayName(env)) || 'Store'} order admin notification email`
   });
-  return { sent: true };
+  return { sent: true, dryRun: result?.dryRun === true };
 }
 
 export async function sendStoreEventReminderEmail(env, {

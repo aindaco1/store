@@ -195,6 +195,17 @@ describe('Store SEO templates', () => {
     expect(config).toContain('admin:');
   });
 
+  it('audits rendered localized product language and breadcrumb metadata', () => {
+    const seoAudit = readRepoFile('scripts', 'audit-seo.mjs');
+
+    expect(seoAudit).toContain('Product JSON-LD inLanguage');
+    expect(seoAudit).toContain('does not match html lang');
+    expect(seoAudit).toContain("hasType(node, 'BreadcrumbList')");
+    expect(seoAudit).toContain('BreadcrumbList should include home and product entries');
+    expect(seoAudit).toContain('BreadcrumbList position');
+    expect(seoAudit).toContain('BreadcrumbList item ${index + 1}');
+  });
+
   it('exposes current SEO customization fields in the admin settings pipeline', () => {
     const worker = readRepoFile('worker', 'src', 'index.js');
     const syncWorkerConfig = readRepoFile('scripts', 'sync-worker-config.rb');

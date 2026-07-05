@@ -1,6 +1,6 @@
 # Store Security Guide
 
-Release `v1.0.4` security posture: Store-owned order email replaces Stripe receipts, confirmed digital download entitlements are durable unless revoked, signed links remain short-lived/private/no-store, super-admin order notifications reuse the transactional email pipeline without ticket/QR attachments, and admin dashboard navigation persistence stores only sanitized non-sensitive tab state in browser storage.
+Since `v1.0.4`, Store-owned order email replaces Stripe receipts, confirmed digital download entitlements are durable unless revoked, signed links remain short-lived/private/no-store, super-admin order notifications reuse the transactional email pipeline without ticket/QR attachments, and admin dashboard navigation persistence stores only sanitized non-sensitive tab state in browser storage.
 
 This document covers the active Store security model: static product pages, first-party cart runtime, Cloudflare Worker checkout APIs, Stripe, USPS/NM GRT integrations, Resend email, signed downloads, inventory, and the private admin dashboard.
 

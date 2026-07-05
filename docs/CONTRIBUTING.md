@@ -91,6 +91,12 @@ For Podman:
 npm run podman:self-check
 ```
 
+For branches that touch checkout, fulfillment, admin, i18n, accessibility, SEO, Podman/release tooling, payment/webhooks, inventory, reminders, or catalog publishing, run the release gate and record the evidence path:
+
+```bash
+npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
+```
+
 Default browser coverage is Store-only. Add new Playwright coverage to the Store public/admin specs unless the change introduces a new Store surface that deserves its own spec.
 
 ## Pull Request Checklist
@@ -105,6 +111,7 @@ Default browser coverage is Store-only. Add new Playwright coverage to the Store
 - [ ] Coupon, lookup, reminder, or marketing changes include Worker tests or focused admin/browser coverage.
 - [ ] No secrets, tokens, customer data, or production export files are committed.
 - [ ] Docs are updated when workflow or operator behavior changes.
+- [ ] `npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md` passes for release-impacting changes, or each skipped external evidence item has owner/date/reason.
 
 ## Branch Names
 

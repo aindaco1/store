@@ -2,7 +2,7 @@
 
 Store sends transactional email through Resend from the Worker. Templates live in `worker/src/email.js`, copy lives in `_data/i18n/*.yml`, and order/reminder scheduling lives in `worker/src/index.js`.
 
-Release `v1.0.4` moves Store order receipts fully into this path: Stripe PaymentIntents do not request Stripe receipt emails, customers receive Store-owned order confirmations, and super admins receive lightweight order notifications.
+Since `v1.0.4`, Store order receipts live fully in this path: Stripe PaymentIntents do not request Stripe receipt emails, customers receive Store-owned order confirmations, and super admins receive lightweight order notifications.
 
 ## Senders
 
@@ -127,3 +127,5 @@ Run the focused suite with:
 ```sh
 npm run test:unit -- tests/unit/email-store.test.ts tests/unit/event-reminders.test.ts tests/unit/order-lookup-email.test.ts
 ```
+
+For release payment evidence, run the target Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The Worker records email delivery markers without calling Resend, and `npm run release:payment-smoke -- --direct-webhook` verifies customer/admin order emails would render for the local signed-webhook matrix.

@@ -261,6 +261,9 @@ for (const filePath of htmlFiles) {
     if (!product) {
       errors.push(`${route}: JSON-LD missing Product`);
     } else {
+      if (product.inLanguage !== lang) {
+        errors.push(`${route}: Product JSON-LD inLanguage (${product.inLanguage || 'missing'}) does not match html lang (${lang})`);
+      }
       for (const field of ['name', 'description', 'image', 'sku', 'brand', 'offers']) {
         if (!product[field]) errors.push(`${route}: Product JSON-LD missing ${field}`);
       }
@@ -270,6 +273,20 @@ for (const filePath of htmlFiles) {
         for (const field of ['price', 'priceCurrency', 'availability', 'itemCondition', 'seller']) {
           if (!offer?.[field]) errors.push(`${route}: Offer JSON-LD missing ${field}`);
         }
+      }
+    }
+    const breadcrumbs = graph.find((node) => hasType(node, 'BreadcrumbList'));
+    if (!breadcrumbs) {
+      errors.push(`${route}: JSON-LD missing BreadcrumbList`);
+    } else {
+      const items = Array.isArray(breadcrumbs.itemListElement) ? breadcrumbs.itemListElement : [];
+      if (items.length < 2) {
+        errors.push(`${route}: BreadcrumbList should include home and product entries`);
+      }
+      for (const [index, item] of items.entries()) {
+        if (item.position !== index + 1) errors.push(`${route}: BreadcrumbList position ${index + 1} is not stable`);
+        if (!item.name) errors.push(`${route}: BreadcrumbList item ${index + 1} missing name`);
+        assertAbsoluteSiteUrl(item.item, siteBase, `BreadcrumbList item ${index + 1}`, route, errors);
       }
     }
   } else if (!graph.some((node) => hasType(node, 'WebSite'))) {

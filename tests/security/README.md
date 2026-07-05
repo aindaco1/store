@@ -16,10 +16,10 @@ With the full local stack running, the root command is enough:
 npm run test:security
 ```
 
-Run against another Worker:
+Run against the Podman Worker or another local/non-production Worker:
 
 ```bash
-WORKER_URL=https://checkout-staging.dustwave.xyz npm run test:security
+WORKER_URL=http://127.0.0.1:8989 npm run test:security
 ```
 
 ## Coverage

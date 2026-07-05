@@ -26,7 +26,8 @@ function buildEnv() {
     SHIPPING_ORIGIN_ZIP: '87102',
     SHIPPING_ORIGIN_COUNTRY: 'US',
     SHIPPING_FALLBACK_FLAT_RATE: '3.00',
-    ...loadWorkerDevVars()
+    ...loadWorkerDevVars(),
+    ...process.env
   };
 }
 
