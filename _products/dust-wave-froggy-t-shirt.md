@@ -6,7 +6,7 @@ price: 25
 image: "/assets/images/froggy-tshirt.png"
 type: shirt
 fulfillment_type: physical
-status: active
+status: archived
 category: dustwave
 order: 140
 shipping_preset: tshirt

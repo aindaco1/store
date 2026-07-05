@@ -849,7 +849,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "url": "https://shop.dustwave.xyz/products/dust-wave-froggy-t-shirt/",
       "type": "physical",
       "fulfillment_type": "physical",
-      "status": "active",
+      "status": "archived",
       "public": true,
       "launch_test": false,
       "order": 140.0,
@@ -868,7 +868,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 1,
-          "status": "active"
+          "status": "archived"
         },
         {
           "id": "s",
@@ -877,7 +877,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 2,
-          "status": "active"
+          "status": "archived"
         },
         {
           "id": "m",
@@ -886,7 +886,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 5,
-          "status": "active"
+          "status": "archived"
         },
         {
           "id": "l",
@@ -895,7 +895,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 7,
-          "status": "active"
+          "status": "archived"
         },
         {
           "id": "xl",
@@ -904,7 +904,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 3,
-          "status": "active"
+          "status": "archived"
         },
         {
           "id": "2xl",
@@ -913,7 +913,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 1,
-          "status": "active"
+          "status": "archived"
         },
         {
           "id": "3xl",
@@ -922,7 +922,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "price": 25.0,
           "price_cents": 2500,
           "inventory": 0,
-          "status": "active"
+          "status": "archived"
         }
       ],
       "inventory_tracking": true,
@@ -952,7 +952,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "url": "https://shop.dustwave.xyz/products/dust-wave-froggy-sticker/",
       "type": "physical",
       "fulfillment_type": "physical",
-      "status": "active",
+      "status": "archived",
       "public": true,
       "launch_test": false,
       "order": 150.0,
@@ -2700,7 +2700,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "7016a3307e14e2680d11ef2657f570df623169c8321bb087292a0290708b09ac"
+  "source_hash": "bb339e62514a7650adbdaa4397219aea848f617ae31ea230eaed3ee135e5c44c"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

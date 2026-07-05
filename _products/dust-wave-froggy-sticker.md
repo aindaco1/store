@@ -6,7 +6,7 @@ price: 3
 image: "/assets/images/froggy-sticker.png"
 type: sticker
 fulfillment_type: physical
-status: active
+status: archived
 category: dustwave
 order: 150
 shipping_preset: sticker
