@@ -45,6 +45,7 @@ USPS quote smoke may also use worker/.dev.vars. It never prints secret values.`)
 }
 
 const results = [];
+const requiresDedicatedCloudflareDnsToken = cloudflareDnsOnly && strict;
 
 function add(status, label, detail = '') {
   results.push({ status, label, detail });
@@ -291,9 +292,11 @@ function checkGithubDeploySecrets() {
   const required = ['CLOUDFLARE_ACCOUNT_ID'];
   if (process.env.GITHUB_ACTIONS === 'true') {
     const missing = required.filter((name) => !envValue(name));
+    const hasDedicatedCloudflareDnsToken = Boolean(envValue('CLOUDFLARE_DNS_API_TOKEN'));
     const hasCloudflareToken = Boolean(envValue('CLOUDFLARE_DNS_API_TOKEN') || envValue('CLOUDFLARE_API_TOKEN'));
     const hasCloudflareZone = Boolean(envValue('CLOUDFLARE_ZONE_ID') || envValue('CLOUDFLARE_ZONE'));
     if (missing.length) add('FAIL', 'GitHub deploy secrets', `missing injected secret(s): ${missing.join(', ')}`);
+    else if (requiresDedicatedCloudflareDnsToken && !hasDedicatedCloudflareDnsToken) add('FAIL', 'GitHub deploy secrets', 'missing injected secret: CLOUDFLARE_DNS_API_TOKEN with Zone:DNS:Read for the production zone');
     else if (!hasCloudflareToken) add('FAIL', 'GitHub deploy secrets', 'missing injected secret: CLOUDFLARE_DNS_API_TOKEN or CLOUDFLARE_API_TOKEN');
     else if (!hasCloudflareZone) add('FAIL', 'GitHub deploy secrets', 'missing injected secret: CLOUDFLARE_ZONE_ID or CLOUDFLARE_ZONE');
     else add('PASS', 'GitHub deploy secrets', `${required.length + 2} required deploy secret(s) injected`);
@@ -316,9 +319,11 @@ function checkGithubDeploySecrets() {
   const parsed = parseJsonOutput(secrets.stdout);
   const visible = new Set((Array.isArray(parsed) ? parsed : []).map((entry) => String(entry.name || '')));
   const missing = required.filter((name) => !visible.has(name));
+  const hasDedicatedCloudflareDnsToken = visible.has('CLOUDFLARE_DNS_API_TOKEN');
   const hasCloudflareToken = visible.has('CLOUDFLARE_DNS_API_TOKEN') || visible.has('CLOUDFLARE_API_TOKEN');
   const hasCloudflareZone = visible.has('CLOUDFLARE_ZONE_ID') || visible.has('CLOUDFLARE_ZONE');
   if (missing.length) add('FAIL', 'GitHub deploy secrets', `missing ${missing.join(', ')}`);
+  else if (requiresDedicatedCloudflareDnsToken && !hasDedicatedCloudflareDnsToken) add('FAIL', 'GitHub deploy secrets', 'missing CLOUDFLARE_DNS_API_TOKEN with Zone:DNS:Read for the production zone');
   else if (!hasCloudflareToken) add('FAIL', 'GitHub deploy secrets', 'missing CLOUDFLARE_DNS_API_TOKEN or CLOUDFLARE_API_TOKEN');
   else if (!hasCloudflareZone) add('FAIL', 'GitHub deploy secrets', 'missing CLOUDFLARE_ZONE_ID or CLOUDFLARE_ZONE');
   else add('PASS', 'GitHub deploy secrets', `${required.length + 2} required deploy secret name(s) visible`);
@@ -364,11 +369,19 @@ async function resolveCloudflareZoneId({ token, accountId, zoneId, zoneName }) {
   return { ok: false, reason: 'zone name lookup returned no matching zone; set CLOUDFLARE_ZONE_ID or check CLOUDFLARE_ZONE' };
 }
 
-function cloudflareDnsRecordFailureDetail(status) {
+function cloudflareDnsRecordFailureDetail(status, tokenSource) {
   if (status === 403) {
-    return 'status 403; token is valid but cannot read DNS records for the configured zone. Use a token with Zone:DNS:Read scoped to this zone, or set CLOUDFLARE_DNS_API_TOKEN for this workflow.';
+    const source = tokenSource ? `${tokenSource} is valid` : 'token is valid';
+    return `status 403; ${source} but cannot read DNS records for the configured zone. Use CLOUDFLARE_DNS_API_TOKEN with Zone:DNS:Read scoped to this zone.`;
   }
   return `status ${status || 'unavailable'}`;
+}
+
+function firstTokenChoice(choices) {
+  for (const [source, token] of choices) {
+    if (token) return { source, token };
+  }
+  return { source: '', token: '' };
 }
 
 async function main() {
@@ -399,11 +412,24 @@ async function main() {
   checkGithubDeploySecrets();
 
   const cloudflareApiToken = envValue('CLOUDFLARE_API_TOKEN');
-  const cloudflareDnsToken = envValue('CLOUDFLARE_DNS_API_TOKEN') || cloudflareApiToken;
+  const dedicatedCloudflareDnsToken = envValue('CLOUDFLARE_DNS_API_TOKEN');
+  const cloudflareDnsTokenChoice = firstTokenChoice([
+    ['CLOUDFLARE_DNS_API_TOKEN', dedicatedCloudflareDnsToken],
+    [requiresDedicatedCloudflareDnsToken ? '' : 'CLOUDFLARE_API_TOKEN', requiresDedicatedCloudflareDnsToken ? '' : cloudflareApiToken]
+  ]);
+  const cloudflareDnsToken = cloudflareDnsTokenChoice.token;
   const cloudflareUsageToken = envValue('CLOUDFLARE_USAGE_API_TOKEN');
-  const cloudflareToken = cloudflareDnsOnly
-    ? (cloudflareDnsToken || cloudflareUsageToken)
-    : (cloudflareApiToken || cloudflareUsageToken || cloudflareDnsToken);
+  const cloudflareTokenChoice = cloudflareDnsOnly
+    ? firstTokenChoice([
+      [cloudflareDnsTokenChoice.source, cloudflareDnsToken],
+      ['CLOUDFLARE_USAGE_API_TOKEN', cloudflareUsageToken]
+    ])
+    : firstTokenChoice([
+      ['CLOUDFLARE_API_TOKEN', cloudflareApiToken],
+      ['CLOUDFLARE_USAGE_API_TOKEN', cloudflareUsageToken],
+      [cloudflareDnsTokenChoice.source, cloudflareDnsToken]
+    ]);
+  const cloudflareToken = cloudflareTokenChoice.token;
   const cloudflareAccountId = envValue('CLOUDFLARE_ACCOUNT_ID');
   const configuredCloudflareZoneId = envValue('CLOUDFLARE_ZONE_ID');
   const configuredCloudflareZone = envValue('CLOUDFLARE_ZONE');
@@ -413,7 +439,7 @@ async function main() {
     const token = await fetchJson('https://api.cloudflare.com/client/v4/user/tokens/verify', {
       headers: { Authorization: `Bearer ${cloudflareToken}` }
     });
-    if (token.ok && token.body?.success !== false) add('PASS', 'Cloudflare API token verification', 'token is accepted');
+    if (token.ok && token.body?.success !== false) add('PASS', 'Cloudflare API token verification', `${cloudflareTokenChoice.source || 'token'} is accepted`);
     else add('FAIL', 'Cloudflare API token verification', `status ${token.status || 'unavailable'}`);
   }
 
@@ -470,7 +496,7 @@ async function main() {
         headers: { Authorization: `Bearer ${cloudflareDnsToken}` }
       });
       if (!records.ok) {
-        add('FAIL', `Cloudflare DNS record ${host}`, cloudflareDnsRecordFailureDetail(records.status));
+        add('FAIL', `Cloudflare DNS record ${host}`, cloudflareDnsRecordFailureDetail(records.status, cloudflareDnsTokenChoice.source));
       } else if ((records.body?.result || []).length > 0) {
         add('PASS', `Cloudflare DNS record ${host}`, `${records.body.result.length} record(s) visible`);
       } else {
