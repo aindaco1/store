@@ -43,4 +43,14 @@ describe('workflow security posture', () => {
     expect(workflow).not.toMatch(/git push|gh pr create|wrangler deploy|deploy:worker|npm run deploy/);
     expect(workflow).not.toMatch(/CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|STRIPE_LIVE_SECRET_KEY/);
   });
+
+  it('keeps release provider evidence read-only and DNS-scoped', () => {
+    const workflow = readWorkflow('release-provider-evidence.yml');
+
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).toContain('CLOUDFLARE_DNS_API_TOKEN');
+    expect(workflow).toContain('CLOUDFLARE_ZONE_ID');
+    expect(workflow).toContain('npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars');
+    expect(workflow).not.toMatch(/wrangler deploy|deploy:worker|purge_cache|contents: write|pull-requests: write/);
+  });
 });

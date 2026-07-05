@@ -49,7 +49,7 @@ npm run release:payment-smoke
 
 `npm run release:providers` can use authenticated `gh`, `wrangler`, and `stripe` CLIs for read-only evidence. Record any remaining warnings or skips in the generated evidence file.
 
-GitHub Actions also has a read-only Cloudflare DNS evidence workflow for production DNS records. `Release Provider Evidence` runs `npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars` with the production `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_ZONE` secrets injected by Actions. Manually dispatch it for release branches when local provider probes cannot read the GitHub-only zone id; it runs automatically on `main`.
+GitHub Actions also has a read-only Cloudflare DNS evidence workflow for production DNS records. `Release Provider Evidence` runs `npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars` with `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE` or `CLOUDFLARE_ZONE_ID`, and either `CLOUDFLARE_DNS_API_TOKEN` or `CLOUDFLARE_API_TOKEN` injected by Actions. Prefer a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read` for the production zone. If `CLOUDFLARE_ZONE` is a zone name instead of an ID, the token also needs zone lookup access or the workflow should receive `CLOUDFLARE_ZONE_ID`. Manually dispatch it for release branches when local provider probes cannot read the GitHub-only zone id; it runs automatically on `main`.
 
 Provider and payment release probes read `worker/.dev.vars` by default, with shell environment values taking precedence. Use `--no-dev-vars` only for clean-shell CI probes. For local signed-webhook settlement without Stripe CLI forwarding:
 

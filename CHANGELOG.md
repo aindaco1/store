@@ -15,6 +15,7 @@
 - Added optional macOS VoiceOver plus Whisper transcript evidence for releases that require assistive-technology speech evidence.
 - Added scheduled, non-deploying Podman E2E drift detection in GitHub Actions.
 - Added a GitHub Actions workflow for strict production Cloudflare DNS API evidence using repository secrets after the workflow is available on `main`.
+- Hardened the Cloudflare DNS evidence workflow to prefer a dedicated `CLOUDFLARE_DNS_API_TOKEN`, support explicit `CLOUDFLARE_ZONE_ID`, and report actionable token-scope errors when DNS record reads return `403`.
 - Hardened SEO auditing with localized Product JSON-LD `inLanguage` checks and BreadcrumbList validation for product pages.
 - Improved Store admin responsiveness under high text scaling by relaxing the product editor action-row grid constraints.
 - Removed the old staging-oriented security test script and updated release docs to use local/Podman rehearsal, read-only provider probes, and GitHub Actions DNS evidence instead.
