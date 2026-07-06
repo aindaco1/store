@@ -191,6 +191,7 @@ Keep these scoped to Store's goals and data model. Share implementation patterns
   - Extend tests around media picker usability, optimization-state rendering, broken-reference warnings, cleanup safety, responsive image selection, Store product preview safety, and any add-on variant price resolution.
   - Update [ADD_ON_PRODUCTS.md](ADD_ON_PRODUCTS.md), [DASHBOARD.md](DASHBOARD.md), [CUSTOMIZATION.md](CUSTOMIZATION.md), and admin help text as media or add-on authoring features land.
 - [ ] Production quality gates and admin operations hardening
+  - Keep the ethical risk review current as a lightweight Store release discipline. New data collection, automation, marketing/reminder behavior, analytics, tokenized links, external providers, and public content workflows should record risk lenses, mitigations, tests, and residual owner/date in the owning docs or release evidence.
   - Add lightweight performance budgets for storefront, cart, checkout, Order Success, order lookup, and admin routes, including JavaScript size, CSS size, image/media weight, Worker response time, and dashboard table/render latency.
   - Add repeatable Lighthouse/PageSpeed checks for core public routes before production deploys, keeping checks scriptable and optional where external provider credentials or stable production URLs are unavailable.
   - Surface Worker timing percentiles and slow-route summaries in admin Plan Usage or Runtime diagnostics using existing performance observation data instead of adding a second telemetry backend.

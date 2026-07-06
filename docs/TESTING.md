@@ -82,6 +82,8 @@ npm run test:premerge
 
 The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, host Worker smoke, Podman Worker smoke, asset minification checks, and the headless Playwright suite. It waits for the real admin shell before host smoke so a stale listener cannot count as a ready site. When host Jekyll gems are unavailable it falls back to a Podman-backed build, smoke, and browser path.
 
+For changes that trigger [ETHICAL_RISK.md](ETHICAL_RISK.md), record the review result in the PR before merge. Automated checks can prove many mitigations, such as private/no-store routes, consent state, suppression, access control, content safety, i18n completeness, and accessibility. Residual risks that require human review should name the owner/date in the PR or release evidence.
+
 ## Release Smoke
 
 ```bash

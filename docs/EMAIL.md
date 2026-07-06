@@ -111,6 +111,8 @@ Human-facing copy should stay short, direct, and localized through `_data/i18n/e
 
 Templates fall back to English strings in `worker/src/email.js` when a catalog key is missing.
 
+Reminder and notification changes should pass the [ethical risk review](ETHICAL_RISK.md) when they alter timing, frequency, targeting, consent, suppression, or customer data. Emails should state why the customer is receiving the message, avoid deceptive urgency, include the expected off-ramp when the message is optional, and avoid exposing private fulfillment tokens beyond the scoped order page.
+
 ## Testing
 
 Unit coverage includes:

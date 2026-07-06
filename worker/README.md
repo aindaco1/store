@@ -111,6 +111,18 @@ Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in
 
 Payment setup, settlement, reconciliation, and Stripe operations are documented in [Payment Processor](../docs/PAYMENT_PROCESSOR.md).
 
+## Ethical Risk Guardrails
+
+Worker changes that collect or expose customer/admin data, send email, create reminders, alter access, add analytics, automate decisions, or mint new signed links should follow the repository [ethical risk review](../docs/ETHICAL_RISK.md).
+
+Keep the Worker posture conservative:
+
+- validate and canonicalize money, access, fulfillment, and inventory server-side
+- minimize stored data and keep sensitive responses private/no-store
+- preserve consent and suppression for reminder/marketing contact
+- scope, expire, and audit tokenized order, lookup, download, ticket, check-in, and admin links
+- add tests or release evidence for abuse cases such as tampered carts, leaked tokens, duplicate sends, export misuse, and unauthorized admin scope expansion
+
 ## Scheduled Work
 
 `worker/wrangler.toml` runs a minute cron. The handler records a bounded heartbeat, processes opted-in abandoned-checkout reminders, sends due event reminders, and records recent error state in `STORE_STATE`. Queue-state markers keep idle cron ticks cheap.

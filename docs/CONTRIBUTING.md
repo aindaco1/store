@@ -34,6 +34,7 @@ Read these first for Store work:
 - [DASHBOARD.md](DASHBOARD.md)
 - [TESTING.md](TESTING.md)
 - [SECURITY.md](SECURITY.md)
+- [ETHICAL_RISK.md](ETHICAL_RISK.md)
 - [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
 
 Use `/Users/aindaco1/Desktop/agents.md` as the product brief when working in Codex.
@@ -49,6 +50,8 @@ Use `/Users/aindaco1/Desktop/agents.md` as the product brief when working in Cod
 - Admin mutations must keep session, CSRF, role/scope, normalization, rate-limit, and audit boundaries intact.
 - Product content should use Markdown, not raw HTML.
 - Coupons, reminders, marketing referrals, and runtime admin users live in KV-backed Worker/admin flows, not product markdown.
+- Run the ethical risk review for changes that affect customer/admin data, access, automation, analytics, reminders, referrals, public tokens, signed links, pricing, coupons, product content, or external providers.
+- Do not add hidden tracking, manipulative urgency, unsuppressible reminders, or customer-data monetization. Collect only what Store needs for checkout, fulfillment, tax, support, security, and operations.
 
 ## Product Changes
 
@@ -109,6 +112,7 @@ Default browser coverage is Store-only. Add new Playwright coverage to the Store
 - [ ] Default Playwright suite passes for UI changes.
 - [ ] Admin changes preserve session, CSRF, role/scope, and audit behavior.
 - [ ] Coupon, lookup, reminder, or marketing changes include Worker tests or focused admin/browser coverage.
+- [ ] Ethical risk review is recorded for triggered changes, or marked `N/A` with a reason.
 - [ ] No secrets, tokens, customer data, or production export files are committed.
 - [ ] Docs are updated when workflow or operator behavior changes.
 - [ ] `npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md` passes for release-impacting changes, or each skipped external evidence item has owner/date/reason.

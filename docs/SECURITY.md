@@ -14,6 +14,18 @@ This guide describes the current Store security model for production. Historical
 - Cloudflare KV stores operational records and session state; Durable Objects coordinate race-sensitive checkout/inventory work; R2 stores private digital download objects.
 - GitHub-backed catalog/admin publishing paths are admin-only and normalized server-side before commit.
 
+## Ethical Risk And User Trust
+
+Security controls are also harm controls. New features that collect data, change access, send messages, publish content, expose analytics, automate decisions, or create new tokenized routes must run the [ethical risk review](ETHICAL_RISK.md) alongside the normal security review.
+
+Default posture:
+
+- collect and retain only the data needed for checkout, fulfillment, tax, support, fraud prevention, and operations
+- keep customer-facing behavior explicit in copy, consent, status text, and errors
+- keep reminders, referrals, lookup, download, ticket, and admin links scoped, expiring where appropriate, private/no-store, and suppressible where they contact users
+- threat-model misuse by outsiders, compromised admins, forwarded emails, leaked exports, automated scraping, and malicious product/media uploads
+- record mitigations through tests, audit events, release evidence, or operator sign-off when automation cannot prove the risk is controlled
+
 ## Authentication And Secrets
 
 | Mechanism | Surface | Notes |
@@ -144,6 +156,8 @@ Rendering defenses also remain in place:
 - product JSON payloads use JSON encoding
 
 Use Markdown for product descriptions; do not author raw HTML in product markdown.
+
+Human review should also reject misleading availability, pricing, policy, event-access, or fulfillment claims; deceptive impersonation; and product/media content that enables harassment, fraud, hate, or other criminal misuse. The automated content audit catches unsafe markup, but it cannot judge every truthfulness or abuse risk.
 
 ## Public Runtime Boundaries
 

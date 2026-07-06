@@ -4,6 +4,7 @@
 
 - What changed:
 - Why:
+- Ethical risk review: N/A or link/summary:
 
 ## Checks
 
@@ -16,6 +17,7 @@
 - [ ] Playwright coverage for touched UI paths
 - [ ] `npm run test:premerge`
 - [ ] `npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md` for release-impacting changes, or skipped external evidence is documented
+- [ ] Ethical risk review completed for triggered changes, or marked N/A with a reason
 
 ## Store Smoke
 

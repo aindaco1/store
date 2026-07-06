@@ -14,6 +14,18 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 - Confirmed digital download entitlements do not expire unless an admin explicitly revokes access; signed fulfillment links remain short-lived.
 - Store admin mutations use `store_admin_session` plus `x-store-admin-csrf`.
 - Public Spanish shells share the same Store workflows as English routes; creator/customer-authored content is not auto-translated.
+- Customer/admin data collection, marketing/reminder sends, analytics, automation, public token/link changes, and external provider additions require an [ethical risk review](ETHICAL_RISK.md) before merge.
+
+## Ethical Risk Review Workflow
+
+Use [ETHICAL_RISK.md](ETHICAL_RISK.md) when a workflow change could surprise users, expose sensitive data, alter access, automate a decision, increase interruption, or create a new abuse path.
+
+Record the outcome in the PR or release evidence:
+
+- touched surfaces
+- applicable risk lenses
+- mitigations and tests
+- residual risk owner/date, or `N/A` with a reason
 
 ## Catalog Workflow
 

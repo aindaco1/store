@@ -66,3 +66,4 @@ Store succeeds the old DUST WAVE Snipcart shop while keeping the repo-backed cat
 - Keep admin mutations CSRF-protected.
 - Keep inventory and digital downloads in the Worker-controlled path.
 - Prefer deleting old compatibility paths over preserving unused shims.
+- Run the [ethical risk review](ETHICAL_RISK.md) before shipping changes that alter customer data collection, admin access, checkout/payment behavior, marketing/reminders, analytics, public tokens, automation, or other surfaces where misuse or second-order harm is plausible.

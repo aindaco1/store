@@ -223,6 +223,8 @@ Analytics CSV export is generated client-side from the currently loaded table da
 
 There is no separate Settings -> Analytics section. Provider usage and runtime telemetry live under Settings -> Plan usage and Settings -> Runtime diagnostics.
 
+Analytics changes should stay operational and explainable. Do not add behavioral tracking, customer profiling, ranking, or inferred traits without an ethical risk review, a data-minimization reason, access controls, retention notes, and tests or release evidence for private/no-store handling where applicable.
+
 ## Marketing
 
 Marketing contains the referral/UTM link builder and abandoned checkout controls.
@@ -245,6 +247,8 @@ Abandoned checkout:
 - Reads reminder queue health.
 - Shows pending/sent/failed/suppressed state.
 - Allows suppressing and unsuppressing reminder emails.
+
+Marketing and reminder changes must preserve consent, suppression, clear purpose, and bounded frequency. Avoid urgency copy or engagement loops that pressure customers beyond the transactional or opted-in reason for contact.
 
 Marketing endpoints:
 
