@@ -8,7 +8,7 @@ type: poster
 fulfillment_type: physical
 status: active
 category: fronteras
-order: 320
+order: 410
 shipping_preset: poster
 tax_category: standard
 inventory_tracking: false
