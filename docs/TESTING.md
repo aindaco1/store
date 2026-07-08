@@ -29,7 +29,7 @@ Default Playwright specs:
 - `tests/e2e/public-page-controls.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
 
-These cover public layout/accessibility, product-card and product-detail controls, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product publish, download replacement upload, coupon management, inventory baseline writes, scoped Store admin access, and Spanish admin tabs.
+These cover public layout/accessibility, product-card and product-detail controls, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 

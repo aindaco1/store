@@ -25,6 +25,8 @@ Shared includes generate:
 
 Product pages emit Product JSON-LD from `_products/` metadata, including Product, Offer, BreadcrumbList, Organization, and merchant return policy data. Product pages with variants emit multiple Offer entries so each variant price/availability state can be represented. Super admins can customize social defaults, same-as links, and merchant return policy values from **Settings -> Brand & SEO**.
 
+The product front matter `description` field is the SEO description. In the admin product editor it appears as **SEO description** and is intentionally separate from **Product page content**, which controls the visible product-detail body.
+
 The rendered SEO audit checks localized product `inLanguage` against the HTML language and requires product BreadcrumbList entries with stable positions and absolute Store URLs.
 
 ## Private Routes

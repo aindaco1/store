@@ -38,6 +38,7 @@ Storefront collection/category filter labels can be localized in `_config.yml` u
 Each sellable item lives in `_products/*.md`. Product records should define:
 
 - `title`
+- `description`
 - `price`
 - `sku`
 - `fulfillment_type`
@@ -50,6 +51,11 @@ Each sellable item lives in `_products/*.md`. Product records should define:
 - download metadata for digital products
 - event metadata for ticket/RSVP products
 - optional `store_collection` and `storefront_category` storefront taxonomy fields
+
+The admin product editor separates visible product copy from metadata:
+
+- **Product page content** writes the visible product-detail body/blocks.
+- **SEO description** writes front matter `description` and feeds meta descriptions, social share copy, and Product JSON-LD.
 
 Regenerate Worker config and the catalog snapshot after product edits:
 
@@ -66,6 +72,16 @@ Current taxonomy rules:
 - The migrated Dust Wave catalog still uses `category: dustwave` or `category: fronteras`; because those values match configured collection IDs, `_includes/product-taxonomy.html` treats them as collections.
 - When no explicit category exists, Store derives category from `fulfillment_type`, `type`, shipping preset, and product name.
 - Do not use `collection` as product front matter; Jekyll reserves that field for collection documents.
+
+Event products should store the venue name in `event_details.venue` and the street/city/state/ZIP in `event_details.address`. The public product page and admin preview display the venue separately, compact U.S. addresses to the shopper-facing form, and link the address to Google Maps. For example:
+
+```yaml
+event_details:
+  venue: "Guild Cinema"
+  address: |-
+    3405 Central Ave NE
+    Albuquerque, NM 87106
+```
 
 Product localization uses one canonical product file. Generated language-prefixed pages use `localized.{lang}` overrides when present and fall back to canonical content when omitted:
 

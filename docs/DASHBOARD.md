@@ -86,10 +86,11 @@ List behavior:
 
 Editor behavior:
 
-- Product-level fields include name, price, status, fulfillment, SKU, tax category, variant mode, media, description, and preview.
+- Product-level fields include name, price, status, fulfillment, SKU, tax category, variant mode, media, Product page content, SEO description, and preview.
 - SKU is read-only. Existing product SKUs are preserved; new product SKUs derive from product name.
-- Description uses the Store block content editor with sandboxed preview output.
-- Preview renders a sandboxed static product page preview. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected.
+- Product page content uses the Store block content editor for visible product-detail copy.
+- SEO description writes the front matter `description` value used by product metadata, social cards, and Product JSON-LD. Keep it concise and separate from the longer visible product page content.
+- Preview renders a sandboxed static product page preview. It mirrors the public product page layout, including full-image display, product-detail spacing, responsive product copy order, compact event address formatting, and Google Maps address links. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - The editor expands inline under the product row being edited.
 
@@ -182,7 +183,7 @@ Current behavior:
 - Export attendee CSV for ticket/RSVP products.
 - Import historical Snipcart CSV exports into production Store order storage.
 - View order totals and fulfillment rows.
-- Mark ticket/RSVP rows checked in or unchecked.
+- Mark ticket/RSVP rows checked in or unchecked. Single-action check-in controls use the same responsive button sizing as other order actions so they fit inside desktop tables and mobile rows.
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 
@@ -295,8 +296,9 @@ Responsive behavior currently covered by E2E tests:
 
 - Admin tab layout on tablet.
 - Products table/editor on mobile.
+- Product preview event address formatting, Google Maps links, and product-detail spacing.
 - Coupons table/editor on mobile.
-- Orders rows on mobile.
+- Orders rows on mobile and single-action check-in buttons in desktop tables.
 - Downloads rows on mobile.
 - Spanish admin route tab compactness.
 
