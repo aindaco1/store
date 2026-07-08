@@ -7663,6 +7663,24 @@ function escapeAdminStorePreviewAttribute(value) {
   return escapeAdminStorePreviewHtml(value).replace(/"/g, '&quot;');
 }
 
+function renderAdminStorePreviewAddressHtml(value) {
+  return String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => escapeAdminStorePreviewHtml(line))
+    .join('<br>');
+}
+
+function adminStorePreviewMapsQuery(venue = '', address = '') {
+  return [venue, address]
+    .map((value) => String(value || '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function adminStorePreviewSiteBase(env = {}) {
   const raw = String(env?.CANONICAL_SITE_BASE || env?.SITE_BASE || '').trim().replace(/\/+$/, '');
   if (!raw) return '';
@@ -7880,7 +7898,8 @@ function buildAdminStoreProductPreviewEventHtml(product = {}, env = {}) {
   const type = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
   if (!isAdminStoreEventFulfillmentType(type)) return '';
   const event = summarizeStoreEventDetails(product.event_details || product.eventDetails);
-  if (!event?.startsAt && !event?.venue && !event?.address) return '';
+  const eventAddress = compactAdminStoreEventAddress(event?.address || '');
+  if (!event?.startsAt && !event?.venue && !eventAddress) return '';
   const lines = [];
   const eventTime = formatStoreEventDisplay(event, env);
   if (eventTime) {
@@ -7889,8 +7908,10 @@ function buildAdminStoreProductPreviewEventHtml(product = {}, env = {}) {
   if (event?.venue) {
     lines.push(`<p class="store-product-card__event-line store-product-card__event-line--venue">${escapeAdminStorePreviewHtml(event.venue)}</p>`);
   }
-  if (event?.address) {
-    lines.push(`<p class="store-product-card__event-line store-product-card__event-line--address">${escapeAdminStorePreviewHtml(event.address)}</p>`);
+  if (eventAddress) {
+    const mapsQuery = adminStorePreviewMapsQuery(event.venue, eventAddress);
+    const addressHtml = renderAdminStorePreviewAddressHtml(eventAddress);
+    lines.push(`<p class="store-product-card__event-line store-product-card__event-line--address"><a class="store-product-card__event-link" href="https://www.google.com/maps/search/?api=1&amp;query=${escapeAdminStorePreviewAttribute(encodeURIComponent(mapsQuery))}" target="_blank" rel="noopener noreferrer">${addressHtml}</a></p>`);
   }
   return lines.length
     ? `<div class="store-product-card__event">${lines.join('')}</div>`
@@ -7951,7 +7972,7 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
     if (hasAdminStoreProductPatchField(fields, 'eventStartsAt')) eventDetails.startsAt = String(fields.eventStartsAt || '').trim();
     if (hasAdminStoreProductPatchField(fields, 'eventEndsAt')) eventDetails.endsAt = String(fields.eventEndsAt || '').trim();
     if (hasAdminStoreProductPatchField(fields, 'eventVenue')) eventDetails.venue = String(fields.eventVenue || '').trim();
-    if (hasAdminStoreProductPatchField(fields, 'eventAddress')) eventDetails.address = String(fields.eventAddress || '').trim();
+    if (hasAdminStoreProductPatchField(fields, 'eventAddress')) eventDetails.address = compactAdminStoreEventAddress(fields.eventAddress || '');
     if (hasAdminStoreProductPatchField(fields, 'eventIcs')) {
       eventDetails.ics = fields.eventIcs === true || String(fields.eventIcs || '').trim().toLowerCase() === 'true';
     }
@@ -15024,6 +15045,7 @@ function corsResponse(env = null, isPublic = false) {
 export {
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
+  buildAdminStoreProductPreviewHtml,
   buildStoreTicketSvg,
   buildStoreOrderAdminNotificationPayloads,
   buildStoreOrderEmailPayload,

@@ -2326,7 +2326,8 @@ test.describe('Admin Dashboard', () => {
     await expect(productEditor.getByRole('button', { name: 'About Shipping preset' })).toBeVisible();
     await expect(productEditor.getByRole('button', { name: 'About Variant Based' })).toBeVisible();
     await expect(productEditor.getByRole('button', { name: 'About Image' })).toBeVisible();
-    await expect(productEditor.getByRole('button', { name: 'About Description' })).toBeVisible();
+    await expect(productEditor.getByRole('button', { name: 'About Product page content' })).toBeVisible();
+    await expect(productEditor.getByRole('button', { name: 'About SEO description' })).toBeVisible();
     await expect(productEditor.getByRole('button', { name: 'About Preview' })).toBeVisible();
     await productEditor.locator('[data-store-product-field-wrapper="shippingPreset"] .admin-settings__help-button').hover();
     const shippingPresetTooltipBounds = await productEditor.locator('[data-store-product-field-wrapper="shippingPreset"] .admin-settings__help-tooltip').evaluate((tooltip: HTMLElement) => {
@@ -2754,6 +2755,36 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Downloads', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Orders', exact: true })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('keeps Store orders single-action buttons inside the desktop table', async ({ page }) => {
+    await routeAdminWorker(page);
+    await page.setViewportSize({ width: 1366, height: 768 });
+
+    await page.goto('/admin/?admin_login=admin-token-orders-desktop');
+    await expect(page.locator('#admin-app')).toBeVisible();
+
+    await selectAdminSection(page, 'Orders');
+    const ordersResults = page.locator('#admin-store-orders-results');
+    await expect(ordersResults).toContainText(TICKET_ORDER_TOKEN);
+
+    const ticketRow = ordersResults.locator('tbody tr').filter({ hasText: TICKET_ORDER_TOKEN });
+    await expect.poll(() => ticketRow.locator('.admin-store-orders__actions').evaluate((cell: HTMLElement) => {
+      const button = cell.querySelector('.btn') as HTMLElement | null;
+      const root = cell.closest('#admin-store-orders-results') as HTMLElement | null;
+      if (!button || !root) return false;
+      const cellRect = cell.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      const rootRect = root.getBoundingClientRect();
+      return (
+        getComputedStyle(cell).containerType === 'inline-size' &&
+        button.scrollWidth <= button.clientWidth + 1 &&
+        buttonRect.left >= cellRect.left - 1 &&
+        buttonRect.right <= cellRect.right + 1 &&
+        cellRect.right <= rootRect.right + 1
+      );
+    })).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
   });
 
   test('loads the Spanish admin route and keeps limited admins in Store-only areas', async ({ page }) => {

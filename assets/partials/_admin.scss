@@ -1851,9 +1851,16 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-orders__actions {
   align-content: start;
+  container-type: inline-size;
   display: grid;
   gap: 8px;
-  min-width: 11rem;
+  min-width: 8.5rem;
+  width: 9rem;
+}
+
+.admin-store-orders__actions > .btn {
+  justify-content: center;
+  width: 100%;
 }
 
 .admin-store-orders__download-access {
@@ -3661,6 +3668,11 @@ textarea.admin-settings__input--readonly {
     min-width: 0;
     overflow-wrap: anywhere;
     padding: 8px 0 0;
+    width: auto;
+  }
+
+  .admin-store-orders__actions {
+    min-width: 0;
     width: auto;
   }
 
