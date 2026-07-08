@@ -1064,7 +1064,9 @@ const RATE_LIMITS = {
   tax: { prefix: 'rl:tax', limit: 90, windowSeconds: 60 },              // 90 tax quote refreshes/min/IP
   complete: { prefix: 'rl:complete', limit: 12, windowSeconds: 60 },    // 12 recovery attempts/min/order
   abandon: { prefix: 'rl:abandon', limit: 12, windowSeconds: 60 },      // 12 abandon attempts/min/order
-  admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 admin calls/min
+  admin: { prefix: 'rl:admin', limit: 5, windowSeconds: 60 },       // 5 high-risk admin calls/min
+  adminProductPreview: { prefix: 'rl:admin-product-preview', limit: 90, windowSeconds: 60 },
+  adminProductPublish: { prefix: 'rl:admin-product-publish', limit: 12, windowSeconds: 60 },
   adminAddressLookup: { prefix: 'rl:admin-address-lookup', limit: 30, windowSeconds: 60 },
   orderRead: { prefix: 'rl:order-read', limit: 120, windowSeconds: 60 },   // 120 order reads/min/IP
   orderLookup: { prefix: 'rl:order-lookup', limit: 8, windowSeconds: 60 }   // 8 order lookup requests/min/IP
@@ -1072,6 +1074,16 @@ const RATE_LIMITS = {
 
 const ADMIN_RATE_LIMIT_OPTIONS = {
   ...RATE_LIMITS.admin,
+  privateResponse: true
+};
+
+const ADMIN_PRODUCT_PREVIEW_RATE_LIMIT_OPTIONS = {
+  ...RATE_LIMITS.adminProductPreview,
+  privateResponse: true
+};
+
+const ADMIN_PRODUCT_PUBLISH_RATE_LIMIT_OPTIONS = {
+  ...RATE_LIMITS.adminProductPublish,
   privateResponse: true
 };
 
@@ -2101,25 +2113,25 @@ export default {
       }
 
       if (path === '/admin/store/products/preview' && method === 'POST') {
-        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        const rl = await checkRateLimit(request, env, ADMIN_PRODUCT_PREVIEW_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreProductPreview(request, env);
       }
 
       if (path === '/admin/store/products/publish' && method === 'POST') {
-        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        const rl = await checkRateLimit(request, env, ADMIN_PRODUCT_PUBLISH_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreProductPublish(request, env);
       }
 
       if (path === '/admin/store/products/bulk-publish' && method === 'POST') {
-        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        const rl = await checkRateLimit(request, env, ADMIN_PRODUCT_PUBLISH_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreProductBulkPublish(request, env);
       }
 
       if (path === '/admin/store/products/order' && method === 'POST') {
-        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        const rl = await checkRateLimit(request, env, ADMIN_PRODUCT_PUBLISH_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreProductOrderPublish(request, env);
       }

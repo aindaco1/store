@@ -26,7 +26,7 @@ async function triggerGitHubWorkflow(env, {
   }
 
   const owner = env.GITHUB_OWNER || 'aindaco1';
-  const repo = env.GITHUB_REPO || 'pool';
+  const repo = env.GITHUB_REPO || 'store';
   const workflowFile = workflow || 'deploy.yml';
   const ref = env.GITHUB_REF || 'main';
 
@@ -40,7 +40,7 @@ async function triggerGitHubWorkflow(env, {
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
           'Content-Type': 'application/json',
-          'User-Agent': 'pool-worker'
+          'User-Agent': 'store-worker'
         },
         body: JSON.stringify({
           ref,
@@ -92,7 +92,7 @@ export async function triggerMediaOptimization(env, { scope = 'changed' } = {}) 
 function getGitHubRepoConfig(env = {}) {
   return {
     owner: env.GITHUB_OWNER || 'aindaco1',
-    repo: env.GITHUB_REPO || 'pool',
+    repo: env.GITHUB_REPO || 'store',
     ref: env.GITHUB_REF || 'main'
   };
 }
@@ -103,7 +103,7 @@ function getGitHubHeaders(env = {}) {
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     'Content-Type': 'application/json',
-    'User-Agent': 'pool-worker'
+    'User-Agent': 'store-worker'
   };
 }
 
