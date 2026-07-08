@@ -2698,9 +2698,60 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
         "ics": true
       },
       "turnstile_required": true
+    },
+    {
+      "id": "film-fatale-at-the-guild-cinema",
+      "slug": "film-fatale-at-the-guild-cinema",
+      "sku": "film-fatale-at-the-guild-cinema",
+      "name": "FILM FATALE at the Guild Cinema",
+      "description": "Join us for a special screening of short films by female filmmakers from Albuquerque!\n\nScreening at the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM -- be there for this one-of-a-kind screening supporting local women in film!",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Join us for a special screening of short films by female filmmakers from Albuquerque!\n\nScreening at the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM -- be there for this one-of-a-kind screening supporting local women in film!\n"
+        }
+      ],
+      "price": 15.0,
+      "price_cents": 1500,
+      "currency": "USD",
+      "image": "/assets/images/products/product-new-product-20260708-075131.png",
+      "url": "https://shop.dustwave.xyz/products/film-fatale-at-the-guild-cinema/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 1000.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/film-fatale-at-the-guild-cinema/",
+        "es": "/es/products/film-fatale-at-the-guild-cinema/"
+      },
+      "inventory_tracking": true,
+      "inventory": 105,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-08-22T13:30:00-06:00",
+        "ends_at": "2026-08-22T15:00:00-06:00",
+        "venue": "Guild Cinema",
+        "address": "The Guild Cinema, 3405, Central Avenue Northeast, Nob Hill, Albuquerque, Bernalillo County, New Mexico, 87106, United States",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
     }
   ],
-  "source_hash": "bb339e62514a7650adbdaa4397219aea848f617ae31ea230eaed3ee135e5c44c"
+  "source_hash": "46120b494df061d5cf919fea0e928cafb5766883b773a7dcc5d336f178ed17cc"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

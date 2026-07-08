@@ -17,9 +17,27 @@
 {%- endif -%}
 {%- assign low_stock_threshold = site.inventory.low_stock_threshold | default: site.add_ons.low_stock_threshold | default: 5 | plus: 0 -%}
 {%- assign variants = product.variants -%}
-{%- assign has_variants = variants and variants != "" and variants.size > 0 -%}
+{%- assign variant_count = 0 -%}
+{%- if variants -%}
+  {%- for variant in variants -%}
+    {%- assign variant_count = variant_count | plus: 1 -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- assign has_variants = false -%}
+{%- if variant_count > 0 -%}
+  {%- assign has_variants = true -%}
+{%- endif -%}
 {%- assign sizes = product.sizes -%}
-{%- assign has_sizes = sizes and sizes != "" and sizes.size > 0 -%}
+{%- assign size_count = 0 -%}
+{%- if sizes -%}
+  {%- for size in sizes -%}
+    {%- assign size_count = size_count | plus: 1 -%}
+  {%- endfor -%}
+{%- endif -%}
+{%- assign has_sizes = false -%}
+{%- if size_count > 0 -%}
+  {%- assign has_sizes = true -%}
+{%- endif -%}
 {%- assign shipping_preset = product.shipping_preset -%}
 {%- if shipping_preset == nil or shipping_preset == "" -%}
   {%- case product.type -%}

@@ -7324,34 +7324,38 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     const baseById = new Map(baseVariants.map((variant) => [String(variant?.id || '').trim(), variant]));
     const seenIds = new Set();
     const normalizedVariants = [];
-    submittedVariants.forEach((submitted, index) => {
-      const idResult = normalizeAdminStoreTokenField(submitted?.id, `Variant ${index + 1} ID`, { required: true, max: 80 });
-      if (!idResult.ok) {
-        errors.push(idResult.error);
-        return;
+    if (variantBased) {
+      submittedVariants.forEach((submitted, index) => {
+        const idResult = normalizeAdminStoreTokenField(submitted?.id, `Variant ${index + 1} ID`, { required: true, max: 80 });
+        if (!idResult.ok) {
+          errors.push(idResult.error);
+          return;
+        }
+        if (seenIds.has(idResult.value)) {
+          errors.push(`Variant ${idResult.value} is duplicated.`);
+          return;
+        }
+        seenIds.add(idResult.value);
+        const baseVariant = baseById.get(idResult.value) || { id: idResult.value };
+        const normalizedVariant = normalizeAdminStoreSubmittedVariant(baseVariant, { ...(submitted || {}), id: idResult.value }, errors, index);
+        if (!digitalProduct) {
+          normalizedVariant.downloadFileKey = '';
+          normalizedVariant.downloadFilename = '';
+        } else if (submittedVariants.length > 0 && intent !== 'preview' && !normalizedVariant.downloadFileKey) {
+          errors.push(`Variant ${index + 1} file is required for digital products.`);
+        }
+        normalizedVariants.push(normalizedVariant);
+      });
+      if (digitalProduct && !submittedVariants.length && intent !== 'preview') {
+        errors.push('Add at least one variant file for digital variant-based products.');
       }
-      if (seenIds.has(idResult.value)) {
-        errors.push(`Variant ${idResult.value} is duplicated.`);
-        return;
-      }
-      seenIds.add(idResult.value);
-      const baseVariant = baseById.get(idResult.value) || { id: idResult.value };
-      const normalizedVariant = normalizeAdminStoreSubmittedVariant(baseVariant, { ...(submitted || {}), id: idResult.value }, errors, index);
-      if (!digitalProduct) {
-        normalizedVariant.downloadFileKey = '';
-        normalizedVariant.downloadFilename = '';
-      } else if (submittedVariants.length > 0 && intent !== 'preview' && !normalizedVariant.downloadFileKey) {
-        errors.push(`Variant ${index + 1} file is required for digital products.`);
-      }
-      normalizedVariants.push(normalizedVariant);
-    });
-    if (digitalProduct && variantBased && !submittedVariants.length && intent !== 'preview') {
-      errors.push('Add at least one variant file for digital variant-based products.');
+      frontMatter.push({
+        key: 'variants',
+        replacement: serializeAdminStoreProductVariantsYaml(normalizedVariants)
+      });
+    } else {
+      frontMatter.push({ key: 'variants', remove: true });
     }
-    frontMatter.push({
-      key: 'variants',
-      replacement: serializeAdminStoreProductVariantsYaml(normalizedVariants)
-    });
     changedFields.push('variants');
   }
 
@@ -7569,7 +7573,6 @@ shipping_preset: ""
 tax_category: "standard"
 inventory_tracking: false
 inventory: 0
-variants: []
 ---
 `;
   return applyAdminStoreProductPatchToMarkdown(source, patch);

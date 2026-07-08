@@ -23,6 +23,13 @@ permalink: /api/products.json
         {%- capture product_category -%}{% include product-taxonomy.html product=product mode="category" %}{%- endcapture -%}
         {%- assign product_category = product_category | strip -%}
         {%- assign product_localized_paths = product.localized_paths | default: empty -%}
+        {%- assign product_variants = product.variants -%}
+        {%- assign product_variant_count = 0 -%}
+        {%- if product_variants -%}
+          {%- for variant in product_variants -%}
+            {%- assign product_variant_count = product_variant_count | plus: 1 -%}
+          {%- endfor -%}
+        {%- endif -%}
         {%- assign shipping_preset = product.shipping_preset -%}
         {%- if shipping_preset == nil or shipping_preset == "" -%}
           {%- case product.type -%}
@@ -49,7 +56,7 @@ permalink: /api/products.json
           "status": {{ product.status | default: "active" | jsonify }},
           "sku": {{ product.sku | default: product_id | jsonify }},
           "inventory": {{ product.inventory | default: 0 | jsonify }},
-          "variants": {{ product.variants | default: empty | jsonify }},
+          "variants": {% if product_variant_count > 0 %}{{ product_variants | jsonify }}{% else %}[]{% endif %},
           "shipping_preset": {{ shipping_preset | jsonify }},
           "tax_category": {{ product.tax_category | default: "standard" | jsonify }}
         }{%- assign emitted_products = emitted_products | plus: 1 -%}

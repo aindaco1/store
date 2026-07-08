@@ -13,7 +13,6 @@ shipping_preset: ""
 tax_category: "admission"
 inventory_tracking: true
 inventory: 105
-variants: []
 long_content:
   - type: "text"
     body: |

@@ -72,7 +72,16 @@
       {%- assign product_availability = "https://schema.org/OutOfStock" -%}
     {%- endif -%}
     {%- assign product_variants = page.variants -%}
-    {%- assign has_variants = product_variants and product_variants != "" and product_variants.size > 0 -%}
+    {%- assign product_variant_count = 0 -%}
+    {%- if product_variants -%}
+      {%- for variant in product_variants -%}
+        {%- assign product_variant_count = product_variant_count | plus: 1 -%}
+      {%- endfor -%}
+    {%- endif -%}
+    {%- assign has_variants = false -%}
+    {%- if product_variant_count > 0 -%}
+      {%- assign has_variants = true -%}
+    {%- endif -%}
     {%- capture product_category_label -%}{% include product-taxonomy.html product=page mode="category_label" %}{%- endcapture -%}
     {%- assign product_category_label = product_category_label | strip -%}
     {

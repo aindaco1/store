@@ -198,7 +198,8 @@
   object-fit: cover;
 }
 
-.storefront:not(.storefront--product) .store-product-card__image {
+.storefront:not(.storefront--product) .store-product-card__image,
+.storefront--product .store-product-card__image {
   object-fit: contain;
 }
 

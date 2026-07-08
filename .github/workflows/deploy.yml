@@ -88,9 +88,9 @@ jobs:
         working-directory: worker
         run: npm ci
 
-      - name: Sync Worker config
+      - name: Sync Worker config and catalog
         if: ${{ github.event_name == 'push' }}
-        run: ruby ./scripts/sync-worker-config.rb
+        run: npm run sync:worker-config
 
       - name: Deploy Worker
         if: ${{ github.event_name == 'push' }}
