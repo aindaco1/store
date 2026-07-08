@@ -682,6 +682,10 @@
     order: 2;
   }
 
+  .storefront--product .storefront__product-copy > :last-child {
+    margin-bottom: 0;
+  }
+
   .storefront--product .store-product-card__body {
     order: 3;
     padding: 0;
