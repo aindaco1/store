@@ -114,6 +114,20 @@ function encodeGitHubPath(filePath) {
     .join('/');
 }
 
+function normalizeGitHubBranchRef(ref) {
+  const raw = String(ref || 'main').trim() || 'main';
+  return raw
+    .replace(/^refs\/heads\//, '')
+    .replace(/^heads\//, '');
+}
+
+function encodeGitHubRefPath(ref) {
+  return String(ref || '')
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+}
+
 function encodeUtf8Base64(value) {
   const bytes = new TextEncoder().encode(String(value || ''));
   let binary = '';
@@ -200,6 +214,175 @@ export async function putGitHubTextFile(env, filePath, content, message, sha) {
     contentSha: data?.content?.sha || '',
     commitSha: data?.commit?.sha || '',
     commitUrl: data?.commit?.html_url || ''
+  };
+}
+
+export async function putGitHubTextFiles(env, files, message) {
+  configureGitHubLogging(env);
+
+  if (!env.GITHUB_TOKEN) {
+    return { ok: false, status: 503, error: 'GITHUB_TOKEN not configured', code: 'github_not_configured' };
+  }
+
+  const normalizedFiles = (Array.isArray(files) ? files : [])
+    .map((file) => ({
+      path: String(file?.path || file?.filePath || '').trim(),
+      content: String(file?.content || ''),
+      expectedSha: String(file?.expectedSha || file?.sha || '').trim()
+    }))
+    .filter((file) => file.path);
+
+  if (normalizedFiles.length === 0) {
+    return { ok: true, skipped: true, reason: 'No files to update', paths: [] };
+  }
+
+  const duplicatePaths = new Set();
+  const seenPaths = new Set();
+  for (const file of normalizedFiles) {
+    if (seenPaths.has(file.path)) duplicatePaths.add(file.path);
+    seenPaths.add(file.path);
+  }
+  if (duplicatePaths.size > 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Duplicate GitHub file update path: ${Array.from(duplicatePaths).join(', ')}`
+    };
+  }
+
+  const { owner, repo, ref } = getGitHubRepoConfig(env);
+  const branch = normalizeGitHubBranchRef(ref);
+  const encodedBranch = encodeGitHubRefPath(branch);
+  const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
+  const headers = getGitHubHeaders(env);
+
+  async function githubJson(url, init = {}, errorContext = 'GitHub API request') {
+    const response = await fetch(url, {
+      ...init,
+      headers
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: data?.message || `${errorContext}: ${response.status}`,
+        data
+      };
+    }
+    return { ok: true, status: response.status, data };
+  }
+
+  const refResult = await githubJson(`${apiBase}/git/ref/heads/${encodedBranch}`, {
+    method: 'GET'
+  }, `Failed to load GitHub branch ${branch}`);
+  if (!refResult.ok) return refResult;
+
+  const baseCommitSha = String(refResult.data?.object?.sha || '').trim();
+  if (!baseCommitSha) {
+    return { ok: false, status: 502, error: 'Unexpected GitHub branch response' };
+  }
+
+  const commitResult = await githubJson(`${apiBase}/git/commits/${encodeURIComponent(baseCommitSha)}`, {
+    method: 'GET'
+  }, `Failed to load GitHub commit ${baseCommitSha}`);
+  if (!commitResult.ok) return commitResult;
+
+  const baseTreeSha = String(commitResult.data?.tree?.sha || '').trim();
+  if (!baseTreeSha) {
+    return { ok: false, status: 502, error: 'Unexpected GitHub commit response' };
+  }
+
+  for (const file of normalizedFiles) {
+    if (!file.expectedSha) continue;
+    const currentResult = await githubJson(
+      `${apiBase}/contents/${encodeGitHubPath(file.path)}?ref=${encodeURIComponent(baseCommitSha)}`,
+      { method: 'GET' },
+      `Failed to verify GitHub file ${file.path}`
+    );
+    if (!currentResult.ok) {
+      return { ...currentResult, path: file.path };
+    }
+    const currentSha = String(currentResult.data?.sha || '').trim();
+    if (currentSha !== file.expectedSha) {
+      return {
+        ok: false,
+        status: 409,
+        path: file.path,
+        error: `${file.path} changed in GitHub before the batch commit could be created. Reload the products and try again.`,
+        code: 'github_file_changed'
+      };
+    }
+  }
+
+  const treeEntries = [];
+  for (const file of normalizedFiles) {
+    const blobResult = await githubJson(`${apiBase}/git/blobs`, {
+      method: 'POST',
+      body: JSON.stringify({
+        content: file.content,
+        encoding: 'utf-8'
+      })
+    }, `Failed to create GitHub blob for ${file.path}`);
+    if (!blobResult.ok) {
+      return { ...blobResult, path: file.path };
+    }
+    const blobSha = String(blobResult.data?.sha || '').trim();
+    if (!blobSha) {
+      return { ok: false, status: 502, path: file.path, error: 'Unexpected GitHub blob response' };
+    }
+    treeEntries.push({
+      path: file.path,
+      mode: '100644',
+      type: 'blob',
+      sha: blobSha
+    });
+  }
+
+  const treeResult = await githubJson(`${apiBase}/git/trees`, {
+    method: 'POST',
+    body: JSON.stringify({
+      base_tree: baseTreeSha,
+      tree: treeEntries
+    })
+  }, 'Failed to create GitHub tree');
+  if (!treeResult.ok) return treeResult;
+
+  const newTreeSha = String(treeResult.data?.sha || '').trim();
+  if (!newTreeSha) {
+    return { ok: false, status: 502, error: 'Unexpected GitHub tree response' };
+  }
+
+  const newCommitResult = await githubJson(`${apiBase}/git/commits`, {
+    method: 'POST',
+    body: JSON.stringify({
+      message: String(message || `Update ${normalizedFiles.length} files`),
+      tree: newTreeSha,
+      parents: [baseCommitSha]
+    })
+  }, 'Failed to create GitHub commit');
+  if (!newCommitResult.ok) return newCommitResult;
+
+  const newCommitSha = String(newCommitResult.data?.sha || '').trim();
+  if (!newCommitSha) {
+    return { ok: false, status: 502, error: 'Unexpected GitHub commit creation response' };
+  }
+
+  const updateResult = await githubJson(`${apiBase}/git/refs/heads/${encodedBranch}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      sha: newCommitSha,
+      force: false
+    })
+  }, `Failed to update GitHub branch ${branch}`);
+  if (!updateResult.ok) return updateResult;
+
+  return {
+    ok: true,
+    paths: normalizedFiles.map((file) => file.path),
+    commitSha: newCommitSha,
+    commitUrl: newCommitResult.data?.html_url || `https://github.com/${owner}/${repo}/commit/${newCommitSha}`,
+    updated: normalizedFiles.length
   };
 }
 

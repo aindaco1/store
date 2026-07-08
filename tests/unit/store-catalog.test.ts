@@ -36,6 +36,13 @@ describe('Store catalog snapshot and validation', () => {
     );
   });
 
+  it('keeps event addresses compact in the Worker catalog snapshot', () => {
+    const filmFatale = findStoreProduct('film-fatale-at-the-guild-cinema', STORE_CATALOG_SNAPSHOT);
+
+    expect(filmFatale?.event_details?.address).toBe('3405 Central Ave NE\nAlbuquerque, NM 87106');
+    expect(filmFatale?.event_details?.address).not.toMatch(/Bernalillo County|United States|Nob Hill|The Guild Cinema/);
+  });
+
   it('keeps archived products visible to admin catalog data but unavailable for checkout', () => {
     const archivedProduct = findStoreProduct('annihilation-1', STORE_CATALOG_SNAPSHOT);
     expect(archivedProduct).toMatchObject({

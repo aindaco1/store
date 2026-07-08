@@ -58,7 +58,7 @@ import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } fr
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
 import { applyStoreCouponCode, getValidationTaxableSubtotalCents, loadStoreCoupons, saveStoreCoupons, upsertStoreCoupon } from './coupons.js';
 import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
-import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
+import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { getScopedConsole } from './logger.js';
 import { isValidSlug, isValidEmail, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { verifyTurnstile } from './turnstile.js';
@@ -187,6 +187,52 @@ async function putAdminRepoTextFile(env, filePath, content, message, sha, option
     });
   }
   return putGitHubTextFile(env, filePath, content, message, sha);
+}
+
+async function putAdminRepoTextFiles(env, files, message, options = {}) {
+  const normalizedFiles = (Array.isArray(files) ? files : [])
+    .map((file) => ({
+      path: String(file?.path || file?.filePath || '').trim(),
+      content: String(file?.content || ''),
+      expectedSha: String(file?.expectedSha || file?.sha || '').trim()
+    }))
+    .filter((file) => file.path);
+
+  if (normalizedFiles.length === 0) {
+    return { ok: true, skipped: true, reason: 'No files to update', paths: [] };
+  }
+
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    const results = [];
+    for (const file of normalizedFiles) {
+      const result = await callLocalAdminRepoService(env, '/write', {
+        path: file.path,
+        content: file.content,
+        message,
+        overwrite: options.overwrite === true || Boolean(file.expectedSha)
+      });
+      if (!result.ok) {
+        return {
+          ok: false,
+          status: result.status || 502,
+          path: file.path,
+          error: result.error || `Unable to write ${file.path}`,
+          code: result.code || 'local_repo_batch_write_failed',
+          results
+        };
+      }
+      results.push({ path: file.path, ...result });
+    }
+    return {
+      ok: true,
+      mode: 'local',
+      paths: normalizedFiles.map((file) => file.path),
+      results,
+      updated: results.length
+    };
+  }
+
+  return putGitHubTextFiles(env, normalizedFiles, message);
 }
 
 async function putAdminRepoBase64File(env, filePath, base64Content, message, sha = undefined, options = {}) {
@@ -6664,7 +6710,7 @@ function adminStoreEventDetailsSummary(source = {}) {
     startsAt: String(event.starts_at || event.startsAt || '').trim(),
     endsAt: String(event.ends_at || event.endsAt || '').trim(),
     venue: String(event.venue || '').trim(),
-    address: String(event.address || '').trim(),
+    address: compactAdminStoreEventAddress(event.address || ''),
     ticketDelivery: String(event.ticket_delivery || event.ticketDelivery || '').trim(),
     ics: event.ics !== false
   };
@@ -8243,6 +8289,12 @@ function formatAdminStoreCompactAddressFromDisplayName(value = '') {
   });
 }
 
+function compactAdminStoreEventAddress(value = '') {
+  const raw = String(value || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if (!raw) return '';
+  return formatAdminStoreCompactAddressFromDisplayName(raw) || raw;
+}
+
 function formatNominatimAddressResult(result = {}) {
   const address = result?.address && typeof result.address === 'object' ? result.address : {};
   return formatAdminStoreCompactAddress({
@@ -8733,6 +8785,7 @@ async function handleAdminStoreProductBulkPublish(request, env) {
 
   const results = [];
   const committedProducts = [];
+  const pendingWrites = [];
   const commitMessage = String(parsedBody.body?.message || '').trim()
     || `Bulk update Store products (${normalized.targets.length})`;
 
@@ -8766,27 +8819,38 @@ async function handleAdminStoreProductBulkPublish(request, env) {
       continue;
     }
 
-    const committed = await putAdminRepoTextFile(env, target.sourcePath, nextMarkdown.content, commitMessage, existing.sha, {
+    const result = {
+      productId: target.productId,
+      githubPath: target.sourcePath,
+      published: true
+    };
+    results.push(result);
+    pendingWrites.push({
+      result,
+      path: target.sourcePath,
+      content: nextMarkdown.content,
+      expectedSha: existing.sha
+    });
+  }
+
+  if (pendingWrites.length > 0) {
+    const committed = await putAdminRepoTextFiles(env, pendingWrites, commitMessage, {
       overwrite: true
     });
     if (!committed.ok) {
       return privateJsonResponse({
-        error: committed.error || `Unable to publish ${target.sourcePath}`,
+        error: committed.error || 'Unable to publish Store product changes',
         code: committed.code || 'repo_write_failed',
-        productId: target.productId,
+        path: committed.path,
         results
       }, committed.status || 502, env);
     }
 
-    const result = {
-      productId: target.productId,
-      githubPath: target.sourcePath,
-      published: true,
-      commitSha: committed.commitSha,
-      commitUrl: committed.commitUrl
-    };
-    results.push(result);
-    committedProducts.push(result);
+    for (const pending of pendingWrites) {
+      pending.result.commitSha = committed.commitSha || '';
+      pending.result.commitUrl = committed.commitUrl || '';
+      committedProducts.push(pending.result);
+    }
   }
 
   const rebuild = committedProducts.length > 0
@@ -8856,6 +8920,7 @@ async function handleAdminStoreProductOrderPublish(request, env) {
 
   const results = [];
   const committedProducts = [];
+  const pendingWrites = [];
   const commitMessage = String(parsedBody.body?.message || '').trim()
     || 'Update Store product display order';
 
@@ -8890,28 +8955,39 @@ async function handleAdminStoreProductOrderPublish(request, env) {
       continue;
     }
 
-    const committed = await putAdminRepoTextFile(env, target.sourcePath, nextMarkdown.content, commitMessage, existing.sha, {
-      overwrite: true
-    });
-    if (!committed.ok) {
-      return privateJsonResponse({
-        error: committed.error || `Unable to publish ${target.sourcePath}`,
-        code: committed.code || 'repo_write_failed',
-        productId: target.productId,
-        results
-      }, committed.status || 502, env);
-    }
-
     const result = {
       productId: target.productId,
       githubPath: target.sourcePath,
       order: target.order,
-      published: true,
-      commitSha: committed.commitSha,
-      commitUrl: committed.commitUrl
+      published: true
     };
     results.push(result);
-    committedProducts.push(result);
+    pendingWrites.push({
+      result,
+      path: target.sourcePath,
+      content: nextMarkdown.content,
+      expectedSha: existing.sha
+    });
+  }
+
+  if (pendingWrites.length > 0) {
+    const committed = await putAdminRepoTextFiles(env, pendingWrites, commitMessage, {
+      overwrite: true
+    });
+    if (!committed.ok) {
+      return privateJsonResponse({
+        error: committed.error || 'Unable to publish product order changes',
+        code: committed.code || 'repo_write_failed',
+        path: committed.path,
+        results
+      }, committed.status || 502, env);
+    }
+
+    for (const pending of pendingWrites) {
+      pending.result.commitSha = committed.commitSha || '';
+      pending.result.commitUrl = committed.commitUrl || '';
+      committedProducts.push(pending.result);
+    }
   }
 
   const rebuild = committedProducts.length > 0

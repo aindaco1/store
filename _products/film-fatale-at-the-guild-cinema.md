@@ -29,7 +29,9 @@ event_details:
   starts_at: "2026-08-22T13:30:00-06:00"
   ends_at: "2026-08-22T15:00:00-06:00"
   venue: "Guild Cinema"
-  address: "The Guild Cinema, 3405, Central Avenue Northeast, Nob Hill, Albuquerque, Bernalillo County, New Mexico, 87106, United States"
+  address: |-
+    3405 Central Ave NE
+    Albuquerque, NM 87106
   ticket_delivery: "qr"
   ics: true
 ---
