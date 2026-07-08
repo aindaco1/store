@@ -2,6 +2,7 @@
 identifier: "film-fatale-at-the-guild-cinema"
 sku: "film-fatale-at-the-guild-cinema"
 name: "FILM FATALE at the Guild Cinema"
+description: "A special Film Fatale screening of short films by female filmmakers from Albuquerque at the Guild Cinema."
 price: 15
 image: "/assets/images/products/product-new-product-20260708-075131.png"
 type: "ticket"

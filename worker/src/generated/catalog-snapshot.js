@@ -367,7 +367,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "slug": "film-fatale-at-the-guild-cinema",
       "sku": "film-fatale-at-the-guild-cinema",
       "name": "FILM FATALE at the Guild Cinema",
-      "description": "## **🎥 Film Fatale! 📽️**\n\nJoin us for a special screening of short films by **female filmmakers from Albuquerque!**\n\nScreening at **the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM** -- be there for this one-of-a-kind screening supporting local women in film!\n\n**Doors open at 1:00pm, show starts at 1:30pm.**\n\n***See you there!***",
+      "description": "A special Film Fatale screening of short films by female filmmakers from Albuquerque at the Guild Cinema.",
       "long_content": [
         {
           "type": "text",
@@ -2751,7 +2751,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "b8dfb51f01854c0390644598b43d21a695c78f7c0bf950fb2e66a988a1d0e9e9"
+  "source_hash": "4b7c201df923f6b75c45299c73b2d6cf1f274e8edd20f88972f4327eb5e4641f"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
