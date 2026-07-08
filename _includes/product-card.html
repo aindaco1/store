@@ -123,7 +123,12 @@
 {%- if product.event_details -%}
   {%- assign event_starts_at = product.event_details.starts_at | default: product.event_details.startsAt | default: "" -%}
   {%- assign event_venue = product.event_details.venue | default: "" -%}
-  {%- assign event_address = product.event_details.address | default: "" -%}
+  {%- assign event_address = product.event_details.address | default: "" | strip -%}
+{%- endif -%}
+{%- assign event_maps_query = "" -%}
+{%- if event_address != "" -%}
+  {%- assign event_address_query = event_address | newline_to_br | replace: "<br />", " " | replace: "<br>", " " | strip_newlines | replace: "  ", " " | strip -%}
+  {%- assign event_maps_query = event_venue | append: " " | append: event_address_query | replace: "  ", " " | strip -%}
 {%- endif -%}
 {%- assign has_event_meta = false -%}
 {%- if product_type == "ticket" or product_type == "rsvp" -%}
@@ -224,7 +229,9 @@
       <p class="store-product-card__event-line store-product-card__event-line--venue">{{ event_venue | escape }}</p>
       {%- endif -%}
       {%- if event_address != "" -%}
-      <p class="store-product-card__event-line store-product-card__event-line--address">{{ event_address | escape }}</p>
+      <p class="store-product-card__event-line store-product-card__event-line--address">
+        <a class="store-product-card__event-link" href="https://www.google.com/maps/search/?api=1&amp;query={{ event_maps_query | url_encode }}" target="_blank" rel="noopener noreferrer">{{ event_address | escape | newline_to_br }}</a>
+      </p>
       {%- endif -%}
     </div>
     {%- endif -%}

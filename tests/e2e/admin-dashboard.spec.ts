@@ -2149,11 +2149,22 @@ test.describe('Admin Dashboard', () => {
     });
     const saveOrder = productsResults.locator('[data-store-products-order-save]');
     await expect(saveOrder).toBeDisabled();
+    await digitalProductRow.getByRole('button', { name: 'Edit' }).click();
+    const reorderDigitalEditor = productsResults.locator(`[data-store-product-editor][data-store-product-editor="${DIGITAL_ITEM_ID}"]`);
+    await expect(reorderDigitalEditor).toBeVisible();
+    await expect.poll(() => calls.storeProductPreviews.length).toBeGreaterThan(0);
+    const previewsBeforeReorder = calls.storeProductPreviews.length;
+    const publishesBeforeReorder = calls.storeProductPublishes.length;
+    const bulkPublishesBeforeReorder = calls.storeProductBulkPublishes.length;
+    const orderPublishesBeforeReorder = calls.storeProductOrders.length;
     await expect(posterRow).toHaveAttribute('draggable', 'true');
     await posterRow.focus();
     await page.keyboard.press('ArrowDown');
     await expect(saveOrder).toBeEnabled();
-    expect(calls.storeProductOrders).toHaveLength(0);
+    expect(calls.storeProductOrders).toHaveLength(orderPublishesBeforeReorder);
+    expect(calls.storeProductPublishes).toHaveLength(publishesBeforeReorder);
+    expect(calls.storeProductBulkPublishes).toHaveLength(bulkPublishesBeforeReorder);
+    expect(calls.storeProductPreviews).toHaveLength(previewsBeforeReorder);
     expect(await currentProductOrder()).toEqual([
       DIGITAL_ITEM_ID,
       'fronteras-poster-big',

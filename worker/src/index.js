@@ -8111,18 +8111,158 @@ async function handleAdminStoreProducts(request, env) {
   }, 200, env);
 }
 
+const ADMIN_STORE_STATE_ABBREVIATIONS = {
+  alabama: 'AL',
+  alaska: 'AK',
+  arizona: 'AZ',
+  arkansas: 'AR',
+  california: 'CA',
+  colorado: 'CO',
+  connecticut: 'CT',
+  delaware: 'DE',
+  florida: 'FL',
+  georgia: 'GA',
+  hawaii: 'HI',
+  idaho: 'ID',
+  illinois: 'IL',
+  indiana: 'IN',
+  iowa: 'IA',
+  kansas: 'KS',
+  kentucky: 'KY',
+  louisiana: 'LA',
+  maine: 'ME',
+  maryland: 'MD',
+  massachusetts: 'MA',
+  michigan: 'MI',
+  minnesota: 'MN',
+  mississippi: 'MS',
+  missouri: 'MO',
+  montana: 'MT',
+  nebraska: 'NE',
+  nevada: 'NV',
+  'new hampshire': 'NH',
+  'new jersey': 'NJ',
+  'new mexico': 'NM',
+  'new york': 'NY',
+  'north carolina': 'NC',
+  'north dakota': 'ND',
+  ohio: 'OH',
+  oklahoma: 'OK',
+  oregon: 'OR',
+  pennsylvania: 'PA',
+  'rhode island': 'RI',
+  'south carolina': 'SC',
+  'south dakota': 'SD',
+  tennessee: 'TN',
+  texas: 'TX',
+  utah: 'UT',
+  vermont: 'VT',
+  virginia: 'VA',
+  washington: 'WA',
+  'west virginia': 'WV',
+  wisconsin: 'WI',
+  wyoming: 'WY',
+  'district of columbia': 'DC'
+};
+
+function compactAdminStoreStreetName(value = '') {
+  return String(value || '')
+    .replace(/\bAvenue\b/gi, 'Ave')
+    .replace(/\bStreet\b/gi, 'St')
+    .replace(/\bRoad\b/gi, 'Rd')
+    .replace(/\bBoulevard\b/gi, 'Blvd')
+    .replace(/\bDrive\b/gi, 'Dr')
+    .replace(/\bLane\b/gi, 'Ln')
+    .replace(/\bCourt\b/gi, 'Ct')
+    .replace(/\bNortheast\b/gi, 'NE')
+    .replace(/\bNorthwest\b/gi, 'NW')
+    .replace(/\bSoutheast\b/gi, 'SE')
+    .replace(/\bSouthwest\b/gi, 'SW')
+    .replace(/\bNorth\b/gi, 'N')
+    .replace(/\bSouth\b/gi, 'S')
+    .replace(/\bEast\b/gi, 'E')
+    .replace(/\bWest\b/gi, 'W')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function compactAdminStoreState(value = '') {
+  const raw = String(value || '').replace(/\./g, '').trim();
+  if (/^[A-Za-z]{2}$/.test(raw)) return raw.toUpperCase();
+  return ADMIN_STORE_STATE_ABBREVIATIONS[raw.toLowerCase()] || raw;
+}
+
+function compactAdminStorePostalCode(value = '') {
+  return String(value || '').trim().match(/\b\d{5}(?:-\d{4})?\b/)?.[0] || String(value || '').trim();
+}
+
+function formatAdminStoreCompactAddress({ houseNumber = '', road = '', city = '', state = '', postcode = '' } = {}) {
+  const streetName = compactAdminStoreStreetName(road);
+  const street = [String(houseNumber || '').trim(), streetName].filter(Boolean).join(' ').trim();
+  const region = compactAdminStoreState(state);
+  const postal = compactAdminStorePostalCode(postcode);
+  const locality = String(city || '').trim();
+  const cityRegion = [locality, region].filter(Boolean).join(', ');
+  const secondLine = [cityRegion, postal].filter(Boolean).join(' ').trim();
+  return [street, secondLine].filter(Boolean).join('\n').trim();
+}
+
+function formatAdminStoreCompactAddressFromDisplayName(value = '') {
+  const raw = String(value || '').trim();
+  if (raw.includes('\n')) return '';
+  const compactMatch = raw.match(/^(.+?\d[^,]*),\s*([^,]+),\s*([A-Za-z]{2})(?:\s+(\d{5}(?:-\d{4})?))?$/);
+  if (compactMatch) {
+    return formatAdminStoreCompactAddress({
+      road: compactMatch[1],
+      city: compactMatch[2],
+      state: compactMatch[3],
+      postcode: compactMatch[4] || ''
+    });
+  }
+  const parts = raw.split(',').map((part) => part.trim()).filter(Boolean);
+  const houseIndex = parts.findIndex((part) => /^\d+[A-Za-z]?$/.test(part) || /^\d+\s+/.test(part));
+  if (houseIndex < 0) return '';
+  const houseNumber = parts[houseIndex].match(/^\d+[A-Za-z]?/)?.[0] || '';
+  const road = parts[houseIndex].replace(/^\d+[A-Za-z]?\s*/, '').trim() || parts[houseIndex + 1] || '';
+  const stateIndex = parts.findIndex((part) => Boolean(compactAdminStoreState(part).match(/^[A-Z]{2}$/)));
+  const statePostalIndex = parts.findIndex((part) => /^[A-Za-z]{2}\s+\d{5}(?:-\d{4})?$/.test(part));
+  const postcodeIndex = parts.findIndex((part) => /\b\d{5}(?:-\d{4})?\b/.test(part));
+  const cityCandidates = parts
+    .slice(
+      Math.min(houseIndex + 2, parts.length),
+      stateIndex >= 0 ? stateIndex : statePostalIndex >= 0 ? statePostalIndex : postcodeIndex >= 0 ? postcodeIndex : parts.length
+    )
+    .filter((part) => !/\bcounty\b/i.test(part));
+  const statePostal = statePostalIndex >= 0 ? parts[statePostalIndex].split(/\s+/) : [];
+  return formatAdminStoreCompactAddress({
+    houseNumber,
+    road,
+    city: cityCandidates[cityCandidates.length - 1] || '',
+    state: stateIndex >= 0 ? parts[stateIndex] : statePostal[0] || '',
+    postcode: postcodeIndex >= 0 ? parts[postcodeIndex] : statePostal[1] || ''
+  });
+}
+
+function formatNominatimAddressResult(result = {}) {
+  const address = result?.address && typeof result.address === 'object' ? result.address : {};
+  return formatAdminStoreCompactAddress({
+    houseNumber: address.house_number || address.housenumber || '',
+    road: address.road || address.pedestrian || address.footway || address.street || '',
+    city: address.city || address.town || address.village || address.municipality || '',
+    state: address.state || '',
+    postcode: address.postcode || ''
+  }) || formatAdminStoreCompactAddressFromDisplayName(result?.display_name || '');
+}
+
 function formatPhotonAddressFeature(feature = {}) {
   const props = feature?.properties && typeof feature.properties === 'object' ? feature.properties : {};
-  const street = [props.housenumber, props.street].map((value) => String(value || '').trim()).filter(Boolean).join(' ');
-  const parts = [
-    props.name,
-    street,
-    props.city || props.county || props.district,
-    props.state,
-    props.postcode,
-    props.country
-  ].map((value) => String(value || '').trim()).filter(Boolean);
-  return Array.from(new Set(parts)).join(', ');
+  return formatAdminStoreCompactAddress({
+    houseNumber: props.housenumber,
+    road: props.street,
+    city: props.city || props.locality,
+    state: props.state,
+    postcode: props.postcode
+  });
 }
 
 function normalizeAdminStoreAddressLookupQuery(query = '') {
@@ -8140,9 +8280,10 @@ async function lookupAdminStoreEventAddress(query, env) {
   if (cacheKey) {
     const cached = await env.STORE_STATE.get(cacheKey, { type: 'json' }).catch(() => null);
     if (cached?.address) {
+      const cachedAddress = String(cached.address || '').trim();
       return {
         ok: true,
-        address: String(cached.address || '').trim(),
+        address: formatAdminStoreCompactAddressFromDisplayName(cachedAddress) || cachedAddress,
         source: String(cached.source || 'cache').trim() || 'cache',
         latitude: String(cached.latitude || '').trim(),
         longitude: String(cached.longitude || '').trim(),
@@ -8167,11 +8308,11 @@ async function lookupAdminStoreEventAddress(query, env) {
     const response = await fetch(nominatimUrl, { headers });
     const results = await response.json().catch(() => []);
     const first = Array.isArray(results) ? results[0] : null;
-    const displayName = String(first?.display_name || '').trim();
-    if (response.ok && displayName) {
+    const address = formatNominatimAddressResult(first);
+    if (response.ok && address) {
       const result = {
         ok: true,
-        address: displayName,
+        address,
         source: 'nominatim',
         latitude: String(first?.lat || '').trim(),
         longitude: String(first?.lon || '').trim()

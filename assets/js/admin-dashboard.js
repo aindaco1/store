@@ -3950,7 +3950,7 @@
       rows: currentStoreProductRows,
       totals: currentStoreProductTotals,
       catalog: { shippingPresets: currentStoreShippingPresets }
-    }, { preserveOrderBaseline: true });
+    }, { preserveOrderBaseline: true, skipEditorPreview: true });
     setStatus($('#admin-store-products-status'), 'Product order changed. Save order to publish it.');
   }
 
@@ -4634,7 +4634,9 @@
       createRow.dataset.storeProductEditorRow = STORE_PRODUCT_CREATE_ID;
       var createCell = document.createElement('td');
       createCell.colSpan = columnCount;
-      createCell.appendChild(renderStoreProductEditor(createStoreProductDraft()));
+      createCell.appendChild(renderStoreProductEditor(createStoreProductDraft(), {
+        skipInitialPreview: opts.skipEditorPreview === true
+      }));
       createRow.appendChild(createCell);
       tbody.appendChild(createRow);
     }
@@ -4674,7 +4676,9 @@
           editorRow.dataset.storeProductEditorRow = row.productId || '';
           var editorCell = document.createElement('td');
           editorCell.colSpan = columnCount;
-          editorCell.appendChild(renderStoreProductEditor(editing));
+          editorCell.appendChild(renderStoreProductEditor(editing, {
+            skipInitialPreview: opts.skipEditorPreview === true
+          }));
           editorRow.appendChild(editorCell);
           tbody.appendChild(editorRow);
         }
@@ -6627,7 +6631,8 @@
     }, delay === undefined ? 500 : delay));
   }
 
-  function renderStoreProductEditor(product) {
+  function renderStoreProductEditor(product, options) {
+    var opts = options || {};
     var isNewProduct = product && product.isNew === true;
     var form = createElement('form', 'admin-store-products__editor');
     form.dataset.storeProductEditor = product.productId || '';
@@ -6731,9 +6736,11 @@
     });
     if (isNewProduct) updateStoreProductEditorDirtyState(form);
     else resetStoreProductEditorDirtyBaseline(form);
-    window.setTimeout(function() {
-      scheduleStoreProductPreview(form, 0);
-    }, 0);
+    if (!opts.skipInitialPreview) {
+      window.setTimeout(function() {
+        scheduleStoreProductPreview(form, 0);
+      }, 0);
+    }
     return form;
   }
 

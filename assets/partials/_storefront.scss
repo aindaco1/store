@@ -276,6 +276,18 @@
   color: var(--color-text-strong);
 }
 
+.store-product-card__event-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+}
+
+.store-product-card__event-link:hover,
+.store-product-card__event-link:focus-visible {
+  color: var(--color-text-strong);
+}
+
 .store-product-card__price {
   margin: 0;
   color: var(--color-text-strong);

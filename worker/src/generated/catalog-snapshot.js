@@ -363,6 +363,57 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     },
     {
+      "id": "film-fatale-at-the-guild-cinema",
+      "slug": "film-fatale-at-the-guild-cinema",
+      "sku": "film-fatale-at-the-guild-cinema",
+      "name": "FILM FATALE at the Guild Cinema",
+      "description": "Join us for a special screening of short films by female filmmakers from Albuquerque!\n\nScreening at the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM -- be there for this one-of-a-kind screening supporting local women in film!",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Join us for a special screening of short films by female filmmakers from Albuquerque!\n\nScreening at the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM -- be there for this one-of-a-kind screening supporting local women in film!\n"
+        }
+      ],
+      "price": 15.0,
+      "price_cents": 1500,
+      "currency": "USD",
+      "image": "/assets/images/products/product-new-product-20260708-075131.png",
+      "url": "https://shop.dustwave.xyz/products/film-fatale-at-the-guild-cinema/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 50.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/film-fatale-at-the-guild-cinema/",
+        "es": "/es/products/film-fatale-at-the-guild-cinema/"
+      },
+      "inventory_tracking": true,
+      "inventory": 105,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-08-22T13:30:00-06:00",
+        "ends_at": "2026-08-22T15:00:00-06:00",
+        "venue": "Guild Cinema",
+        "address": "3405 Central Ave NE\nAlbuquerque, NM 87106",
+        "ticket_delivery": "qr",
+        "ics": true
+      },
+      "turnstile_required": false
+    },
+    {
       "id": "poster-4",
       "slug": "attack-poster",
       "sku": "poster-4",
@@ -378,7 +429,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 50.0,
+      "order": 60.0,
       "collection": "dustwave",
       "category": "prints",
       "localized_paths": {
@@ -415,7 +466,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 60.0,
+      "order": 70.0,
       "collection": "dustwave",
       "category": "media",
       "localized_paths": {
@@ -452,7 +503,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 70.0,
+      "order": 80.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -489,7 +540,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 80.0,
+      "order": 90.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -526,7 +577,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 90.0,
+      "order": 100.0,
       "collection": "dustwave",
       "category": "prints",
       "localized_paths": {
@@ -563,7 +614,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 100.0,
+      "order": 110.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -666,7 +717,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 110.0,
+      "order": 120.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -703,7 +754,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 120.0,
+      "order": 130.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -806,7 +857,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 130.0,
+      "order": 140.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -852,7 +903,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 140.0,
+      "order": 150.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -955,7 +1006,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 150.0,
+      "order": 160.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -1007,7 +1058,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 160.0,
+      "order": 170.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1057,7 +1108,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 165.0,
+      "order": 180.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1107,7 +1158,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 170.0,
+      "order": 190.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1157,7 +1208,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 175.0,
+      "order": 200.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1207,7 +1258,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 180.0,
+      "order": 210.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1257,7 +1308,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 185.0,
+      "order": 220.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1307,7 +1358,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 190.0,
+      "order": 230.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1357,7 +1408,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 195.0,
+      "order": 240.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1407,7 +1458,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 200.0,
+      "order": 250.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1457,7 +1508,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 205.0,
+      "order": 260.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1507,7 +1558,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 210.0,
+      "order": 270.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1557,7 +1608,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 215.0,
+      "order": 280.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1607,7 +1658,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 220.0,
+      "order": 290.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1678,7 +1729,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 225.0,
+      "order": 300.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1749,7 +1800,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 230.0,
+      "order": 310.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1799,7 +1850,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 235.0,
+      "order": 320.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1849,7 +1900,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 240.0,
+      "order": 330.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1899,7 +1950,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 245.0,
+      "order": 340.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1949,7 +2000,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 250.0,
+      "order": 350.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1999,7 +2050,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 255.0,
+      "order": 360.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2050,7 +2101,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 260.0,
+      "order": 370.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2100,7 +2151,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 265.0,
+      "order": 380.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -2137,7 +2188,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 300.0,
+      "order": 390.0,
       "collection": "fronteras",
       "category": "apparel",
       "localized_paths": {
@@ -2240,7 +2291,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 310.0,
+      "order": 400.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2277,7 +2328,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 320.0,
+      "order": 410.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2314,7 +2365,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 330.0,
+      "order": 420.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2360,7 +2411,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 340.0,
+      "order": 430.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2406,7 +2457,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 350.0,
+      "order": 440.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2443,7 +2494,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 360.0,
+      "order": 450.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2480,7 +2531,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 370.0,
+      "order": 460.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2517,7 +2568,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 380.0,
+      "order": 470.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2563,7 +2614,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 900.0,
+      "order": 480.0,
       "collection": "dustwave",
       "category": "downloads",
       "localized_paths": {
@@ -2605,7 +2656,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 910.0,
+      "order": 490.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2671,7 +2722,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 920.0,
+      "order": 500.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2698,60 +2749,9 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
         "ics": true
       },
       "turnstile_required": true
-    },
-    {
-      "id": "film-fatale-at-the-guild-cinema",
-      "slug": "film-fatale-at-the-guild-cinema",
-      "sku": "film-fatale-at-the-guild-cinema",
-      "name": "FILM FATALE at the Guild Cinema",
-      "description": "Join us for a special screening of short films by female filmmakers from Albuquerque!\n\nScreening at the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM -- be there for this one-of-a-kind screening supporting local women in film!",
-      "long_content": [
-        {
-          "type": "text",
-          "body": "Join us for a special screening of short films by female filmmakers from Albuquerque!\n\nScreening at the Guild Cinema (3405 Central Ave NE) on August 22nd at 1:30 PM -- be there for this one-of-a-kind screening supporting local women in film!\n"
-        }
-      ],
-      "price": 15.0,
-      "price_cents": 1500,
-      "currency": "USD",
-      "image": "/assets/images/products/product-new-product-20260708-075131.png",
-      "url": "https://shop.dustwave.xyz/products/film-fatale-at-the-guild-cinema/",
-      "type": "ticket",
-      "fulfillment_type": "ticket",
-      "status": "active",
-      "public": true,
-      "launch_test": false,
-      "order": 1000.0,
-      "collection": "dustwave",
-      "category": "event-access",
-      "localized_paths": {
-        "en": "/products/film-fatale-at-the-guild-cinema/",
-        "es": "/es/products/film-fatale-at-the-guild-cinema/"
-      },
-      "inventory_tracking": true,
-      "inventory": 105,
-      "shipping_preset": "parcel",
-      "shipping": {
-        "weight_oz": 12,
-        "packaging_weight_oz": 4,
-        "length_in": 12,
-        "width_in": 9,
-        "height_in": 4,
-        "stack_height_in": 1
-      },
-      "tax_category": "admission",
-      "event_details": {
-        "starts_at": "2026-08-22T13:30:00-06:00",
-        "ends_at": "2026-08-22T15:00:00-06:00",
-        "venue": "Guild Cinema",
-        "address": "The Guild Cinema, 3405, Central Avenue Northeast, Nob Hill, Albuquerque, Bernalillo County, New Mexico, 87106, United States",
-        "ticket_delivery": "qr",
-        "ics": true
-      },
-      "turnstile_required": false
     }
   ],
-  "source_hash": "46120b494df061d5cf919fea0e928cafb5766883b773a7dcc5d336f178ed17cc"
+  "source_hash": "f7bc01af9c0d7a7a015b7ffb34be519f3c3dbbb3f45830f267be2944e8f7a4a0"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
