@@ -2,6 +2,7 @@
 identifier: cure-1
 sku: cure-1
 name: "CURE at the Guild Cinema!"
+description: "Tickets for CURE at the Guild Cinema on May 2, 2025."
 price: 10
 image: "/assets/images/cure-guild.png"
 type: ticket

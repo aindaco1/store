@@ -2,6 +2,7 @@
 identifier: print-3
 sku: print-3
 name: Fronteras Print (Small)
+description: "Shop Fronteras Print (Small): 4\" x 6\" silk coverstock fine print featuring Fronteras artwork, made for small frames or desk display."
 price: 10
 image: "/assets/images/print.jpg"
 type: print

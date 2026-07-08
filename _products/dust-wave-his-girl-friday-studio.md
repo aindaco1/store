@@ -2,6 +2,7 @@
 identifier: his-girl-1
 sku: his-girl-1
 name: "His Girl Friday at The Studio at WESST!"
+description: "Tickets for His Girl Friday at The Studio at WESST on June 7, 2025."
 price: 10
 image: "/assets/images/friday-studio.png"
 type: ticket

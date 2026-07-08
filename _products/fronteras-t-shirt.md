@@ -2,6 +2,7 @@
 identifier: t-shirt-2
 sku: t-shirt-2
 name: Fronteras T-Shirt
+description: "Shop Fronteras T-Shirt: official t-shirt of the 2023 Fronteras Micro-film Festival. 100% cotton and available in XS through 3XL."
 price: 30
 image: "/assets/images/fronteras-tshirt.png"
 type: shirt

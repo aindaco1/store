@@ -2,6 +2,7 @@
 identifier: download-1
 sku: download-1
 name: DUST WAVE Digital Download
+description: "Shop DUST WAVE Digital Download: A starter digital-download product for Store's post-payment signed-link flow."
 price: 5
 image: "/assets/images/default.png"
 type: digital

@@ -2,6 +2,7 @@
 identifier: mug-1
 sku: mug-1
 name: DUST WAVE Mug
+description: "Shop DUST WAVE Mug: 15 oz. glossy black mug with our mark and name. Suitable for any potable liquids."
 price: 20
 image: "/assets/images/dustwave-mug.png"
 type: physical

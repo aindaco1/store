@@ -2,6 +2,7 @@
 identifier: t-shirt-7
 sku: t-shirt-7
 name: Just Hang On T-Shirt
+description: "Shop the Just Hang On T-Shirt from Dust Wave. 100% cotton and available in S, M, L, XL, 2XL, and 3XL."
 price: 25
 image: "/assets/images/jho-shirt.png"
 type: shirt

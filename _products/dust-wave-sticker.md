@@ -2,6 +2,7 @@
 identifier: sticker-1
 sku: sticker-1
 name: DUST WAVE Sticker
+description: "Shop DUST WAVE Sticker: 3\" X 3\" matte laminated circle-cut vinyl sticker. Perfect for refrigerators, laptops, and anywhere else you feel like repping."
 price: 3
 image: "/assets/images/sticker-glove.png"
 type: sticker

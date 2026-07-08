@@ -2,6 +2,7 @@
 identifier: frograiser-1
 sku: frograiser-1
 name: "Frograiser at Rio Bravo!"
+description: "Tickets for Frograiser at Rio Bravo on November 8, 2024."
 price: 10
 image: "/assets/images/frograiser.png"
 type: ticket

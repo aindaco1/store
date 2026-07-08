@@ -2,6 +2,7 @@
 identifier: redline-1
 sku: redline-1
 name: "REDLINE at the Black Cat!"
+description: "Tickets for REDLINE at the Black Cat on May 16, 2025."
 price: 10
 image: "/assets/images/redline.png"
 type: ticket

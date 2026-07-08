@@ -223,6 +223,7 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
     'sku' => present_string(product['sku']) || id,
     'name' => present_string(product['name']) || id,
     'description' => present_string(product['description']) || body,
+    'body_description' => body,
     'long_content' => product['long_content'].is_a?(Array) ? product['long_content'] : nil,
     'price' => price,
     'price_cents' => cents(price),

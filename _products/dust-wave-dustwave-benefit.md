@@ -2,6 +2,7 @@
 identifier: benefit-1
 sku: benefit-1
 name: "A Dust Wave Benefit at Studio 519!"
+description: "Tickets for A Dust Wave Benefit at Studio 519 on April 17, 2026."
 price: 12
 image: "/assets/images/benefit.jpg"
 type: ticket

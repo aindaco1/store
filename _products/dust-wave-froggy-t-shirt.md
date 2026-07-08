@@ -2,6 +2,7 @@
 identifier: t-shirt-4
 sku: t-shirt-4
 name: Froggy and the Boys T-Shirt
+description: "Shop Froggy and the Boys T-Shirt: Band t-shirt from the upcoming DUST WAVE production, \"No Good Reason\". 100% cotton. Available in XS, S, M, L, XL, 2XL, 3XL."
 price: 25
 image: "/assets/images/froggy-tshirt.png"
 type: shirt

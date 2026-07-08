@@ -2,6 +2,7 @@
 identifier: sticker-3
 sku: sticker-3
 name: Froggy and the Boys Sticker
+description: "Shop Froggy and the Boys Sticker: Sticker from the upcoming DUST WAVE production, \"No Good Reason\". 3\" X 3\" matte laminated circle-cut vinyl."
 price: 3
 image: "/assets/images/froggy-sticker.png"
 type: sticker

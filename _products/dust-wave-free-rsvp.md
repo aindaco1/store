@@ -2,6 +2,7 @@
 identifier: rsvp-1
 sku: rsvp-1
 name: DUST WAVE Free RSVP
+description: "Tickets for DUST WAVE Free RSVP on December 18, 2026."
 price: 0
 image: "/assets/images/calendar-2026.png"
 type: rsvp

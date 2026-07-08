@@ -2,6 +2,7 @@
 identifier: thong-1
 sku: thong-1
 name: First Time Sexpot Thong
+description: "Shop First Time Sexpot Thong: Get your very own Hot N' Dangerous-branded thong! Yes, we're selling thongs!"
 price: 35
 image: "/assets/images/sexpot-thong.png"
 type: physical

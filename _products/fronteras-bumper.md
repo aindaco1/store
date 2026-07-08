@@ -2,6 +2,7 @@
 identifier: bumper
 sku: bumper
 name: Fronteras Bumper Sticker
+description: "Shop Fronteras Bumper Sticker: a 3\" X 11.5\" laminated bumper sticker for cars, fridges, and Fronteras festival fans."
 price: 8
 image: "/assets/images/fronteras-bumper.png"
 type: sticker

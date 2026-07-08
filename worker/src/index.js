@@ -6632,6 +6632,7 @@ function buildAdminStoreProductRow({
     label: String(product.name || productId),
     productName: String(product.name || productId),
     description: String(product.description || '').trim(),
+    bodyDescription: String(product.body_description || product.bodyDescription || '').trim(),
     longContent: Array.isArray(product.long_content)
       ? product.long_content
       : Array.isArray(product.longContent)
@@ -6745,6 +6746,7 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     sku: String(product?.sku || '').trim(),
     name: String(product?.name || productId).trim(),
     description: String(product?.description || '').trim(),
+    bodyDescription: String(product?.body_description || product?.bodyDescription || '').trim(),
     longContent: Array.isArray(product?.long_content)
       ? product.long_content
       : Array.isArray(product?.longContent)
@@ -7210,12 +7212,37 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     }
   }
 
-  if (hasAdminStoreProductPatchField(fields, 'description')) {
-    const normalized = normalizeAdminStoreStringField(fields.description, 'Description', { required: false, max: 8000 });
+  const seoDescriptionField = hasAdminStoreProductPatchField(fields, 'seoDescription')
+    ? 'seoDescription'
+    : hasAdminStoreProductPatchField(fields, 'seo_description')
+      ? 'seo_description'
+      : '';
+  if (seoDescriptionField) {
+    const normalized = normalizeAdminStoreStringField(fields[seoDescriptionField], 'SEO description', { required: false, max: 320 });
+    if (normalized.ok) {
+      frontMatter.push({
+        key: 'description',
+        replacement: adminStoreProductScalarLine('description', normalized.value, 'string')
+      });
+      changedFields.push('seoDescription');
+    } else {
+      errors.push(normalized.error);
+    }
+  }
+
+  const bodyDescriptionField = hasAdminStoreProductPatchField(fields, 'bodyDescription')
+    ? 'bodyDescription'
+    : hasAdminStoreProductPatchField(fields, 'body_description')
+      ? 'body_description'
+      : hasAdminStoreProductPatchField(fields, 'description')
+        ? 'description'
+        : '';
+  if (bodyDescriptionField) {
+    const normalized = normalizeAdminStoreStringField(fields[bodyDescriptionField], 'Product page content', { required: false, max: 8000 });
     if (normalized.ok) {
       descriptionChanged = true;
       description = normalized.value;
-      changedFields.push('description');
+      changedFields.push('bodyDescription');
     } else {
       errors.push(normalized.error);
     }
@@ -7608,6 +7635,7 @@ function buildAdminStoreNewProductMarkdown(productId, patch = {}) {
 identifier: ${yamlAdminValue(productId, 'string')}
 sku: ${yamlAdminValue(productId, 'string')}
 name: ""
+description: ""
 price: 0
 image: ""
 type: "product"
@@ -7893,7 +7921,11 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
   const fields = body?.fields && typeof body.fields === 'object' ? body.fields : {};
   const preview = { ...product };
   if (hasAdminStoreProductPatchField(fields, 'name')) preview.name = String(fields.name || '').trim();
-  if (hasAdminStoreProductPatchField(fields, 'description')) preview.description = String(fields.description || '').trim();
+  if (hasAdminStoreProductPatchField(fields, 'seoDescription')) preview.description = String(fields.seoDescription || '').trim();
+  else if (hasAdminStoreProductPatchField(fields, 'seo_description')) preview.description = String(fields.seo_description || '').trim();
+  if (hasAdminStoreProductPatchField(fields, 'bodyDescription')) preview.body_description = String(fields.bodyDescription || '').trim();
+  else if (hasAdminStoreProductPatchField(fields, 'body_description')) preview.body_description = String(fields.body_description || '').trim();
+  else if (hasAdminStoreProductPatchField(fields, 'description')) preview.body_description = String(fields.description || '').trim();
   if (hasAdminStoreProductPatchField(fields, 'longContent') || hasAdminStoreProductPatchField(fields, 'long_content')) {
     const normalized = normalizeAdminStoreLongContent(
       hasAdminStoreProductPatchField(fields, 'longContent') ? fields.longContent : fields.long_content
@@ -7960,6 +7992,12 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
   return preview;
 }
 
+function adminStoreProductPreviewDescriptionSource(product = {}) {
+  if (hasAdminStoreProductPatchField(product, 'body_description')) return String(product.body_description || '');
+  if (hasAdminStoreProductPatchField(product, 'bodyDescription')) return String(product.bodyDescription || '');
+  return String(product.description || '');
+}
+
 function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const siteBase = adminStorePreviewSiteBase(env);
   const stylesheet = siteBase ? `${siteBase}/assets/main.css` : '/assets/main.css';
@@ -7971,7 +8009,7 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const selectedPriceCents = adminStorePreviewSelectedPriceCents(product, selectedVariant);
   const price = formatAdminStorePreviewPrice(selectedPriceCents, product.currency || 'USD');
   const isFree = selectedPriceCents <= 0;
-  const descriptionSource = product.description || '';
+  const descriptionSource = adminStoreProductPreviewDescriptionSource(product);
   const description = renderAdminStoreProductMarkdown(descriptionSource, env);
   const buttonLabel = adminStorePreviewButtonLabel(product, selectedPriceCents);
   const buttonText = isFree ? buttonLabel : `${buttonLabel} - ${price}`;

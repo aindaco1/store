@@ -2,6 +2,7 @@
 identifier: poster-4
 sku: poster-4
 name: Attack of the 50 Ft. Dust Wave! Poster
+description: "27\" X 40\" poster commemorating Attack of the 50 Ft. Dust Wave!"
 price: 35
 image: "/assets/images/attack-poster.png"
 type: physical

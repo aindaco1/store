@@ -2,6 +2,7 @@
 identifier: horse-1
 sku: horse-1
 name: "Horse vs. Vamp!"
+description: "Tickets for Horse vs. Vamp at Black Cat on May 3, 2025."
 price: 10
 image: "/assets/images/horsevamp.jpg"
 type: ticket

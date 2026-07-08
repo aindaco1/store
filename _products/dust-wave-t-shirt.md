@@ -2,6 +2,7 @@
 identifier: t-shirt-1
 sku: t-shirt-1
 name: DUST WAVE T-Shirt
+description: "Shop DUST WAVE T-Shirt: Our official t-shirt. \"DUST WAVE\" on the sleeve. 100% cotton. Available in XS, S, M, L, XL, 2XL, 3XL."
 price: 25
 image: "/assets/images/dustwave-tshirt.png"
 type: shirt

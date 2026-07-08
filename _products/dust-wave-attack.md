@@ -2,6 +2,7 @@
 identifier: attack-1
 sku: attack-1
 name: "ATTACK OF THE FIFTY FOOT DUST WAVE! at the Guild Cinema"
+description: "Tickets for ATTACK OF THE FIFTY FOOT DUST WAVE! at the Guild Cinema on November 20, 2025."
 price: 0
 image: "/assets/images/attack-guild.png"
 type: ticket

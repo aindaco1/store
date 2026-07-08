@@ -2,6 +2,7 @@
 identifier: calendar-1
 sku: calendar-1
 name: "DUST WAVE After Dark 2026 Calendar"
+description: "Shop the DUST WAVE After Dark 2026 Calendar, a limited-run wall calendar featuring twelve sultry months of Dust Wave members."
 price: 35
 image: "/assets/images/calendar-2026.png"
 type: physical

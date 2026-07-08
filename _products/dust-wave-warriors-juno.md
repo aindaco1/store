@@ -2,6 +2,7 @@
 identifier: warriors-1
 sku: warriors-1
 name: "THE WARRIORS at Juno Brewery!"
+description: "Tickets for THE WARRIORS at Juno Brewery on May 13, 2025."
 price: 10
 image: "/assets/images/default.png"
 type: ticket

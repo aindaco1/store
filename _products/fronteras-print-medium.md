@@ -2,6 +2,7 @@
 identifier: print-2
 sku: print-2
 name: Fronteras Print (Medium)
+description: "Shop Fronteras Print (Medium): 8\" x 12\" silk coverstock fine print featuring Fronteras artwork in a compact display size."
 price: 15
 image: "/assets/images/print.jpg"
 type: print

@@ -4147,7 +4147,9 @@
     eventIcs: 'Adds an iCalendar file link to event order confirmations when a start time is set.',
     image: 'Primary product image used on public product cards, cart rows, receipts, and previews.',
     preview: 'Live product-card preview generated from the current editor values.',
-    description: 'Public product copy. Use the block editor for text, media, embeds, and galleries.'
+    seoDescription: 'Search and social summary for this product. Keep it specific and under 320 characters.',
+    bodyDescription: 'Visible product page copy. Use the block editor for text, media, embeds, and galleries.',
+    description: 'Visible product page copy. Use the block editor for text, media, embeds, and galleries.'
   };
 
   function storeProductFieldHelp(field, fallback) {
@@ -5358,7 +5360,11 @@
 
   function storeProductDescriptionBlocksFromProduct(product) {
     var blocks = storeProductDescriptionParseBlocks(product.longContent || product.long_content || []);
-    return blocks.length ? blocks : storeProductDescriptionBlocksFromMarkdown(product.description || '');
+    return blocks.length
+      ? blocks
+      : storeProductDescriptionBlocksFromMarkdown(
+        product.bodyDescription || product.body_description || product.content || product.description || ''
+      );
   }
 
   function storeProductDescriptionSerializableBlocks(blocks) {
@@ -6476,9 +6482,9 @@
     label.setAttribute('for', textareaId);
     textarea.id = textareaId;
     textarea.rows = 9;
-    textarea.value = product.description || '';
+    textarea.value = product.bodyDescription || product.body_description || product.content || product.description || '';
     textarea.className = 'admin-settings__input';
-    textarea.dataset.storeProductField = 'description';
+    textarea.dataset.storeProductField = 'bodyDescription';
     textarea.dataset.storeProductDescriptionSource = 'true';
     textarea.hidden = true;
     longContentField.dataset.storeProductField = 'longContent';
@@ -6489,7 +6495,7 @@
     library.hidden = true;
     editor.dataset.storeProductDescriptionEditor = 'true';
     editor.dataset.contentEditorId = 'store-product-description-' + String(++storeProductDescriptionEditorCounter);
-    editor.setAttribute('aria-label', 'Product description blocks');
+    editor.setAttribute('aria-label', 'Product page content blocks');
     var context = {
       id: editor.dataset.contentEditorId,
       product: product,
@@ -6506,7 +6512,7 @@
     storeProductDescriptionAttach(editor);
     storeProductDescriptionRenderBlocks(context);
 
-    label.appendChild(createStoreProductFieldLabel('Description', 'description', textarea));
+    label.appendChild(createStoreProductFieldLabel('Product page content', 'bodyDescription', textarea));
     header.appendChild(label);
     wrapper.appendChild(header);
     wrapper.appendChild(status);
@@ -6515,6 +6521,15 @@
     wrapper.appendChild(longContentField);
     wrapper.appendChild(library);
     return wrapper;
+  }
+
+  function createStoreProductSeoDescriptionField(product) {
+    var field = productField('SEO description', 'seoDescription', product.description || '', 'textarea', {
+      rows: 3,
+      maxLength: 320
+    });
+    field.classList.add('admin-store-products__field--seo-description');
+    return field;
   }
 
   function createStoreProductPreviewPanel() {
@@ -6676,6 +6691,7 @@
     eventDetails.appendChild(productField('Venue', 'eventVenue', product.eventVenue || product.eventDetails?.venue || '', 'text'));
     eventDetails.appendChild(createStoreProductEventAddressField(product));
     mediaDescription.appendChild(createStoreProductImageField(product));
+    mediaDescription.appendChild(createStoreProductSeoDescriptionField(product));
     mediaDescription.appendChild(createStoreProductDescriptionEditor(product));
     fields.appendChild(basics);
     fields.appendChild(commerce);
@@ -6838,7 +6854,7 @@
       input.value = String(value);
     } else if (type === 'textarea') {
       input = document.createElement('textarea');
-      input.rows = 5;
+      input.rows = opts.rows || 5;
       input.value = value;
     } else {
       input = document.createElement('input');
@@ -6854,6 +6870,7 @@
       if (opts.min) input.min = opts.min;
     }
     if (opts.required) input.required = true;
+    if (opts.maxLength) input.maxLength = opts.maxLength;
     input.className = 'admin-settings__input';
     input.dataset.storeProductField = field;
     label.appendChild(createStoreProductFieldLabel(labelText, field, input, opts.noHelp ? false : opts.help));

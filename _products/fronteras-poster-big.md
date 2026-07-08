@@ -2,6 +2,7 @@
 identifier: poster-1
 sku: poster-1
 name: Fronteras Poster (Big)
+description: "Shop Fronteras Poster (Big): 18\" X 24\" super heavyweight matte poster. Butterflies are cool."
 price: 35
 image: "/assets/images/fronteras-poster.png"
 type: poster

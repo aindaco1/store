@@ -2,6 +2,7 @@
 identifier: cronos-1
 sku: cronos-1
 name: "CRONOS at the Guild Cinema"
+description: "Tickets for CRONOS at the Guild Cinema on March 21, 2026."
 price: 10
 image: "/assets/images/cronos-guild.png"
 type: ticket

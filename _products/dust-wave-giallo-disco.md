@@ -2,6 +2,7 @@
 identifier: giallo-1
 sku: giallo-1
 name: "GIALLO DISCO at Ren's Den!"
+description: "Tickets for GIALLO DISCO at Ren's Den on June 21, 2025."
 price: 10
 image: "/assets/images/giallo.jpg"
 type: ticket

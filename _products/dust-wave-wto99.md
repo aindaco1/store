@@ -2,6 +2,7 @@
 identifier: wto99-1
 sku: wto99-1
 name: "WTO/99 at the Dust Wave Microcinema"
+description: "Tickets for WTO/99 at the Dust Wave Microcinema on May 1, 2026."
 price: 0
 image: "/assets/images/wto99.png"
 type: ticket

@@ -2,6 +2,7 @@
 identifier: annihilation-1
 sku: annihilation-1
 name: "ANNIHILATION at the Guild Cinema"
+description: "Tickets for ANNIHILATION at the Guild Cinema on December 12, 2025."
 price: 10
 image: "/assets/images/annihilation-guild.jpg"
 type: ticket

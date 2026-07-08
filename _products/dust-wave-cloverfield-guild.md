@@ -2,6 +2,7 @@
 identifier: cloverfield-1
 sku: cloverfield-1
 name: "CLOVERFIELD at the Guild Cinema!"
+description: "Tickets for CLOVERFIELD at the Guild Cinema on August 1, 2025."
 price: 10
 image: "/assets/images/cloverfield-guild.png"
 type: ticket

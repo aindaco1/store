@@ -2,6 +2,7 @@
 identifier: al1ce-1
 sku: al1ce-1
 name: "AL1CE at Juno Brewery!"
+description: "Tickets for AL1CE at Juno Brewery on September 27, 2025."
 price: 20
 image: "/assets/images/al1ce.png"
 type: ticket

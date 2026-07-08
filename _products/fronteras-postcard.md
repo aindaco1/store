@@ -2,6 +2,7 @@
 identifier: postcard
 sku: postcard
 name: Fronteras Postcard
+description: "Shop Fronteras Postcard: 4\" X 6\" glossy postcard. Perfect for mailing to friends OR enemies."
 price: 2
 image: "/assets/images/print.jpg"
 type: postcard

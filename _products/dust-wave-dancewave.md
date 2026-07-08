@@ -2,6 +2,7 @@
 identifier: dancewave-1
 sku: dancewave-1
 name: "DANCEWAVE at Juno Brewery!"
+description: "Tickets for DANCEWAVE at Juno Brewery on September 6, 2025."
 price: 35
 image: "/assets/images/dancewave.png"
 type: ticket

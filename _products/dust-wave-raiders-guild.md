@@ -2,6 +2,7 @@
 identifier: raiders-1
 sku: raiders-1
 name: "RAIDERS OF THE LOST ARK at the Guild Cinema!"
+description: "Tickets for RAIDERS OF THE LOST ARK at the Guild Cinema on July 4, 2025."
 price: 10
 image: "/assets/images/raiders-guild.jpg"
 type: ticket

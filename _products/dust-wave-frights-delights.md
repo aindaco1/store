@@ -2,6 +2,7 @@
 identifier: frights-delights-1
 sku: frights-delights-1
 name: "An Evening of Frights & Delights!"
+description: "Tickets for An Evening of Frights & Delights at The Guild Cinema on November 6, 2024."
 price: 8
 image: "/assets/images/frights-delights.jpg"
 type: ticket

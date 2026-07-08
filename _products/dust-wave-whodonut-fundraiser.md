@@ -2,6 +2,7 @@
 identifier: whodonut-1
 sku: whodonut-1
 name: "Film Networking + WHODONUT Fundraiser at Rio Bravo"
+description: "Tickets for Film Networking + WHODONUT Fundraiser at Rio Bravo on March 1, 2026."
 price: 10
 image: "/assets/images/whodonut.png"
 type: ticket

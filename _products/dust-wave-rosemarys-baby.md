@@ -2,6 +2,7 @@
 identifier: rosemary-1
 sku: rosemary-1
 name: "ROSEMARY'S BABY at the Guild Cinema"
+description: "Tickets for ROSEMARY'S BABY at the Guild Cinema on November 7, 2025."
 price: 10
 image: "/assets/images/rosemary.jpg"
 type: ticket

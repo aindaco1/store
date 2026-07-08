@@ -2,6 +2,7 @@
 identifier: ticket-1
 sku: ticket-1
 name: DUST WAVE Event Ticket
+description: "Tickets for DUST WAVE Event Ticket at The Guild Cinema on December 12, 2026."
 price: 12
 image: "/assets/images/dancewave.png"
 type: ticket

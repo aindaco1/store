@@ -2,6 +2,7 @@
 identifier: condom-1
 sku: condom-1
 name: First Time Sexpot Condom Pack
+description: "Shop a 3-pack of First Time Sexpot and Hot N' Dangerous branded latex condoms from Dust Wave."
 price: 6
 image: "/assets/images/sexpot-condom-pack.png"
 type: physical

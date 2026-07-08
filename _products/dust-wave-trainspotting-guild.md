@@ -2,6 +2,7 @@
 identifier: trainspotting-1
 sku: trainspotting-1
 name: "TRAINSPOTTING at the Guild Cinema!"
+description: "Tickets for TRAINSPOTTING at the Guild Cinema on June 20, 2025."
 price: 10
 image: "/assets/images/trainspotting-guild.png"
 type: ticket

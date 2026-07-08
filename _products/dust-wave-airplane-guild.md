@@ -2,6 +2,7 @@
 identifier: airplane-1
 sku: airplane-1
 name: "AIRPLANE! at the Guild Cinema"
+description: "Tickets for AIRPLANE! at the Guild Cinema on September 5, 2025."
 price: 10
 image: "/assets/images/airplane-guild.jpg"
 type: ticket
