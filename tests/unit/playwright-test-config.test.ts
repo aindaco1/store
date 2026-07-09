@@ -55,4 +55,14 @@ describe('Playwright test server config', () => {
     expect(preMergeScript).toContain('/workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1');
     expect(preMergeScript).toContain('minify_site_assets || return 1');
   });
+
+  it('keeps Podman site builds local when _config.local.yml is absent', () => {
+    const podmanSiteEntrypoint = readFileSync(join(repoRoot, 'scripts/podman-site-entrypoint.sh'), 'utf8');
+
+    expect(podmanSiteEntrypoint).toContain('if [[ -f /workspace/_config.local.yml ]]; then');
+    expect(podmanSiteEntrypoint).toContain('/workspace/scripts/jekyll-config-files.sh /workspace');
+    expect(podmanSiteEntrypoint).toContain('/workspace/scripts/jekyll-test-config-files.sh "${TEMP_JEKYLL_CONFIG}"');
+    expect(podmanSiteEntrypoint).toContain('SITE_BASE="${SITE_BASE:-http://127.0.0.1:4002}"');
+    expect(podmanSiteEntrypoint).toContain('WORKER_BASE="${WORKER_BASE:-http://127.0.0.1:8989}"');
+  });
 });
