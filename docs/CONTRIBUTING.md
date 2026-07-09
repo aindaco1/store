@@ -66,7 +66,7 @@ Then run:
 ```bash
 npm run test:seo
 npm run test:content-security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 ```
 
 ## Test Expectations
@@ -78,14 +78,14 @@ bundle exec jekyll build --quiet
 npm run test:seo
 npm run test:content-security
 npm run test:unit
-PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
+npm run test:e2e:headless
 ```
 
 For Worker/security changes:
 
 ```bash
 npm run test:security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 ```
 
 For Podman:

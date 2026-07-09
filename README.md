@@ -4,7 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Release target: `v1.0.5`.
+- Release target: `v1.0.6`.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -43,7 +43,8 @@ npm run test:seo
 npm run test:content-security
 npm run test:unit
 npm run test:security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+npm run test:e2e:headless
+SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 npm run test:premerge
 ```
 
@@ -51,6 +52,7 @@ For release environment setup:
 
 ```bash
 npm run setup:deploy -- --mode=local
+npm run backup:plan
 npm run setup:deploy -- --mode=production --dry-run
 npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 ```
@@ -85,4 +87,4 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 
 ## Production Operations
 
-Store is live on the production storefront and Worker domains. Ongoing production work is operational: keep Cloudflare Worker secrets and external accounts current, verify Stripe webhooks, Resend senders, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, and real inventory baselines, and rerun the production smoke/reconciliation path after checkout, fulfillment, admin, or catalog changes.
+Store is live on the production storefront and Worker domains. Production deploys are manual through the **Deploy Production** GitHub Actions workflow; merging a release branch or pushing a release tag does not deploy by itself. Ongoing production work is operational: keep Cloudflare Worker secrets and external accounts current, verify Stripe webhooks, Resend senders, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, and real inventory baselines, and rerun the production smoke/reconciliation path after checkout, fulfillment, admin, or catalog changes.

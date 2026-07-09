@@ -1,8 +1,6 @@
 name: Deploy Production
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reason:
@@ -70,7 +68,6 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Node
-        if: ${{ github.event_name == 'push' }}
         uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -78,27 +75,46 @@ jobs:
           cache-dependency-path: worker/package-lock.json
 
       - name: Setup Ruby
-        if: ${{ github.event_name == 'push' }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
 
       - name: Install Worker dependencies
-        if: ${{ github.event_name == 'push' }}
         working-directory: worker
         run: npm ci
 
       - name: Sync Worker config and catalog
-        if: ${{ github.event_name == 'push' }}
         run: npm run sync:worker-config
 
       - name: Deploy Worker
-        if: ${{ github.event_name == 'push' }}
         working-directory: worker
         run: npx wrangler deploy -c wrangler.toml --env=""
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Purge Workers Cache
+        run: |
+          if [ -z "$WORKERS_CACHE_PURGE_SECRET" ]; then
+            echo "WORKERS_CACHE_PURGE_SECRET is not configured; skipping Workers Cache purge."
+            exit 0
+          fi
+
+          response="$(mktemp)"
+          status="$(curl -sS -o "$response" -w "%{http_code}" \
+            -X POST "$WORKERS_CACHE_PURGE_URL" \
+            -H "Authorization: Bearer ${WORKERS_CACHE_PURGE_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{"target":"all_known","source":"deploy"}')"
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Workers Cache purge failed with status $status"
+            cat "$response"
+            exit 1
+          fi
+        env:
+          WORKERS_CACHE_PURGE_URL: ${{ vars.WORKERS_CACHE_PURGE_URL || 'https://checkout.dustwave.xyz/admin/workers-cache/purge' }}
+          WORKERS_CACHE_PURGE_SECRET: ${{ secrets.WORKERS_CACHE_PURGE_SECRET }}
 
       - name: Deploy to GitHub Pages
         id: deployment

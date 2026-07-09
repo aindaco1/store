@@ -44,6 +44,7 @@ Secret storage rules:
 - Local development secrets belong in ignored `worker/.dev.vars`.
 - Production Worker secrets belong in Cloudflare Worker secrets via `wrangler secret put`.
 - GitHub repository secrets are for CI/deploy/operator workflows only; they are not runtime Worker secrets.
+- `WORKERS_CACHE_PURGE_SECRET` is the exception that must be present in both places with the same value: Worker runtime verifies deploy purge requests, and GitHub Actions sends the bearer token after `wrangler deploy`.
 - `_config.yml`, product markdown, and admin-published settings must never contain Stripe, Resend, USPS, ZIP.TAX, Cloudflare, GitHub, or admin session secrets.
 - The admin dashboard may show configured/missing status for credentials, but must not expose, edit, serialize, or publish secret values.
 
@@ -71,6 +72,17 @@ Secret storage rules:
 | `rl:{endpoint}:{ip}` | KV | Rate-limit counters | Low |
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
+
+Workers Cache rule:
+
+- The default Worker gateway entrypoint remains uncached so auth, CSRF, role/scope checks, rate limits, route dispatch, and mutations always run.
+- Only reviewed inner `GET`/`HEAD` entrypoints may emit cacheable responses. Today that means `CachedAdminStoreOrders` for non-search admin Orders list reads.
+- The gateway authenticates the admin before calling the cached entrypoint and sends only minimal `ctx.props` role/scope partitioning. Do not key cached admin data on `Cookie`, `Authorization`, raw session tokens, email addresses, names, CSRF tokens, or signed-link values.
+- Browser-facing admin responses stay `private, no-store` even when the inner Workers Cache response is public-cacheable.
+- Free-text admin Orders searches bypass Workers Cache because `q` may contain customer PII or order tokens.
+- Cache tags must stay low-cardinality and non-PII. Use route/domain tags such as `admin-orders`, `orders`, `order-index`, and version tags only.
+- Purge requests to cached inner entrypoints must require trusted internal props and should be triggered from the same mutation boundaries that invalidate KV/order projections.
+- External purge requests are limited to `POST /admin/workers-cache/purge` and require either a super-admin session with CSRF or the dedicated `WORKERS_CACHE_PURGE_SECRET`; callers cannot submit arbitrary cache tags.
 
 Browser storage:
 
@@ -136,6 +148,7 @@ Required protections:
 - restrictive admin CSP and no public social/structured metadata
 - runtime admin users stored in KV, not `_config.yml`
 - local dashboard navigation persistence limited to non-sensitive tab identifiers
+- Workers Cache use limited to authenticated, normalized, non-search read paths with private/no-store browser responses
 
 Limited admins should see only the Store surfaces allowed by their access scopes. Super admins retain settings and user-management access.
 

@@ -9,6 +9,8 @@ WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
 ORIGINAL_DEV_VARS_BACKUP=""
+TEMP_JEKYLL_CONFIG=""
+TEMP_JEKYLL_CONFIG_DIR=""
 LOG_DIR="$(mktemp -d /tmp/store-premerge-logs.XXXXXX)"
 declare -a PHASE_RESULTS=()
 HOST_JEKYLL_STATUS="unknown"
@@ -91,9 +93,9 @@ prepare_host_jekyll() {
   fi
 
   HOST_JEKYLL_STATUS="bundle_install_failed"
-  if [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
+  if [[ -f "${HOST_JEKYLL_LOG}" ]] && grep -Eq "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="locked gem version is unavailable from RubyGems"
-  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
+  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && grep -Eq "extensions are not built" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="native gem extensions are missing on the host Ruby"
   else
     HOST_JEKYLL_FAILURE_REASON="bundle install failed"
@@ -150,6 +152,10 @@ ensure_podman_ready() {
 
 build_with_podman_jekyll() {
   ensure_podman_ready || return 1
+  local jekyll_config_files
+  jekyll_config_files="$(./scripts/jekyll-config-files.sh)"
+
+  rm -rf _site .jekyll-cache
 
   if ! podman image exists localhost/store-dev-site:latest; then
     podman build -t localhost/store-dev-site:latest -f Containerfile.dev .
@@ -161,14 +167,17 @@ build_with_podman_jekyll() {
     -v "$PWD:/workspace" \
     -v store-dev-bundle:/usr/local/bundle \
     localhost/store-dev-site:latest \
-    bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+    /workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1
 
-  minify_site_assets
+  minify_site_assets || return 1
 }
 
 build_with_host_jekyll() {
-  SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
-  minify_site_assets
+  local jekyll_config_files
+  jekyll_config_files="$(./scripts/jekyll-config-files.sh)"
+  rm -rf _site .jekyll-cache
+  SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1
+  minify_site_assets || return 1
 }
 
 minify_site_assets() {
@@ -180,7 +189,7 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
-  if ! rg -n '\.store-first-party-cart__panel' _site/assets/main.css >/dev/null; then
+  if ! grep -Eq '\.store-first-party-cart__panel' _site/assets/main.css; then
     echo "main.css is missing expected first-party cart UI styles"
     return 1
   fi
@@ -192,35 +201,35 @@ verify_build_artifacts() {
     echo "sitemap.xml is missing from the built site"
     return 1
   fi
-  if ! rg -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
+  if ! grep -Eq 'Sitemap: .+/sitemap\.xml' _site/robots.txt; then
     echo "robots.txt is missing its sitemap pointer"
     return 1
   fi
-  if rg -n 'Disallow: /order-success/' _site/robots.txt >/dev/null; then
+  if grep -Eq 'Disallow: /order-success/' _site/robots.txt; then
     echo "robots.txt blocks order-success before crawlers can observe noindex"
     return 1
   fi
-  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
+  if ! grep -Eq '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml; then
     echo "sitemap.xml is missing the expected urlset root"
     return 1
   fi
-  if ! rg -n '<loc>.+/products/' _site/sitemap.xml >/dev/null; then
+  if ! grep -Eq '<loc>.+/products/' _site/sitemap.xml; then
     echo "sitemap.xml is missing public product URLs"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/index.html >/dev/null; then
+  if ! grep -Eq 'application/ld\+json' _site/index.html; then
     echo "Home page is missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/products/*/index.html >/dev/null; then
+  if ! grep -Eq 'application/ld\+json' _site/products/*/index.html; then
     echo "Product pages are missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/order-success/index.html >/dev/null; then
+  if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/order-success/index.html; then
     echo "Order success page is missing noindex robots metadata"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
+  if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html; then
     echo "Admin page is missing noindex robots metadata"
     return 1
   fi
@@ -228,23 +237,23 @@ verify_build_artifacts() {
     echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
+  if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html; then
     echo "Spanish admin page is missing noindex robots metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
+  if grep -Eq 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html; then
     echo "Admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
+  if grep -Eq 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html; then
     echo "Spanish admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
+  if grep -Eq '<loc>.+/admin/' _site/sitemap.xml; then
     echo "sitemap.xml unexpectedly includes the admin route"
     return 1
   fi
-  if rg -n '<loc>.+/order-success/' _site/sitemap.xml >/dev/null; then
+  if grep -Eq '<loc>.+/order-success/' _site/sitemap.xml; then
     echo "sitemap.xml unexpectedly includes the order-success route"
     return 1
   fi
@@ -297,6 +306,9 @@ cleanup() {
   fi
   if [[ -n "${TEMP_DEV_VARS}" && -f "${TEMP_DEV_VARS}" ]]; then
     rm -f "${TEMP_DEV_VARS}"
+  fi
+  if [[ -n "${TEMP_JEKYLL_CONFIG_DIR}" && -d "${TEMP_JEKYLL_CONFIG_DIR}" ]]; then
+    rm -rf "${TEMP_JEKYLL_CONFIG_DIR}"
   fi
   if [[ -n "${ORIGINAL_DEV_VARS_BACKUP}" && -f "${ORIGINAL_DEV_VARS_BACKUP}" ]]; then
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
@@ -377,6 +389,14 @@ host_site_ready() {
   local body
   body="$(curl -fsS "http://127.0.0.1:4002/admin/" 2>/dev/null || true)"
   [[ "${body}" == *'id="admin-auth-panel"'* ]]
+}
+
+test_jekyll_config_files() {
+  if [[ -z "${TEMP_JEKYLL_CONFIG}" ]]; then
+    TEMP_JEKYLL_CONFIG_DIR="$(mktemp -d /tmp/store-premerge-jekyll.XXXXXX)"
+    TEMP_JEKYLL_CONFIG="${TEMP_JEKYLL_CONFIG_DIR}/config.yml"
+  fi
+  ./scripts/jekyll-test-config-files.sh "${TEMP_JEKYLL_CONFIG}"
 }
 
 echo "==> Pre-merge regression checks"
@@ -488,47 +508,13 @@ STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
 EOF
 fi
 
-start_worker || exit 1
-
 run_phase "8. Security suite" npm run test:security
 
-stop_worker
+reset_podman_dev_artifacts || exit 1
+run_phase "9. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
 
-if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
-  reset_podman_dev_artifacts || exit 1
-  run_phase "9. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
-else
-  start_worker || exit 1
-
-  if ! host_site_ready; then
-    bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
-    JEKYLL_PID=$!
-  fi
-
-  for _ in {1..60}; do
-    if host_site_ready; then
-      break
-    fi
-    sleep 1
-  done
-
-  if ! host_site_ready; then
-    echo "Jekyll failed to start. See /tmp/store-premerge-jekyll.log"
-    exit 1
-  fi
-
-  run_phase "9a. Host Store Worker smoke" env SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
-  stop_worker
-  reset_podman_dev_artifacts || exit 1
-  run_phase "9b. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
-fi
-
-if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
-  reset_podman_dev_artifacts || exit 1
-  run_phase "10. Podman E2E suite" env CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
-else
-  run_phase "10. Headless E2E suite" npm run test:e2e:headless
-fi
+reset_podman_dev_artifacts || exit 1
+run_phase "10. Podman E2E suite" npm run test:e2e:headless
 
 echo "Pre-merge regression checks completed."
 print_phase_summary

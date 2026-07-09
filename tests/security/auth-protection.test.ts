@@ -24,6 +24,7 @@ describe('Store auth protection', () => {
   it('requires an admin session before Store admin writes', async () => {
     const endpoints = [
       ['/admin/settings/publish', { changes: [] }],
+      ['/admin/workers-cache/purge', { target: 'all_known' }],
       ['/admin/users', { users: [] }],
       ['/admin/store/products/publish', { productId: 't-shirt-2' }],
       ['/admin/store/products/bulk-publish', { intent: 'bulk_publish', productIds: ['t-shirt-2'], fields: { status: 'draft' } }],

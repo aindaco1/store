@@ -1,6 +1,6 @@
 # Testing
 
-The current `v1.0.5` release gate adds Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
+The current `v1.0.6` release gate keeps Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering, and adds Workers Cache plus backup/restore coverage. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -12,9 +12,12 @@ npm run test:unit
 npm run test:seo
 npm run test:content-security
 npm run test:security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
-PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
+npm run backup:plan
+SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
+npm run test:e2e:headless
 ```
+
+Runtime-dependent defaults use the Podman stack so Worker and browser checks run against the production-like local environment. Use `npm run test:security:host`, `npm run test:e2e:host`, or `npm run test:e2e:headless:host` only for focused host-debugging sessions where the local Worker/site are already managed separately.
 
 Local services:
 
@@ -43,6 +46,8 @@ Focused Store runs:
 
 ```bash
 npx vitest run \
+  tests/unit/workers-cache-policy.test.ts \
+  tests/unit/store-backup-script.test.ts \
   tests/unit/store-catalog.test.ts \
   tests/unit/store-coupons.test.ts \
   tests/unit/shipping.test.ts \
@@ -60,10 +65,15 @@ npx vitest run \
 npm run test:secrets
 npm run test:content-security
 npm run test:security
-npm run test:security:podman
 ```
 
-The security suite checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior.
+The default security suite starts or reuses the Podman Storefront and Worker stack through `npm run test:security:podman`. It checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior. Use `npm run test:security:host` only when you intentionally want to target an already-running host Worker.
+
+Podman-backed security, Worker smoke, and headless E2E wrappers reset local Wrangler state for their isolated stack before running. This avoids stale Miniflare SQLite state from turning `RATELIMIT` reads into false `503` failures while leaving normal manual `./scripts/dev.sh --podman` state intact.
+
+Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`. It checks admin Orders request normalization, credential stripping, search bypasses, kill-switch behavior, non-PII role/scope props, cacheable inner response headers, shared purge helpers, and internal-props enforcement for cache purges.
+
+Backup automation coverage lives in `tests/unit/store-backup-script.test.ts`. It checks KV prefix classification, Wrangler inventory parsing, command generation, KV restore-shape transforms, download key discovery, secret inventory redaction, and dry-run behavior.
 
 ## SEO
 
@@ -80,7 +90,7 @@ The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, soci
 npm run test:premerge
 ```
 
-The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, host Worker smoke, Podman Worker smoke, asset minification checks, and the headless Playwright suite. It waits for the real admin shell before host smoke so a stale listener cannot count as a ready site. When host Jekyll gems are unavailable it falls back to a Podman-backed build, smoke, and browser path.
+The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, Podman Worker smoke, asset minification checks, and the Podman headless Playwright suite. When host Jekyll gems are unavailable it falls back to a Podman-backed build path.
 
 For changes that trigger [ETHICAL_RISK.md](ETHICAL_RISK.md), record the review result in the PR before merge. Automated checks can prove many mitigations, such as private/no-store routes, consent state, suppression, access control, content safety, i18n completeness, and accessibility. Residual risks that require human review should name the owner/date in the PR or release evidence.
 
@@ -148,6 +158,7 @@ Before deploys that affect checkout, fulfillment, admin publishing, product inve
 ```bash
 npm run sync:worker-config
 npm run catalog:generate
+npm run backup:plan
 npm run launch:readiness
 bundle exec jekyll build --config _config.yml,_config.local.yml
 npm run assets:minify:check
@@ -158,6 +169,8 @@ For checkout, admin, or Worker changes, also run:
 
 ```bash
 npm run test:security
+npm run test:unit -- tests/unit/workers-cache-policy.test.ts tests/unit/store-backup-script.test.ts
+cd worker && npx wrangler deploy --dry-run --env="" && cd ..
 CI=1 npx playwright test tests/e2e/admin-dashboard.spec.ts --workers=1
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 ```

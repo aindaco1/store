@@ -90,6 +90,7 @@ TOP_LEVEL_ORDER = [
   'INTENT_PREFETCH_DELAY_MS',
   'INTENT_PREFETCH_LIMIT',
   'LIVE_INVENTORY_CACHE_TTL_SECONDS',
+  'WORKERS_CACHE_ADMIN_ORDERS_ENABLED',
   'DEFAULT_PLATFORM_TIP_PERCENT',
   'MAX_PLATFORM_TIP_PERCENT'
 ].freeze
@@ -175,6 +176,7 @@ DEV_ENV_ORDER = [
   'INTENT_PREFETCH_DELAY_MS',
   'INTENT_PREFETCH_LIMIT',
   'LIVE_INVENTORY_CACHE_TTL_SECONDS',
+  'WORKERS_CACHE_ADMIN_ORDERS_ENABLED',
   'DEFAULT_PLATFORM_TIP_PERCENT',
   'MAX_PLATFORM_TIP_PERCENT',
   'ADMIN_LOCAL_REPO_WRITES_ENABLED',
@@ -465,6 +467,7 @@ def build_mirror_values(config, existing)
     'INTENT_PREFETCH_DELAY_MS' => performance.key?('intent_prefetch_delay_ms') ? format_int(performance['intent_prefetch_delay_ms']) : existing['INTENT_PREFETCH_DELAY_MS'],
     'INTENT_PREFETCH_LIMIT' => performance.key?('intent_prefetch_limit') ? format_int(performance['intent_prefetch_limit']) : existing['INTENT_PREFETCH_LIMIT'],
     'LIVE_INVENTORY_CACHE_TTL_SECONDS' => cache.key?('live_inventory_ttl_seconds') ? format_int(cache['live_inventory_ttl_seconds']) : existing['LIVE_INVENTORY_CACHE_TTL_SECONDS'],
+    'WORKERS_CACHE_ADMIN_ORDERS_ENABLED' => cache.key?('workers_admin_orders_enabled') ? (cache['workers_admin_orders_enabled'] ? 'true' : 'false') : existing['WORKERS_CACHE_ADMIN_ORDERS_ENABLED'],
     'DEFAULT_PLATFORM_TIP_PERCENT' => pricing.key?('default_tip_percent') ? format_int(pricing['default_tip_percent']) : existing['DEFAULT_PLATFORM_TIP_PERCENT'],
     'MAX_PLATFORM_TIP_PERCENT' => pricing.key?('max_tip_percent') ? format_int(pricing['max_tip_percent']) : existing['MAX_PLATFORM_TIP_PERCENT'],
     'ADMIN_LOCAL_REPO_WRITES_ENABLED' => existing['ADMIN_LOCAL_REPO_WRITES_ENABLED'],

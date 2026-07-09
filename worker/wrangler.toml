@@ -1,12 +1,21 @@
 name = "store-worker"
 main = "src/index.js"
-compatibility_date = "2026-05-03"
+compatibility_date = "2026-07-09"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 
 routes = [
   { pattern = "checkout.dustwave.xyz/*", zone_name = "dustwave.xyz" }
 ]
+
+[cache]
+enabled = false
+
+[exports.CachedAdminStoreOrders]
+type = "worker"
+
+  [exports.CachedAdminStoreOrders.cache]
+  enabled = true
 
 # Cron trigger:
 # - `* * * * *`: timezone-aware platform scheduler. Individual tasks gate on
@@ -95,6 +104,7 @@ INTENT_PREFETCH_ENABLED = "true"
 INTENT_PREFETCH_DELAY_MS = "90"
 INTENT_PREFETCH_LIMIT = "3"
 LIVE_INVENTORY_CACHE_TTL_SECONDS = "300"
+WORKERS_CACHE_ADMIN_ORDERS_ENABLED = "true"
 DEFAULT_PLATFORM_TIP_PERCENT = "5"
 MAX_PLATFORM_TIP_PERCENT = "15"
 
@@ -144,6 +154,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
 # - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - STORE_DOWNLOAD_SECRET      (optional dedicated HMAC secret for signed download/fulfillment links)
+# - WORKERS_CACHE_PURGE_SECRET (dedicated bearer secret for deploy-time Workers Cache purge)
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)
@@ -240,6 +251,7 @@ INTENT_PREFETCH_ENABLED = "true"
 INTENT_PREFETCH_DELAY_MS = "90"
 INTENT_PREFETCH_LIMIT = "3"
 LIVE_INVENTORY_CACHE_TTL_SECONDS = "300"
+WORKERS_CACHE_ADMIN_ORDERS_ENABLED = "true"
 DEFAULT_PLATFORM_TIP_PERCENT = "5"
 MAX_PLATFORM_TIP_PERCENT = "15"
 ADMIN_LOCAL_REPO_WRITES_ENABLED = "true"

@@ -18,7 +18,7 @@ module.exports = defineConfig({
   webServer: useExternalServer
     ? undefined
     : {
-        command: "bash -lc 'rm -rf _site .jekyll-cache && bundle exec jekyll build --config _config.yml,_config.local.yml --quiet && exec python3 -m http.server 4002 --bind 127.0.0.1 --directory _site'",
+        command: './scripts/playwright-web-server.sh',
         port: 4002,
         timeout: 120_000,
         reuseExistingServer: true,

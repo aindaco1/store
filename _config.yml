@@ -41,8 +41,8 @@ exclude:
   - Containerfile.playwright.dev
 platform:
   name: Shop
-  version: 1.0.4
-  release_label: v1.0.4
+  version: 1.0.6
+  release_label: v1.0.6
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>
@@ -165,6 +165,7 @@ add_ons:
 cache:
   live_inventory_cache_ttl_seconds: 300
   live_inventory_ttl_seconds: 300
+  workers_admin_orders_enabled: true
 performance:
   intent_prefetch_enabled: true
   intent_prefetch_delay_ms: 90

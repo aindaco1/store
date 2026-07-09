@@ -29,6 +29,8 @@ PODMAN_STACK_START_ATTEMPTS="${PODMAN_STACK_START_ATTEMPTS:-3}"
 PODMAN_STACK_RETRY_DELAY="${PODMAN_STACK_RETRY_DELAY:-3}"
 PODMAN_SITE_READY_TIMEOUT="${PODMAN_SITE_READY_TIMEOUT:-180}"
 PODMAN_WORKER_READY_TIMEOUT="${PODMAN_WORKER_READY_TIMEOUT:-60}"
+PODMAN_RESET_WRANGLER_STATE="${PODMAN_RESET_WRANGLER_STATE:-false}"
+PODMAN_STOP_FILE="${PODMAN_STOP_FILE:-}"
 
 detect_podman_socket() {
   podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
@@ -526,6 +528,15 @@ start_dev_stack_once() {
   wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/notfound" "Worker" || return 1
 }
 
+reset_wrangler_local_state_if_requested() {
+  if [ "$PODMAN_RESET_WRANGLER_STATE" != "true" ]; then
+    return 0
+  fi
+
+  echo "🧹 Resetting local Wrangler state for Podman test run..."
+  rm -rf "$ROOT_DIR/worker/.wrangler/state" "$ROOT_DIR/worker/.wrangler/tmp"
+}
+
 start_dev_stack() {
   local attempt=1
 
@@ -615,7 +626,17 @@ retry_later() {
 supervise_dev_stack() {
   echo "🛡️  Supervising Podman containers; stopped services will be restarted automatically"
   while true; do
+    if [ -n "$PODMAN_STOP_FILE" ] && [ -f "$PODMAN_STOP_FILE" ]; then
+      echo "🛑 Podman stop file detected; stopping dev stack..."
+      return 0
+    fi
+
     sleep "$PODMAN_SUPERVISE_INTERVAL"
+
+    if [ -n "$PODMAN_STOP_FILE" ] && [ -f "$PODMAN_STOP_FILE" ]; then
+      echo "🛑 Podman stop file detected; stopping dev stack..."
+      return 0
+    fi
 
     if ! podman info >/dev/null 2>&1; then
       echo "⚠️  Podman became unreachable; attempting to recover the Podman machine..."
@@ -680,7 +701,9 @@ wait_for_worker_http() {
 }
 
 cleanup() {
-  kill "${STRIPE_LISTEN_PID:-0}" >/dev/null 2>&1 || true
+  if [ -n "${STRIPE_LISTEN_PID:-}" ]; then
+    kill "$STRIPE_LISTEN_PID" >/dev/null 2>&1 || true
+  fi
   cleanup_pod
 }
 
@@ -718,6 +741,7 @@ fi
 podman volume exists "$SITE_VOLUME" >/dev/null 2>&1 || podman volume create "$SITE_VOLUME" >/dev/null
 podman volume exists "$WORKER_NODE_MODULES_VOLUME" >/dev/null 2>&1 || podman volume create "$WORKER_NODE_MODULES_VOLUME" >/dev/null
 
+reset_wrangler_local_state_if_requested
 start_dev_stack
 
 if [ "$SKIP_STRIPE" != "true" ]; then

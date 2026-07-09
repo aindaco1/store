@@ -328,21 +328,20 @@ PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --worke
 ## Deployment Workflow
 
 1. Merge catalog/settings/media changes.
-2. Generate catalog snapshot.
-3. Build Jekyll and minify generated `_site` assets with `npm run build`.
-4. Deploy Worker to Cloudflare on pushes to `main`.
-5. Deploy static site to GitHub Pages.
-6. Optionally purge Cloudflare cache when enabled.
-7. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
+2. Run release smoke and backup planning before tagging.
+3. Dispatch the **Deploy Production** workflow manually when the operator is ready to deploy.
+4. The workflow generates the catalog snapshot, builds Jekyll, minifies generated `_site` assets, deploys the Worker to Cloudflare, purges known Workers Cache entries when `WORKERS_CACHE_PURGE_SECRET` is configured, deploys the static site to GitHub Pages, and optionally purges the Cloudflare zone cache when enabled.
+5. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
 
 Before production deploys that touch Worker bindings or runtime config:
 
 - confirm `worker/wrangler.toml` production bindings point at production `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` resources
 - set production Worker secrets with `wrangler secret put`
+- set `WORKERS_CACHE_PURGE_SECRET` to the same generated value in Cloudflare Worker secrets and GitHub repository secrets when deploy-time Workers Cache purge is enabled
 - keep Cloudflare deploy tokens in GitHub or local operator environments only, not Worker runtime config
 - confirm DNS records for `shop.dustwave.xyz` and `checkout.dustwave.xyz`
 - confirm the cron trigger remains enabled for background maintenance
-- deploy the Worker with `npm run deploy:worker` when a manual deploy is needed
+- use `npm run deploy:worker` only for an explicit Worker-only manual deploy outside the production workflow
 
 Production non-secret config should match the intended public domains and providers unless an operator intentionally changes them:
 

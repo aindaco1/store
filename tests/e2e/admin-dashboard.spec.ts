@@ -94,6 +94,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     settings: [],
     settingsPreview: [],
     settingsPublish: [],
+    workersCachePurges: [],
     logoUploads: [],
     imageUploads: [],
     adminUsersSave: [],
@@ -352,6 +353,21 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     if (url.pathname === '/admin/settings/publish') {
       calls.settingsPublish.push(body);
       return fulfillJson({ success: true, deployNotice: 'Settings published. Deploy started.', writeBudget: { readOnly: false, kvWritesExpected: 1 } });
+    }
+    if (url.pathname === '/admin/workers-cache/purge') {
+      calls.workersCachePurges.push(body);
+      return fulfillJson({
+        success: true,
+        target: body.target || 'admin_orders',
+        purges: [{
+          entrypoint: 'CachedAdminStoreOrders',
+          ok: true,
+          status: 200,
+          tags: ['admin-orders', 'orders', 'order-index', 'admin-orders-v1'],
+          purgedAt: '2026-07-09T00:00:00.000Z'
+        }],
+        writeBudget: { readOnly: false, kvWritesExpected: 1 }
+      });
     }
     if (url.pathname === '/admin/settings/logo-upload') {
       calls.logoUploads.push(body);
@@ -819,7 +835,8 @@ function storeSettingsSections(lang = 'en') {
       settingsRow({ label: 'Intent prefetch enabled', value: 'true', rawValue: 'true', editable: true, path: 'performance.intent_prefetch_enabled', type: 'boolean', input: 'boolean' }),
       settingsRow({ label: 'Intent prefetch delay ms', value: '90', rawValue: '90', editable: true, path: 'performance.intent_prefetch_delay_ms', type: 'number', input: 'integer', min: 0, step: 10 }),
       settingsRow({ label: 'Intent prefetch limit', value: '3', rawValue: '3', editable: true, path: 'performance.intent_prefetch_limit', type: 'number', input: 'integer', min: 0, step: 1 }),
-      settingsRow({ label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer' })
+      settingsRow({ label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer' }),
+      settingsRow({ label: 'Workers Cache admin Orders enabled', value: 'true', rawValue: 'true', editable: true, path: 'cache.workers_admin_orders_enabled', type: 'boolean', input: 'boolean' })
     ]
   }, {
     title: 'Secrets & credentials',
@@ -833,7 +850,10 @@ function storeSettingsSections(lang = 'en') {
     rows: [
       settingsRow({ label: 'Current site base', value: SITE_BASE }),
       settingsRow({ label: 'Current Worker base', value: WORKER_BASE }),
-      settingsRow({ label: 'CORS allowed origin', value: SITE_BASE })
+      settingsRow({ label: 'CORS allowed origin', value: SITE_BASE }),
+      settingsRow({ label: 'Workers Cache gateway', value: 'disabled' }),
+      settingsRow({ label: 'Workers Cache admin Orders', value: 'enabled' }),
+      settingsRow({ label: 'Workers Cache controls', value: '', rawValue: '', input: 'workers-cache-controls', hideLabel: true })
     ]
   }];
   return localizeStoreSettingsSections(sections, lang);
@@ -1791,6 +1811,10 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-panel-settings .admin-settings__header')).toHaveJSProperty('offsetHeight', Math.round(settingsHeaderHeight));
     await expect(page.locator('#admin-settings-results')).toContainText('Current site base');
 	    await expect(page.locator('#admin-settings-results')).toContainText(SITE_BASE);
+    await page.getByRole('button', { name: 'Clear Workers cache' }).click();
+    await expect.poll(() => calls.workersCachePurges.length).toBe(1);
+    expect(calls.workersCachePurges[0]).toMatchObject({ target: 'all_known', source: 'dashboard' });
+    await expect(page.locator('[data-workers-cache-status]')).toContainText('Workers Cache cleared.');
 
 	    await selectSettingsSection(page, 'Store readiness');
 	    await expect(page.locator('[data-settings-section-panel="Store readiness"] .admin-settings__section-title')).toHaveCount(0);
@@ -1958,6 +1982,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_enabled"]')).toHaveValue('true');
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_delay_ms"]')).toHaveValue('90');
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_limit"]')).toHaveValue('3');
+    await expect(page.locator('[data-settings-path="cache.workers_admin_orders_enabled"]')).toHaveValue('true');
 
     await selectSettingsSection(page, 'Users');
     const adminUsersEditor = page.locator('[data-settings-path="admin.users"]');
@@ -2460,7 +2485,8 @@ test.describe('Admin Dashboard', () => {
       bodyScriptRan: false,
       javascriptHref: ''
     });
-    expect(sandboxScriptErrors).toEqual([]);
+    // Chromium can report blocked sandbox script attempts to the parent console; the assertions above verify they did not execute.
+    expect(sandboxScriptErrors.every((message) => message.includes('Blocked script execution') && message.includes('frame is sandboxed'))).toBe(true);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront--product.admin-store-product-preview')).toBeVisible();
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront__eyebrow')).toHaveCount(0);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__eyebrow')).toHaveCount(0);
@@ -2533,8 +2559,8 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.storeProductMedia.length).toBe(1);
     await productEditor.locator('.admin-store-products__media-item').first().click();
     await expect(descriptionEditor.locator('.content-block--image img')).toHaveAttribute('src', /fronteras-poster\.png$/);
-    await expect(productEditor.locator('[data-store-product-field="description"]')).toHaveValue(/!\[Fronteras Poster \(Big\)\]\(\/assets\/images\/fronteras-poster\.png\)/);
     await expect(productEditor.locator('[data-store-product-field="longContent"]')).toHaveValue(/"type":"image"/);
+    await expect(productEditor.locator('[data-store-product-field="longContent"]')).toHaveValue(/fronteras-poster\.png/);
     await productEditor.locator('[data-store-product-image-upload="true"]').setInputFiles({
       name: 'poster-e2e.png',
       mimeType: 'image/png',

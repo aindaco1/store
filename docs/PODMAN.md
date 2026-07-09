@@ -94,6 +94,8 @@ The Worker smoke validates:
 - tampered Store carts fail closed
 - malformed checkout intent payloads fail closed
 
+Podman-backed test wrappers reset `worker/.wrangler/state` and `worker/.wrangler/tmp` before starting their isolated stack. That keeps release, security, Worker smoke, and headless E2E runs from reusing corrupt or stale Miniflare SQLite state. Manual `./scripts/dev.sh --podman` keeps local Wrangler state unless you opt in with `PODMAN_RESET_WRANGLER_STATE=true`.
+
 ## Rebuild Images
 
 Normal code changes do not need an image rebuild because the repo is bind-mounted.
@@ -125,10 +127,12 @@ Podman-backed helpers:
 
 ```bash
 ./scripts/test-worker.sh --podman
-npm run test:security:podman
-npm run test:e2e:headless:podman
+npm run test:security
+npm run test:e2e:headless
 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
 ```
+
+`npm run test:security`, `npm run test:e2e`, and `npm run test:e2e:headless` are Podman-backed by default. Host-only aliases are available as `npm run test:security:host`, `npm run test:e2e:host`, and `npm run test:e2e:headless:host`.
 
 For focused admin browser coverage:
 
@@ -187,6 +191,12 @@ Then retry:
 ```bash
 npm run podman:doctor
 ./scripts/dev.sh --podman
+```
+
+If Worker requests return `503` with `Rate limiting unavailable` and the Worker log mentions a malformed SQLite database, stop the stack and rerun the failing test wrapper. The wrapper resets local Wrangler state automatically; for manual dev, run:
+
+```bash
+PODMAN_RESET_WRANGLER_STATE=true SKIP_STRIPE=true ./scripts/dev.sh --podman
 ```
 
 ## Cross-Platform First Run

@@ -1,6 +1,6 @@
 {
   "name": "store-worker",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Cloudflare Worker for Store checkout, orders, inventory, shipping, tax, emails, and admin APIs",
   "main": "src/index.js",
   "type": "module",
@@ -11,7 +11,7 @@
     "tail": "wrangler tail"
   },
   "devDependencies": {
-    "wrangler": "^4.87.0"
+    "wrangler": "^4.107.1"
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",

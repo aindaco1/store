@@ -15,8 +15,20 @@ describe('workflow security posture', () => {
     expect(deploy).not.toContain('jakejarvis/cloudflare-purge-action@master');
     expect(deploy).toContain('https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE}/purge_cache');
     expect(deploy).toContain('CLOUDFLARE_CACHE_PURGE_TOKEN');
+    expect(deploy).toContain('/admin/workers-cache/purge');
+    expect(deploy).toContain('WORKERS_CACHE_PURGE_SECRET');
     expect(deploy).not.toContain('CLOUDFLARE_EMAIL:');
     expect(deploy).not.toContain('CLOUDFLARE_KEY:');
+  });
+
+  it('keeps production deploy manual-only so release merges do not deploy', () => {
+    const deploy = readWorkflow('deploy.yml');
+
+    expect(deploy).toContain('workflow_dispatch:');
+    expect(deploy).not.toMatch(/\n\s+push:\s*\n/);
+    expect(deploy).not.toContain("github.event_name == 'push'");
+    expect(deploy).toContain('npx wrangler deploy -c wrangler.toml --env=""');
+    expect(deploy).toContain('actions/deploy-pages@v5');
   });
 
   it('sends media optimization changes through a pull request', () => {

@@ -33,7 +33,26 @@ Durable Object inventory state should be treated as derived live state. Restore 
 
 ## Backup Directory
 
-Run from the repository root:
+Use the snapshot helper for the normal plan and local artifact structure:
+
+```bash
+npm run backup:plan
+npm run backup:snapshot -- --output "$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
+```
+
+The helper writes a manifest, Git status/head/diff details, an optional Git bundle, selected config/build files, Wrangler cache/KV/R2 inventory, secret presence inventory without values, KV backup classification, R2 download key inventory, and a generated restore plan. It does not call remote provider APIs unless `--remote` is passed.
+
+Remote reads are opt-in:
+
+```bash
+npm run backup:snapshot -- --remote
+npm run backup:snapshot -- --remote --kv-values
+npm run backup:snapshot -- --remote --r2-objects
+```
+
+`--kv-values` can export customer/order/admin data and `--r2-objects` can download private fulfillment files. Store those snapshots only outside the repository in encrypted operator storage. The helper never exports production secret values.
+
+Manual fallback from the repository root:
 
 ```bash
 export STORE_BACKUP_DIR="$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
