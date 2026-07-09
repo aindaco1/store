@@ -203,7 +203,8 @@ describe('setup-deploy script', () => {
       'ADMIN_SESSION_SECRET',
       'CHECKOUT_INTENT_SECRET',
       'MAGIC_LINK_SECRET',
-      'STORE_DOWNLOAD_SECRET'
+      'STORE_DOWNLOAD_SECRET',
+      'WORKERS_CACHE_PURGE_SECRET'
     ]) {
       expect(devVars).toMatch(new RegExp(`${key}=[a-f0-9]{64}`));
     }
@@ -230,6 +231,7 @@ describe('setup-deploy script', () => {
     const log = commandLog(temp);
     expect(log).toContain('npx wrangler secret put ADMIN_SECRET');
     expect(log).toContain('npx wrangler secret put STORE_DOWNLOAD_SECRET');
+    expect(log).toContain('npx wrangler secret put WORKERS_CACHE_PURGE_SECRET');
     expect(log).not.toContain('npx wrangler secret put STRIPE_SECRET_KEY');
     expect(log).not.toContain('gh secret set');
   });

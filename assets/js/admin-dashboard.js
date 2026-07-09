@@ -1524,10 +1524,14 @@
     label.textContent = row.label || row.path || 'Setting';
     header.appendChild(label);
     var body = createElement('div', 'admin-settings__row-body');
-    if (row.input === 'plan-usage' || row.input === 'store-readiness') {
+    if (row.input === 'plan-usage' || row.input === 'store-readiness' || row.input === 'workers-cache-controls') {
       wrapper.classList.add('admin-settings__row--custom');
       if (row.hideLabel) wrapper.classList.add('admin-settings__row--hide-label');
-      body.appendChild(row.input === 'plan-usage' ? createPlanUsageTracker() : createStoreReadinessTracker());
+      body.appendChild(row.input === 'plan-usage'
+        ? createPlanUsageTracker()
+        : row.input === 'store-readiness'
+          ? createStoreReadinessTracker()
+          : createWorkersCacheControls());
       if (!row.hideLabel) wrapper.appendChild(header);
       wrapper.appendChild(body);
       return wrapper;
@@ -2348,6 +2352,44 @@
     root.appendChild(status);
     root.appendChild(summary);
     root.appendChild(results);
+    return root;
+  }
+
+  function createWorkersCacheControls() {
+    var root = createElement('div', 'admin-workers-cache-controls');
+    root.dataset.workersCacheControls = 'true';
+    var actions = createElement('div', 'admin-store-readiness__actions');
+    var status = createElement('p', 'admin-dashboard__status admin-workers-cache-controls__status');
+    status.dataset.workersCacheStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+
+    var purge = createElement('button', 'btn btn--secondary', 'Clear Workers cache');
+    purge.type = 'button';
+    purge.dataset.workersCachePurge = 'true';
+    purge.hidden = !(currentUser && currentUser.role === 'super_admin');
+    purge.addEventListener('click', function() {
+      purge.disabled = true;
+      setStatus(status, 'Clearing Workers Cache...');
+      requestJson('/admin/workers-cache/purge', {
+        method: 'POST',
+        body: {
+          target: 'all_known',
+          source: 'dashboard'
+        }
+      }).then(function(data) {
+        clearStoreOrderCache();
+        setStatus(status, data && data.success ? 'Workers Cache cleared.' : 'Workers Cache purge failed.', !(data && data.success));
+      }).catch(function(error) {
+        setStatus(status, formatError(error), true);
+      }).finally(function() {
+        purge.disabled = false;
+      });
+    });
+
+    actions.appendChild(purge);
+    root.appendChild(actions);
+    root.appendChild(status);
     return root;
   }
 

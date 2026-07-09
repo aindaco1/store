@@ -54,10 +54,10 @@ Current Settings sections:
 - Users: admin users, roles, and access scopes. Newly added users can receive notification email.
 - Store readiness: launch/runtime checks, audit CSV export, and reconciliation CSV export.
 - Plan usage: Cloudflare and Resend quota/usage posture.
-- Advanced performance: intent prefetch and live inventory cache controls.
+- Advanced performance: intent prefetch, live inventory cache controls, and the admin Orders Workers Cache kill switch.
 - Debug: console logging flags.
 - Secrets & credentials: read-only status checks for required and optional runtime secrets.
-- Runtime diagnostics: current site base, Worker base, CORS allowed origin, Workers Cache gateway state, and cached admin Orders entrypoint state.
+- Runtime diagnostics: current site base, Worker base, CORS allowed origin, Workers Cache gateway state, cached admin Orders entrypoint state, and a super-admin Workers Cache clear action.
 
 Settings media fields use upload controls and image previews rather than manual path-only editing where supported.
 

@@ -349,6 +349,7 @@ const ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION = 1;
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS = ['admin-orders', 'orders', 'order-index', 'admin-orders-v1'];
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL = 'public, max-age=20, stale-while-revalidate=40, stale-if-error=0';
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH = '/__store-cache/admin-orders/purge';
+const ADMIN_WORKERS_CACHE_PURGE_PATH = '/admin/workers-cache/purge';
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_ALLOWED_PARAMS = ['status', 'fulfillment', 'limit', 'cursor', 'lang', 'locale'];
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN = 'https://store-cache.internal';
 
@@ -514,25 +515,74 @@ function noStoreAdminStoreOrdersCacheResponse(data = {}, status = 200, env = nul
   });
 }
 
-function purgeAdminStoreOrdersWorkersCache(ctx = null) {
-  const props = {
+function buildAdminStoreOrdersWorkersCachePurgeProps() {
+  return {
     source: ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE,
     version: ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION,
     role: 'super_admin',
     scopeKey: 'purge',
     accessScope: STORE_ADMIN_SCOPE
   };
-  const request = new Request(`${ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN}${ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH}`, {
+}
+
+function buildAdminStoreOrdersWorkersCachePurgeRequest() {
+  return new Request(`${ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN}${ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH}`, {
     method: 'POST',
     headers: {
       Accept: 'application/json'
     }
   });
-  const responsePromise = fetchAdminStoreOrdersWorkersCache(ctx, request, props);
-  if (!responsePromise) return;
+}
+
+function adminStoreOrdersWorkersCachePurgeResult(overrides = {}) {
+  return {
+    entrypoint: ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT,
+    tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS,
+    cacheControl: ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL,
+    ok: false,
+    status: 0,
+    purgedAt: new Date().toISOString(),
+    ...overrides
+  };
+}
+
+async function purgeAdminStoreOrdersWorkersCacheNow(ctx = null) {
+  const responsePromise = fetchAdminStoreOrdersWorkersCache(
+    ctx,
+    buildAdminStoreOrdersWorkersCachePurgeRequest(),
+    buildAdminStoreOrdersWorkersCachePurgeProps()
+  );
+  if (!responsePromise) {
+    return adminStoreOrdersWorkersCachePurgeResult({
+      error: 'Workers Cache entrypoint unavailable'
+    });
+  }
+  try {
+    const response = await responsePromise;
+    let body = {};
+    try {
+      body = await response.clone().json();
+    } catch {
+      body = {};
+    }
+    const ok = response.ok && body?.ok !== false;
+    return adminStoreOrdersWorkersCachePurgeResult({
+      ok,
+      status: response.status,
+      purgedAt: body?.purgedAt || new Date().toISOString(),
+      error: ok ? undefined : body?.error || `Workers Cache purge failed with status ${response.status}`
+    });
+  } catch (error) {
+    return adminStoreOrdersWorkersCachePurgeResult({
+      error: error?.message || 'Workers Cache purge failed'
+    });
+  }
+}
+
+function purgeAdminStoreOrdersWorkersCache(ctx = null) {
   queueBackgroundTask(
     ctx,
-    responsePromise,
+    purgeAdminStoreOrdersWorkersCacheNow(ctx),
     'admin Store orders Workers Cache purge'
   );
 }
@@ -1364,6 +1414,104 @@ function requireAdmin(request, env, scope = 'default') {
   }
   
   return { ok: false, response: jsonResponse({ error: 'Unauthorized' }, 401) };
+}
+
+function bearerTokenFromRequest(request) {
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearerPrefix = 'Bearer ';
+  return authHeader.startsWith(bearerPrefix)
+    ? authHeader.slice(bearerPrefix.length)
+    : '';
+}
+
+async function requireWorkersCachePurgeAccess(request, env) {
+  const secret = configuredSecret(env?.WORKERS_CACHE_PURGE_SECRET);
+  const bearerToken = bearerTokenFromRequest(request);
+  if (secret && bearerToken && timingSafeEqual(bearerToken, secret)) {
+    return {
+      ok: true,
+      source: 'deploy_secret',
+      user: {
+        email: 'deploy@github-actions',
+        name: 'GitHub Actions deploy',
+        role: 'super_admin',
+        accessScopes: []
+      }
+    };
+  }
+
+  const auth = await requireAdminSession(request, env, 'settings:publish', { requireCsrf: true });
+  if (!auth.ok) return auth;
+  if (auth.user.role !== 'super_admin') {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Forbidden' }, 403, env)
+    };
+  }
+  return {
+    ok: true,
+    source: 'admin_session',
+    user: auth.user
+  };
+}
+
+function normalizeWorkersCachePurgeTarget(value) {
+  const target = String(value || 'admin_orders').trim().toLowerCase().replace(/-/g, '_');
+  if (target === 'admin_orders' || target === 'orders') return { ok: true, value: 'admin_orders' };
+  if (target === 'all' || target === 'all_known' || target === 'known') return { ok: true, value: 'all_known' };
+  return { ok: false, error: 'Unsupported Workers Cache purge target.' };
+}
+
+function workersCachePurgeSource(value, fallback = 'dashboard') {
+  const text = String(value || fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return text || fallback;
+}
+
+async function handleAdminWorkersCachePurge(request, env, ctx, body = {}) {
+  const auth = await requireWorkersCachePurgeAccess(request, env);
+  if (!auth.ok) return auth.response;
+
+  const target = normalizeWorkersCachePurgeTarget(body.target);
+  if (!target.ok) {
+    return privateJsonResponse({
+      success: false,
+      error: target.error,
+      writeBudget: adminReadBudget()
+    }, 400, env);
+  }
+
+  const purges = [];
+  if (target.value === 'admin_orders' || target.value === 'all_known') {
+    purges.push(await purgeAdminStoreOrdersWorkersCacheNow(ctx));
+  }
+  const success = purges.length > 0 && purges.every((purge) => purge.ok);
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'workers_cache:purge',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    authSource: auth.source,
+    target: target.value,
+    purgeSource: workersCachePurgeSource(body.source, auth.source === 'deploy_secret' ? 'deploy' : 'dashboard'),
+    purges: purges.map((purge) => ({
+      entrypoint: purge.entrypoint,
+      ok: purge.ok,
+      status: purge.status,
+      tags: purge.tags,
+      error: purge.error || ''
+    }))
+  });
+
+  return privateJsonResponse({
+    success,
+    target: target.value,
+    purges,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 1 : 0 })
+  }, success ? 200 : 502, env);
 }
 
 
@@ -2207,6 +2355,16 @@ export default {
 
       if (path === '/admin/settings' && method === 'GET') {
         return handleAdminSettings(request, env);
+      }
+
+      if (path === ADMIN_WORKERS_CACHE_PURGE_PATH && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        return handleAdminWorkersCachePurge(request, env, ctx, parsedBody.body || {});
       }
 
       if (path === '/admin/settings/preview' && method === 'POST') {
@@ -12898,6 +13056,7 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['performance.intent_prefetch_delay_ms', { label: 'Intent prefetch delay ms', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
   ['performance.intent_prefetch_limit', { label: 'Intent prefetch limit', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
   ['cache.live_inventory_ttl_seconds', { label: 'Live inventory cache TTL seconds', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
+  ['cache.workers_admin_orders_enabled', { label: 'Workers Cache admin Orders enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls the route-level Workers Cache gateway for non-search admin Orders list reads.' }],
   ['debug.console_logging_enabled', { label: 'Console logging enabled', type: 'boolean', layoutGroup: 'debug' }],
   ['debug.verbose_console_logging', { label: 'Verbose console logging', type: 'boolean', layoutGroup: 'debug' }]
 ]);
@@ -13781,7 +13940,8 @@ async function handleAdminSettings(request, env) {
         ['Intent prefetch enabled', env.INTENT_PREFETCH_ENABLED ?? 'true', editableAdminSetting('performance.intent_prefetch_enabled', 'boolean')],
         ['Intent prefetch delay ms', env.INTENT_PREFETCH_DELAY_MS || '90', editableAdminSetting('performance.intent_prefetch_delay_ms', 'number')],
         ['Intent prefetch limit', env.INTENT_PREFETCH_LIMIT || '3', editableAdminSetting('performance.intent_prefetch_limit', 'number')],
-        ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')]
+        ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')],
+        ['Workers Cache admin Orders enabled', workersCacheEnabledForAdminStoreOrders(env), editableAdminSetting('cache.workers_admin_orders_enabled', 'boolean')]
       ]),
       adminSettingsSection('Debug', [
         ['Console logging enabled', env.DEBUG_CONSOLE_LOGGING_ENABLED, editableAdminSetting('debug.console_logging_enabled', 'boolean')],
@@ -13793,7 +13953,11 @@ async function handleAdminSettings(request, env) {
         ['Current Worker base', env.WORKER_BASE, readOnlyAdminSettingHelp('The Worker API base URL used by the current runtime environment.')],
         ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')],
         ['Workers Cache gateway', 'disabled', readOnlyAdminSettingHelp('The default Worker entrypoint stays uncached so authentication, CSRF, routing, and mutations always run.')],
-        ['Workers Cache admin Orders', workersCacheEnabledForAdminStoreOrders(env) ? 'enabled' : 'disabled', readOnlyAdminSettingHelp(`Admin Orders list reads can use the ${ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT} entrypoint with ${ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL}. Search requests bypass this cache.`)]
+        ['Workers Cache admin Orders', workersCacheEnabledForAdminStoreOrders(env) ? 'enabled' : 'disabled', readOnlyAdminSettingHelp(`Admin Orders list reads can use the ${ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT} entrypoint with ${ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL}. Search requests bypass this cache.`)],
+        ['Workers Cache controls', '', {
+          input: 'workers-cache-controls',
+          hideLabel: true
+        }]
       ])
     );
   }
@@ -15563,6 +15727,8 @@ export {
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
   buildAdminStoreOrdersCacheRequest,
+  buildAdminStoreOrdersWorkersCachePurgeProps,
+  buildAdminStoreOrdersWorkersCachePurgeRequest,
   buildAdminStoreOrdersWorkersCacheProps,
   buildAdminStoreProductPreviewHtml,
   buildStoreTicketSvg,
@@ -15572,7 +15738,9 @@ export {
   adminStoreOrdersWorkersCacheBypassReason,
   cacheableAdminStoreOrdersJsonResponse,
   fetchAdminStoreOrdersWorkersCache,
+  purgeAdminStoreOrdersWorkersCacheNow,
   readAdminStoreOrdersWorkersCacheProps,
+  workersCacheEnabledForAdminStoreOrders,
   storeOrderReconciliationRowsCsv,
   processStoreEventReminders,
   queueStoreEventReminders

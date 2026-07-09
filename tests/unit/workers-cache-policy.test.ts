@@ -4,10 +4,14 @@ import {
   CachedAdminStoreOrders,
   adminStoreOrdersWorkersCacheBypassReason,
   buildAdminStoreOrdersCacheRequest,
+  buildAdminStoreOrdersWorkersCachePurgeProps,
+  buildAdminStoreOrdersWorkersCachePurgeRequest,
   buildAdminStoreOrdersWorkersCacheProps,
   cacheableAdminStoreOrdersJsonResponse,
   fetchAdminStoreOrdersWorkersCache,
-  readAdminStoreOrdersWorkersCacheProps
+  purgeAdminStoreOrdersWorkersCacheNow,
+  readAdminStoreOrdersWorkersCacheProps,
+  workersCacheEnabledForAdminStoreOrders
 } from '../../worker/src/index.js';
 
 describe('Workers Cache policy helpers', () => {
@@ -43,6 +47,13 @@ describe('Workers Cache policy helpers', () => {
 
     expect(adminStoreOrdersWorkersCacheBypassReason(searchRequest)).toBe('search_query');
     expect(adminStoreOrdersWorkersCacheBypassReason(listRequest)).toBe('');
+  });
+
+  it('enables admin Orders Workers Cache by default and honors the runtime kill switch', () => {
+    expect(workersCacheEnabledForAdminStoreOrders({})).toBe(true);
+    expect(workersCacheEnabledForAdminStoreOrders({ WORKERS_CACHE_ADMIN_ORDERS_ENABLED: 'true' })).toBe(true);
+    expect(workersCacheEnabledForAdminStoreOrders({ WORKERS_CACHE_ADMIN_ORDERS_ENABLED: 'false' })).toBe(false);
+    expect(workersCacheEnabledForAdminStoreOrders({ WORKERS_CACHE_ADMIN_ORDERS_ENABLED: ' FALSE ' })).toBe(false);
   });
 
   it('partitions cached admin Orders reads without storing admin identity', () => {
@@ -115,5 +126,38 @@ describe('Workers Cache policy helpers', () => {
     const accepted = await CachedAdminStoreOrders.fetch(request, {}, { props, cache: { purge } });
     expect(accepted.status).toBe(200);
     expect(purge).toHaveBeenCalledWith({ tags: ['admin-orders', 'orders', 'order-index', 'admin-orders-v1'] });
+  });
+
+  it('uses the same trusted purge request and props for endpoint-driven purge calls', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, purgedAt: '2026-07-09T00:00:00.000Z' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    }));
+
+    const result = await purgeAdminStoreOrdersWorkersCacheNow({
+      exports: {
+        CachedAdminStoreOrders: { fetch }
+      }
+    });
+
+    const request = buildAdminStoreOrdersWorkersCachePurgeRequest();
+    expect(request.url).toBe('https://store-cache.internal/__store-cache/admin-orders/purge');
+    expect(request.method).toBe('POST');
+    expect(buildAdminStoreOrdersWorkersCachePurgeProps()).toMatchObject({
+      source: 'store-admin-orders-cache-gateway',
+      version: 1,
+      role: 'super_admin',
+      scopeKey: 'purge',
+      accessScope: 'store'
+    });
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }), {
+      props: buildAdminStoreOrdersWorkersCachePurgeProps()
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      status: 200,
+      entrypoint: 'CachedAdminStoreOrders',
+      tags: ['admin-orders', 'orders', 'order-index', 'admin-orders-v1']
+    });
   });
 });

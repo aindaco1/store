@@ -111,7 +111,7 @@ Body.
   it('records secret presence without exporting values', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-backup-secrets-'));
     const devVars = path.join(root, '.dev.vars');
-    fs.writeFileSync(devVars, 'STRIPE_SECRET_KEY=sk_test_secret\nRESEND_API_KEY=re_secret\n', 'utf8');
+    fs.writeFileSync(devVars, 'STRIPE_SECRET_KEY=sk_test_secret\nRESEND_API_KEY=re_secret\nWORKERS_CACHE_PURGE_SECRET=cache_secret\n', 'utf8');
 
     const inventory = buildSecretInventory({
       devVarsPath: devVars,
@@ -119,11 +119,14 @@ Body.
     });
     const stripe = inventory.find((entry) => entry.name === 'STRIPE_SECRET_KEY');
     const resend = inventory.find((entry) => entry.name === 'RESEND_API_KEY');
+    const workersCache = inventory.find((entry) => entry.name === 'WORKERS_CACHE_PURGE_SECRET');
 
     expect(stripe).toMatchObject({ shellPresent: true, localDevPresent: true, valueExported: false });
     expect(resend).toMatchObject({ shellPresent: false, localDevPresent: true, valueExported: false });
+    expect(workersCache).toMatchObject({ shellPresent: false, localDevPresent: true, valueExported: false });
     expect(JSON.stringify(inventory)).not.toContain('sk_live_shell_secret');
     expect(JSON.stringify(inventory)).not.toContain('re_secret');
+    expect(JSON.stringify(inventory)).not.toContain('cache_secret');
   });
 
   it('dry-runs a snapshot without writing backup artifacts', async () => {

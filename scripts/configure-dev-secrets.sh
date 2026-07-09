@@ -211,6 +211,7 @@ ensure_local_default "ADMIN_BOOTSTRAP_EMAILS"
 ensure_generated_secret "ADMIN_SECRET"
 ensure_generated_secret "MAGIC_LINK_SECRET"
 ensure_generated_secret "ADMIN_SESSION_SECRET"
+ensure_generated_secret "WORKERS_CACHE_PURGE_SECRET"
 ensure_generated_webhook_secret "STRIPE_WEBHOOK_SECRET"
 
 prompt_optional_secret "STRIPE_SECRET_KEY_TEST" "Stripe test secret key"

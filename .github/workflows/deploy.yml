@@ -100,6 +100,30 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Purge Workers Cache
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          if [ -z "$WORKERS_CACHE_PURGE_SECRET" ]; then
+            echo "WORKERS_CACHE_PURGE_SECRET is not configured; skipping Workers Cache purge."
+            exit 0
+          fi
+
+          response="$(mktemp)"
+          status="$(curl -sS -o "$response" -w "%{http_code}" \
+            -X POST "$WORKERS_CACHE_PURGE_URL" \
+            -H "Authorization: Bearer ${WORKERS_CACHE_PURGE_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{"target":"all_known","source":"deploy"}')"
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Workers Cache purge failed with status $status"
+            cat "$response"
+            exit 1
+          fi
+        env:
+          WORKERS_CACHE_PURGE_URL: ${{ vars.WORKERS_CACHE_PURGE_URL || 'https://checkout.dustwave.xyz/admin/workers-cache/purge' }}
+          WORKERS_CACHE_PURGE_SECRET: ${{ secrets.WORKERS_CACHE_PURGE_SECRET }}
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

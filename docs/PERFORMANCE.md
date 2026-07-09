@@ -42,7 +42,7 @@ npm run assets:minify:check
 
 The default Worker entrypoint stays uncached. Authentication, role/scope checks, CSRF checks, rate limits, route dispatch, mutations, checkout, webhooks, tokenized order routes, signed downloads, shipping, and tax all continue to execute through the gateway and return private/no-store responses where appropriate.
 
-`GET /admin/store/orders` can use the named `CachedAdminStoreOrders` entrypoint when `WORKERS_CACHE_ADMIN_ORDERS_ENABLED` is not set to `false`. The gateway authenticates the admin, builds a normalized internal request, strips credentials and CSRF headers, and passes minimal role/scope props with `ctx.exports`. The inner response is cacheable for `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`; the browser-facing response remains `private, no-store`.
+`GET /admin/store/orders` can use the named `CachedAdminStoreOrders` entrypoint when `cache.workers_admin_orders_enabled` / `WORKERS_CACHE_ADMIN_ORDERS_ENABLED` is not set to `false`. The gateway authenticates the admin, builds a normalized internal request, strips credentials and CSRF headers, and passes minimal role/scope props with `ctx.exports`. The inner response is cacheable for `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`; the browser-facing response remains `private, no-store`.
 
 Cacheable admin Orders requests include only safe filter/page parameters: `status`, `fulfillment`, `limit`, `cursor`, `lang`, and `locale`. Free-text `q` searches bypass Workers Cache because search terms can contain customer names, email addresses, or order tokens.
 
@@ -51,6 +51,7 @@ Performance expectations:
 - repeated no-change Orders reads should avoid repeated Worker CPU/KV index work while the cache entry is fresh
 - cache hits still count as Cloudflare Workers requests, but should reduce billed CPU and backend reads
 - order mutations call the existing order-index invalidation path, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available
+- super-admins can clear known Workers Cache entries from Settings -> Runtime diagnostics, and production deploys can call the Worker purge endpoint with `WORKERS_CACHE_PURGE_SECRET`
 - short TTLs bound staleness if a purge cannot run, such as from an older helper path without `ctx`
 - dashboard responses include `page.cache.workers` metadata and `X-Store-Workers-Cache` / `X-Store-Workers-Cache-Entry` headers for operator diagnostics
 

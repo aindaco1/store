@@ -68,7 +68,7 @@ npm run test:security:podman
 
 The security suite checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior.
 
-Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`. It checks admin Orders request normalization, credential stripping, search bypasses, non-PII role/scope props, cacheable inner response headers, and internal-props enforcement for cache purges.
+Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`. It checks admin Orders request normalization, credential stripping, search bypasses, kill-switch behavior, non-PII role/scope props, cacheable inner response headers, shared purge helpers, and internal-props enforcement for cache purges.
 
 Backup automation coverage lives in `tests/unit/store-backup-script.test.ts`. It checks KV prefix classification, Wrangler inventory parsing, command generation, KV restore-shape transforms, download key discovery, secret inventory redaction, and dry-run behavior.
 

@@ -44,6 +44,7 @@ Secret storage rules:
 - Local development secrets belong in ignored `worker/.dev.vars`.
 - Production Worker secrets belong in Cloudflare Worker secrets via `wrangler secret put`.
 - GitHub repository secrets are for CI/deploy/operator workflows only; they are not runtime Worker secrets.
+- `WORKERS_CACHE_PURGE_SECRET` is the exception that must be present in both places with the same value: Worker runtime verifies deploy purge requests, and GitHub Actions sends the bearer token after `wrangler deploy`.
 - `_config.yml`, product markdown, and admin-published settings must never contain Stripe, Resend, USPS, ZIP.TAX, Cloudflare, GitHub, or admin session secrets.
 - The admin dashboard may show configured/missing status for credentials, but must not expose, edit, serialize, or publish secret values.
 
@@ -81,6 +82,7 @@ Workers Cache rule:
 - Free-text admin Orders searches bypass Workers Cache because `q` may contain customer PII or order tokens.
 - Cache tags must stay low-cardinality and non-PII. Use route/domain tags such as `admin-orders`, `orders`, `order-index`, and version tags only.
 - Purge requests to cached inner entrypoints must require trusted internal props and should be triggered from the same mutation boundaries that invalidate KV/order projections.
+- External purge requests are limited to `POST /admin/workers-cache/purge` and require either a super-admin session with CSRF or the dedicated `WORKERS_CACHE_PURGE_SECRET`; callers cannot submit arbitrary cache tags.
 
 Browser storage:
 

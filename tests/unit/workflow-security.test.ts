@@ -15,6 +15,8 @@ describe('workflow security posture', () => {
     expect(deploy).not.toContain('jakejarvis/cloudflare-purge-action@master');
     expect(deploy).toContain('https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE}/purge_cache');
     expect(deploy).toContain('CLOUDFLARE_CACHE_PURGE_TOKEN');
+    expect(deploy).toContain('/admin/workers-cache/purge');
+    expect(deploy).toContain('WORKERS_CACHE_PURGE_SECRET');
     expect(deploy).not.toContain('CLOUDFLARE_EMAIL:');
     expect(deploy).not.toContain('CLOUDFLARE_KEY:');
   });

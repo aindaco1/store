@@ -85,9 +85,9 @@ Admin Orders cache flow:
 4. The inner response can be cached with `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`.
 5. The gateway returns a browser-facing `private, no-store` response with the authenticated user restored.
 
-Free-text `q` searches bypass Workers Cache. Set `WORKERS_CACHE_ADMIN_ORDERS_ENABLED=false` to disable this route-level cache without changing Wrangler entrypoint config.
+Free-text `q` searches bypass Workers Cache. Set `cache.workers_admin_orders_enabled: false` in `_config.yml`, publish the Advanced performance setting, or set `WORKERS_CACHE_ADMIN_ORDERS_ENABLED=false` to disable this route-level cache without changing Wrangler entrypoint config.
 
-Order mutations call the shared order-index invalidation helper, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available. The short TTL bounds staleness if a purge path cannot run.
+Order mutations call the shared order-index invalidation helper, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available. Super-admins can also clear known Workers Cache entries from Settings -> Runtime diagnostics, and production deploys can call `POST /admin/workers-cache/purge` with `WORKERS_CACHE_PURGE_SECRET`. The short TTL bounds staleness if a purge path cannot run.
 
 ## Secrets
 
@@ -106,6 +106,7 @@ Operationally important optional secrets:
 
 - `FILM_STRIPE_SUMMARY_ADAPTER_SECRET`: shared bearer secret for Film summary-only aggregate reads through `/film/stripe-summary`.
 - `STORE_DOWNLOAD_SECRET`: dedicated signed download/fulfillment secret.
+- `WORKERS_CACHE_PURGE_SECRET`: dedicated bearer secret for deploy-time Workers Cache purges. Store the same value as a Cloudflare Worker secret and a GitHub repository secret.
 - `STORE_ORDER_LOOKUP_SECRET`: dedicated customer lookup-token secret.
 - `ABANDONED_CART_TOKEN_SECRET`: dedicated reminder resume/unsubscribe secret.
 - `ADMIN_TURNSTILE_SECRET_KEY`: admin-specific Turnstile secret.

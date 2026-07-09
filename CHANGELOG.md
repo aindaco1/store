@@ -3,7 +3,8 @@
 ## v1.0.6 - Unreleased
 
 - Added a Cloudflare Workers Cache integration for authenticated admin Orders list reads using a cached named Worker entrypoint while keeping the default gateway and browser-facing admin responses private/no-store.
-- Added Workers Cache policy tests for admin Orders request normalization, search bypasses, role/scope partitioning, cache headers, and internal purge authorization.
+- Added a super-admin Workers Cache clear action, a deploy-time Workers Cache purge hook with `WORKERS_CACHE_PURGE_SECRET`, and a `_config.yml`/Settings kill switch for admin Orders caching.
+- Added Workers Cache policy tests for admin Orders request normalization, search bypasses, kill-switch behavior, role/scope partitioning, cache headers, shared purge helpers, and internal purge authorization.
 - Added repeatable backup/restore snapshot automation with dry-run planning, Git/config/provider inventory, KV/R2 backup plans, secret presence inventory without values, and restore-plan generation.
 - Updated Worker, performance, security, dashboard, testing, and backup/restore docs for the cached admin Orders path and backup automation.
 
