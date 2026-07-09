@@ -111,6 +111,42 @@ describe('Workers Cache policy helpers', () => {
     expect(fetch).toHaveBeenCalledWith(request, { props });
   });
 
+  it('supports function-style Workers Cache entrypoint bindings', async () => {
+    const props = buildAdminStoreOrdersWorkersCacheProps({ user: { role: 'limited_admin', accessScopes: ['store'] } });
+    const request = new Request('https://store-cache.internal/admin/store/orders?status=confirmed');
+    const fetch = vi.fn().mockResolvedValue(new Response('{}'));
+    const factory = vi.fn().mockReturnValue({ fetch });
+
+    await fetchAdminStoreOrdersWorkersCache({
+      exports: {
+        CachedAdminStoreOrders: factory
+      }
+    }, request, props);
+
+    expect(factory).toHaveBeenCalledWith({ props });
+    expect(fetch).toHaveBeenCalledWith(request);
+  });
+
+  it('rejects malformed Workers Cache props before reading private order data', () => {
+    const validProps = buildAdminStoreOrdersWorkersCacheProps({
+      user: {
+        role: 'limited_admin',
+        accessScopes: ['store']
+      }
+    });
+
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: validProps })).toMatchObject({
+      role: 'limited_admin',
+      scopeKey: 'store'
+    });
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: { ...validProps, source: 'browser' } })).toBeNull();
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: { ...validProps, version: 2 } })).toBeNull();
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: { ...validProps, role: 'owner' } })).toBeNull();
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: { ...validProps, scopeKey: '' } })).toBeNull();
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: { ...validProps, scopeKey: 'store admin' } })).toBeNull();
+    expect(readAdminStoreOrdersWorkersCacheProps({ props: { ...validProps, scopeKey: 'admin@example.com' } })).toBeNull();
+  });
+
   it('requires trusted internal props before purging admin Orders cache tags', async () => {
     const request = new Request('https://store-cache.internal/__store-cache/admin-orders/purge', {
       method: 'POST'

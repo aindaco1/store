@@ -56,6 +56,8 @@ Legacy aliases `/cart/validate` and `/checkout/intent` still route to the Store 
 
 - `POST /film/stripe-summary`: Film-facing summary-only Stripe aggregate adapter. Requires `Authorization: Bearer <FILM_STRIPE_SUMMARY_ADAPTER_SECRET>`, `dataBoundary: "summary_only"`, `source: "store"`, and mapped refs in `mappedRefs`. Accepted refs are Store order tokens, marketing ref codes, product IDs, variant IDs, SKUs, or item IDs. The response is limited to aggregate money/count fields, mapped-ref/order counts, status, generated timestamp, and currency; it does not return customer emails, payment intent IDs, charge IDs, balance transaction IDs, or card/payment-method data.
 
+The Film summary adapter uses the admin order scan cache and `admin-store-orders:index:v1` when fresh. A cold request may still build that index with a bounded `orders:` scan, but warm reads avoid repeated KV namespace listings while preserving the summary-only response boundary.
+
 ## Admin API
 
 Browser admin mutations use the `store_admin_session` cookie plus `x-store-admin-csrf`.

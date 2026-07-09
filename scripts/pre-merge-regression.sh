@@ -155,6 +155,8 @@ build_with_podman_jekyll() {
   local jekyll_config_files
   jekyll_config_files="$(./scripts/jekyll-config-files.sh)"
 
+  rm -rf _site .jekyll-cache
+
   if ! podman image exists localhost/store-dev-site:latest; then
     podman build -t localhost/store-dev-site:latest -f Containerfile.dev .
   fi
@@ -165,16 +167,17 @@ build_with_podman_jekyll() {
     -v "$PWD:/workspace" \
     -v store-dev-bundle:/usr/local/bundle \
     localhost/store-dev-site:latest \
-    /workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet
+    /workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1
 
-  minify_site_assets
+  minify_site_assets || return 1
 }
 
 build_with_host_jekyll() {
   local jekyll_config_files
   jekyll_config_files="$(./scripts/jekyll-config-files.sh)"
-  SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet
-  minify_site_assets
+  rm -rf _site .jekyll-cache
+  SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1
+  minify_site_assets || return 1
 }
 
 minify_site_assets() {

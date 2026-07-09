@@ -6793,7 +6793,10 @@ function normalizeAdminStoreOrderIndex(index = {}) {
 }
 
 async function readAdminStoreOrderIndex(env) {
-  const memoryIndex = normalizeAdminStoreOrderIndex(adminStoreOrderIndexCache);
+  const storeStateBinding = env?.STORE_STATE || null;
+  const memoryIndex = adminStoreOrderIndexCache?.storeState === storeStateBinding
+    ? normalizeAdminStoreOrderIndex(adminStoreOrderIndexCache.index)
+    : null;
   if (memoryIndex) {
     return {
       ok: true,
@@ -6806,7 +6809,10 @@ async function readAdminStoreOrderIndex(env) {
   const storedIndex = await env.STORE_STATE.get(ADMIN_STORE_ORDER_INDEX_KEY, { type: 'json' });
   const normalized = normalizeAdminStoreOrderIndex(storedIndex);
   if (!normalized) return { ok: false, skipped: 'missing_or_stale_index' };
-  adminStoreOrderIndexCache = storedIndex;
+  adminStoreOrderIndexCache = {
+    storeState: storeStateBinding,
+    index: storedIndex
+  };
   return {
     ok: true,
     ...normalized,
@@ -6826,7 +6832,10 @@ async function writeAdminStoreOrderIndex(env, data = {}) {
     truncated: data.truncated === true,
     orders: data.orders
   };
-  adminStoreOrderIndexCache = index;
+  adminStoreOrderIndexCache = {
+    storeState: env?.STORE_STATE || null,
+    index
+  };
   await env.STORE_STATE.put(ADMIN_STORE_ORDER_INDEX_KEY, JSON.stringify(index), {
     expirationTtl: ADMIN_STORE_ORDER_INDEX_TTL_SECONDS
   });
@@ -6834,8 +6843,10 @@ async function writeAdminStoreOrderIndex(env, data = {}) {
 
 async function readAdminStoreOrderScan(env, options = {}) {
   const nowMs = Date.now();
+  const storeStateBinding = env?.STORE_STATE || null;
   if (
     options.force !== true &&
+    adminStoreOrderScanCache?.storeState === storeStateBinding &&
     adminStoreOrderScanCache?.expiresAtMs > nowMs &&
     adminStoreOrderScanCache?.data
   ) {
@@ -6896,6 +6907,7 @@ async function readAdminStoreOrderScan(env, options = {}) {
     generatedAt: new Date().toISOString()
   };
   adminStoreOrderScanCache = {
+    storeState: storeStateBinding,
     createdAtMs: nowMs,
     expiresAtMs: Date.now() + ADMIN_STORE_ORDER_SCAN_CACHE_TTL_MS,
     data
@@ -10272,7 +10284,7 @@ async function buildFilmStripeStoreSummary(env, mappedRefs = [], ctx = null) {
   const summary = emptyFilmStripeStoreSummary(mappedRefs.length, generatedAt);
   if (!mappedRefs.length) return summary;
 
-  const scanned = await readAdminStoreOrderScan(env, { ctx, force: true });
+  const scanned = await readAdminStoreOrderScan(env, { ctx });
   if (!scanned.ok) {
     return {
       ...summary,

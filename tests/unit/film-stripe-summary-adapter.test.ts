@@ -102,6 +102,43 @@ function buildOrder(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildIndexedOrder(overrides: Record<string, unknown> = {}) {
+  const rawOrder = buildOrder();
+  const orderDraft = rawOrder.orderDraft;
+  return {
+    orderToken: rawOrder.orderToken,
+    status: rawOrder.status,
+    fulfillmentReady: true,
+    createdAt: rawOrder.createdAt,
+    confirmedAt: rawOrder.confirmedAt,
+    updatedAt: rawOrder.updatedAt,
+    totals: {
+      totalCents: orderDraft.totals.totalCents,
+      itemCount: orderDraft.totals.itemCount,
+      currency: 'USD'
+    },
+    payment: {
+      required: rawOrder.payment.required,
+      provider: rawOrder.payment.provider,
+      status: rawOrder.payment.status,
+      amountCents: rawOrder.payment.amountCents,
+      currency: rawOrder.payment.currency,
+      stripeFinancials: rawOrder.payment.stripeFinancials
+    },
+    attribution: orderDraft.attribution,
+    items: orderDraft.items.map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      variantId: item.variantId,
+      sku: item.sku,
+      quantity: item.quantity,
+      subtotalCents: item.subtotalCents,
+      fulfillmentType: item.fulfillmentType
+    })),
+    ...overrides
+  };
+}
+
 async function fetchStoreSummary(env: any, token = 'film-adapter-secret') {
   return worker.fetch(new Request('http://127.0.0.1:8989/film/stripe-summary', {
     method: 'POST',
@@ -218,6 +255,41 @@ describe('Film Stripe summary adapter for Store', () => {
     expect(serialized).not.toContain('txn_should_not_return');
     expect(serialized).not.toContain('buyer@example.com');
     expect(Array.from(storeState.store.keys()).some((key) => key.includes('film_stripe_summary_adapter:read'))).toBe(true);
+  });
+
+  it('uses the Store order index for Film summary reads when the index is fresh', async () => {
+    const storeState = new MockKVNamespace();
+    await storeState.put('admin-store-orders:index:v1', JSON.stringify({
+      version: 1,
+      generatedAt: new Date().toISOString(),
+      scanned: 2500,
+      indexed: 1,
+      listCalls: 18,
+      truncated: false,
+      orders: [buildIndexedOrder()]
+    }));
+    const listSpy = vi.spyOn(storeState, 'list');
+
+    const response = await fetchStoreSummary(buildEnv(storeState));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      source: 'store',
+      status: 'available',
+      matchedOrderCount: 1,
+      totals: {
+        grossAmountCents: 60000,
+        feeAmountCents: 1800,
+        netAmountCents: 58200,
+        chargedAmountCents: 60000,
+        orderRevenueCents: 60000
+      },
+      counts: {
+        paymentCount: 1
+      }
+    });
+    expect(listSpy).not.toHaveBeenCalled();
   });
 
   it('rejects requests without the adapter bearer token', async () => {
