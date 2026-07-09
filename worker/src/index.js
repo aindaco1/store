@@ -330,6 +330,8 @@ const MAX_ADMIN_STORE_DOWNLOAD_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_ADMIN_STORE_DOWNLOAD_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_ADMIN_SNIPCART_IMPORT_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
+const MAX_FILM_STRIPE_SUMMARY_BODY_BYTES = 16 * 1024;
+const FILM_STRIPE_SUMMARY_MAX_REFS = 100;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
 const OBSERVABILITY_RETENTION_SECONDS = 14 * 24 * 60 * 60;
 const OBSERVABILITY_RECENT_EVENT_LIMIT = 25;
@@ -1114,6 +1116,7 @@ const RATE_LIMITS = {
   adminProductPreview: { prefix: 'rl:admin-product-preview', limit: 90, windowSeconds: 60 },
   adminProductPublish: { prefix: 'rl:admin-product-publish', limit: 12, windowSeconds: 60 },
   adminAddressLookup: { prefix: 'rl:admin-address-lookup', limit: 30, windowSeconds: 60 },
+  filmStripeSummary: { prefix: 'rl:film-stripe-summary', limit: 30, windowSeconds: 60, privateResponse: true },
   orderRead: { prefix: 'rl:order-read', limit: 120, windowSeconds: 60 },   // 120 order reads/min/IP
   orderLookup: { prefix: 'rl:order-lookup', limit: 8, windowSeconds: 60 }   // 8 order lookup requests/min/IP
 };
@@ -2055,6 +2058,14 @@ export default {
 
       if (path === '/admin/store/analytics' && method === 'GET') {
         return handleAdminStoreAnalytics(request, env);
+      }
+
+      if (path === '/film/stripe-summary' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_FILM_STRIPE_SUMMARY_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const rl = await checkRateLimit(request, env, RATE_LIMITS.filmStripeSummary);
+        if (!rl.allowed) return rl.response;
+        return handleFilmStripeSummaryAdapter(request, env, ctx);
       }
 
       if (path === '/admin/store/marketing/referrals' && method === 'GET') {
@@ -6059,6 +6070,26 @@ function normalizeAdminStorePaymentCardChecks(payment = {}) {
   };
 }
 
+function normalizeAdminStorePaymentFinancials(payment = {}) {
+  const source = payment.stripeFinancials && typeof payment.stripeFinancials === 'object'
+    ? payment.stripeFinancials
+    : {};
+  const financialSource = String(source.source || payment.stripeFinancialsSource || '').trim();
+  if (financialSource !== 'actual') {
+    return financialSource === 'pending' ? { source: 'pending' } : null;
+  }
+  const grossAmount = Number(source.grossAmount ?? payment.stripeGrossAmount ?? payment.amountCents);
+  const feeAmount = Number(source.feeAmount ?? payment.stripeFeeAmount);
+  const netAmount = Number(source.netAmount ?? payment.stripeNetAmount);
+  if (!Number.isFinite(feeAmount) || !Number.isFinite(netAmount)) return null;
+  return {
+    source: 'actual',
+    grossAmount: Number.isFinite(grossAmount) ? Math.max(0, Math.trunc(grossAmount)) : Math.max(0, Math.trunc(feeAmount + netAmount)),
+    feeAmount: Math.max(0, Math.trunc(feeAmount)),
+    netAmount: Math.max(0, Math.trunc(netAmount))
+  };
+}
+
 function buildAdminStoreOrderRecord(storedOrder = {}) {
   const orderDraft = storedOrder.orderDraft || {};
   const attribution = normalizeAdminStoreOrderAttribution(orderDraft.attribution || storedOrder.attribution || {});
@@ -6102,6 +6133,7 @@ function buildAdminStoreOrderRecord(storedOrder = {}) {
       paymentIntentId: storedOrder.payment?.paymentIntentId || storedOrder.stripePaymentIntentId || '',
       chargeId: storedOrder.payment?.chargeId || storedOrder.stripeChargeId || '',
       balanceTransactionId: storedOrder.payment?.balanceTransactionId || storedOrder.stripeBalanceTransactionId || '',
+      stripeFinancials: normalizeAdminStorePaymentFinancials(storedOrder.payment || {}),
       cardChecks: normalizeAdminStorePaymentCardChecks(storedOrder.payment || {})
     },
     shipping: {
@@ -9665,6 +9697,222 @@ async function handleAdminStoreAnalytics(request, env) {
     row.referrer || row.name || row.code
   ]));
   return privateJsonResponse(payload, 200, env);
+}
+
+function filmStripeSummaryAdapterSecret(env = {}) {
+  return configuredSecret(env.FILM_STRIPE_SUMMARY_ADAPTER_SECRET || env.STRIPE_SUMMARY_ADAPTER_SECRET);
+}
+
+function requireFilmStripeSummaryAdapterAuth(request, env) {
+  const secret = filmStripeSummaryAdapterSecret(env);
+  if (!secret) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Film Stripe summary adapter is not configured' }, 503, env)
+    };
+  }
+
+  const authHeader = request.headers.get('Authorization') || '';
+  const bearerPrefix = 'Bearer ';
+  const bearerToken = authHeader.startsWith(bearerPrefix)
+    ? authHeader.slice(bearerPrefix.length)
+    : '';
+  if (!bearerToken || !timingSafeEqual(bearerToken, secret)) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Unauthorized' }, 401, env)
+    };
+  }
+
+  return { ok: true };
+}
+
+function normalizeFilmStripeSummaryId(value, maxLength = 160) {
+  return String(value || '')
+    .trim()
+    .replace(/[^\w.:-]+/g, '_')
+    .slice(0, maxLength);
+}
+
+function normalizeFilmStripeStoreRefs(value) {
+  const refs = Array.isArray(value) ? value : [];
+  const normalizedRefs = [];
+  const seen = new Set();
+  for (const item of refs) {
+    const ref = String(item || '').trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9._:-]{0,159}$/.test(ref) || seen.has(ref)) continue;
+    seen.add(ref);
+    normalizedRefs.push(ref);
+    if (normalizedRefs.length >= FILM_STRIPE_SUMMARY_MAX_REFS) break;
+  }
+  return normalizedRefs;
+}
+
+function addFilmStripeStoreRef(refs, value) {
+  const ref = String(value || '').trim().toLowerCase();
+  if (/^[a-z0-9][a-z0-9._:-]{0,159}$/.test(ref)) refs.add(ref);
+}
+
+function collectFilmStripeStoreOrderRefs(order = {}) {
+  const refs = new Set();
+  addFilmStripeStoreRef(refs, order.orderToken);
+  addFilmStripeStoreRef(refs, order.attribution?.ref);
+  addFilmStripeStoreRef(refs, order.attribution?.utmCampaign);
+  for (const item of Array.isArray(order.items) ? order.items : []) {
+    addFilmStripeStoreRef(refs, item.id);
+    addFilmStripeStoreRef(refs, item.itemId);
+    addFilmStripeStoreRef(refs, item.productId);
+    addFilmStripeStoreRef(refs, item.variantId);
+    addFilmStripeStoreRef(refs, item.sku);
+  }
+  return refs;
+}
+
+function filmStripeStoreOrderMatchedRefs(order = {}, refSet = new Set()) {
+  const refs = collectFilmStripeStoreOrderRefs(order);
+  return Array.from(refs).filter((ref) => refSet.has(ref));
+}
+
+function emptyFilmStripeStoreSummary(mappedRefCount = 0, generatedAt = new Date().toISOString()) {
+  return {
+    source: 'store',
+    status: 'empty',
+    generatedAt,
+    currency: 'USD',
+    dataBoundary: 'summary_only',
+    mappedRefCount,
+    matchedRefCount: 0,
+    missingRefCount: mappedRefCount,
+    matchedOrderCount: 0,
+    totals: {
+      grossAmountCents: 0,
+      feeAmountCents: 0,
+      netAmountCents: 0,
+      pledgedAmountCents: 0,
+      chargedAmountCents: 0,
+      orderRevenueCents: 0,
+      paymentFailedAmountCents: 0,
+      refundedAmountCents: 0,
+      disputedAmountCents: 0
+    },
+    counts: {
+      paymentCount: 0,
+      paymentFailedCount: 0,
+      refundCount: 0,
+      disputeCount: 0,
+      invoiceCount: 0,
+      payoutCount: 0
+    }
+  };
+}
+
+function addFilmStripeStoreOrderToSummary(summary, order = {}) {
+  const totalCents = Math.max(0, Number(order.totals?.totalCents ?? order.payment?.amountCents ?? 0) || 0);
+  const paymentStatus = String(order.payment?.status || '').trim().toLowerCase();
+  const orderStatus = String(order.status || '').trim().toLowerCase();
+
+  if (isAdminStoreAnalyticsSettledOrder(order)) {
+    summary.totals.orderRevenueCents += totalCents;
+    if (order.payment?.required === true) {
+      const financials = order.payment?.stripeFinancials || null;
+      const hasActualFinancials = financials?.source === 'actual';
+      const grossAmount = hasActualFinancials
+        ? Number(financials.grossAmount || 0)
+        : Number(order.payment?.amountCents ?? totalCents);
+      const feeAmount = hasActualFinancials ? Number(financials.feeAmount || 0) : 0;
+      const netAmount = hasActualFinancials
+        ? Number(financials.netAmount || 0)
+        : Math.max(0, Number(grossAmount || 0) - Number(feeAmount || 0));
+      summary.totals.grossAmountCents += Math.max(0, Math.trunc(grossAmount || 0));
+      summary.totals.feeAmountCents += Math.max(0, Math.trunc(feeAmount || 0));
+      summary.totals.netAmountCents += Math.max(0, Math.trunc(netAmount || 0));
+      summary.totals.chargedAmountCents += Math.max(0, Math.trunc(grossAmount || 0));
+      summary.counts.paymentCount += 1;
+    }
+  }
+
+  if (orderStatus === STORE_ORDER_STATUS_PAYMENT_FAILED || paymentStatus === STORE_ORDER_STATUS_PAYMENT_FAILED) {
+    summary.totals.paymentFailedAmountCents += Math.max(0, Number(order.payment?.amountCents ?? totalCents) || 0);
+    summary.counts.paymentFailedCount += 1;
+  }
+}
+
+function filmStripeStoreSummaryHasMetrics(summary) {
+  return Object.values(summary.totals).some((value) => Number(value || 0) > 0) ||
+    Object.values(summary.counts).some((value) => Number(value || 0) > 0);
+}
+
+async function buildFilmStripeStoreSummary(env, mappedRefs = [], ctx = null) {
+  const generatedAt = new Date().toISOString();
+  const summary = emptyFilmStripeStoreSummary(mappedRefs.length, generatedAt);
+  if (!mappedRefs.length) return summary;
+
+  const scanned = await readAdminStoreOrderScan(env, { ctx, force: true });
+  if (!scanned.ok) {
+    return {
+      ...summary,
+      status: 'failed',
+      errorCode: scanned.error || 'store_order_scan_failed'
+    };
+  }
+
+  const refSet = new Set(mappedRefs);
+  const matchedRefs = new Set();
+  for (const order of scanned.orders || []) {
+    const orderMatches = filmStripeStoreOrderMatchedRefs(order, refSet);
+    if (orderMatches.length === 0) continue;
+    orderMatches.forEach((ref) => matchedRefs.add(ref));
+    summary.matchedOrderCount += 1;
+    addFilmStripeStoreOrderToSummary(summary, order);
+  }
+
+  summary.matchedRefCount = matchedRefs.size;
+  summary.missingRefCount = Math.max(0, summary.mappedRefCount - summary.matchedRefCount);
+  summary.status = filmStripeStoreSummaryHasMetrics(summary) ? 'available' : 'empty';
+  return summary;
+}
+
+async function handleFilmStripeSummaryAdapter(request, env, ctx = null) {
+  const auth = requireFilmStripeSummaryAdapterAuth(request, env);
+  if (!auth.ok) return auth.response;
+
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_FILM_STRIPE_SUMMARY_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+
+  const body = parsedBody.body || {};
+  if (String(body.source || '').trim().toLowerCase() !== 'store') {
+    return privateJsonResponse({ error: 'Invalid summary source' }, 400, env);
+  }
+  if (String(body.dataBoundary || '').trim() !== 'summary_only') {
+    return privateJsonResponse({ error: 'Invalid data boundary' }, 400, env);
+  }
+
+  const workspaceId = normalizeFilmStripeSummaryId(body.workspaceId);
+  const projectId = normalizeFilmStripeSummaryId(body.projectId);
+  const mappedRefs = normalizeFilmStripeStoreRefs(body.mappedRefs);
+  if (!workspaceId || !projectId || mappedRefs.length === 0) {
+    return privateJsonResponse({ error: 'workspaceId, projectId, and mappedRefs are required' }, 400, env);
+  }
+
+  const summary = await buildFilmStripeStoreSummary(env, mappedRefs, ctx);
+  await recordAdminAuditEvent(env, {
+    action: 'film_stripe_summary_adapter:read',
+    source: 'store',
+    workspaceId,
+    projectId,
+    dataBoundary: 'summary_only',
+    mappedRefCount: summary.mappedRefCount,
+    matchedRefCount: summary.matchedRefCount,
+    missingRefCount: summary.missingRefCount,
+    matchedOrderCount: summary.matchedOrderCount,
+    status: summary.status
+  });
+
+  return privateJsonResponse(summary, summary.status === 'failed' ? 503 : 200, env);
 }
 
 function adminStoreMarketingAllowedOrigins(env) {

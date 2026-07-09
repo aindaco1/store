@@ -52,6 +52,10 @@ Local defaults:
 
 Legacy aliases `/cart/validate` and `/checkout/intent` still route to the Store validation/checkout handlers for browser runtime compatibility, but new callers should use `/api/cart/validate` and `/api/checkout/intent`.
 
+## Server-to-Server API
+
+- `POST /film/stripe-summary`: Film-facing summary-only Stripe aggregate adapter. Requires `Authorization: Bearer <FILM_STRIPE_SUMMARY_ADAPTER_SECRET>`, `dataBoundary: "summary_only"`, `source: "store"`, and mapped refs in `mappedRefs`. Accepted refs are Store order tokens, marketing ref codes, product IDs, variant IDs, SKUs, or item IDs. The response is limited to aggregate money/count fields, mapped-ref/order counts, status, generated timestamp, and currency; it does not return customer emails, payment intent IDs, charge IDs, balance transaction IDs, or card/payment-method data.
+
 ## Admin API
 
 Browser admin mutations use the `store_admin_session` cookie plus `x-store-admin-csrf`.
@@ -84,6 +88,7 @@ Production-required Worker secrets:
 
 Operationally important optional secrets:
 
+- `FILM_STRIPE_SUMMARY_ADAPTER_SECRET`: shared bearer secret for Film summary-only aggregate reads through `/film/stripe-summary`.
 - `STORE_DOWNLOAD_SECRET`: dedicated signed download/fulfillment secret.
 - `STORE_ORDER_LOOKUP_SECRET`: dedicated customer lookup-token secret.
 - `ABANDONED_CART_TOKEN_SECRET`: dedicated reminder resume/unsubscribe secret.

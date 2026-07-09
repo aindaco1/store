@@ -140,6 +140,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - STRIPE_SECRET_KEY_LIVE / STRIPE_SECRET_KEY_TEST
 # - STRIPE_WEBHOOK_SECRET_LIVE / STRIPE_WEBHOOK_SECRET_TEST
 # - STRIPE_WEBHOOK_SECRET      (webhook signing secret)
+# - FILM_STRIPE_SUMMARY_ADAPTER_SECRET (shared bearer secret for Film summary-only aggregate reads)
 # - USPS_CLIENT_SECRET         (USPS OAuth client secret for live shipping quotes)
 # - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - STORE_DOWNLOAD_SECRET      (optional dedicated HMAC secret for signed download/fulfillment links)

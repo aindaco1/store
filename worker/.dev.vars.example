@@ -40,6 +40,8 @@ STRIPE_SECRET_KEY_TEST=
 STRIPE_PUBLISHABLE_KEY_TEST=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_WEBHOOK_SECRET_TEST=
+# Optional shared bearer secret for Film summary-only aggregate adapter calls.
+FILM_STRIPE_SUMMARY_ADAPTER_SECRET=
 
 # Email delivery.
 RESEND_API_KEY=
