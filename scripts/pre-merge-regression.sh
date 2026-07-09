@@ -150,6 +150,8 @@ ensure_podman_ready() {
 
 build_with_podman_jekyll() {
   ensure_podman_ready || return 1
+  local jekyll_config_files
+  jekyll_config_files="$(./scripts/jekyll-config-files.sh)"
 
   if ! podman image exists localhost/store-dev-site:latest; then
     podman build -t localhost/store-dev-site:latest -f Containerfile.dev .
@@ -161,13 +163,15 @@ build_with_podman_jekyll() {
     -v "$PWD:/workspace" \
     -v store-dev-bundle:/usr/local/bundle \
     localhost/store-dev-site:latest \
-    /workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+    /workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet
 
   minify_site_assets
 }
 
 build_with_host_jekyll() {
-  SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
+  local jekyll_config_files
+  jekyll_config_files="$(./scripts/jekyll-config-files.sh)"
+  SKIP_TESTS=1 bundle exec jekyll build --config "${jekyll_config_files}" --quiet
   minify_site_assets
 }
 
@@ -501,7 +505,7 @@ else
   start_worker || exit 1
 
   if ! host_site_ready; then
-    bundle exec jekyll serve --config _config.yml,_config.local.yml --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
+    bundle exec jekyll serve --config "$(./scripts/jekyll-config-files.sh)" --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
     JEKYLL_PID=$!
   fi
 
