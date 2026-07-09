@@ -9,6 +9,8 @@ WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
 ORIGINAL_DEV_VARS_BACKUP=""
+TEMP_JEKYLL_CONFIG=""
+TEMP_JEKYLL_CONFIG_DIR=""
 LOG_DIR="$(mktemp -d /tmp/store-premerge-logs.XXXXXX)"
 declare -a PHASE_RESULTS=()
 HOST_JEKYLL_STATUS="unknown"
@@ -302,6 +304,9 @@ cleanup() {
   if [[ -n "${TEMP_DEV_VARS}" && -f "${TEMP_DEV_VARS}" ]]; then
     rm -f "${TEMP_DEV_VARS}"
   fi
+  if [[ -n "${TEMP_JEKYLL_CONFIG_DIR}" && -d "${TEMP_JEKYLL_CONFIG_DIR}" ]]; then
+    rm -rf "${TEMP_JEKYLL_CONFIG_DIR}"
+  fi
   if [[ -n "${ORIGINAL_DEV_VARS_BACKUP}" && -f "${ORIGINAL_DEV_VARS_BACKUP}" ]]; then
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
@@ -381,6 +386,14 @@ host_site_ready() {
   local body
   body="$(curl -fsS "http://127.0.0.1:4002/admin/" 2>/dev/null || true)"
   [[ "${body}" == *'id="admin-auth-panel"'* ]]
+}
+
+test_jekyll_config_files() {
+  if [[ -z "${TEMP_JEKYLL_CONFIG}" ]]; then
+    TEMP_JEKYLL_CONFIG_DIR="$(mktemp -d /tmp/store-premerge-jekyll.XXXXXX)"
+    TEMP_JEKYLL_CONFIG="${TEMP_JEKYLL_CONFIG_DIR}/config.yml"
+  fi
+  ./scripts/jekyll-test-config-files.sh "${TEMP_JEKYLL_CONFIG}"
 }
 
 echo "==> Pre-merge regression checks"
@@ -505,7 +518,7 @@ else
   start_worker || exit 1
 
   if ! host_site_ready; then
-    bundle exec jekyll serve --config "$(./scripts/jekyll-config-files.sh)" --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
+    bundle exec jekyll serve --config "$(test_jekyll_config_files)" --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
     JEKYLL_PID=$!
   fi
 
