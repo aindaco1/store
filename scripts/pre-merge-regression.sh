@@ -91,9 +91,9 @@ prepare_host_jekyll() {
   fi
 
   HOST_JEKYLL_STATUS="bundle_install_failed"
-  if [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
+  if [[ -f "${HOST_JEKYLL_LOG}" ]] && grep -Eq "can no longer be found in that source" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="locked gem version is unavailable from RubyGems"
-  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && rg -q "extensions are not built" "${HOST_JEKYLL_LOG}"; then
+  elif [[ -f "${HOST_JEKYLL_LOG}" ]] && grep -Eq "extensions are not built" "${HOST_JEKYLL_LOG}"; then
     HOST_JEKYLL_FAILURE_REASON="native gem extensions are missing on the host Ruby"
   else
     HOST_JEKYLL_FAILURE_REASON="bundle install failed"
@@ -184,7 +184,7 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
-  if ! rg -n '\.store-first-party-cart__panel' _site/assets/main.css >/dev/null; then
+  if ! grep -Eq '\.store-first-party-cart__panel' _site/assets/main.css; then
     echo "main.css is missing expected first-party cart UI styles"
     return 1
   fi
@@ -196,35 +196,35 @@ verify_build_artifacts() {
     echo "sitemap.xml is missing from the built site"
     return 1
   fi
-  if ! rg -n 'Sitemap: .+/sitemap\.xml' _site/robots.txt >/dev/null; then
+  if ! grep -Eq 'Sitemap: .+/sitemap\.xml' _site/robots.txt; then
     echo "robots.txt is missing its sitemap pointer"
     return 1
   fi
-  if rg -n 'Disallow: /order-success/' _site/robots.txt >/dev/null; then
+  if grep -Eq 'Disallow: /order-success/' _site/robots.txt; then
     echo "robots.txt blocks order-success before crawlers can observe noindex"
     return 1
   fi
-  if ! rg -n '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml >/dev/null; then
+  if ! grep -Eq '<urlset xmlns="http://www\.sitemaps\.org/schemas/sitemap/0\.9" xmlns:xhtml="http://www\.w3\.org/1999/xhtml">' _site/sitemap.xml; then
     echo "sitemap.xml is missing the expected urlset root"
     return 1
   fi
-  if ! rg -n '<loc>.+/products/' _site/sitemap.xml >/dev/null; then
+  if ! grep -Eq '<loc>.+/products/' _site/sitemap.xml; then
     echo "sitemap.xml is missing public product URLs"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/index.html >/dev/null; then
+  if ! grep -Eq 'application/ld\+json' _site/index.html; then
     echo "Home page is missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'application/ld\+json' _site/products/*/index.html >/dev/null; then
+  if ! grep -Eq 'application/ld\+json' _site/products/*/index.html; then
     echo "Product pages are missing JSON-LD"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/order-success/index.html >/dev/null; then
+  if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/order-success/index.html; then
     echo "Order success page is missing noindex robots metadata"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html >/dev/null; then
+  if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/admin/index.html; then
     echo "Admin page is missing noindex robots metadata"
     return 1
   fi
@@ -232,23 +232,23 @@ verify_build_artifacts() {
     echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
-  if ! rg -n 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html >/dev/null; then
+  if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html; then
     echo "Spanish admin page is missing noindex robots metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html >/dev/null; then
+  if grep -Eq 'property="og:title"|name="twitter:card"|application/ld\+json' _site/admin/index.html; then
     echo "Admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html >/dev/null; then
+  if grep -Eq 'property="og:title"|name="twitter:card"|application/ld\+json' _site/es/admin/index.html; then
     echo "Spanish admin page is emitting public social or structured-data metadata"
     return 1
   fi
-  if rg -n '<loc>.+/admin/' _site/sitemap.xml >/dev/null; then
+  if grep -Eq '<loc>.+/admin/' _site/sitemap.xml; then
     echo "sitemap.xml unexpectedly includes the admin route"
     return 1
   fi
-  if rg -n '<loc>.+/order-success/' _site/sitemap.xml >/dev/null; then
+  if grep -Eq '<loc>.+/order-success/' _site/sitemap.xml; then
     echo "sitemap.xml unexpectedly includes the order-success route"
     return 1
   fi
