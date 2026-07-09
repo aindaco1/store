@@ -135,7 +135,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 - [x] Setup and deployment helpers
   - `npm run setup:deploy` handles local secret generation, production dry runs, Cloudflare KV/R2/Durable Object resource checks, Worker secret writes, GitHub secret writes, optional deploy, and provider readiness.
   - `npm run sync:worker-config` keeps `_config.yml`, product data, Worker vars, and the generated catalog snapshot aligned.
-  - Production deploys use the GitHub Pages/static-site path and Cloudflare Worker deploy workflow, with manual Worker deploy support when needed.
+  - Production deploys use the manual **Deploy Production** workflow for the GitHub Pages/static-site path, Cloudflare Worker deploy, Workers Cache purge, and optional Cloudflare zone purge; release merges/tags do not deploy automatically.
 - [x] Media and asset workflows
   - Store keeps uploaded product/default media in the repository and uses deterministic optimization/minification tooling instead of Worker-side image processing.
   - Media optimization and minification checks are available for host and Podman paths.
@@ -152,7 +152,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
   - Direct local signed-webhook payment evidence covers paid digital, paid physical, paid ticket, free RSVP, failed-payment suppression, and no-send customer/admin email rendering.
   - `.github/workflows/podman-e2e.yml` provides scheduled non-deploying Podman E2E drift detection, and `.github/workflows/release-provider-evidence.yml` provides production Cloudflare DNS API evidence through GitHub Actions secrets.
 - [x] Cross-repo parity and docs-as-code
-  - [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md), [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [TESTING.md](TESTING.md), and [release-evidence/v1.0.5.md](release-evidence/v1.0.5.md) document the Store release discipline.
+  - [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md), [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [TESTING.md](TESTING.md), and [release-evidence/](release-evidence/) document the Store release discipline.
   - Store/Pool parity rules treat shared work as transferable primitives while preserving Store-specific nouns, storage boundaries, checkout, fulfillment, admin, inventory, and SEO behavior.
   - Store release notes are tracked in [../CHANGELOG.md](../CHANGELOG.md), while this roadmap keeps the current capability inventory and future feature plan.
 

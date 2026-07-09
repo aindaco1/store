@@ -1,8 +1,6 @@
 name: Deploy Production
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       reason:
@@ -70,7 +68,6 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Node
-        if: ${{ github.event_name == 'push' }}
         uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -78,22 +75,18 @@ jobs:
           cache-dependency-path: worker/package-lock.json
 
       - name: Setup Ruby
-        if: ${{ github.event_name == 'push' }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
 
       - name: Install Worker dependencies
-        if: ${{ github.event_name == 'push' }}
         working-directory: worker
         run: npm ci
 
       - name: Sync Worker config and catalog
-        if: ${{ github.event_name == 'push' }}
         run: npm run sync:worker-config
 
       - name: Deploy Worker
-        if: ${{ github.event_name == 'push' }}
         working-directory: worker
         run: npx wrangler deploy -c wrangler.toml --env=""
         env:
@@ -101,7 +94,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Purge Workers Cache
-        if: ${{ github.event_name == 'push' }}
         run: |
           if [ -z "$WORKERS_CACHE_PURGE_SECRET" ]; then
             echo "WORKERS_CACHE_PURGE_SECRET is not configured; skipping Workers Cache purge."

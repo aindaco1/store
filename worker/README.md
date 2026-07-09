@@ -163,6 +163,8 @@ Worker-backed release evidence is split by risk:
 
 Set `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` on the target Worker when running the direct payment matrix. The Worker records email delivery markers so release smoke can prove customer/admin order emails would render without calling Resend.
 
+Production Worker deploys normally run through the manual **Deploy Production** GitHub Actions workflow after release approval. Merging to `main` or pushing a release tag does not deploy by itself.
+
 ## Config Sync
 
 Run this after `_config.yml`, `_config.local.yml`, `_products/`, shipping, tax, pricing, URL, add-on, marketing, or design settings change:

@@ -10,6 +10,8 @@ ruby ./scripts/sync-worker-config.rb >/dev/null
 
 USE_PODMAN=false
 PODMAN_STARTED_BY_SCRIPT=false
+DEV_PID=""
+STOP_FILE=""
 
 for arg in "$@"; do
   if [ "$arg" = "--podman" ]; then
@@ -52,8 +54,18 @@ prefer_podman_path() {
 }
 
 podman_stack_ready() {
-  curl -s "$SITE_URL" >/dev/null 2>&1 && \
-    curl -s "$WORKER_URL/notfound" >/dev/null 2>&1
+  podman info >/dev/null 2>&1 || return 1
+  podman exec store-dev-worker true >/dev/null 2>&1 || return 1
+  podman exec store-dev-site true >/dev/null 2>&1 || return 1
+  curl -fsS "$SITE_URL" >/dev/null 2>&1 || return 1
+
+  local status=""
+  status="$(curl -sS -o /dev/null -w "%{http_code}" \
+    -X POST "$WORKER_URL/api/cart/validate" \
+    "${WORKER_HEADERS[@]}" \
+    -H "Content-Type: application/json" \
+    --data '{"items":[{"id":"t-shirt-2__m","price":30,"quantity":1}]}' 2>/dev/null || true)"
+  [ "$status" = "200" ]
 }
 
 cleanup_podman_stack() {
@@ -78,11 +90,25 @@ request_json() {
 
 cleanup() {
   if [ "$PODMAN_STARTED_BY_SCRIPT" = "true" ]; then
+    if [ -n "$STOP_FILE" ]; then
+      touch "$STOP_FILE" 2>/dev/null || true
+    fi
+    if [ -n "$DEV_PID" ]; then
+      wait "$DEV_PID" 2>/dev/null || true
+    fi
+    rm -f "$STOP_FILE" 2>/dev/null || true
     cleanup_podman_stack
   fi
 }
 
-trap cleanup EXIT
+finish() {
+  local status=$?
+  trap - EXIT
+  cleanup
+  exit "$status"
+}
+
+trap finish EXIT
 
 if [ "$USE_PODMAN" = "true" ]; then
   prefer_podman_path || true
@@ -91,7 +117,10 @@ if [ "$USE_PODMAN" = "true" ]; then
   else
     echo "📦 Starting shared Podman dev stack..."
     PODMAN_DEV_LOG="${PODMAN_DEV_LOG:-/tmp/store-test-worker-podman.log}"
-    PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1
+    STOP_FILE="$(mktemp /tmp/store-test-worker-stop.XXXXXX)"
+    rm -f "$STOP_FILE"
+    PODMAN_STOP_FILE="$STOP_FILE" PODMAN_RESET_WRANGLER_STATE=true SKIP_STRIPE=true ./scripts/dev.sh --podman > "$PODMAN_DEV_LOG" 2>&1 &
+    DEV_PID=$!
     PODMAN_STARTED_BY_SCRIPT=true
 
     echo "⏳ Waiting for Podman-backed local services..."
@@ -102,10 +131,15 @@ if [ "$USE_PODMAN" = "true" ]; then
         PODMAN_READY=true
         break
       fi
+      if ! kill -0 "$DEV_PID" 2>/dev/null; then
+        tail -n 80 "$PODMAN_DEV_LOG" >&2 || true
+        fail "Podman dev stack process exited before readiness"
+      fi
       sleep 1
     done
 
     if [ "$PODMAN_READY" != "true" ]; then
+      tail -n 80 "$PODMAN_DEV_LOG" >&2 || true
       fail "Podman dev stack did not become ready within 60 seconds"
     fi
   fi

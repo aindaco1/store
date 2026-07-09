@@ -10,7 +10,7 @@ Store SEO focuses on public product, terms, and home pages. Admin pages are excl
 - `sitemap.xml` emits only canonical, indexable public pages and active/sold-out public products; archived and `public: false` products are excluded.
 - Sitemap and page metadata include reciprocal `hreflang` alternates for generated localized product routes and localized public shells such as home and Terms.
 - Product SEO still depends on `_products/*` fields, generated localized product routes, and Store's Product/Offer JSON-LD.
-- `v1.0.5` release evidence samples rendered canonical, hreflang, Open Graph, Twitter card, Product/Offer/Breadcrumb JSON-LD, sitemap, robots, and private-route `noindex` behavior.
+- `v1.0.6` release evidence keeps rendered canonical, hreflang, Open Graph, Twitter card, Product/Offer/Breadcrumb JSON-LD, sitemap, robots, and private-route `noindex` behavior in the release smoke path.
 
 ## Public Metadata
 

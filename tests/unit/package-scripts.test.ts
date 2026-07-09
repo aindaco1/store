@@ -44,4 +44,31 @@ describe('package test scripts', () => {
     expect(preMergeScript).not.toContain('run_phase "9a. Host Store Worker smoke"');
     expect(preMergeScript).not.toContain('run_phase "10. Headless E2E suite"');
   });
+
+  it('keeps Podman wrappers alive until runtime checks finish', () => {
+    const stackRun = readFileSync(join(repoRoot, 'scripts/podman-stack-run.sh'), 'utf8');
+    const playwrightRun = readFileSync(join(repoRoot, 'scripts/podman-playwright-run.sh'), 'utf8');
+    const workerSmoke = readFileSync(join(repoRoot, 'scripts/test-worker.sh'), 'utf8');
+
+    for (const script of [stackRun, playwrightRun, workerSmoke]) {
+      expect(script).toContain('STOP_FILE="$(mktemp ');
+      expect(script).toContain('PODMAN_STOP_FILE="$STOP_FILE" PODMAN_RESET_WRANGLER_STATE=true SKIP_STRIPE=true ./scripts/dev.sh --podman >');
+      expect(script).toContain('DEV_PID=$!');
+      expect(script).toContain('touch "$STOP_FILE"');
+      expect(script).toContain('wait "$DEV_PID"');
+      expect(script).toContain('/api/cart/validate');
+      expect(script).not.toContain('nohup env PODMAN_RESET_WRANGLER_STATE=true');
+      expect(script).not.toContain('disown "$DEV_PID"');
+      expect(script).not.toContain('kill "$DEV_PID"');
+      expect(script).not.toContain('PODMAN_DETACH=true SKIP_STRIPE=true ./scripts/dev.sh --podman');
+    }
+  });
+
+  it('does not terminate the Podman wrapper process group when Stripe forwarding is skipped', () => {
+    const podmanDev = readFileSync(join(repoRoot, 'scripts/dev-podman.sh'), 'utf8');
+
+    expect(podmanDev).toContain('if [ -n "${STRIPE_LISTEN_PID:-}" ]; then');
+    expect(podmanDev).toContain('kill "$STRIPE_LISTEN_PID"');
+    expect(podmanDev).not.toContain('kill "${STRIPE_LISTEN_PID:-0}"');
+  });
 });

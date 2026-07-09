@@ -87,4 +87,4 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 
 ## Production Operations
 
-Store is live on the production storefront and Worker domains. Ongoing production work is operational: keep Cloudflare Worker secrets and external accounts current, verify Stripe webhooks, Resend senders, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, and real inventory baselines, and rerun the production smoke/reconciliation path after checkout, fulfillment, admin, or catalog changes.
+Store is live on the production storefront and Worker domains. Production deploys are manual through the **Deploy Production** GitHub Actions workflow; merging a release branch or pushing a release tag does not deploy by itself. Ongoing production work is operational: keep Cloudflare Worker secrets and external accounts current, verify Stripe webhooks, Resend senders, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, and real inventory baselines, and rerun the production smoke/reconciliation path after checkout, fulfillment, admin, or catalog changes.

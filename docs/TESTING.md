@@ -1,6 +1,6 @@
 # Testing
 
-The current `v1.0.5` release gate adds Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
+The current `v1.0.6` release gate keeps Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering, and adds Workers Cache plus backup/restore coverage. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -68,6 +68,8 @@ npm run test:security
 ```
 
 The default security suite starts or reuses the Podman Storefront and Worker stack through `npm run test:security:podman`. It checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior. Use `npm run test:security:host` only when you intentionally want to target an already-running host Worker.
+
+Podman-backed security, Worker smoke, and headless E2E wrappers reset local Wrangler state for their isolated stack before running. This avoids stale Miniflare SQLite state from turning `RATELIMIT` reads into false `503` failures while leaving normal manual `./scripts/dev.sh --podman` state intact.
 
 Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`. It checks admin Orders request normalization, credential stripping, search bypasses, kill-switch behavior, non-PII role/scope props, cacheable inner response headers, shared purge helpers, and internal-props enforcement for cache purges.
 
