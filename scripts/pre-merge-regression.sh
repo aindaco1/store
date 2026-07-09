@@ -161,7 +161,7 @@ build_with_podman_jekyll() {
     -v "$PWD:/workspace" \
     -v store-dev-bundle:/usr/local/bundle \
     localhost/store-dev-site:latest \
-    bash -lc 'cd /workspace && SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet'
+    /workspace/scripts/podman-jekyll-command.sh env SKIP_TESTS=1 bundle exec jekyll build --config _config.yml,_config.local.yml --quiet
 
   minify_site_assets
 }
