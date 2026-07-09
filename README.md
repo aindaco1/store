@@ -43,7 +43,8 @@ npm run test:seo
 npm run test:content-security
 npm run test:unit
 npm run test:security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+npm run test:e2e:headless
+SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 npm run test:premerge
 ```
 

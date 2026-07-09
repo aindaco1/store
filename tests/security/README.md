@@ -6,20 +6,22 @@ This directory contains Worker security checks for the Store API.
 
 ```bash
 npm run test:secrets
-cd worker && npx wrangler dev --env dev --ip 127.0.0.1 --port 8989
 npm run test:security
 ```
 
-With the full local stack running, the root command is enough:
+`npm run test:security` starts or reuses the Podman-backed Storefront and Worker stack before running the security suite.
+
+To run against an already-started host Worker instead:
 
 ```bash
-npm run test:security
+cd worker && npx wrangler dev --env dev --ip 127.0.0.1 --port 8989
+npm run test:security:host
 ```
 
 Run against the Podman Worker or another local/non-production Worker:
 
 ```bash
-WORKER_URL=http://127.0.0.1:8989 npm run test:security
+WORKER_URL=http://127.0.0.1:8989 npm run test:security:host
 ```
 
 ## Coverage

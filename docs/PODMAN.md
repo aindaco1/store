@@ -125,10 +125,12 @@ Podman-backed helpers:
 
 ```bash
 ./scripts/test-worker.sh --podman
-npm run test:security:podman
-npm run test:e2e:headless:podman
+npm run test:security
+npm run test:e2e:headless
 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
 ```
+
+`npm run test:security`, `npm run test:e2e`, and `npm run test:e2e:headless` are Podman-backed by default. Host-only aliases are available as `npm run test:security:host`, `npm run test:e2e:host`, and `npm run test:e2e:headless:host`.
 
 For focused admin browser coverage:
 

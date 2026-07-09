@@ -5,13 +5,18 @@ cd "$(dirname "$0")/.."
 
 echo "🚀 Starting E2E tests..."
 
-USE_PODMAN=false
+USE_PODMAN=true
 PODMAN_STARTED_BY_SCRIPT=false
 
 for arg in "$@"; do
-    if [ "$arg" = "--podman" ]; then
-        USE_PODMAN=true
-    fi
+    case "$arg" in
+        --podman)
+            USE_PODMAN=true
+            ;;
+        --host|--no-podman)
+            USE_PODMAN=false
+            ;;
+    esac
 done
 
 USES_FIRST_PARTY_LOCAL=true

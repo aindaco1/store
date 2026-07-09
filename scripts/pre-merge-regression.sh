@@ -508,47 +508,13 @@ STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
 EOF
 fi
 
-start_worker || exit 1
-
 run_phase "8. Security suite" npm run test:security
 
-stop_worker
+reset_podman_dev_artifacts || exit 1
+run_phase "9. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
 
-if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
-  reset_podman_dev_artifacts || exit 1
-  run_phase "9. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
-else
-  start_worker || exit 1
-
-  if ! host_site_ready; then
-    bundle exec jekyll serve --config "$(test_jekyll_config_files)" --port 4002 >/tmp/store-premerge-jekyll.log 2>&1 &
-    JEKYLL_PID=$!
-  fi
-
-  for _ in {1..60}; do
-    if host_site_ready; then
-      break
-    fi
-    sleep 1
-  done
-
-  if ! host_site_ready; then
-    echo "Jekyll failed to start. See /tmp/store-premerge-jekyll.log"
-    exit 1
-  fi
-
-  run_phase "9a. Host Store Worker smoke" env SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
-  stop_worker
-  reset_podman_dev_artifacts || exit 1
-  run_phase "9b. Podman Store Worker smoke" ./scripts/test-worker.sh --podman
-fi
-
-if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
-  reset_podman_dev_artifacts || exit 1
-  run_phase "10. Podman E2E suite" env CI=1 ./scripts/podman-playwright-run.sh npx playwright test --workers=1
-else
-  run_phase "10. Headless E2E suite" npm run test:e2e:headless
-fi
+reset_podman_dev_artifacts || exit 1
+run_phase "10. Podman E2E suite" npm run test:e2e:headless
 
 echo "Pre-merge regression checks completed."
 print_phase_summary

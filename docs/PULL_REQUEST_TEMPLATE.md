@@ -14,7 +14,7 @@
 - [ ] `npm run test:security`
 - [ ] `npm run sync:worker-config` when catalog/config changed
 - [ ] `bundle exec jekyll build --quiet`
-- [ ] Playwright coverage for touched UI paths
+- [ ] Podman Playwright coverage for touched UI paths, usually `npm run test:e2e:headless`
 - [ ] `npm run test:premerge`
 - [ ] `npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md` for release-impacting changes, or skipped external evidence is documented
 - [ ] Ethical risk review completed for triggered changes, or marked N/A with a reason
