@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.6 - Unreleased
+
+- Added a Cloudflare Workers Cache integration for authenticated admin Orders list reads using a cached named Worker entrypoint while keeping the default gateway and browser-facing admin responses private/no-store.
+- Added Workers Cache policy tests for admin Orders request normalization, search bypasses, role/scope partitioning, cache headers, and internal purge authorization.
+- Added repeatable backup/restore snapshot automation with dry-run planning, Git/config/provider inventory, KV/R2 backup plans, secret presence inventory without values, and restore-plan generation.
+- Updated Worker, performance, security, dashboard, testing, and backup/restore docs for the cached admin Orders path and backup automation.
+
 ## v1.0.5 - 2026-07-05
 
 - Added a Store release smoke wrapper that records evidence across the pre-merge gate, launch readiness, Podman E2E, accessibility coverage, optional VoiceOver/Whisper transcript evidence, rendered i18n/SEO checks, Worker fulfillment checks, provider readiness, and payment readiness.

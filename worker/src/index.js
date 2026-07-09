@@ -343,6 +343,14 @@ const ADMIN_STORE_ORDER_INDEX_KEY = 'admin-store-orders:index:v1';
 const ADMIN_STORE_ORDER_INDEX_VERSION = 1;
 const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 10 * 60;
 const ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS = ADMIN_STORE_ORDER_INDEX_TTL_SECONDS * 1000;
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT = 'CachedAdminStoreOrders';
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE = 'store-admin-orders-cache-gateway';
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION = 1;
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS = ['admin-orders', 'orders', 'order-index', 'admin-orders-v1'];
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL = 'public, max-age=20, stale-while-revalidate=40, stale-if-error=0';
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH = '/__store-cache/admin-orders/purge';
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_ALLOWED_PARAMS = ['status', 'fulfillment', 'limit', 'cursor', 'lang', 'locale'];
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN = 'https://store-cache.internal';
 
 let adminStoreOrderScanCache = null;
 let adminStoreOrderIndexCache = null;
@@ -357,6 +365,176 @@ function invalidateAdminStoreOrderScanCache(env = null, ctx = null) {
       'admin Store order index invalidation'
     );
   }
+  purgeAdminStoreOrdersWorkersCache(ctx);
+}
+
+function workersCacheEnabledForAdminStoreOrders(env = {}) {
+  return String(env.WORKERS_CACHE_ADMIN_ORDERS_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
+}
+
+function adminStoreOrdersWorkersCacheBypassReason(request) {
+  const url = new URL(request.url);
+  const query = String(url.searchParams.get('q') || '').trim();
+  return query ? 'search_query' : '';
+}
+
+function sanitizeAdminStoreOrdersCacheParam(key, value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (key === 'limit') {
+    return String(clampAdminPageLimit(text));
+  }
+  if (key === 'cursor') {
+    return String(Math.max(0, Number.parseInt(text, 10) || 0));
+  }
+  if (key === 'lang' || key === 'locale') {
+    return text.toLowerCase().replace(/[^a-z-]/g, '').slice(0, 12);
+  }
+  return text.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+}
+
+function buildAdminStoreOrdersCacheRequest(request) {
+  const sourceUrl = new URL(request.url);
+  const cacheUrl = new URL('/admin/store/orders', ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN);
+  for (const key of ADMIN_STORE_ORDERS_WORKERS_CACHE_ALLOWED_PARAMS) {
+    if (!sourceUrl.searchParams.has(key)) continue;
+    const value = sanitizeAdminStoreOrdersCacheParam(key, sourceUrl.searchParams.get(key));
+    if (value) cacheUrl.searchParams.set(key, value);
+  }
+  return new Request(cacheUrl.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json'
+    },
+    cf: {
+      cacheControl: ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL
+    }
+  });
+}
+
+function buildAdminStoreOrdersWorkersCacheProps(auth = {}) {
+  const user = auth.user || {};
+  const role = String(user.role || '').trim().toLowerCase() === 'super_admin'
+    ? 'super_admin'
+    : 'limited_admin';
+  const scopes = role === 'super_admin'
+    ? ['super_admin']
+    : normalizeAdminAccessScopes(user.accessScopes || []).sort();
+  return {
+    source: ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE,
+    version: ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION,
+    role,
+    scopeKey: scopes.join('|') || 'none',
+    accessScope: STORE_ADMIN_SCOPE
+  };
+}
+
+function readAdminStoreOrdersWorkersCacheProps(ctx = null) {
+  const props = ctx?.props && typeof ctx.props === 'object' ? ctx.props : {};
+  if (props.source !== ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE) return null;
+  if (Number(props.version || 0) !== ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION) return null;
+  const role = String(props.role || '').trim().toLowerCase();
+  if (role !== 'super_admin' && role !== 'limited_admin') return null;
+  const scopeKey = String(props.scopeKey || '').trim().toLowerCase();
+  if (!scopeKey || /[^a-z0-9:_|-]/.test(scopeKey)) return null;
+  return {
+    role,
+    scopeKey,
+    accessScope: String(props.accessScope || STORE_ADMIN_SCOPE).trim() || STORE_ADMIN_SCOPE
+  };
+}
+
+function authFromAdminStoreOrdersWorkersCacheProps(props = {}) {
+  return {
+    ok: true,
+    user: {
+      email: '',
+      name: '',
+      role: props.role === 'super_admin' ? 'super_admin' : 'limited_admin',
+      accessScopes: props.role === 'super_admin' ? [] : [STORE_ADMIN_SCOPE]
+    }
+  };
+}
+
+function getAdminStoreOrdersWorkersCacheBinding(ctx = null) {
+  const binding = ctx?.exports?.[ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT];
+  return binding || null;
+}
+
+function fetchAdminStoreOrdersWorkersCache(ctx = null, request, props = {}) {
+  const binding = getAdminStoreOrdersWorkersCacheBinding(ctx);
+  if (!binding) return null;
+  if (typeof binding.fetch === 'function') {
+    return binding.fetch(request, { props });
+  }
+  if (typeof binding === 'function') {
+    const scopedBinding = binding({ props });
+    if (scopedBinding && typeof scopedBinding.fetch === 'function') {
+      return scopedBinding.fetch(request);
+    }
+  }
+  return null;
+}
+
+function adminStoreOrdersWorkersCacheMetadata(response = null, { enabled = true, bypass = '' } = {}) {
+  return {
+    enabled,
+    entrypoint: ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT,
+    status: response?.headers?.get?.('Cf-Cache-Status') || (enabled ? 'unavailable' : 'disabled'),
+    bypass,
+    tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS,
+    cacheControl: ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL
+  };
+}
+
+function attachAdminStoreOrdersGatewayUser(payload = {}, auth = {}, workersCache = null) {
+  return {
+    ...payload,
+    user: auth.user || null,
+    page: {
+      ...(payload.page || {}),
+      cache: {
+        ...(payload.page?.cache || {}),
+        workers: workersCache
+      }
+    }
+  };
+}
+
+function cacheableAdminStoreOrdersJsonResponse(payload = {}, status = 200, env = null) {
+  return jsonResponse(payload, status, env, false, {
+    'Cache-Control': ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL,
+    'Cache-Tag': ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS.join(',')
+  });
+}
+
+function noStoreAdminStoreOrdersCacheResponse(data = {}, status = 200, env = null) {
+  return jsonResponse(data, status, env, false, {
+    'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL
+  });
+}
+
+function purgeAdminStoreOrdersWorkersCache(ctx = null) {
+  const props = {
+    source: ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE,
+    version: ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION,
+    role: 'super_admin',
+    scopeKey: 'purge',
+    accessScope: STORE_ADMIN_SCOPE
+  };
+  const request = new Request(`${ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN}${ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+  const responsePromise = fetchAdminStoreOrdersWorkersCache(ctx, request, props);
+  if (!responsePromise) return;
+  queueBackgroundTask(
+    ctx,
+    responsePromise,
+    'admin Store orders Workers Cache purge'
+  );
 }
 
 
@@ -1903,6 +2081,51 @@ function resolveCheckoutUiRuntime(env) {
     stripePublishableKey: usingCustomCheckoutUi ? stripePublishableKey : ''
   };
 }
+
+export const CachedAdminStoreOrders = {
+  async fetch(request, env, ctx) {
+    configureWorkerLogging(env);
+    const url = new URL(request.url);
+
+    if (url.pathname === ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH && request.method === 'POST') {
+      const props = readAdminStoreOrdersWorkersCacheProps(ctx);
+      if (!props || props.scopeKey !== 'purge') {
+        return noStoreAdminStoreOrdersCacheResponse({ error: 'Forbidden' }, 403, env);
+      }
+      if (ctx?.cache && typeof ctx.cache.purge === 'function') {
+        await ctx.cache.purge({ tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS });
+      }
+      return noStoreAdminStoreOrdersCacheResponse({
+        ok: true,
+        entrypoint: ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT,
+        tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS,
+        purgedAt: new Date().toISOString()
+      }, 200, env);
+    }
+
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      return noStoreAdminStoreOrdersCacheResponse({ error: 'Method not allowed' }, 405, env);
+    }
+
+    if (url.pathname !== '/admin/store/orders') {
+      return noStoreAdminStoreOrdersCacheResponse({ error: 'Not found' }, 404, env);
+    }
+
+    const props = readAdminStoreOrdersWorkersCacheProps(ctx);
+    if (!props) {
+      return noStoreAdminStoreOrdersCacheResponse({ error: 'Forbidden' }, 403, env);
+    }
+
+    const built = await buildAdminStoreOrdersPayload(request, env, {
+      ctx,
+      auth: authFromAdminStoreOrdersWorkersCacheProps(props),
+      includeUser: false
+    });
+    if (!built.ok) return built.response;
+
+    return cacheableAdminStoreOrdersJsonResponse(built.payload, 200, env);
+  }
+};
 
 export default {
   async fetch(request, env, ctx) {
@@ -9359,7 +9582,9 @@ function storeAdminOrderFiltersFromUrl(url) {
 }
 
 async function buildAdminStoreOrdersPayload(request, env, options = {}) {
-  const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
+  const auth = options.auth?.ok
+    ? options.auth
+    : await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return { ok: false, response: auth.response };
 
   const scannedOrders = await readAdminStoreOrderScan(env, {
@@ -9400,7 +9625,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   return {
     ok: true,
     payload: {
-      user: auth.user,
+      user: options.includeUser === false ? null : auth.user,
       scope: STORE_ADMIN_SCOPE,
       orders: pageOrders,
       fulfillments: fulfillmentRows,
@@ -9579,9 +9804,51 @@ async function handleAdminStoreSnipcartOrderImport(request, env, body = {}, ctx 
 }
 
 async function handleAdminStoreOrders(request, env, ctx = null) {
-  const built = await buildAdminStoreOrdersPayload(request, env, { ctx });
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+
+  const cacheBypassReason = adminStoreOrdersWorkersCacheBypassReason(request);
+  if (workersCacheEnabledForAdminStoreOrders(env) && !cacheBypassReason) {
+    const props = buildAdminStoreOrdersWorkersCacheProps(auth);
+    const responsePromise = fetchAdminStoreOrdersWorkersCache(ctx, buildAdminStoreOrdersCacheRequest(request), props);
+    if (responsePromise) {
+      try {
+        const response = await responsePromise;
+        const text = await response.text();
+        const payload = text ? JSON.parse(text) : {};
+        if (response.ok) {
+          const workersCache = adminStoreOrdersWorkersCacheMetadata(response);
+          return privateJsonResponse(
+            attachAdminStoreOrdersGatewayUser(payload, auth, workersCache),
+            200,
+            env,
+            {
+              'X-Store-Workers-Cache': workersCache.status,
+              'X-Store-Workers-Cache-Entry': ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT
+            }
+          );
+        }
+        return privateJsonResponse(payload, response.status || 503, env);
+      } catch (error) {
+        console.warn('Admin Store orders Workers Cache bypassed:', error?.message || String(error));
+      }
+    }
+  }
+
+  const built = await buildAdminStoreOrdersPayload(request, env, { ctx, auth });
   if (!built.ok) return built.response;
-  return privateJsonResponse(built.payload, 200, env);
+  return privateJsonResponse(
+    attachAdminStoreOrdersGatewayUser(
+      built.payload,
+      auth,
+      adminStoreOrdersWorkersCacheMetadata(null, {
+        enabled: workersCacheEnabledForAdminStoreOrders(env),
+        bypass: cacheBypassReason || (workersCacheEnabledForAdminStoreOrders(env) ? 'entrypoint_unavailable' : 'disabled')
+      })
+    ),
+    200,
+    env
+  );
 }
 
 function incrementStoreAnalyticsBreakdown(map, key, quantity = 1, revenueCents = 0) {
@@ -13524,7 +13791,9 @@ async function handleAdminSettings(request, env) {
       adminSettingsSection('Runtime diagnostics', [
         ['Current site base', env.SITE_BASE, readOnlyAdminSettingHelp('The site origin the current Worker runtime is configured to trust for browser requests.')],
         ['Current Worker base', env.WORKER_BASE, readOnlyAdminSettingHelp('The Worker API base URL used by the current runtime environment.')],
-        ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')]
+        ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')],
+        ['Workers Cache gateway', 'disabled', readOnlyAdminSettingHelp('The default Worker entrypoint stays uncached so authentication, CSRF, routing, and mutations always run.')],
+        ['Workers Cache admin Orders', workersCacheEnabledForAdminStoreOrders(env) ? 'enabled' : 'disabled', readOnlyAdminSettingHelp(`Admin Orders list reads can use the ${ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT} entrypoint with ${ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL}. Search requests bypass this cache.`)]
       ])
     );
   }
@@ -15293,11 +15562,17 @@ function corsResponse(env = null, isPublic = false) {
 export {
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
+  buildAdminStoreOrdersCacheRequest,
+  buildAdminStoreOrdersWorkersCacheProps,
   buildAdminStoreProductPreviewHtml,
   buildStoreTicketSvg,
   buildStoreOrderAdminNotificationPayloads,
   buildStoreOrderEmailPayload,
   buildStoreOrderEventEmailAttachments,
+  adminStoreOrdersWorkersCacheBypassReason,
+  cacheableAdminStoreOrdersJsonResponse,
+  fetchAdminStoreOrdersWorkersCache,
+  readAdminStoreOrdersWorkersCacheProps,
   storeOrderReconciliationRowsCsv,
   processStoreEventReminders,
   queueStoreEventReminders

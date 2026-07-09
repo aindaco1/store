@@ -72,6 +72,16 @@ Secret storage rules:
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
 
+Workers Cache rule:
+
+- The default Worker gateway entrypoint remains uncached so auth, CSRF, role/scope checks, rate limits, route dispatch, and mutations always run.
+- Only reviewed inner `GET`/`HEAD` entrypoints may emit cacheable responses. Today that means `CachedAdminStoreOrders` for non-search admin Orders list reads.
+- The gateway authenticates the admin before calling the cached entrypoint and sends only minimal `ctx.props` role/scope partitioning. Do not key cached admin data on `Cookie`, `Authorization`, raw session tokens, email addresses, names, CSRF tokens, or signed-link values.
+- Browser-facing admin responses stay `private, no-store` even when the inner Workers Cache response is public-cacheable.
+- Free-text admin Orders searches bypass Workers Cache because `q` may contain customer PII or order tokens.
+- Cache tags must stay low-cardinality and non-PII. Use route/domain tags such as `admin-orders`, `orders`, `order-index`, and version tags only.
+- Purge requests to cached inner entrypoints must require trusted internal props and should be triggered from the same mutation boundaries that invalidate KV/order projections.
+
 Browser storage:
 
 - `store-admin-dashboard-state:v1` may persist the last selected admin tab and Settings section index in `localStorage`.
@@ -136,6 +146,7 @@ Required protections:
 - restrictive admin CSP and no public social/structured metadata
 - runtime admin users stored in KV, not `_config.yml`
 - local dashboard navigation persistence limited to non-sensitive tab identifiers
+- Workers Cache use limited to authenticated, normalized, non-search read paths with private/no-store browser responses
 
 Limited admins should see only the Store surfaces allowed by their access scopes. Super admins retain settings and user-management access.
 

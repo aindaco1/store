@@ -1,12 +1,21 @@
 name = "store-worker"
 main = "src/index.js"
-compatibility_date = "2026-05-03"
+compatibility_date = "2026-07-09"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 
 routes = [
   { pattern = "checkout.dustwave.xyz/*", zone_name = "dustwave.xyz" }
 ]
+
+[cache]
+enabled = false
+
+[exports.CachedAdminStoreOrders]
+type = "worker"
+
+  [exports.CachedAdminStoreOrders.cache]
+  enabled = true
 
 # Cron trigger:
 # - `* * * * *`: timezone-aware platform scheduler. Individual tasks gate on

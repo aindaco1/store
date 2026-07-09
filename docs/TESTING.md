@@ -12,6 +12,7 @@ npm run test:unit
 npm run test:seo
 npm run test:content-security
 npm run test:security
+npm run backup:plan
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
 ```
@@ -43,6 +44,8 @@ Focused Store runs:
 
 ```bash
 npx vitest run \
+  tests/unit/workers-cache-policy.test.ts \
+  tests/unit/store-backup-script.test.ts \
   tests/unit/store-catalog.test.ts \
   tests/unit/store-coupons.test.ts \
   tests/unit/shipping.test.ts \
@@ -64,6 +67,10 @@ npm run test:security:podman
 ```
 
 The security suite checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior.
+
+Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`. It checks admin Orders request normalization, credential stripping, search bypasses, non-PII role/scope props, cacheable inner response headers, and internal-props enforcement for cache purges.
+
+Backup automation coverage lives in `tests/unit/store-backup-script.test.ts`. It checks KV prefix classification, Wrangler inventory parsing, command generation, KV restore-shape transforms, download key discovery, secret inventory redaction, and dry-run behavior.
 
 ## SEO
 
@@ -148,6 +155,7 @@ Before deploys that affect checkout, fulfillment, admin publishing, product inve
 ```bash
 npm run sync:worker-config
 npm run catalog:generate
+npm run backup:plan
 npm run launch:readiness
 bundle exec jekyll build --config _config.yml,_config.local.yml
 npm run assets:minify:check
@@ -158,6 +166,8 @@ For checkout, admin, or Worker changes, also run:
 
 ```bash
 npm run test:security
+npm run test:unit -- tests/unit/workers-cache-policy.test.ts tests/unit/store-backup-script.test.ts
+cd worker && npx wrangler deploy --dry-run --env="" && cd ..
 CI=1 npx playwright test tests/e2e/admin-dashboard.spec.ts --workers=1
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 ```

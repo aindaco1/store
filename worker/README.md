@@ -73,6 +73,22 @@ Browser admin mutations use the `store_admin_session` cookie plus `x-store-admin
 
 Some maintenance/observability routes also accept the configured admin recovery secret. Browser dashboard routes should prefer the session/CSRF path.
 
+## Workers Cache
+
+Wrangler config keeps the default Worker gateway entrypoint uncached and enables cache only for the named `CachedAdminStoreOrders` entrypoint. This requires Wrangler `4.107+` and `compatibility_date = "2026-07-09"`; `ctx.exports` support is available by default at that compatibility date.
+
+Admin Orders cache flow:
+
+1. The browser calls `GET /admin/store/orders` with the normal admin session cookie.
+2. The gateway authenticates the session and role/scope first.
+3. Non-search reads call `ctx.exports.CachedAdminStoreOrders` with a normalized internal request and minimal role/scope props.
+4. The inner response can be cached with `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`.
+5. The gateway returns a browser-facing `private, no-store` response with the authenticated user restored.
+
+Free-text `q` searches bypass Workers Cache. Set `WORKERS_CACHE_ADMIN_ORDERS_ENABLED=false` to disable this route-level cache without changing Wrangler entrypoint config.
+
+Order mutations call the shared order-index invalidation helper, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available. The short TTL bounds staleness if a purge path cannot run.
+
 ## Secrets
 
 Production-required Worker secrets:
@@ -139,6 +155,8 @@ Worker-backed release evidence is split by risk:
 - `npm run release:fulfillment-evidence` runs the Worker in process with mock KV/R2 data to verify signed downloads, revoke/refresh behavior, ticket/RSVP check-in, and admin CSV exports without external providers.
 - `npm run release:providers` is read-only and can use shell credentials, authenticated `gh`/`wrangler`/`stripe` CLIs, or `worker/.dev.vars` defaults unless `--no-dev-vars` is passed.
 - `npm run release:payment-smoke` runs payment contract checks. With `PAYMENT_SMOKE_ALLOW_MUTATION=1 -- --direct-webhook`, it targets only a local/non-production Worker, signs local Stripe webhook events, and verifies Store settlement.
+- `npm run backup:plan` dry-runs the backup/restore snapshot plan without writing artifacts or calling provider CLIs.
+- `npm run backup:snapshot` writes a local backup manifest and restore plan. Add `--remote`, `--kv-values`, or `--r2-objects` only when the operator is ready to handle production data.
 
 Set `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` on the target Worker when running the direct payment matrix. The Worker records email delivery markers so release smoke can prove customer/admin order emails would render without calling Resend.
 

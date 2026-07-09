@@ -1,6 +1,6 @@
 {
   "name": "store",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
   "main": "index.js",
   "directories": {
@@ -35,6 +35,8 @@
     "catalog:generate": "ruby ./scripts/generate-catalog-snapshot.rb",
     "secrets:dev": "./scripts/configure-dev-secrets.sh",
     "setup:deploy": "node ./scripts/setup-deploy.mjs",
+    "backup:plan": "node ./scripts/store-backup.mjs --dry-run",
+    "backup:snapshot": "node ./scripts/store-backup.mjs",
     "podman:doctor": "./scripts/podman-doctor.sh",
     "podman:self-check": "./scripts/podman-self-check.sh",
     "test:security": "vitest run --config vitest.security.config.mts",

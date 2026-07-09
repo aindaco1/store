@@ -4,7 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Release target: `v1.0.5`.
+- Release target: `v1.0.6`.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -51,6 +51,7 @@ For release environment setup:
 
 ```bash
 npm run setup:deploy -- --mode=local
+npm run backup:plan
 npm run setup:deploy -- --mode=production --dry-run
 npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 ```

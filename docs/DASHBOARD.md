@@ -57,7 +57,7 @@ Current Settings sections:
 - Advanced performance: intent prefetch and live inventory cache controls.
 - Debug: console logging flags.
 - Secrets & credentials: read-only status checks for required and optional runtime secrets.
-- Runtime diagnostics: current site base, Worker base, and CORS allowed origin.
+- Runtime diagnostics: current site base, Worker base, CORS allowed origin, Workers Cache gateway state, and cached admin Orders entrypoint state.
 
 Settings media fields use upload controls and image previews rather than manual path-only editing where supported.
 
@@ -186,6 +186,14 @@ Current behavior:
 - Mark ticket/RSVP rows checked in or unchecked. Single-action check-in controls use the same responsive button sizing as other order actions so they fit inside desktop tables and mobile rows.
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
+
+Performance/cache behavior:
+
+- Non-search list/filter/page reads can use the Worker `CachedAdminStoreOrders` inner entrypoint after the gateway authenticates the admin.
+- The browser still receives a private/no-store response with the authenticated `user`; the cacheable inner response omits user identity.
+- Free-text search requests bypass Workers Cache.
+- The response payload includes `page.cache.workers` metadata, and the response headers include `X-Store-Workers-Cache` and `X-Store-Workers-Cache-Entry` when the cached entrypoint is used.
+- Order mutations purge the admin Orders cache tags through the same invalidation path that refreshes the order index.
 
 Snipcart import:
 
