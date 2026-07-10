@@ -93,9 +93,15 @@ Orders accepts validated `since` and `watermark` values. A matching first-page n
 
 Mutation invalidation maps low-cardinality `orders`, `order-index`, `analytics`, `inventory`, `products`, `downloads`, and `marketing` domains to cache tags. Purge failure never fails the underlying mutation; it writes only a bounded seven-day `workers-cache-purge-failure:recent` diagnostic. Super-admin and deploy-secret purges clear all known route tags. The default versioned cache key remains in place; `cross_version_cache` stays off.
 
+The shared materialized order index has a seven-day safety TTL and is explicitly invalidated by every order-changing path. The longer TTL avoids periodic full namespace rescans while retaining bounded recovery if an invalidation is ever missed. Scheduled cache evidence scopes Analytics Engine rows to the current Worker deployment and reports weighted p50/p95/p99/min/max plus the slowest sample's cache and operation-budget state; recent deployments are `inconclusive` until the stability window passes.
+
 Every cached inner fetch is an additional billed Workers request, including hits. `writeBudget` and the benchmark harness distinguish that request from avoided order KV list/get and R2 list/head work. Analytics Engine adds one asynchronous data-point write per eligible read but avoids per-hit KV counters. Use labeled disabled/enabled `npm run cache:benchmark` runs plus `npm run cache:compare` for metadata-only latency/status evidence; never persist response bodies, cookies, or tokens.
 
 `POST /admin/workers-cache/evidence` is the scheduled read-only probe. It accepts only `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs three fixed Orders reads (full, no-change warmup, and identical no-change repeat), and returns cache status, timing, response-size, unchanged state, and operation budgets without Store rows. It cannot purge, change settings, or call checkout/fulfillment/provider mutations. `.github/workflows/workers-cache-evidence.yml` queries `store_workers_cache_metrics` nightly and calls this probe only under its configured cache-read traffic ceiling.
+
+## Inventory Recovery
+
+`POST /admin/store/recovery/inventory-reconciliation` is a super-admin session/CSRF route for rebuilding Durable Object claimed inventory from confirmed Store orders without importing Durable Object storage. `plan` captures current/expected inventory, active reservation counts, the order watermark, and an aggregate read-only Stripe PaymentIntent comparison in one fingerprinted 15-minute plan. A different super admin must `approve`; only the requester may `execute`, with `STORE_INVENTORY_RECONCILE`, maintenance, Stripe-webhook pause, and reservation-review confirmations. Orphaned/over-limit SKUs, stale fingerprints, incomplete or mismatched Stripe comparison, and same-operator approval all block execution. Responses and audit rows contain aggregate counts/reason categories, not order, customer, PaymentIntent, or credential values.
 
 ## Secrets
 
@@ -125,6 +131,8 @@ Operationally important optional secrets:
 - `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_REF`, `GITHUB_WORKFLOW`, and `GITHUB_MEDIA_OPTIMIZATION_WORKFLOW`: production admin publish/rebuild/media workflow integration. Set owner/repo/ref explicitly; do not rely on legacy helper fallbacks.
 - `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN`: read-only Cloudflare GraphQL/Analytics Engine access for plan usage, cache evidence, and recovery traffic preflight. Keep it separate from the deploy token where possible.
 - `STORE_BACKUP_ENCRYPTION_RECIPIENT`, `STORE_BACKUP_AGE_IDENTITY`, and a fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN`: approval-gated quarterly captured-data drill inputs. Use a dedicated recovery identity and never treat the one-time admin token as a reusable scheduled credential.
+- `STRIPE_RECOVERY_READ_KEY`: restricted live-mode read-only Stripe key used only for captured-order PaymentIntent comparison; test-mode or write-capable keys must not be substituted.
+- `STORE_RECOVERY_ARCHIVE_S3_URI`, `STORE_RECOVERY_ARCHIVE_AWS_ACCESS_KEY_ID`, and `STORE_RECOVERY_ARCHIVE_AWS_SECRET_ACCESS_KEY`: protected off-account encrypted archive destination and credentials. The workflow verifies both archive and receipt after upload before decrypting locally for preview rehearsal.
 - `ADMIN_LOCAL_REPO_TOKEN`: optional local sidecar bearer token; falls back to `ADMIN_SECRET` in local dev.
 
 Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in Cloudflare Worker secrets or GitHub repository secrets for deploy-only credentials.

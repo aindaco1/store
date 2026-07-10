@@ -11,7 +11,12 @@ required_names=(
   STORE_BACKUP_ENCRYPTION_RECIPIENT
   STORE_BACKUP_AGE_IDENTITY
   STORE_BACKUP_ADMIN_LOGIN_TOKEN
+  STRIPE_SECRET_KEY
   STORE_RECOVERY_PREVIEW_R2_BUCKET
+  STORE_RECOVERY_ARCHIVE_S3_URI
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
+  AWS_REGION
   WORKER_BASE
 )
 
@@ -39,6 +44,17 @@ if ! command -v age >/dev/null 2>&1; then
   echo "age is required for the protected recovery drill." >&2
   exit 1
 fi
+if ! command -v aws >/dev/null 2>&1; then
+  echo "AWS CLI is required for the durable off-account recovery archive." >&2
+  exit 1
+fi
+
+node -e '
+  const value = String(process.argv[1] || "").trim();
+  if (!/^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9](?:\/[A-Za-z0-9._\/-]+)?$/.test(value) || value.includes("..")) {
+    throw new Error("STORE_RECOVERY_ARCHIVE_S3_URI must be a bounded S3 bucket/prefix URI.");
+  }
+' "$STORE_RECOVERY_ARCHIVE_S3_URI"
 
 WORK_DIR="$(mktemp -d "${RUNNER_TEMP:-/tmp}/store-protected-recovery.XXXXXX")"
 IDENTITY_FILE="${WORK_DIR}/age-identity.txt"
@@ -47,10 +63,27 @@ DECRYPTED_ARCHIVE="${WORK_DIR}/store-backup.tar.gz"
 SNAPSHOT_DIR="${WORK_DIR}/snapshot"
 EVIDENCE_DIR="${STORE_RECOVERY_DRILL_EVIDENCE_DIR:-${WORK_DIR}/evidence}"
 RESTORE_RESULT="${WORK_DIR}/restore-result.json"
+RESTORE_VERIFICATION_RESULT="${WORK_DIR}/restore-verification.json"
+RESTORE_CLEANUP_RESULT="${WORK_DIR}/restore-cleanup.json"
+OFF_ACCOUNT_ARCHIVE_COPY="${WORK_DIR}/off-account-store-backup.tar.gz.age"
+OFF_ACCOUNT_RECEIPT_COPY="${WORK_DIR}/off-account-manifest.json"
+RECONCILIATION_RESULT="${EVIDENCE_DIR}/captured-reconciliation.json"
+PREVIEW_RESTORE_STARTED=false
 
 cleanup() {
-  rm -rf "$SNAPSHOT_DIR" "$DECRYPTED_ARCHIVE" "$IDENTITY_FILE" "$RESTORE_RESULT"
+  status=$?
+  if [ "$PREVIEW_RESTORE_STARTED" = true ] && [ -f "${SNAPSHOT_DIR}/manifest.json" ]; then
+    node ./scripts/store-restore.mjs \
+      --snapshot="$SNAPSHOT_DIR" \
+      --target=preview \
+      --preview-r2-bucket="$STORE_RECOVERY_PREVIEW_R2_BUCKET" \
+      --cleanup-preview \
+      --acknowledge-preview-cleanup=STORE_PREVIEW_RESTORE_CLEANUP \
+      --json >/dev/null 2>&1 || true
+  fi
+  rm -rf "$SNAPSHOT_DIR" "$DECRYPTED_ARCHIVE" "$IDENTITY_FILE" "$RESTORE_RESULT" "$RESTORE_VERIFICATION_RESULT" "$RESTORE_CLEANUP_RESULT" "$OFF_ACCOUNT_ARCHIVE_COPY" "$OFF_ACCOUNT_RECEIPT_COPY"
   rm -rf "${ENCRYPTED_DIR}.staging-"*
+  return "$status"
 }
 trap cleanup EXIT
 
@@ -68,6 +101,7 @@ node ./scripts/store-backup.mjs \
   --remote \
   --kv-values \
   --r2-objects \
+  --require-complete-r2 \
   --admin-exports \
   --worker-base="$WORKER_BASE" \
   --acknowledge-sensitive=STORE_SENSITIVE_BACKUP \
@@ -75,12 +109,45 @@ node ./scripts/store-backup.mjs \
   --encryption-backend=age \
   --skip-build
 
+archive_run_key="${GITHUB_RUN_ID:-manual}-${started_at//[:]/-}"
+archive_uri="${STORE_RECOVERY_ARCHIVE_S3_URI%/}/${archive_run_key}"
+aws s3 cp \
+  "${ENCRYPTED_DIR}/store-backup.tar.gz.age" \
+  "${archive_uri}/store-backup.tar.gz.age" \
+  --only-show-errors
+aws s3 cp \
+  "${ENCRYPTED_DIR}/manifest.json" \
+  "${archive_uri}/manifest.json" \
+  --only-show-errors
+aws s3 ls "${archive_uri}/store-backup.tar.gz.age" >/dev/null
+aws s3 ls "${archive_uri}/manifest.json" >/dev/null
+aws s3 cp \
+  "${archive_uri}/store-backup.tar.gz.age" \
+  "$OFF_ACCOUNT_ARCHIVE_COPY" \
+  --only-show-errors
+aws s3 cp \
+  "${archive_uri}/manifest.json" \
+  "$OFF_ACCOUNT_RECEIPT_COPY" \
+  --only-show-errors
+cmp -s "${ENCRYPTED_DIR}/store-backup.tar.gz.age" "$OFF_ACCOUNT_ARCHIVE_COPY"
+cmp -s "${ENCRYPTED_DIR}/manifest.json" "$OFF_ACCOUNT_RECEIPT_COPY"
+rm -f "$OFF_ACCOUNT_ARCHIVE_COPY" "$OFF_ACCOUNT_RECEIPT_COPY"
+
 age --decrypt \
   --identity "$IDENTITY_FILE" \
   --output "$DECRYPTED_ARCHIVE" \
   "${ENCRYPTED_DIR}/store-backup.tar.gz.age"
 tar -xzf "$DECRYPTED_ARCHIVE" -C "$SNAPSHOT_DIR"
 
+npm run recovery:reconcile -- \
+  --snapshot="$SNAPSHOT_DIR" \
+  --stripe-mode=required \
+  --expected-stripe-mode=live \
+  --maximum-stripe-requests=500 \
+  --output="$RECONCILIATION_RESULT" \
+  --strict
+
+PREVIEW_RESTORE_STARTED=true
 node ./scripts/store-restore.mjs \
   --snapshot="$SNAPSHOT_DIR" \
   --target=preview \
@@ -88,6 +155,22 @@ node ./scripts/store-restore.mjs \
   --execute \
   --conflict=overwrite \
   --json > "$RESTORE_RESULT"
+
+node ./scripts/store-restore.mjs \
+  --snapshot="$SNAPSHOT_DIR" \
+  --target=preview \
+  --preview-r2-bucket="$STORE_RECOVERY_PREVIEW_R2_BUCKET" \
+  --verify \
+  --json > "$RESTORE_VERIFICATION_RESULT"
+
+node ./scripts/store-restore.mjs \
+  --snapshot="$SNAPSHOT_DIR" \
+  --target=preview \
+  --preview-r2-bucket="$STORE_RECOVERY_PREVIEW_R2_BUCKET" \
+  --cleanup-preview \
+  --acknowledge-preview-cleanup=STORE_PREVIEW_RESTORE_CLEANUP \
+  --json > "$RESTORE_CLEANUP_RESULT"
+PREVIEW_RESTORE_STARTED=false
 
 cp "${ENCRYPTED_DIR}/manifest.json" "${EVIDENCE_DIR}/encrypted-snapshot-receipt.json"
 completed_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -97,6 +180,9 @@ node -e '
   const fs = require("node:fs");
   const restore = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
   const receipt = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+  const reconciliation = JSON.parse(fs.readFileSync(process.argv[7], "utf8"));
+  const verification = JSON.parse(fs.readFileSync(process.argv[9], "utf8"));
+  const cleanup = JSON.parse(fs.readFileSync(process.argv[10], "utf8"));
   const evidence = {
     schemaVersion: 1,
     startedAt: process.argv[3],
@@ -104,7 +190,20 @@ node -e '
     durationSeconds: Number(process.argv[5]),
     target: "preview",
     productionWrites: false,
-    stripeOperations: 0,
+    stripeReadOperations: reconciliation.stripe?.compared || 0,
+    stripeWriteOperations: 0,
+    stripeComparisonState: reconciliation.stripe?.state || "unavailable",
+    stripeMismatches: reconciliation.stripe?.mismatches || 0,
+    recoveredOrdersCompared: reconciliation.orders?.total || 0,
+    recoveredSoldSkus: reconciliation.orders?.soldSkus || 0,
+    restoreReadbackVerified: verification.verification?.ok === true,
+    restoredKvRecordsVerified: verification.verification?.kvRecords || 0,
+    restoredR2ObjectsVerified: verification.verification?.r2Objects || 0,
+    previewCleanupVerified: cleanup.cleanup?.ok === true,
+    previewResidualKvRecords: cleanup.cleanup?.residualKvRecords || 0,
+    previewResidualR2Objects: cleanup.cleanup?.residualR2Objects || 0,
+    offAccountArchiveProvider: "s3",
+    offAccountArchiveVerified: process.argv[8] === "true",
     emailOperations: 0,
     sourceArchiveSha256: receipt.archiveSha256 || "",
     includedDataClasses: receipt.includedDataClasses || [],
@@ -123,7 +222,11 @@ node -e '
   "$started_at" \
   "$completed_at" \
   "$((completed_epoch - started_epoch))" \
-  "${EVIDENCE_DIR}/recovery-drill.json"
+  "${EVIDENCE_DIR}/recovery-drill.json" \
+  "$RECONCILIATION_RESULT" \
+  "true" \
+  "$RESTORE_VERIFICATION_RESULT" \
+  "$RESTORE_CLEANUP_RESULT"
 
 rm -f "$RESTORE_RESULT"
 echo "Protected recovery drill completed against the isolated preview target."

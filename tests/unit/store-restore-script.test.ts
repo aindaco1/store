@@ -6,11 +6,13 @@ import { describe, expect, it } from 'vitest';
 import { buildChecksumManifest } from '../../scripts/lib/file-integrity.mjs';
 import {
   buildStoreRestorePlan,
+  cleanupStorePreviewRestore,
   executeStoreRestorePlan,
   productionRestoreGate,
   readAndVerifySnapshot,
   transformKvValuesToRestoreRecords,
-  validateKvRestoreRecords
+  validateKvRestoreRecords,
+  verifyStoreRestorePlan
 } from '../../scripts/store-restore.mjs';
 import { loadStoreDataInventory } from '../../scripts/lib/store-data-inventory.mjs';
 
@@ -93,8 +95,12 @@ describe('Store restore automation', () => {
       key: 'orders:wrong',
       value: JSON.stringify({ orderToken: 'store-order-right', status: 'confirmed', orderDraft: {} })
     }])).toMatchObject({ ok: false });
-    expect(transformKvValuesToRestoreRecords({ key: { value: 'value', metadata: { source: 'test' } } })).toEqual([
-      { key: 'key', value: 'value', metadata: { source: 'test' } }
+    expect(transformKvValuesToRestoreRecords({
+      structured: { value: 'value', metadata: { source: 'test' } },
+      wranglerV4: 'raw value'
+    })).toEqual([
+      { key: 'structured', value: 'value', metadata: { source: 'test' } },
+      { key: 'wranglerV4', value: 'raw value' }
     ]);
   });
 
@@ -149,6 +155,7 @@ describe('Store restore automation', () => {
     });
     expect(execution.ok).toBe(true);
     expect(calls.some((args) => args.includes('bulk') && args.includes('put'))).toBe(true);
+    expect(calls.filter((args) => args.includes('bulk') && args.includes('put'))).toHaveLength(1);
     expect(calls.some((args) => args.includes('admin-store-orders:index:v2') && args.includes('delete'))).toBe(true);
     expect(calls.some((args) => args.some((arg) => arg.includes('admin-session')) && args.includes('put'))).toBe(false);
     fs.rmSync(root, { recursive: true, force: true });
@@ -224,6 +231,99 @@ describe('Store restore automation', () => {
     });
     expect(execution.ok).toBe(false);
     expect(calls).toHaveLength(1);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('reads back preview KV and R2 data without returning keys or values', () => {
+    const root = fixtureSnapshot();
+    const objectPath = path.join(root, 'r2', 'objects', 'downloads', 'fixture.txt');
+    fs.mkdirSync(path.dirname(objectPath), { recursive: true });
+    fs.writeFileSync(objectPath, 'private fixture', { mode: 0o600 });
+    const artifacts = buildChecksumManifest(root, { exclude: ['checksums.json'] });
+    writeJson(path.join(root, 'checksums.json'), { schemaVersion: 1, artifacts });
+    const plan = buildStoreRestorePlan(readAndVerifySnapshot(root), { target: 'preview' });
+    const runner = (_command: string, args: string[]) => {
+      if (args.includes('bulk') && args.includes('get')) {
+        return {
+          status: 0,
+          stdout: JSON.stringify({
+            'orders:store-order-test': JSON.stringify({
+              orderToken: 'store-order-test',
+              status: 'confirmed',
+              orderDraft: { orderToken: 'store-order-test', status: 'confirmed', items: [] }
+            })
+          }),
+          stderr: '',
+          error: ''
+        };
+      }
+      if (args.includes('r2') && args.includes('get')) {
+        const output = args[args.indexOf('--file') + 1];
+        fs.writeFileSync(output, 'private fixture', { mode: 0o600 });
+        return { status: 0, stdout: '', stderr: '', error: '' };
+      }
+      return { status: 1, stdout: '', stderr: 'unexpected command', error: '' };
+    };
+    const evidence = verifyStoreRestorePlan(plan, {
+      target: 'preview',
+      previewR2Bucket: 'store-recovery-drill-preview',
+      runner
+    });
+    expect(evidence).toMatchObject({
+      ok: true,
+      containsCustomerData: false,
+      containsKeys: false,
+      providerWritesExecuted: false,
+      kvFamilies: 1,
+      kvRecords: 1,
+      r2Objects: 1,
+      failures: 0,
+      mismatches: 0
+    });
+    expect(JSON.stringify(evidence)).not.toContain('store-order-test');
+    expect(JSON.stringify(evidence)).not.toContain('private fixture');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('deletes only snapshot-owned preview data and verifies it is absent', () => {
+    const root = fixtureSnapshot();
+    const objectPath = path.join(root, 'r2', 'objects', 'downloads', 'fixture.txt');
+    fs.mkdirSync(path.dirname(objectPath), { recursive: true });
+    fs.writeFileSync(objectPath, 'private fixture', { mode: 0o600 });
+    const artifacts = buildChecksumManifest(root, { exclude: ['checksums.json'] });
+    writeJson(path.join(root, 'checksums.json'), { schemaVersion: 1, artifacts });
+    const plan = buildStoreRestorePlan(readAndVerifySnapshot(root), { target: 'preview' });
+    const calls: string[][] = [];
+    const evidence = cleanupStorePreviewRestore(plan, {
+      target: 'preview',
+      previewR2Bucket: 'store-recovery-drill-preview',
+      acknowledgePreviewCleanup: 'STORE_PREVIEW_RESTORE_CLEANUP',
+      runner: (_command: string, args: string[]) => {
+        calls.push(args);
+        if (args.includes('key') && args.includes('list')) {
+          return { status: 0, stdout: '[]', stderr: '', error: '' };
+        }
+        if (args.includes('r2') && args.includes('get')) {
+          return { status: 1, stdout: '', stderr: 'not found', error: '' };
+        }
+        return { status: 0, stdout: '', stderr: '', error: '' };
+      }
+    });
+    expect(evidence).toMatchObject({
+      ok: true,
+      productionDeletesExecuted: false,
+      kvRecordsTargeted: 1,
+      r2ObjectsTargeted: 1,
+      residualKvRecords: 0,
+      residualR2Objects: 0
+    });
+    expect(calls.some((args) => args.includes('bulk') && args.includes('delete') && args.includes('--preview'))).toBe(true);
+    expect(calls.some((args) => args.includes('r2') && args.includes('delete') && args.includes('--remote'))).toBe(true);
+    expect(() => cleanupStorePreviewRestore(plan, {
+      target: 'production',
+      acknowledgePreviewCleanup: 'STORE_PREVIEW_RESTORE_CLEANUP'
+    })).toThrow(/only.*preview/i);
+    expect(JSON.stringify(evidence)).not.toContain('store-order-test');
     fs.rmSync(root, { recursive: true, force: true });
   });
 });

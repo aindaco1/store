@@ -62,6 +62,7 @@ Performance expectations:
 
 - every `ctx.exports.fetch()` is an additional billed Workers request, including a cache hit; the benefit is avoided inner CPU and backend reads, not a lower request count
 - order mutations invalidate Orders, Analytics, and order-derived inventory; inventory, download-library, and referral mutations invalidate their dependent policies
+- the materialized v2 order index uses a seven-day safety TTL because every order-changing path explicitly invalidates it; this avoids a measured periodic full-order rescan while retaining bounded recovery from a missed invalidation
 - purge failure does not fail a write and records only a bounded failure diagnostic; short TTLs cap stale exposure
 - download readiness lists R2 once and derives attached-file readiness from that listing, avoiding duplicate per-file `head` calls when the list is complete
 - response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters
@@ -99,7 +100,7 @@ npm run cache:compare -- \
 
 The evidence files contain timings, byte counts, cache statuses, bypass reasons, and operation budgets, not response bodies or credentials. The comparator requires correctly labeled schema-v2 artifacts, at least 30 repeated samples, zero order-data KV list/get operations on warm/no-change hits, at least 40% p95 improvement, expected search bypasses, and a bounded post-purge refill. Mutation freshness and normal-traffic aggregate hit ratios remain separate production gates. Podman validates the application contract but cannot prove Cloudflare edge behavior.
 
-`.github/workflows/workers-cache-evidence.yml` runs at `03:17 America/Denver` on `main`. It queries the prior 24 hours from Analytics Engine and calls `POST /admin/workers-cache/evidence` only when recent cache-read traffic is below the configured threshold. That endpoint requires `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs three fixed read-only Orders probes (full, no-change warmup, and identical no-change repeat), and returns metrics only. The scheduled workflow cannot purge or change configuration.
+`.github/workflows/workers-cache-evidence.yml` runs at `03:17 America/Denver` on `main`. It resolves the current Worker deployment, queries only rows since that deployment, and reports weighted p50/p95/p99/min/max plus cache/operation details for the slowest row. Evidence remains `inconclusive` during the configured stability window or when sample count is low, preventing deployments from contaminating a hit-ratio conclusion. It calls `POST /admin/workers-cache/evidence` only when recent cache-read traffic is below the configured threshold. That endpoint requires `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs three fixed read-only Orders probes (full, no-change warmup, and identical no-change repeat), and returns metrics only. The scheduled workflow cannot purge or change configuration.
 
 Verify Worker Cache config before deploys that touch cached entrypoints:
 

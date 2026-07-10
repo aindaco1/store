@@ -15,8 +15,8 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, check-in links, Resend receipts, abandoned-checkout reminders, and event reminders.
 - Public Spanish shells exist for home, Terms, Orders, and Order Success; product titles/descriptions stay creator-authored unless a product defines localized overrides.
 - Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
-- Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, and the `CachedAdminStoreReads` Workers Cache entrypoint. Analytics, inventory, and download readiness use the same reviewed entrypoint but remain disabled by default pending real-edge benchmark evidence. Sanitized Analytics Engine telemetry, disabled/enabled comparison gates, a scoped nightly probe, kill switches, and the incident runbook support measured rollout.
-- Backup and disaster recovery use a canonical Store data inventory, checksum-verified snapshot v2 manifests, encrypted sensitive exports, guarded restore planning, preview-only R2 isolation, retention/readiness planning, release-smoke evidence, weekly representative Podman drills, and a disabled-by-default protected quarterly captured-data workflow.
+- Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, an explicitly invalidated seven-day materialized index, and the `CachedAdminStoreReads` Workers Cache entrypoint. Analytics, inventory, and download readiness use the same reviewed entrypoint but remain disabled pending route-specific real-edge evidence. Deployment-scoped weighted telemetry, disabled/enabled comparison gates, a scoped nightly probe, kill switches, and the incident runbook support measured rollout.
+- Backup and disaster recovery use a canonical Store data inventory, checksum-verified snapshot v2 manifests, complete/chunked encrypted KV/R2 capture, guarded restore planning, read-only Store/Stripe reconciliation, maker/checker Durable Object inventory recovery, preview readback/cleanup, retention/readiness planning, weekly representative Podman drills, and a disabled-by-default protected quarterly workflow with off-account archive gates.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
 ## Local Development
@@ -52,6 +52,7 @@ npm run backup:inventory:audit
 npm run backup:readiness
 npm run backup:retention -- --root "$HOME/store-backups"
 npm run restore:rehearse
+npm run recovery:reconcile -- --snapshot /secure/decrypted/store-snapshot --stripe-mode=off
 npm run recovery:traffic-preflight -- --maximum-requests=100
 ```
 
@@ -79,7 +80,7 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 - `worker/src/coupons.js` - coupon normalization, storage, and discount application.
 - `worker/src/local-repo-service.mjs` - local admin publish sidecar for dev.
 - `config/store-data-inventory.json` - canonical KV/R2/Durable Object backup and restore classification.
-- `scripts/store-backup.mjs`, `scripts/store-restore.mjs`, `scripts/backup-readiness.mjs`, and `scripts/backup-retention.mjs` - guarded snapshot, restore, readiness, and retention tooling.
+- `scripts/store-backup.mjs`, `scripts/store-restore.mjs`, `scripts/recovery-reconciliation.mjs`, `scripts/backup-readiness.mjs`, and `scripts/backup-retention.mjs` - guarded snapshot, restore/readback/cleanup, reconciliation, readiness, and retention tooling.
 
 ## Docs
 
@@ -98,4 +99,4 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 
 ## Production Operations
 
-Store is live on the production storefront and Worker domains. Production deploys are manual through **Deploy Production**; merging a release branch or pushing a release tag does not deploy by itself. Deploy, cache evidence, and protected recovery share production concurrency. **Workers Cache Evidence** runs nightly with read-only credentials, **Recovery Readiness** runs weekly with synthetic data, and **Quarterly Recovery Operations** runs a Worker-wide traffic preflight while keeping captured-data restore disabled until the protected recovery environment, dedicated key, fresh one-time admin token, and preview resources are approved. Ongoing production work remains operational: keep provider credentials/accounts current and rerun production smoke/reconciliation after checkout, fulfillment, admin, or catalog changes.
+Store is live on the production storefront and Worker domains. Production deploys are manual through **Deploy Production**; merging a release branch or pushing a release tag does not deploy by itself. Deploy, cache evidence, and protected recovery share production concurrency. **Workers Cache Evidence** runs nightly with read-only credentials, **Recovery Readiness** runs weekly with synthetic data, and **Quarterly Recovery Operations** runs a Worker-wide traffic preflight while keeping captured-data restore disabled until a fresh admin token, restricted live Stripe read key, durable off-account S3 destination, and operator approval are available. The protected environment, dedicated age identity, preview KV, and preview R2 bucket are configured. Ongoing production work remains operational: keep provider credentials/accounts current and rerun production smoke/reconciliation after checkout, fulfillment, admin, or catalog changes.

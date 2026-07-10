@@ -167,7 +167,7 @@ The recovery rehearsal uses that wrapper directly:
 npm run restore:rehearse -- --output=/tmp/store-recovery-rehearsal.json
 ```
 
-It creates a checksum-covered synthetic snapshot with physical, digital, ticket, RSVP, failed-payment, idempotency, reminder, audit, inventory, quarantine, derived-repair, and R2 fixtures. Restore commands are injected/no-op provider calls; the live Podman Worker is used only to prove unauthenticated admin responses remain private/no-store. No production value or provider write enters the drill.
+It creates a checksum-covered synthetic snapshot with physical, digital, ticket, RSVP, failed-payment, idempotency, reminder, audit, inventory, quarantine, derived-repair, and R2 fixtures. Restore commands are injected/no-op provider calls, and the reconciliation path uses a fake read-only Stripe response while asserting zero provider writes. The live Podman Worker is used only to prove unauthenticated admin responses remain private/no-store. No production value or provider write enters the drill; Podman does not prove Cloudflare edge caching or captured-production recoverability.
 
 ## CI And Release Evidence
 

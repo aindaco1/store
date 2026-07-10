@@ -6,6 +6,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['tests/setup/browser-env.ts'],
     include: ['tests/unit/**/*.test.ts'],
+    testTimeout: 15000,
+    hookTimeout: 10000,
     coverage: {
       reporter: ['text', 'html'],
       include: ['assets/js/**/*.js'],

@@ -6,6 +6,18 @@ import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DATASET = 'store_workers_cache_metrics';
 const HIT_STATUSES = new Set(['HIT', 'UPDATING']);
+const CACHE_STATUSES = Object.freeze([
+  'HIT',
+  'MISS',
+  'EXPIRED',
+  'REVALIDATED',
+  'UPDATING',
+  'STALE',
+  'BYPASS',
+  'DISABLED',
+  'UNAVAILABLE',
+  'ERROR'
+]);
 
 function valueArg(args, name, fallback = '') {
   const exact = args.indexOf(name);
@@ -54,28 +66,65 @@ function normalizedWorkerBase(value) {
   return url.origin;
 }
 
+function normalizedScriptName(value) {
+  const scriptName = String(value || '').trim();
+  if (!scriptName) return '';
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(scriptName)) {
+    throw new Error('Cloudflare Worker script name is invalid.');
+  }
+  return scriptName;
+}
+
+function normalizedQueryStart(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) throw new Error('Workers Cache analytics start time is invalid.');
+  return parsed.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function statusColumn(status) {
+  const camel = status.toLowerCase().replace(/_([a-z])/g, (_, character) => character.toUpperCase());
+  return `${camel}Requests`;
+}
+
 export function buildWorkersCacheAnalyticsQuery(options = {}) {
   const dataset = normalizedDataset(options.dataset);
   const hours = boundedInteger(options.hours, 24, 1, 168);
   const recentMinutes = boundedInteger(options.recentMinutes, 15, 5, 120);
+  const queryStart = normalizedQueryStart(options.since);
+  const timePredicate = queryStart
+    ? `timestamp >= toDateTime('${queryStart}')`
+    : `timestamp >= NOW() - INTERVAL '${hours}' HOUR`;
+  const statusColumns = CACHE_STATUSES.map((status) =>
+    `  SUM(if(blob3 = '${status}', _sample_interval, 0)) AS ${statusColumn(status)}`
+  ).join(',\n');
   return `SELECT
   blob2 AS route,
-  blob3 AS status,
   SUM(_sample_interval) AS estimatedRequests,
   SUM(if(timestamp >= NOW() - INTERVAL '${recentMinutes}' MINUTE, _sample_interval, 0)) AS recentEstimatedRequests,
   SUM(_sample_interval * double1) / SUM(_sample_interval) AS averageDurationMs,
+  quantileExactWeighted(0.50)(double1, _sample_interval) AS p50DurationMs,
+  quantileExactWeighted(0.95)(double1, _sample_interval) AS p95DurationMs,
+  quantileExactWeighted(0.99)(double1, _sample_interval) AS p99DurationMs,
+  MIN(double1) AS minimumDurationMs,
+  MAX(double1) AS maximumDurationMs,
+  argMax(blob3, double1) AS maximumDurationStatus,
+  argMax(double4, double1) AS maximumDurationKvReadsExpected,
+  argMax(double5, double1) AS maximumDurationKvListExpected,
   SUM(_sample_interval * double2) AS responseBytes,
   SUM(_sample_interval * double3) AS workersRequestsExpected,
   SUM(_sample_interval * double4) AS kvReadsExpected,
   SUM(_sample_interval * double5) AS kvListExpected,
   SUM(_sample_interval * double6) AS r2ReadsExpected,
   SUM(_sample_interval * double7) AS r2ListExpected,
-  SUM(_sample_interval * double8) AS providerCallsExpected
+  SUM(_sample_interval * double8) AS providerCallsExpected,
+${statusColumns}
 FROM ${dataset}
-WHERE timestamp >= NOW() - INTERVAL '${hours}' HOUR
+WHERE ${timePredicate}
   AND blob1 = 'store-workers-cache-v1'
-GROUP BY route, status
-ORDER BY route, status`;
+  AND blob5 = 'enabled'
+GROUP BY route
+ORDER BY route`;
 }
 
 function responseRows(value) {
@@ -99,7 +148,6 @@ export function summarizeWorkersCacheAnalytics(rows = [], options = {}) {
 
   for (const rawRow of rows) {
     const route = String(rawRow?.route || '').trim().toLowerCase();
-    const status = String(rawRow?.status || 'UNKNOWN').trim().toUpperCase();
     if (!['orders', 'analytics', 'inventory', 'downloads'].includes(route)) continue;
     if (!routes.has(route)) {
       routes.set(route, {
@@ -108,6 +156,10 @@ export function summarizeWorkersCacheAnalytics(rows = [], options = {}) {
         recentEstimatedRequests: 0,
         cacheStatuses: {},
         weightedDuration: 0,
+        latencyMs: { p50: 0, p95: 0, p99: 0, min: 0, max: 0 },
+        maximumDurationStatus: 'UNKNOWN',
+        maximumDurationKvReadsExpected: 0,
+        maximumDurationKvListExpected: 0,
         responseBytes: 0,
         workersRequestsExpected: 0,
         kvReadsExpected: 0,
@@ -122,8 +174,26 @@ export function summarizeWorkersCacheAnalytics(rows = [], options = {}) {
     const recent = numeric(rawRow.recentEstimatedRequests);
     summary.estimatedRequests += count;
     summary.recentEstimatedRequests += recent;
-    summary.cacheStatuses[status] = (summary.cacheStatuses[status] || 0) + count;
+    const legacyStatus = String(rawRow?.status || '').trim().toUpperCase();
+    if (legacyStatus) {
+      summary.cacheStatuses[legacyStatus] = (summary.cacheStatuses[legacyStatus] || 0) + count;
+    } else {
+      for (const status of CACHE_STATUSES) {
+        const statusCount = numeric(rawRow[statusColumn(status)]);
+        if (statusCount > 0) summary.cacheStatuses[status] = statusCount;
+      }
+    }
     summary.weightedDuration += numeric(rawRow.averageDurationMs) * count;
+    summary.latencyMs = {
+      p50: numeric(rawRow.p50DurationMs),
+      p95: numeric(rawRow.p95DurationMs),
+      p99: numeric(rawRow.p99DurationMs),
+      min: numeric(rawRow.minimumDurationMs),
+      max: numeric(rawRow.maximumDurationMs)
+    };
+    summary.maximumDurationStatus = String(rawRow.maximumDurationStatus || 'UNKNOWN').trim().toUpperCase();
+    summary.maximumDurationKvReadsExpected = numeric(rawRow.maximumDurationKvReadsExpected);
+    summary.maximumDurationKvListExpected = numeric(rawRow.maximumDurationKvListExpected);
     for (const key of [
       'responseBytes',
       'workersRequestsExpected',
@@ -153,6 +223,13 @@ export function summarizeWorkersCacheAnalytics(rows = [], options = {}) {
       averageDurationMs: summary.estimatedRequests > 0
         ? Number((summary.weightedDuration / summary.estimatedRequests).toFixed(2))
         : 0,
+      latencyMs: summary.latencyMs,
+      maximumDurationSample: {
+        status: summary.maximumDurationStatus,
+        durationMs: summary.latencyMs.max,
+        kvReadsExpected: summary.maximumDurationKvReadsExpected,
+        kvListExpected: summary.maximumDurationKvListExpected
+      },
       responseBytes: summary.responseBytes,
       workersRequestsExpected: summary.workersRequestsExpected,
       kvReadsExpected: summary.kvReadsExpected,
@@ -173,6 +250,69 @@ export function summarizeWorkersCacheAnalytics(rows = [], options = {}) {
     lowTraffic: recentEstimatedRequests <= maxRecentRequests,
     routes: routeSummaries,
     gatesPassed: routeSummaries.every((route) => route.gatePassed)
+  };
+}
+
+function deploymentRows(value) {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.deployments)) return value.deployments;
+  if (Array.isArray(value?.result?.deployments)) return value.result.deployments;
+  return [];
+}
+
+function readWorkerDeployments(filePath) {
+  if (!filePath) return null;
+  const resolved = path.resolve(filePath);
+  const stat = fs.lstatSync(resolved);
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    throw new Error('Cloudflare Worker deployments evidence must be a regular file.');
+  }
+  return deploymentRows(JSON.parse(fs.readFileSync(resolved, 'utf8')));
+}
+
+async function queryWorkerDeployments({ accountId, apiToken, scriptName, fetchImpl = fetch }) {
+  const response = await fetchImpl(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${encodeURIComponent(scriptName)}/deployments`,
+    {
+      headers: { Authorization: `Bearer ${apiToken}`, Accept: 'application/json' },
+      redirect: 'error'
+    }
+  );
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`Cloudflare Worker deployments query failed with status ${response.status}.`);
+  return deploymentRows(body);
+}
+
+export function summarizeWorkerDeployments(deployments = [], options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date(options.now || Date.now());
+  const hours = boundedInteger(options.hours, 24, 1, 168);
+  const minimumStableHours = boundedNumber(options.minimumStableHours, 4, 0, 168);
+  const startMs = now.getTime() - (hours * 60 * 60 * 1000);
+  const normalized = deployments.map((deployment) => {
+    const createdAt = new Date(String(deployment?.created_on || deployment?.createdAt || ''));
+    return {
+      createdAt,
+      trigger: String(deployment?.annotations?.['workers/triggered_by'] || deployment?.trigger || 'unknown')
+        .trim().toLowerCase().slice(0, 48)
+    };
+  }).filter((deployment) => Number.isFinite(deployment.createdAt.getTime()) && deployment.createdAt <= now)
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+  const latest = normalized[0] || null;
+  const latestAgeHours = latest
+    ? Math.max(0, (now.getTime() - latest.createdAt.getTime()) / (60 * 60 * 1000))
+    : null;
+  const deploymentsInWindow = normalized.filter((deployment) => deployment.createdAt.getTime() >= startMs);
+  return {
+    checked: true,
+    deploymentsInWindow: deploymentsInWindow.length,
+    latestDeploymentAt: latest?.createdAt.toISOString() || '',
+    latestDeploymentTrigger: latest?.trigger || '',
+    latestDeploymentAgeHours: latestAgeHours === null ? null : Number(latestAgeHours.toFixed(2)),
+    minimumStableHours,
+    stable: latestAgeHours === null || latestAgeHours >= minimumStableHours,
+    analyticsSince: latest && latest.createdAt.getTime() >= startMs ? latest.createdAt.toISOString() : '',
+    containsDeploymentIds: false,
+    containsAuthorIdentity: false
   };
 }
 
@@ -233,7 +373,43 @@ export async function collectWorkersCacheObservability(options = {}) {
   if (!apiToken) throw new Error('Workers Cache observability requires a Cloudflare Analytics API token.');
   const hours = boundedInteger(options.hours, 24, 1, 168);
   const recentMinutes = boundedInteger(options.recentMinutes, 15, 5, 120);
-  const query = buildWorkersCacheAnalyticsQuery({ dataset: options.dataset, hours, recentMinutes });
+  const scriptName = normalizedScriptName(options.scriptName);
+  const deploymentApiToken = String(options.deploymentApiToken || apiToken).trim();
+  let deployments = {
+    checked: false,
+    deploymentsInWindow: 0,
+    latestDeploymentAt: '',
+    latestDeploymentTrigger: '',
+    latestDeploymentAgeHours: null,
+    minimumStableHours: boundedNumber(options.minimumStableHours, 4, 0, 168),
+    stable: true,
+    analyticsSince: '',
+    containsDeploymentIds: false,
+    containsAuthorIdentity: false
+  };
+  if (scriptName) {
+    const deploymentFileData = readWorkerDeployments(options.deploymentsFile);
+    if (!deploymentFileData && !deploymentApiToken) {
+      throw new Error('Workers Cache deployment evidence requires a Cloudflare Workers read token or deployments file.');
+    }
+    const deploymentData = deploymentFileData || await queryWorkerDeployments({
+      accountId,
+      apiToken: deploymentApiToken,
+      scriptName,
+      fetchImpl: options.fetchImpl
+    });
+    deployments = summarizeWorkerDeployments(deploymentData, {
+      hours,
+      minimumStableHours: options.minimumStableHours,
+      now: options.now
+    });
+  }
+  const query = buildWorkersCacheAnalyticsQuery({
+    dataset: options.dataset,
+    hours,
+    recentMinutes,
+    since: deployments.analyticsSince
+  });
   const rows = await queryAnalyticsEngine({ accountId, apiToken, query, fetchImpl: options.fetchImpl });
   const analytics = summarizeWorkersCacheAnalytics(rows, options);
   const workerBase = normalizedWorkerBase(options.workerBase);
@@ -258,8 +434,17 @@ export async function collectWorkersCacheObservability(options = {}) {
   const evaluatedProbe = probeGate(probe);
   const requestedProbeUnavailable = probeRequested && analytics.lowTraffic &&
     (!workerBase || !evidenceSecret);
+  const evaluatedRoutes = analytics.routes.filter((route) => route.evidenceState === 'evaluated');
+  let acceptanceState = 'passed';
+  if (!evaluatedProbe.passed || requestedProbeUnavailable) {
+    acceptanceState = 'failed';
+  } else if (!deployments.stable || evaluatedRoutes.length === 0) {
+    acceptanceState = 'inconclusive';
+  } else if (!analytics.gatesPassed) {
+    acceptanceState = 'failed';
+  }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     dataset: normalizedDataset(options.dataset),
     hours,
@@ -272,10 +457,15 @@ export async function collectWorkersCacheObservability(options = {}) {
       maxRecentRequests: analytics.maxRecentRequests,
       lowTraffic: analytics.lowTraffic
     },
+    deployments,
     acceptance: {
       minimumRequests: analytics.minimumRequests,
       minimumHitRatioPercent: analytics.minimumHitRatioPercent,
-      passed: analytics.gatesPassed && evaluatedProbe.passed && !requestedProbeUnavailable
+      minimumStableHours: deployments.minimumStableHours,
+      evaluatedRoutes: evaluatedRoutes.map((route) => route.route),
+      state: acceptanceState,
+      conclusive: acceptanceState !== 'inconclusive',
+      passed: acceptanceState === 'passed'
     },
     routes: analytics.routes,
     probe: probe ? {
@@ -302,13 +492,16 @@ function writeOutput(output, value) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
-    console.log('Usage: node scripts/workers-cache-observability.mjs [--hours=24] [--recent-minutes=15] [--max-recent-requests=25] [--minimum-requests=10] [--minimum-hit-ratio-percent=50] [--no-probe] [--output=FILE] [--strict]');
-    console.log('Requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_ANALYTICS_API_TOKEN. A low-traffic probe also requires WORKER_BASE and WORKERS_CACHE_EVIDENCE_SECRET.');
+    console.log('Usage: node scripts/workers-cache-observability.mjs [--hours=24] [--recent-minutes=15] [--max-recent-requests=25] [--minimum-requests=10] [--minimum-hit-ratio-percent=50] [--minimum-stable-hours=4] [--worker-script=NAME] [--deployments-file=FILE] [--no-probe] [--output=FILE] [--strict]');
+    console.log('Requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_ANALYTICS_API_TOKEN. Deployment-aware evidence also requires CLOUDFLARE_WORKERS_API_TOKEN and a Worker script name. A low-traffic probe requires WORKER_BASE and WORKERS_CACHE_EVIDENCE_SECRET.');
     return;
   }
   const result = await collectWorkersCacheObservability({
     accountId: process.env.CLOUDFLARE_ACCOUNT_ID,
     apiToken: process.env.CLOUDFLARE_ANALYTICS_API_TOKEN || process.env.CLOUDFLARE_USAGE_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN,
+    deploymentApiToken: process.env.CLOUDFLARE_WORKERS_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN || '',
+    scriptName: valueArg(args, '--worker-script', process.env.CLOUDFLARE_WORKER_SCRIPT_NAME || ''),
+    deploymentsFile: valueArg(args, '--deployments-file', ''),
     dataset: valueArg(args, '--dataset', process.env.WORKERS_CACHE_ANALYTICS_DATASET || DEFAULT_DATASET),
     workerBase: valueArg(args, '--worker-base', process.env.WORKER_BASE || ''),
     evidenceSecret: process.env.WORKERS_CACHE_EVIDENCE_SECRET || '',
@@ -318,11 +511,12 @@ async function main() {
     maxRecentRequests: valueArg(args, '--max-recent-requests', '25'),
     minimumRequests: valueArg(args, '--minimum-requests', '10'),
     minimumHitRatioPercent: valueArg(args, '--minimum-hit-ratio-percent', '50'),
+    minimumStableHours: valueArg(args, '--minimum-stable-hours', '4'),
     probe: !args.includes('--no-probe')
   });
   writeOutput(valueArg(args, '--output', ''), result);
   console.log(JSON.stringify(result, null, 2));
-  if (args.includes('--strict') && !result.acceptance.passed) process.exitCode = 1;
+  if (args.includes('--strict') && result.acceptance.state === 'failed') process.exitCode = 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
