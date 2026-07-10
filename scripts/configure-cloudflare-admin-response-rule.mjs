@@ -86,14 +86,15 @@ export async function verifyAdminResponsePolicy(options = {}) {
     });
     const body = await response.text();
     const cacheControl = response.headers.get('cache-control') || '';
+    const reportOnlyCsp = response.headers.get('content-security-policy-report-only') || '';
     const directives = cacheControlDirectives(cacheControl);
     const missing = ['private', 'no-store', 'no-transform', 'must-revalidate'].filter((name) => !directives.has(name));
     if (directives.get('max-age') !== '0') missing.push('max-age=0');
     const injected = /challenge-platform\/scripts\/jsd|__CF\$cv|static\.cloudflareinsights\.com\/beacon\.min|data-cf-beacon/i.test(body);
-    if (!response.ok || missing.length || injected) {
-      throw new Error(`Admin response policy verification failed for ${route} (status ${response.status}; missing ${missing.join(',') || 'none'}; edge injection ${injected ? 'present' : 'absent'}).`);
+    if (!response.ok || missing.length || injected || reportOnlyCsp) {
+      throw new Error(`Admin response policy verification failed for ${route} (status ${response.status}; missing ${missing.join(',') || 'none'}; edge injection ${injected ? 'present' : 'absent'}; report-only CSP ${reportOnlyCsp ? 'present' : 'absent'}).`);
     }
-    routes.push({ route, status: response.status, cacheControl, edgeInjection: false });
+    routes.push({ route, status: response.status, cacheControl, edgeInjection: false, reportOnlyCsp: false });
   }
   return {
     schemaVersion: 1,
