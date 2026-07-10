@@ -110,6 +110,10 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('npm run recovery:traffic-preflight');
     expect(workflow).toContain('CLOUDFLARE_WORKER_SCRIPT_NAME');
     expect(workflow).toContain('protected-recovery-drill.sh');
+    const protectedJob = workflow.split('  protected-preview-restore:')[1];
+    const protectedJobHeader = protectedJob.split('    steps:')[0];
+    expect(protectedJobHeader).not.toContain('${{ runner.temp }}');
+    expect(workflow).toContain('STORE_RECOVERY_TRAFFIC_EVIDENCE: ${{ runner.temp }}/recovery-preflight/recovery-traffic-preflight.json');
     expect(drill).toContain('--target=preview');
     expect(drill).toContain('--preview-r2-bucket=');
     expect(drill).toContain('--acknowledge-sensitive=STORE_SENSITIVE_BACKUP');

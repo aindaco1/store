@@ -75,9 +75,6 @@ jobs:
       STORE_BACKUP_ADMIN_LOGIN_TOKEN: ${{ secrets.STORE_BACKUP_ADMIN_LOGIN_TOKEN }}
       STORE_RECOVERY_PREVIEW_R2_BUCKET: ${{ vars.STORE_RECOVERY_PREVIEW_R2_BUCKET }}
       WORKER_BASE: ${{ vars.WORKER_BASE || 'https://checkout.dustwave.xyz' }}
-      STORE_RECOVERY_TRAFFIC_EVIDENCE: ${{ runner.temp }}/recovery-preflight/recovery-traffic-preflight.json
-      STORE_RECOVERY_ENCRYPTED_DIR: ${{ runner.temp }}/store-quarterly-encrypted
-      STORE_RECOVERY_DRILL_EVIDENCE_DIR: ${{ runner.temp }}/store-quarterly-evidence
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -103,6 +100,10 @@ jobs:
 
       - name: Run protected encrypted snapshot and preview restore
         run: ./scripts/protected-recovery-drill.sh
+        env:
+          STORE_RECOVERY_TRAFFIC_EVIDENCE: ${{ runner.temp }}/recovery-preflight/recovery-traffic-preflight.json
+          STORE_RECOVERY_ENCRYPTED_DIR: ${{ runner.temp }}/store-quarterly-encrypted
+          STORE_RECOVERY_DRILL_EVIDENCE_DIR: ${{ runner.temp }}/store-quarterly-evidence
 
       - name: Upload sanitized drill evidence
         if: always()
