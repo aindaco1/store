@@ -23,7 +23,6 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
       CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-      CLOUDFLARE_CACHE_RULES_API_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_RULES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
       SITE_BASE: https://shop.dustwave.xyz
     steps:
       - name: Checkout
@@ -38,4 +37,4 @@ jobs:
         run: npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars
 
       - name: Verify admin response security rule
-        run: npm run cloudflare:admin-response-rule -- --require-current
+        run: npm run cloudflare:admin-response-rule -- --verify-public --require-current

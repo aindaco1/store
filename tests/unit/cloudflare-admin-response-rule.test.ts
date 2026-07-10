@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  ADMIN_RESPONSE_RULE_DESCRIPTION,
   ADMIN_RESPONSE_RULE_PHASE,
   ADMIN_RESPONSE_RULE_REF,
   adminResponseRuleMatches,
   buildAdminResponseRule,
-  configureAdminResponseRule
+  configureAdminResponseRule,
+  verifyAdminResponsePolicy
 } from '../../scripts/configure-cloudflare-admin-response-rule.mjs';
 
 const ZONE_ID = '0123456789abcdef0123456789abcdef';
@@ -105,6 +107,32 @@ describe('Cloudflare admin response rule', () => {
     expect(fetchImpl.mock.calls[1][0]).toContain('/rules/managed-rule');
   });
 
+  it('adopts a matching dashboard-created rule instead of adding a duplicate', async () => {
+    const desired = buildAdminResponseRule(SITE_BASE);
+    const dashboardRule = {
+      id: 'dashboard-rule',
+      ...desired,
+      description: ADMIN_RESPONSE_RULE_DESCRIPTION,
+      ref: 'cloudflare-generated-ref'
+    };
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(apiResponse(ruleset([dashboardRule])))
+      .mockResolvedValueOnce(apiResponse(ruleset([{ id: 'dashboard-rule', ...desired }])));
+
+    const result = await configureAdminResponseRule({
+      apply: true,
+      zoneId: ZONE_ID,
+      token: TOKEN,
+      siteBase: SITE_BASE,
+      fetchImpl
+    });
+
+    expect(result).toMatchObject({ state: 'current', operation: 'update_rule', changed: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl.mock.calls[1][0]).toContain('/rules/dashboard-rule');
+    expect(fetchImpl.mock.calls[1][1].method).toBe('PATCH');
+  });
+
   it('creates the phase entrypoint when it is missing', async () => {
     const desired = { id: 'managed-rule', ...buildAdminResponseRule(SITE_BASE) };
     const fetchImpl = vi.fn()
@@ -124,5 +152,40 @@ describe('Cloudflare admin response rule', () => {
     expect(body).toMatchObject({ kind: 'zone', phase: ADMIN_RESPONSE_RULE_PHASE });
     expect(body.rules).toHaveLength(1);
     expect(adminResponseRuleMatches(body.rules[0], buildAdminResponseRule(SITE_BASE))).toBe(true);
+  });
+
+  it('verifies effective public headers without retaining response bodies', async () => {
+    const fetchImpl = vi.fn(async () => new Response('<!doctype html><title>Admin</title>', {
+      status: 200,
+      headers: { 'Cache-Control': 'max-age=0, private, must-revalidate, no-store, no-transform' }
+    }));
+
+    const result = await verifyAdminResponsePolicy({ siteBase: SITE_BASE, fetchImpl });
+
+    expect(result).toMatchObject({
+      mode: 'public_verification',
+      state: 'current',
+      containsResponseBodies: false,
+      containsCredentials: false,
+      containsCustomerData: false
+    });
+    expect(result.routes).toHaveLength(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails public verification on missing directives or injected edge scripts', async () => {
+    const missingDirective = vi.fn().mockResolvedValue(new Response('<!doctype html>', {
+      status: 200,
+      headers: { 'Cache-Control': 'max-age=600' }
+    }));
+    await expect(verifyAdminResponsePolicy({ siteBase: SITE_BASE, fetchImpl: missingDirective }))
+      .rejects.toThrow('missing private,no-store,no-transform,must-revalidate,max-age=0');
+
+    const injected = vi.fn().mockResolvedValue(new Response('<script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script>', {
+      status: 200,
+      headers: { 'Cache-Control': 'max-age=0, private, must-revalidate, no-store, no-transform' }
+    }));
+    await expect(verifyAdminResponsePolicy({ siteBase: SITE_BASE, fetchImpl: injected }))
+      .rejects.toThrow('edge injection present');
   });
 });

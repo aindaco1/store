@@ -86,13 +86,6 @@ jobs:
       - name: Sync Worker config and catalog
         run: npm run sync:worker-config
 
-      - name: Configure admin response security rule
-        run: npm run cloudflare:admin-response-rule -- --apply --require-current
-        env:
-          CLOUDFLARE_CACHE_RULES_API_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_RULES_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID || secrets.CLOUDFLARE_ZONE }}
-          SITE_BASE: https://shop.dustwave.xyz
-
       - name: Deploy Worker
         working-directory: worker
         run: npx wrangler deploy -c wrangler.toml --env=""
@@ -163,3 +156,8 @@ jobs:
         env:
           CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
           CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Verify admin response security policy
+        run: npm run cloudflare:admin-response-rule -- --verify-public --require-current
+        env:
+          SITE_BASE: https://shop.dustwave.xyz
