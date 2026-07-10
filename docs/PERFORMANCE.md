@@ -54,6 +54,8 @@ The `CachedAdminStoreReads` policy registry owns canonical paths/query fields, n
 
 The gateway authenticates every request, strips credentials/CSRF, and passes only props version, route, normalized role, scope key, and Store access scope. Inner responses are public-cacheable; outer browser responses remain `private, no-store`.
 
+Loopback dispatch specializes the binding before fetching: `ctx.exports.CachedAdminStoreReads({ props }).fetch(request)`. Calling the generic `.fetch()` surface without that factory step does not deliver trusted dynamic `ctx.props`, so the cached entrypoint rejects the request. Tests include the callable-plus-`fetch` binding shape exposed by production Cloudflare.
+
 Orders keys accept only safe filter/page/locale fields plus validated ISO `since` and `orders-v2-<hash>` watermark values. Free-text `q` bypasses Workers Cache because search terms can contain names, email addresses, or order tokens. A matching first-page watermark returns a minimal `unchanged: true` response and leaves the existing PII-bearing payload in memory only.
 
 Performance expectations:

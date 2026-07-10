@@ -64,6 +64,13 @@ describe('package test scripts', () => {
     }
   });
 
+  it('keeps container dependency refreshes lockfile-preserving', () => {
+    const playwrightEntrypoint = readFileSync(join(repoRoot, 'scripts/podman-playwright-entrypoint.sh'), 'utf8');
+
+    expect(playwrightEntrypoint).toContain('npm ci');
+    expect(playwrightEntrypoint).not.toContain('npm install');
+  });
+
   it('does not terminate the Podman wrapper process group when Stripe forwarding is skipped', () => {
     const podmanDev = readFileSync(join(repoRoot, 'scripts/dev-podman.sh'), 'utf8');
 

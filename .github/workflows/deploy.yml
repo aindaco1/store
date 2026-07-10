@@ -101,17 +101,26 @@ jobs:
           fi
 
           response="$(mktemp)"
-          status="$(curl -sS -o "$response" -w "%{http_code}" \
-            -X POST "$WORKERS_CACHE_PURGE_URL" \
-            -H "Authorization: Bearer ${WORKERS_CACHE_PURGE_SECRET}" \
-            -H "Content-Type: application/json" \
-            --data '{"target":"all_known","source":"deploy"}')"
+          for attempt in 1 2 3 4 5 6; do
+            status="$(curl -sS -o "$response" -w "%{http_code}" \
+              -X POST "$WORKERS_CACHE_PURGE_URL" \
+              -H "Authorization: Bearer ${WORKERS_CACHE_PURGE_SECRET}" \
+              -H "Content-Type: application/json" \
+              --data '{"target":"all_known","source":"deploy"}')"
 
-          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
-            echo "Workers Cache purge failed with status $status"
-            cat "$response"
-            exit 1
-          fi
+            if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+              exit 0
+            fi
+            if [ "$status" -lt 500 ] || [ "$attempt" -eq 6 ]; then
+              break
+            fi
+            echo "Workers Cache purge returned transient status $status on attempt $attempt; waiting for Worker propagation."
+            sleep "$((attempt * 5))"
+          done
+
+          echo "Workers Cache purge failed with status $status"
+          cat "$response"
+          exit 1
         env:
           WORKERS_CACHE_PURGE_URL: ${{ vars.WORKERS_CACHE_PURGE_URL || 'https://checkout.dustwave.xyz/admin/workers-cache/purge' }}
           WORKERS_CACHE_PURGE_SECRET: ${{ secrets.WORKERS_CACHE_PURGE_SECRET }}

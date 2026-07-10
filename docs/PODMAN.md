@@ -102,6 +102,8 @@ The Worker smoke validates:
 
 Podman-backed test wrappers reset `worker/.wrangler/state` and `worker/.wrangler/tmp` before starting their isolated stack. That keeps release, security, Worker smoke, and headless E2E runs from reusing corrupt or stale Miniflare SQLite state. Manual `./scripts/dev.sh --podman` keeps local Wrangler state unless you opt in with `PODMAN_RESET_WRANGLER_STATE=true`.
 
+The Playwright container keeps root dependencies in a named volume. When `package-lock.json` changes, it refreshes that volume with `npm ci`, so the bind-mounted repository lockfile is never rewritten by the container's npm version.
+
 Wrappers that start their own stack pass a private `PODMAN_STOP_FILE` into `./scripts/dev.sh --podman`. Cleanup touches that file and waits for the supervisor to exit normally before removing the pod. This avoids signal-based teardown leaking `143` exits into Vitest, Playwright, or pre-merge scripts.
 
 ## Rebuild Images
