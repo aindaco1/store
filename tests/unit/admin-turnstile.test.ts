@@ -30,7 +30,9 @@ describe('admin Turnstile sign-in', () => {
         </form>
         <p id="admin-auth-status"></p>
       </section>
-      <section id="admin-app" hidden></section>
+      <section id="admin-app" hidden>
+        <p id="admin-session-summary"></p>
+      </section>
       <script data-admin-dashboard-script="true" data-canonical-worker-base="https://checkout.dustwave.xyz"></script>
     `;
     (window as any).STORE_CONFIG = {
@@ -69,6 +71,8 @@ describe('admin Turnstile sign-in', () => {
 
     await import('../../assets/js/admin-dashboard.js');
 
+    await waitFor(() => (window as any).turnstile.render.mock.calls.length === 1);
+
     expect((window as any).turnstile.render).toHaveBeenCalledWith(
       document.querySelector('[data-admin-turnstile-widget]'),
       expect.objectContaining({
@@ -88,5 +92,42 @@ describe('admin Turnstile sign-in', () => {
       preferredLang: 'en',
       turnstileToken: 'turnstile-client-token'
     });
+  });
+
+  it('does not load or render the admin challenge for an existing authenticated session', async () => {
+    (window as any).turnstile = {
+      render: vi.fn(() => 'widget-1'),
+      getResponse: vi.fn(() => ''),
+      reset: vi.fn()
+    };
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+      if (String(url).endsWith('/admin/session')) {
+        return jsonResponse({
+          user: { email: 'alonso@dustwave.xyz', role: 'super_admin' },
+          csrfToken: 'csrf-token'
+        });
+      }
+      return jsonResponse({ ok: true });
+    }));
+
+    await import('../../assets/js/admin-dashboard.js');
+
+    await waitFor(() => !(document.getElementById('admin-app') as HTMLElement).hidden);
+    expect((window as any).turnstile.render).not.toHaveBeenCalled();
+    expect(document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')).toBeNull();
+    expect((document.getElementById('admin-auth-panel') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('loads the challenge script after the session endpoint rejects the user', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string | URL | Request) => {
+      if (String(url).endsWith('/admin/session')) return jsonResponse({ error: 'Unauthorized' }, 401);
+      return jsonResponse({ ok: true });
+    }));
+
+    await import('../../assets/js/admin-dashboard.js');
+
+    await waitFor(() => Boolean(document.querySelector('script[src*="challenges.cloudflare.com/turnstile"]')));
+    expect((document.getElementById('admin-auth-panel') as HTMLElement).hidden).toBe(false);
+    expect((document.getElementById('admin-app') as HTMLElement).hidden).toBe(true);
   });
 });

@@ -343,6 +343,14 @@
     return adminTurnstileLoadPromise;
   }
 
+  function loadAdminTurnstileForAuth() {
+    if (!hasAdminTurnstile()) return;
+    ensureAdminTurnstile().catch(function(error) {
+      logger.warn('Admin challenge failed to load', error);
+      setStatus($('#admin-auth-status'), 'Security check failed. Please try again.', true);
+    });
+  }
+
   function adminTurnstileTokenForSubmit() {
     if (!hasAdminTurnstile()) return Promise.resolve('');
     return ensureAdminTurnstile().then(function() {
@@ -871,6 +879,7 @@
     if (authPanel) authPanel.hidden = false;
     if (app) app.hidden = true;
     if (message) setStatus($('#admin-auth-status'), message);
+    loadAdminTurnstileForAuth();
   }
 
   function showApp(data) {
@@ -912,12 +921,6 @@
   function setupAuth() {
     var form = adminLoginForm || $('#admin-login-form');
     if (!form) return;
-    if (hasAdminTurnstile()) {
-      ensureAdminTurnstile().catch(function(error) {
-        logger.warn('Admin challenge failed to load', error);
-        setStatus($('#admin-auth-status'), 'Security check failed. Please try again.', true);
-      });
-    }
     form.addEventListener('submit', function(event) {
       event.preventDefault();
       var emailField = $('#admin-email');
