@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fetchAdminExport, exchangeAdminLoginToken } from './lib/admin-export-client.mjs';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
 import { buildChecksumManifest, enforcePrivatePermissions, sha256File } from './lib/file-integrity.mjs';
+import { transformKvBackupValuesToPutRecords } from './lib/kv-backup-records.mjs';
 import {
   loadStoreDataInventory,
   storeKvBackupFamilies,
@@ -87,6 +88,7 @@ Options:
   --remote              Allow read-only remote provider commands.
   --kv-values           With --remote, also export KV values with wrangler kv bulk get.
   --r2-objects          With --remote, download referenced STORE_DOWNLOADS R2 objects.
+  --require-complete-r2 Require provider object enumeration before an R2 object snapshot.
   --admin-exports       With --remote, capture protected admin CSV/readiness/download inventory.
   --worker-base=URL     Worker base for --admin-exports. Defaults to WORKER_BASE.
   --acknowledge-sensitive=STORE_SENSITIVE_BACKUP
@@ -124,6 +126,7 @@ export function parseBackupArgs(args = []) {
     remote: args.includes('--remote'),
     kvValues: args.includes('--kv-values'),
     r2Objects: args.includes('--r2-objects'),
+    requireCompleteR2Inventory: args.includes('--require-complete-r2'),
     adminExports: args.includes('--admin-exports'),
     workerBase: valueArg(args, '--worker-base', process.env.WORKER_BASE || ''),
     acknowledgeSensitive: valueArg(args, '--acknowledge-sensitive', ''),
@@ -280,11 +283,34 @@ export function buildKvBackupPlan(prefixes = KV_BACKUP_PREFIXES, {
 }
 
 export function transformKvBulkGetToPutRecords(values = {}) {
-  return Object.entries(values || {}).map(([key, entry]) => ({
-    key,
-    value: String(entry?.value ?? ''),
-    ...(entry?.metadata ? { metadata: entry.metadata } : {})
-  }));
+  return transformKvBackupValuesToPutRecords(values);
+}
+
+export function chunkKvBackupKeys(keys = [], maximum = 100) {
+  const boundedMaximum = Math.max(1, Math.min(100, Number.parseInt(String(maximum || 100), 10) || 100));
+  const normalized = Array.isArray(keys) ? keys.filter((entry) => String(entry?.name || entry || '').trim()) : [];
+  const chunks = [];
+  for (let index = 0; index < normalized.length; index += boundedMaximum) {
+    chunks.push(normalized.slice(index, index + boundedMaximum));
+  }
+  return chunks;
+}
+
+export function sanitizeBackupWarningCategories(warnings = []) {
+  const categories = new Set();
+  for (const warning of warnings || []) {
+    const value = String(warning || '').trim().toLowerCase();
+    if (!value) continue;
+    if (value.startsWith('stripe ')) categories.add('stripe_provider_inventory');
+    else if (value.startsWith('kv keys ')) categories.add('kv_key_inventory');
+    else if (value.startsWith('kv values ')) categories.add('kv_value_capture');
+    else if (value.startsWith('r2 object ')) categories.add('r2_object_capture');
+    else if (value.includes('admin export')) categories.add('admin_exports');
+    else if (value.includes('github') || value.startsWith('gh ')) categories.add('github_provider_inventory');
+    else if (value.includes('wrangler')) categories.add('cloudflare_provider_inventory');
+    else categories.add('backup_warning');
+  }
+  return Array.from(categories).sort();
 }
 
 function captureCommand(manifest, label, command, args, options = {}) {
@@ -438,20 +464,58 @@ function captureKv(manifest, outputDir, options) {
     durableObjectRestore: 'derived_state_only'
   }, options);
   writeJson(path.join(kvDir, 'plan.json'), plan, options);
+  manifest.kvValueCapture = [];
 
   if (!options.remote) return;
   for (const item of plan) {
     const keysFile = path.join(outputDir, item.keysFile);
-    captureCommand(manifest, `kv keys ${item.prefix}`, 'npx', item.commands[0][1], {
+    const keysResult = captureCommand(manifest, `kv keys ${item.prefix}`, 'npx', item.commands[0][1], {
       ...options,
       cwd: WORKER_DIR,
       stdoutFile: keysFile
     });
     if (options.kvValues && item.valuesFile) {
-      captureCommand(manifest, `kv values ${item.prefix}`, 'npx', ['wrangler', 'kv', 'bulk', 'get', keysFile, '--remote', '--binding', item.binding], {
-        ...options,
-        cwd: WORKER_DIR,
-        stdoutFile: path.join(outputDir, item.valuesFile)
+      if (keysResult.status !== 0) throw new Error(`KV key inventory failed for required value family ${item.prefix}.`);
+      let keys;
+      try {
+        keys = JSON.parse(fs.readFileSync(keysFile, 'utf8'));
+      } catch {
+        throw new Error(`KV key inventory is invalid for required value family ${item.prefix}.`);
+      }
+      if (!Array.isArray(keys)) throw new Error(`KV key inventory must be an array for ${item.prefix}.`);
+      const chunks = chunkKvBackupKeys(keys);
+      const mergedValues = {};
+      for (const [index, chunk] of chunks.entries()) {
+        const chunkKeysFile = path.join(kvDir, `${safeName(item.prefix)}.keys.${index + 1}.json`);
+        const chunkValuesFile = path.join(kvDir, `${safeName(item.prefix)}.values.${index + 1}.json`);
+        writeJson(chunkKeysFile, chunk, options);
+        const result = captureCommand(manifest, `kv values ${item.prefix} chunk ${index + 1}/${chunks.length}`, 'npx', [
+          'wrangler', 'kv', 'bulk', 'get', chunkKeysFile, '--remote', '--binding', item.binding
+        ], {
+          ...options,
+          cwd: WORKER_DIR,
+          stdoutFile: chunkValuesFile
+        });
+        if (result.status !== 0) throw new Error(`KV value capture failed for ${item.prefix} chunk ${index + 1}/${chunks.length}.`);
+        let chunkValues;
+        try {
+          chunkValues = JSON.parse(fs.readFileSync(chunkValuesFile, 'utf8'));
+        } catch {
+          throw new Error(`KV value capture returned invalid JSON for ${item.prefix} chunk ${index + 1}/${chunks.length}.`);
+        }
+        Object.assign(mergedValues, chunkValues || {});
+        fs.rmSync(chunkKeysFile, { force: true });
+        fs.rmSync(chunkValuesFile, { force: true });
+      }
+      if (Object.keys(mergedValues).length !== keys.length) {
+        throw new Error(`KV value capture count mismatch for ${item.prefix}: expected ${keys.length}, captured ${Object.keys(mergedValues).length}.`);
+      }
+      writeJson(path.join(outputDir, item.valuesFile), mergedValues, options);
+      manifest.kvValueCapture.push({
+        prefix: item.prefix,
+        keys: keys.length,
+        chunks: chunks.length,
+        complete: true
       });
     }
   }
@@ -499,24 +563,93 @@ async function captureAdminExports(manifest, outputDir, options) {
     if (filename === 'downloads.json') {
       const parsed = JSON.parse(new TextDecoder().decode(result.bytes));
       manifest.adminDownloadKeys = (Array.isArray(parsed.files) ? parsed.files : [])
+        .filter((file) => String(file?.source || '').trim().toLowerCase() === 'r2' && file?.ready === true)
         .map((file) => String(file?.fileKey || '').trim())
         .filter(Boolean)
         .sort();
+      manifest.adminDownloadInventoryComplete = parsed.page?.r2ListComplete === true;
     }
   }
 }
 
-function captureR2(manifest, outputDir, options, wranglerInventory) {
+export async function discoverR2ObjectKeys(options = {}) {
+  const accountId = String(options.accountId || '').trim();
+  const bucket = String(options.bucket || '').trim();
+  const apiToken = String(options.apiToken || '').trim();
+  if (!/^[a-f0-9]{32}$/i.test(accountId) || !/^[a-z0-9][a-z0-9.-]{1,62}$/i.test(bucket) || !apiToken) {
+    throw new Error('Complete R2 object discovery requires account, bucket, and read token.');
+  }
+  const fetchImpl = options.fetchImpl || fetch;
+  const keys = [];
+  let cursor = '';
+  const seenCursors = new Set();
+  for (let page = 0; page < 100; page += 1) {
+    const url = new URL(`https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}/objects`);
+    url.searchParams.set('per_page', '1000');
+    if (cursor) url.searchParams.set('cursor', cursor);
+    const response = await fetchImpl(url, {
+      headers: { Authorization: `Bearer ${apiToken}`, Accept: 'application/json' },
+      redirect: 'error'
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.success === false) {
+      throw new Error(`R2 object inventory query failed with status ${response.status}.`);
+    }
+    const objects = Array.isArray(body?.result)
+      ? body.result
+      : (Array.isArray(body?.result?.objects) ? body.result.objects : []);
+    for (const object of objects) {
+      const key = String(object?.key || '').trim();
+      if (key) keys.push(key);
+    }
+    const nextCursor = String(body?.result_info?.cursor || body?.result?.cursor || '').trim();
+    if (!nextCursor) return Array.from(new Set(keys)).sort();
+    if (seenCursors.has(nextCursor)) throw new Error('R2 object inventory returned a repeated cursor.');
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+  throw new Error('R2 object inventory exceeded the bounded page limit.');
+}
+
+async function captureR2(manifest, outputDir, options, wranglerInventory) {
   const r2Dir = path.join(outputDir, 'r2');
   ensureDir(r2Dir, options);
   const catalogKeys = discoverDownloadKeys(ROOT);
-  const downloadKeys = Array.from(new Set([...catalogKeys, ...(manifest.adminDownloadKeys || [])])).sort();
-  writeText(path.join(r2Dir, 'download-keys.txt'), `${downloadKeys.join('\n')}${downloadKeys.length ? '\n' : ''}`, options);
   const bucket = String(wranglerInventory.r2Buckets.find((entry) => entry.binding === 'STORE_DOWNLOADS')?.bucket_name || '').trim();
+  let providerKeys = [];
+  let fullInventory = manifest.adminDownloadInventoryComplete === true;
+  let inventorySource = fullInventory ? 'admin_export' : 'known_keys';
+  if (options.remote && options.r2Objects && bucket && !fullInventory) {
+    const apiToken = String(process.env.CLOUDFLARE_R2_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN || '').trim();
+    const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+    if (apiToken && accountId) {
+      try {
+        providerKeys = await discoverR2ObjectKeys({ accountId, bucket, apiToken });
+        fullInventory = true;
+        inventorySource = 'cloudflare_api';
+      } catch (error) {
+        manifest.warnings.push('R2 complete object inventory failed; only known object keys are available.');
+        if (options.requireCompleteR2Inventory) throw error;
+      }
+    } else if (options.requireCompleteR2Inventory) {
+      throw new Error('Complete R2 object inventory requires CLOUDFLARE_R2_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.');
+    } else {
+      manifest.warnings.push('R2 complete object inventory skipped; configure a read-only R2 API token to include unattached objects.');
+    }
+  }
+  const downloadKeys = Array.from(new Set([
+    ...catalogKeys,
+    ...(manifest.adminDownloadKeys || []),
+    ...providerKeys
+  ])).sort();
+  writeText(path.join(r2Dir, 'download-keys.txt'), `${downloadKeys.join('\n')}${downloadKeys.length ? '\n' : ''}`, options);
   manifest.r2 = {
     bucket,
     catalogReferencedObjects: catalogKeys.length,
     discoveredLibraryObjects: (manifest.adminDownloadKeys || []).length,
+    providerDiscoveredObjects: providerKeys.length,
+    completeInventory: fullInventory,
+    inventorySource,
     totalDiscoveredObjects: downloadKeys.length,
     objectsRequested: options.remote && options.r2Objects ? downloadKeys.length : 0,
     objectsDownloadedCount: 0,
@@ -535,6 +668,9 @@ function captureR2(manifest, outputDir, options, wranglerInventory) {
     if (result.status === 0) manifest.r2.objectsDownloadedCount += 1;
   }
   manifest.r2.objectsDownloaded = manifest.r2.objectsDownloadedCount === objectPlan.length;
+  if (options.requireCompleteR2Inventory && !manifest.r2.objectsDownloaded) {
+    throw new Error(`R2 object capture was incomplete: expected ${objectPlan.length}, captured ${manifest.r2.objectsDownloadedCount}.`);
+  }
 }
 
 function writeRestorePlan(outputDir, options) {
@@ -636,7 +772,7 @@ function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
     version: 2,
     createdAt: manifest.createdAt,
     completedAt: manifest.completedAt,
-    outputDir,
+    outputName: path.basename(outputDir),
     encrypted: true,
     encryptionBackend: backend,
     archive: archiveName,
@@ -645,7 +781,16 @@ function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
     sourceCommit: manifest.git?.head || '',
     releaseSnapshot: manifest.releaseSnapshot === true,
     includedDataClasses: manifest.includedDataClasses,
-    warnings: manifest.warnings
+    warningCount: manifest.warnings.length,
+    warningCategories: sanitizeBackupWarningCategories(manifest.warnings),
+    captureSummary: {
+      kvValueFamilies: Array.isArray(manifest.kvValueCapture) ? manifest.kvValueCapture.length : 0,
+      kvValueKeys: (manifest.kvValueCapture || []).reduce((sum, item) => sum + Number(item.keys || 0), 0),
+      r2Objects: Number(manifest.r2?.objectsDownloadedCount || 0),
+      r2InventoryComplete: manifest.r2?.completeInventory === true,
+      r2InventorySource: String(manifest.r2?.inventorySource || 'not_captured'),
+      adminExports: Array.isArray(manifest.adminExports) ? manifest.adminExports.length : 0
+    }
   };
   writeJson(path.join(outputDir, 'manifest.json'), receipt, options);
   enforcePrivatePermissions(outputDir);
@@ -658,6 +803,7 @@ export async function createBackupSnapshot(rawOptions = {}) {
     remote: rawOptions.remote === true,
     kvValues: rawOptions.kvValues === true,
     r2Objects: rawOptions.r2Objects === true,
+    requireCompleteR2Inventory: rawOptions.requireCompleteR2Inventory === true,
     adminExports: rawOptions.adminExports === true,
     workerBase: rawOptions.workerBase || process.env.WORKER_BASE || '',
     acknowledgeSensitive: rawOptions.acknowledgeSensitive || '',
@@ -751,33 +897,47 @@ export async function createBackupSnapshot(rawOptions = {}) {
     manifest.warnings.push('--admin-exports requires --remote; admin exports were not captured.');
   }
 
-  ensureDir(captureDir, options);
-  captureGit(manifest, captureDir, options);
-  captureLocalFiles(manifest, captureDir, options);
-  captureBuildEvidence(manifest, captureDir, options);
-  captureProviderInventory(manifest, captureDir, options, wranglerInventory);
-  captureKv(manifest, captureDir, options);
-  await captureAdminExports(manifest, captureDir, options);
-  captureR2(manifest, captureDir, options, wranglerInventory);
-  writeRestorePlan(captureDir, options);
-  manifest.completedAt = new Date().toISOString();
-  if (!options.dryRun) {
-    manifest.artifacts = buildChecksumManifest(captureDir, {
-      exclude: ['manifest.json', 'checksums.json']
-    });
-    writeJson(path.join(captureDir, 'manifest.json'), manifest, options);
-    const checksumArtifacts = buildChecksumManifest(captureDir, {
-      exclude: ['checksums.json']
-    });
-    writeJson(path.join(captureDir, 'checksums.json'), {
-      schemaVersion: 1,
-      generatedAt: manifest.completedAt,
-      artifacts: checksumArtifacts
-    }, options);
-    enforcePrivatePermissions(captureDir);
-    if (safety.sensitive) return archiveSensitiveSnapshot(captureDir, outputDir, options, manifest);
+  try {
+    ensureDir(captureDir, options);
+    captureGit(manifest, captureDir, options);
+    captureLocalFiles(manifest, captureDir, options);
+    captureBuildEvidence(manifest, captureDir, options);
+    captureProviderInventory(manifest, captureDir, options, wranglerInventory);
+    captureKv(manifest, captureDir, options);
+    await captureAdminExports(manifest, captureDir, options);
+    await captureR2(manifest, captureDir, options, wranglerInventory);
+    writeRestorePlan(captureDir, options);
+    manifest.completedAt = new Date().toISOString();
+    if (!options.dryRun) {
+      manifest.artifacts = buildChecksumManifest(captureDir, {
+        exclude: ['manifest.json', 'checksums.json']
+      });
+      writeJson(path.join(captureDir, 'manifest.json'), manifest, options);
+      const checksumArtifacts = buildChecksumManifest(captureDir, {
+        exclude: ['checksums.json']
+      });
+      writeJson(path.join(captureDir, 'checksums.json'), {
+        schemaVersion: 1,
+        generatedAt: manifest.completedAt,
+        artifacts: checksumArtifacts
+      }, options);
+      enforcePrivatePermissions(captureDir);
+      if (safety.sensitive) return archiveSensitiveSnapshot(captureDir, outputDir, options, manifest);
+    }
+    return manifest;
+  } catch (error) {
+    if (safety.sensitive && !options.dryRun) fs.rmSync(captureDir, { recursive: true, force: true });
+    throw error;
   }
-  return manifest;
+}
+
+export function backupCompletionDetails(manifest = {}) {
+  return {
+    destination: String(manifest.outputDir || manifest.outputName || 'configured destination'),
+    warningCount: Array.isArray(manifest.warnings)
+      ? manifest.warnings.length
+      : Number(manifest.warningCount || 0)
+  };
 }
 
 async function main() {
@@ -796,9 +956,10 @@ async function main() {
       console.log(`[warn] ${warning}`);
     }
   } else {
-    console.log(`Store backup snapshot written to ${manifest.outputDir}`);
-    if (manifest.warnings.length) {
-      console.log(`Warnings: ${manifest.warnings.length}`);
+    const completion = backupCompletionDetails(manifest);
+    console.log(`Store backup snapshot written to ${completion.destination}`);
+    if (completion.warningCount) {
+      console.log(`Warnings: ${completion.warningCount}`);
     }
   }
   if (options.json) {

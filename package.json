@@ -46,6 +46,7 @@
     "restore:plan": "node ./scripts/store-restore.mjs",
     "restore:rehearse": "./scripts/podman-stack-run.sh node ./scripts/rehearse-store-restore.mjs",
     "recovery:traffic-preflight": "node ./scripts/recovery-traffic-preflight.mjs",
+    "recovery:reconcile": "node ./scripts/recovery-reconciliation.mjs",
     "cache:benchmark": "node ./scripts/workers-cache-benchmark.mjs",
     "cache:compare": "node ./scripts/workers-cache-benchmark.mjs --compare",
     "cache:observability": "node ./scripts/workers-cache-observability.mjs",

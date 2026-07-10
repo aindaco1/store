@@ -8,11 +8,15 @@ import {
   KV_QUARANTINE_PREFIXES,
   KV_VALUE_BACKUP_PREFIXES,
   buildKvBackupPlan,
+  backupCompletionDetails,
+  chunkKvBackupKeys,
   buildSecretInventory,
   createBackupSnapshot,
   discoverDownloadKeys,
+  discoverR2ObjectKeys,
   parseWranglerTomlInventory,
   resolveR2BackupObjectPath,
+  sanitizeBackupWarningCategories,
   transformKvBulkGetToPutRecords,
   validateBackupSafety
 } from '../../scripts/store-backup.mjs';
@@ -102,11 +106,42 @@ preview_bucket_name = "store-downloads-preview"
   it('transforms Wrangler KV bulk get output to bulk put records', () => {
     expect(transformKvBulkGetToPutRecords({
       'orders:one': { value: '{"ok":true}', metadata: { type: 'order' } },
-      'store-coupons:v1': { value: '[]' }
+      'store-coupons:v1': { value: '[]' },
+      'admin-users:v1': '{"users":[]}'
     })).toEqual([
       { key: 'orders:one', value: '{"ok":true}', metadata: { type: 'order' } },
-      { key: 'store-coupons:v1', value: '[]' }
+      { key: 'store-coupons:v1', value: '[]' },
+      { key: 'admin-users:v1', value: '{"users":[]}' }
     ]);
+  });
+
+  it('chunks KV value reads at Cloudflare current limits and skips empty families', () => {
+    const keys = Array.from({ length: 205 }, (_, index) => ({ name: `orders:${index}` }));
+    expect(chunkKvBackupKeys(keys).map((chunk) => chunk.length)).toEqual([100, 100, 5]);
+    expect(chunkKvBackupKeys([])).toEqual([]);
+    expect(chunkKvBackupKeys(keys, 500).map((chunk) => chunk.length)).toEqual([100, 100, 5]);
+  });
+
+  it('reduces encrypted receipt warnings to non-sensitive categories', () => {
+    const categories = sanitizeBackupWarningCategories([
+      'kv values orders: failed: /Users/private/path and provider output',
+      'stripe webhook_endpoints list failed: expired secret detail',
+      'unclassified local warning /private/path'
+    ]);
+    expect(categories).toEqual(['backup_warning', 'kv_value_capture', 'stripe_provider_inventory']);
+    expect(JSON.stringify(categories)).not.toContain('/Users/private');
+    expect(JSON.stringify(categories)).not.toContain('expired secret');
+  });
+
+  it('formats plaintext manifests and encrypted receipts without assuming raw warnings exist', () => {
+    expect(backupCompletionDetails({ outputDir: '/private/snapshot', warnings: ['one'] })).toEqual({
+      destination: '/private/snapshot',
+      warningCount: 1
+    });
+    expect(backupCompletionDetails({ outputName: 'encrypted-snapshot', warningCount: 2 })).toEqual({
+      destination: 'encrypted-snapshot',
+      warningCount: 2
+    });
   });
 
   it('discovers configured product download object keys', () => {
@@ -135,6 +170,29 @@ Body.
     expect(() => resolveR2BackupObjectPath(objectsDir, '../outside.pdf')).toThrow(/safely/i);
     expect(() => resolveR2BackupObjectPath(objectsDir, 'downloads//file.pdf')).toThrow(/safely/i);
     expect(() => resolveR2BackupObjectPath(objectsDir, 'downloads\\file.pdf')).toThrow(/safely/i);
+  });
+
+  it('discovers every R2 object through bounded read-only API pagination', async () => {
+    const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      expect(init?.headers).toMatchObject({ Authorization: 'Bearer r2-read-secret' });
+      const cursor = url.searchParams.get('cursor') || '';
+      return new Response(JSON.stringify(cursor ? {
+        success: true,
+        result: [{ key: 'unattached/private.bin' }],
+        result_info: { cursor: '' }
+      } : {
+        success: true,
+        result: [{ key: 'downloads/catalog.pdf' }],
+        result_info: { cursor: 'next-page' }
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    await expect(discoverR2ObjectKeys({
+      accountId: '0123456789abcdef0123456789abcdef',
+      bucket: 'store-downloads',
+      apiToken: 'r2-read-secret',
+      fetchImpl
+    })).resolves.toEqual(['downloads/catalog.pdf', 'unattached/private.bin']);
   });
 
   it('records secret presence without exporting values', () => {

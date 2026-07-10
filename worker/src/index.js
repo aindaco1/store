@@ -46,6 +46,7 @@
  *   POST /admin/store/downloads/delete - Delete a Store download library file
  *   GET  /admin/store/inventory  - Read Store catalog inventory
  *   POST /admin/store/inventory  - Override or reset Store inventory baselines
+ *   POST /admin/store/recovery/inventory-reconciliation - Run reviewed inventory recovery
  *   GET  /admin/add-ons/inventory - Read platform add-on inventory
  *   POST /admin/add-ons/inventory - Override or reset platform add-on inventory
  *   POST /admin/rebuild          - Trigger GitHub Pages rebuild
@@ -102,6 +103,14 @@ import {
   workersCacheEnabledForAdminStoreRead
 } from './workers-cache-policy.js';
 import { recordWorkersCacheMetric, workersCacheTelemetryEnabled } from './workers-cache-telemetry.js';
+import {
+  STORE_INVENTORY_RECONCILIATION_ACKNOWLEDGEMENT,
+  buildExpectedStoreRecoveryInventory,
+  buildStoreInventoryRecoveryReconciliation,
+  compareStoreOrdersToStripePaymentIntents,
+  storeStripeRecoveryComparisonGate,
+  storeRecoveryFingerprint
+} from './store-recovery-reconciliation.js';
 import {
   getPlatformDateKey,
   getPlatformTimeZone,
@@ -369,8 +378,10 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
-const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 10 * 60;
+const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 7 * 24 * 60 * 60;
 const ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS = ADMIN_STORE_ORDER_INDEX_TTL_SECONDS * 1000;
+const STORE_RECOVERY_INVENTORY_PLAN_PREFIX = 'store-recovery-approval:inventory:';
+const STORE_RECOVERY_INVENTORY_PLAN_TTL_SECONDS = 15 * 60;
 const ADMIN_WORKERS_CACHE_PURGE_PATH = '/admin/workers-cache/purge';
 const ADMIN_WORKERS_CACHE_EVIDENCE_PATH = '/admin/workers-cache/evidence';
 const WORKERS_CACHE_PURGE_FAILURE_KEY = 'workers-cache-purge-failure:recent';
@@ -3011,6 +3022,18 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreInventoryMutation(request, env, ctx);
+      }
+
+      if (path === '/admin/store/recovery/inventory-reconciliation' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreInventoryRecoveryReconciliation(request, env, parsedBody.body || {}, ctx);
       }
 
       if (path === '/admin/store/orders/download-access' && method === 'POST') {
@@ -7332,7 +7355,8 @@ async function buildStoreInventorySoldCounts(env, options = {}) {
     cache: scanned.cache || null,
     generatedAt: scanned.generatedAt || '',
     latestKnownUpdatedAt: scanned.latestKnownUpdatedAt || '',
-    watermark: scanned.watermark || ''
+    watermark: scanned.watermark || '',
+    orders: scanned.orders || []
   };
 }
 
@@ -10113,6 +10137,224 @@ async function handleAdminStoreInventoryMutation(request, env, ctx = null) {
     return privateJsonResponse({
       error: error instanceof Error ? error.message : String(error || 'Store inventory mutation failed')
     }, 400, env);
+  }
+}
+
+function storeRecoveryPlanId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function normalizedStoreRecoveryPlanId(value) {
+  const planId = String(value || '').trim().toLowerCase();
+  return /^[a-f0-9]{48}$/.test(planId) ? planId : '';
+}
+
+function storeRecoveryInventoryPlanKey(planId) {
+  const normalized = normalizedStoreRecoveryPlanId(planId);
+  return normalized ? `${STORE_RECOVERY_INVENTORY_PLAN_PREFIX}${normalized}` : '';
+}
+
+async function buildStoreInventoryRecoveryState(env, ctx = null) {
+  if (!env?.STORE_STATE || !hasStoreInventoryCoordinator(env)) {
+    throw new Error('Store recovery inventory bindings are unavailable');
+  }
+  const catalogInventory = await buildStoreCatalogInventorySnapshot(env);
+  const sold = await buildStoreInventorySoldCounts(env, { ctx });
+  if (!sold.ok) throw new Error(sold.error || 'Store order inventory counts are unavailable');
+  const expected = buildExpectedStoreRecoveryInventory(catalogInventory, sold.soldBySku);
+  const current = await callStoreInventoryCoordinator(env, '/snapshot', { inventory: catalogInventory });
+  const reconciliation = buildStoreInventoryRecoveryReconciliation(current, expected);
+  const stripe = await compareStoreOrdersToStripePaymentIntents(sold.orders || [], {
+    mode: 'required',
+    expectedCredentialMode: getAppMode(env),
+    secretKey: getStripeKey(env),
+    maximumRequests: 50,
+    requestTimeoutMs: 10000,
+    concurrency: 4
+  });
+  const fingerprint = await storeRecoveryFingerprint({
+    expectedInventory: expected.inventory,
+    currentInventory: current.inventory || {},
+    reservedCounts: current.reservedCounts || {},
+    orderWatermark: sold.watermark || '',
+    orphanedSoldSkus: expected.orphanedSoldSkus,
+    overLimitSkus: expected.overLimitSkus,
+    stripe
+  });
+  return { expected, reconciliation, stripe, fingerprint };
+}
+
+async function readStoreRecoveryInventoryPlan(env, planId) {
+  const key = storeRecoveryInventoryPlanKey(planId);
+  if (!key || !env?.STORE_STATE?.get) return null;
+  const plan = await env.STORE_STATE.get(key, { type: 'json' });
+  if (!plan || Date.parse(String(plan.expiresAt || '')) <= Date.now()) return null;
+  return { key, plan };
+}
+
+function storeRecoveryPlanPublicResult(planId, plan, reconciliation, stripe) {
+  return {
+    planId,
+    expiresAt: plan.expiresAt,
+    requestedBy: plan.requestedBy,
+    approved: Boolean(plan.approvedBy),
+    approvedBy: plan.approvedBy || '',
+    requiresSecondOperator: true,
+    fingerprint: String(plan.fingerprint || '').slice(0, 16),
+    reconciliation,
+    stripe
+  };
+}
+
+async function handleAdminStoreInventoryRecoveryReconciliation(request, env, body = {}, ctx = null) {
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Super-admin access required' }, 403, env);
+  }
+  const action = String(body.action || 'plan').trim().toLowerCase();
+  if (!['plan', 'approve', 'execute'].includes(action)) {
+    return privateJsonResponse({ error: 'Unsupported recovery reconciliation action' }, 400, env);
+  }
+
+  try {
+    const currentState = await buildStoreInventoryRecoveryState(env, ctx);
+    if (action === 'plan') {
+      const planId = storeRecoveryPlanId();
+      const key = storeRecoveryInventoryPlanKey(planId);
+      const now = new Date();
+      const plan = {
+        schemaVersion: 1,
+        type: 'store_inventory_reconciliation',
+        requestedBy: auth.user.email,
+        requestedAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + STORE_RECOVERY_INVENTORY_PLAN_TTL_SECONDS * 1000).toISOString(),
+        fingerprint: currentState.fingerprint,
+        expectedInventory: currentState.expected.inventory,
+        approvedBy: '',
+        approvedAt: ''
+      };
+      await env.STORE_STATE.put(key, JSON.stringify(plan), { expirationTtl: STORE_RECOVERY_INVENTORY_PLAN_TTL_SECONDS });
+      const auditKey = await recordAdminAuditEvent(env, {
+        action: 'store_recovery_inventory:plan',
+        adminEmail: auth.user.email,
+        adminRole: auth.user.role,
+        planFingerprint: plan.fingerprint.slice(0, 16),
+        reconciliation: currentState.reconciliation.totals,
+        stripeComparison: {
+          state: currentState.stripe.state,
+          compared: currentState.stripe.compared,
+          mismatches: currentState.stripe.mismatches
+        }
+      });
+      return privateJsonResponse({
+        success: true,
+        action,
+        ...storeRecoveryPlanPublicResult(planId, plan, currentState.reconciliation, currentState.stripe),
+        auditKey,
+        writeBudget: adminWriteBudget({
+          readOnly: false,
+          kvWritesExpected: 2,
+          kvReadsExpected: 2,
+          providerCallsExpected: currentState.stripe.compared
+        })
+      }, 200, env);
+    }
+
+    const planId = normalizedStoreRecoveryPlanId(body.planId);
+    const loaded = await readStoreRecoveryInventoryPlan(env, planId);
+    if (!loaded) return privateJsonResponse({ error: 'Recovery reconciliation plan not found or expired' }, 404, env);
+    const { key, plan } = loaded;
+    if (plan.fingerprint !== currentState.fingerprint) {
+      return privateJsonResponse({ error: 'Recovery reconciliation plan is stale; create a new plan' }, 409, env);
+    }
+
+    if (action === 'approve') {
+      if (String(plan.requestedBy || '').toLowerCase() === auth.user.email.toLowerCase()) {
+        return privateJsonResponse({ error: 'A different super-admin must approve this recovery plan' }, 409, env);
+      }
+      const remainingTtl = Math.max(60, Math.ceil((Date.parse(plan.expiresAt) - Date.now()) / 1000));
+      const approved = { ...plan, approvedBy: auth.user.email, approvedAt: new Date().toISOString() };
+      await env.STORE_STATE.put(key, JSON.stringify(approved), { expirationTtl: remainingTtl });
+      const auditKey = await recordAdminAuditEvent(env, {
+        action: 'store_recovery_inventory:approve',
+        adminEmail: auth.user.email,
+        adminRole: auth.user.role,
+        requestedBy: plan.requestedBy,
+        planFingerprint: plan.fingerprint.slice(0, 16)
+      });
+      return privateJsonResponse({
+        success: true,
+        action,
+        ...storeRecoveryPlanPublicResult(planId, approved, currentState.reconciliation, currentState.stripe),
+        auditKey,
+        writeBudget: adminWriteBudget({
+          readOnly: false,
+          kvWritesExpected: 2,
+          kvReadsExpected: 3,
+          providerCallsExpected: currentState.stripe.compared
+        })
+      }, 200, env);
+    }
+
+    if (String(plan.requestedBy || '').toLowerCase() !== auth.user.email.toLowerCase()) {
+      return privateJsonResponse({ error: 'The requesting super-admin must execute this recovery plan' }, 403, env);
+    }
+    if (!plan.approvedBy || String(plan.approvedBy).toLowerCase() === auth.user.email.toLowerCase()) {
+      return privateJsonResponse({ error: 'A different super-admin must approve this recovery plan before execution' }, 409, env);
+    }
+    const missingAcknowledgements = [];
+    if (body.acknowledgement !== STORE_INVENTORY_RECONCILIATION_ACKNOWLEDGEMENT) missingAcknowledgements.push('exact reconciliation acknowledgement');
+    if (body.maintenanceConfirmed !== true) missingAcknowledgements.push('maintenance confirmation');
+    if (body.stripeWebhooksPaused !== true) missingAcknowledgements.push('Stripe webhook pause confirmation');
+    if (body.inventoryReservationsReviewed !== true) missingAcknowledgements.push('inventory reservation review');
+    if (currentState.expected.totals.orphanedSoldSkus > 0) missingAcknowledgements.push('orphaned sold SKU resolution');
+    if (currentState.expected.totals.overLimitSkus > 0) missingAcknowledgements.push('over-limit SKU resolution');
+    if (!storeStripeRecoveryComparisonGate(currentState.stripe, 'required').passed) {
+      missingAcknowledgements.push('complete matching Stripe recovery comparison');
+    }
+    if (missingAcknowledgements.length) {
+      return privateJsonResponse({ error: 'Recovery reconciliation execution blocked', missing: missingAcknowledgements }, 409, env);
+    }
+
+    await callStoreInventoryCoordinator(env, '/replace', { inventory: plan.expectedInventory });
+    await env.STORE_STATE.delete(key);
+    invalidateStoreReadCachesForMutation(env, ctx, 'inventory_override');
+    const auditKey = await recordAdminAuditEvent(env, {
+      action: 'store_recovery_inventory:execute',
+      adminEmail: auth.user.email,
+      adminRole: auth.user.role,
+      approvedBy: plan.approvedBy,
+      planFingerprint: plan.fingerprint.slice(0, 16),
+      reconciliation: currentState.reconciliation.totals,
+      stripeComparison: {
+        state: currentState.stripe.state,
+        compared: currentState.stripe.compared,
+        mismatches: currentState.stripe.mismatches
+      }
+    });
+    return privateJsonResponse({
+      success: true,
+      action,
+      executed: true,
+      approvedBy: plan.approvedBy,
+      reconciliation: currentState.reconciliation,
+      stripe: currentState.stripe,
+      auditKey,
+      writeBudget: adminWriteBudget({
+        readOnly: false,
+        kvWritesExpected: 3,
+        kvReadsExpected: 3,
+        providerCallsExpected: currentState.stripe.compared
+      })
+    }, 200, env);
+  } catch (error) {
+    return privateJsonResponse({
+      error: error instanceof Error ? error.message : String(error || 'Store recovery inventory reconciliation failed')
+    }, 409, env);
   }
 }
 

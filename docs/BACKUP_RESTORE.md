@@ -62,8 +62,9 @@ Cloudflare KV key listing is billable even when values are not exported. R2 list
 - an age or GPG recipient
 - local decryptability verification before plaintext staging is deleted
 - `STORE_BACKUP_ADMIN_LOGIN_TOKEN` in the environment for admin exports; never pass the token as a CLI argument
+- `CLOUDFLARE_R2_API_TOKEN` plus `CLOUDFLARE_ACCOUNT_ID` when `--require-complete-r2` must enumerate unattached objects through the provider API
 
-The helper resolves existing output ancestors before accepting the destination, so a symlink into the repository is rejected as well. R2 keys must map to contained snapshot paths; unsafe `..`, empty-segment, backslash, or NUL forms stop capture. The temporary plaintext tar is always `0600` and is removed even when encryption or decryptability verification fails; the private staging directory remains for operator recovery.
+The helper resolves existing output ancestors before accepting the destination, so a symlink into the repository is rejected as well. R2 keys must map to contained snapshot paths; unsafe `..`, empty-segment, backslash, or NUL forms stop capture. Temporary plaintext archives and sensitive staging are removed on success or failure.
 
 Example with a GPG recipient that has a locally available secret key for verification:
 
@@ -75,6 +76,7 @@ npm run backup:snapshot -- \
   --remote \
   --kv-values \
   --r2-objects \
+  --require-complete-r2 \
   --admin-exports \
   --worker-base=https://checkout.example.com \
   --acknowledge-sensitive=STORE_SENSITIVE_BACKUP \
@@ -83,7 +85,7 @@ npm run backup:snapshot -- \
   --output="$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-For age, set `STORE_BACKUP_AGE_IDENTITY` to the local identity file used for decryptability verification. The final directory contains only the encrypted archive and a sanitized receipt with archive size/checksum. If encryption or verification fails, plaintext staging is retained for operator diagnosis and must be secured or removed manually.
+For age, set `STORE_BACKUP_AGE_IDENTITY` to the local identity file used for decryptability verification. The final directory contains only the encrypted archive and a sanitized receipt with archive size/checksum, warning categories, KV record coverage, and R2 completeness/source. Provider stderr, local paths, object keys, and payloads stay inside encrypted staging and are not copied to the receipt.
 
 The snapshot never exports secret values. Back up and rotate Cloudflare, Stripe, Resend, GitHub, USPS, and tax credentials through their provider-specific secure recovery process.
 
@@ -91,7 +93,7 @@ The snapshot never exports secret values. Back up and rotate Cloudflare, Stripe,
 
 Admin export capture exchanges a one-time token in memory, keeps the session cookie/CSRF token in memory, and writes Orders, attendee, reconciliation, audit, download-library, and health artifacts only inside encrypted staging. Production Worker bases must use HTTPS; loopback HTTP is allowed only for local development, and normalized export paths must remain under `/admin/`. Tokens, cookies, response bodies, object keys, and customer rows are not written to logs or the sanitized receipt.
 
-The admin Downloads export discovers attached and unattached library objects. `--r2-objects` downloads the union of that inventory and catalog-referenced keys, closing the catalog-only discovery gap.
+The admin Downloads export discovers attached and unattached library objects. When a fresh admin token is unavailable, `--require-complete-r2` uses Cloudflare's paginated R2 object API with a read token. `--r2-objects` downloads the union of provider/admin inventory and catalog-referenced keys, and the required mode fails if enumeration or any download is incomplete. KV value capture chunks at 100 keys and accepts both current Wrangler raw-string output and the older structured value/metadata form.
 
 ## Verify And Plan Restore
 
@@ -102,6 +104,21 @@ npm run restore:plan -- --snapshot /secure/decrypted/store-snapshot
 ```
 
 Planning is the default. It verifies every listed checksum, including the finalized `manifest.json`, rejects duplicate, unlisted, symlink, unsupported, or path-escaping artifacts, validates authoritative record shapes, identifies missing value artifacts, excludes quarantine families, schedules derived-record rebuilds, and lists R2 objects. It performs no provider writes. A metadata-only snapshot remains useful evidence but cannot execute until every required value artifact is present.
+
+Generate aggregate-only captured-order and inventory evidence before restoration:
+
+```bash
+npm run recovery:reconcile -- \
+  --snapshot=/secure/decrypted/store-snapshot \
+  --stripe-mode=required \
+  --expected-stripe-mode=live \
+  --strict \
+  --output=/secure/evidence/captured-reconciliation.json
+```
+
+Use a dedicated restricted live read key through `STRIPE_SECRET_KEY`. The command rejects test/live credential mismatch before a provider request and writes counts/reason categories only; it never writes customer, order, PaymentIntent, or credential identifiers. `--stripe-mode=off` is suitable only for local format testing, not a protected production-data drill.
+
+For a reviewed Durable Object inventory correction, use the authenticated `POST /admin/store/recovery/inventory-reconciliation` `plan` -> distinct-super-admin `approve` -> requester `execute` flow. The 15-minute plan fingerprints Store order/inventory/reservation state and a fresh bounded read-only Stripe comparison. Execution additionally requires exact `STORE_INVENTORY_RECONCILE`, maintenance, paused-webhook, and reservation-review confirmations, and blocks on stale state, active data anomalies, incomplete provider coverage, or any payment mismatch. The operation replaces claimed inventory from confirmed orders and clears reviewed reservations; it does not import Durable Object storage or modify Stripe.
 
 Rehearse the same contracts with the production-like local stack:
 
@@ -139,6 +156,26 @@ npm run restore:plan -- \
 
 The command transforms KV bulk-get output to bulk-put records in a private temporary directory, restores only reviewed authoritative/control artifacts, uploads included R2 objects to the explicit preview bucket, and deletes `admin-store-orders:index:v2` so normal admin reads rebuild it. It rejects a missing preview bucket or one equal to the captured source bucket.
 
+Read back every restored KV value and R2 object checksum, then remove only snapshot-owned preview data:
+
+```bash
+npm run restore:plan -- \
+  --snapshot=/secure/decrypted/store-snapshot \
+  --target=preview \
+  --preview-r2-bucket=store-downloads-preview \
+  --verify --json
+
+npm run restore:plan -- \
+  --snapshot=/secure/decrypted/store-snapshot \
+  --target=preview \
+  --preview-r2-bucket=store-downloads-preview \
+  --cleanup-preview \
+  --acknowledge-preview-cleanup=STORE_PREVIEW_RESTORE_CLEANUP \
+  --json
+```
+
+Verification and cleanup evidence contains counts only. Cleanup cannot target production, is idempotent, checks KV/R2 absence, runs explicitly after a successful protected drill, and is attempted again by the failure trap after a partial preview restore.
+
 ## Readiness And Retention
 
 Generate a sanitized readiness report:
@@ -166,9 +203,9 @@ The planner revalidates encrypted receipt/archive checksums and never selects th
 
 - **Recovery Readiness** runs weekly at `03:43 America/Denver`. It performs read-only Cloudflare provider evidence, the representative Podman rehearsal, and backup readiness, then uploads sanitized evidence only.
 - **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of January, April, July, and October. The captured-data job remains disabled unless `RECOVERY_DRILL_ENABLED=true`.
-- The captured-data job shares production concurrency with deploy/cache operations and requires approval through the `production-recovery` environment. It requires a dedicated age recipient/identity, a fresh one-time super-admin token, and an explicit preview R2 bucket. It captures encrypted KV/admin/R2 data, decrypts only in private temporary runner storage, restores only to preview, derives artifacts from sanitized counts/status, and removes detailed restore output and plaintext material before artifact upload.
+- The captured-data job shares production concurrency with deploy/cache operations and requires approval through the `production-recovery` environment. It requires a dedicated age recipient/identity, a fresh one-time super-admin token, a restricted live Stripe read key, an explicit preview R2 bucket, and off-account S3 archive credentials/destination. It captures encrypted KV/admin/R2 data, verifies the S3 copy, reconciles captured orders read-only, restores only to preview, verifies every restored value/object, removes snapshot-owned preview data, derives artifacts from sanitized counts/status, and removes detailed restore output and plaintext material before artifact upload.
 - Store the dedicated recovery identity as a protected environment secret only after review; do not reuse an operator's personal/master key. A fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN` must be supplied immediately before approval because it is short-lived and one-time.
-- GitHub's 90-day encrypted drill artifact is an off-account test copy, not the approved long-term 7-daily/5-weekly/12-monthly destination and not proof of decryption on a second isolated device.
+- GitHub's 90-day encrypted drill artifact is secondary drill evidence, not the approved long-term 7-daily/5-weekly/12-monthly destination and not proof of decryption on a second isolated device. The protected path additionally requires verified S3 upload, but operators must still approve that account/provider and retention policy.
 - No scheduled or protected workflow contains a production restore acknowledgement or production target. A production restore remains a separate manual incident procedure governed by the gates below.
 
 ## Production Restore Gates

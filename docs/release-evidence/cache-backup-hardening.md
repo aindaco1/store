@@ -1,8 +1,8 @@
 # Cache And Recovery Hardening Evidence
 
-- Generated: `2026-07-10T04:04:07Z`
-- Branch: `release/1.0.6-cache-backup-hardening`
-- Base commit/tag: `42a5e902fa4fc7f479b6bf147736506caff4636d` / `v1.0.6`
+- Generated: `2026-07-10T04:04:07Z`; updated `2026-07-10T15:15:21Z`
+- Branch: `feature/cache-recovery-operations`
+- Base commit/tag: `1e30af2` / `v1.0.6`
 - Release status: additional `v1.0.6` hardening; the published tag was not moved
 - Production deployment at initial evidence capture: not performed; follow-up deployment and operational evidence are recorded below
 
@@ -10,14 +10,14 @@
 
 | Result | Check | Evidence |
 | --- | --- | --- |
-| PASS | Definitive release smoke | `npm run release:smoke -- --podman-e2e --evidence-file /tmp/store-1.0.6-cache-recovery-operations-final-release-smoke.md`; all enabled phases passed. Logs: `/tmp/store-release-smoke-logs.yKiK7b`. |
-| PASS | Full unit suite | Vitest 4 ran 289 tests across 65 files, including cache policy, endpoint, telemetry, observability, benchmark, backup, retention, restore, recovery preflight, and workflow safeguards. |
+| PASS | Definitive release smoke | `npm run release:smoke -- --podman-e2e --evidence-file /tmp/store-1.0.6-cache-recovery-operations-final-release-smoke.md`; all enabled phases passed. Logs: `/tmp/store-release-smoke-logs.vrJKMj`. |
+| PASS | Full unit suite | Vitest 4 ran 323 tests across 69 files, including cache policy, endpoint, telemetry, deployment observability, benchmark, backup, retention, preview verification/cleanup, captured reconciliation, maker/checker plus provider-gated recovery, and workflow safeguards. |
 | PASS | Podman security | 22 tests passed against the production-like local stack, including evidence-secret authorization, admin boundaries, input limits, webhook signatures, rate limiting, CORS, and fail-closed behavior. |
-| PASS | Podman runtime/browser evidence | Worker smoke and both Podman headless E2E phases passed. Automated accessibility, rendered English/Spanish and SEO, fulfillment, admin dashboard, responsive, and private-route behavior were exercised through the container stack. |
+| PASS | Podman runtime/browser evidence | Worker smoke and both Podman headless E2E phases passed; the independent final Playwright run passed all 31 tests in 47.6 seconds. Automated accessibility, rendered English/Spanish and SEO, fulfillment, admin dashboard, responsive, and private-route behavior were exercised through the container stack. |
 | SKIP | Optional screen-reader transcript | This backend/admin operations slice did not require a new VoiceOver audio artifact. Axe, keyboard/status, high-zoom, responsive, and localized Playwright checks passed. |
 | PASS | Read-only provider/payment readiness | Cloudflare provider evidence and payment smoke passed without production writes. A direct Cloudflare Analytics Engine token query and Worker-wide invocation/error preflight also succeeded during implementation. |
-| PASS | Representative restore rehearsal | The Podman drill verified 19 integrity artifacts and 35 actions, restored 17 records and one R2 object across physical, digital, ticket, RSVP, failed-payment, idempotency, reminder, audit, and inventory-control classes, excluded quarantine/derived state, issued no side-effect provider commands, and received `401` plus `private, no-store` from the Worker admin probe. |
-| PASS | Backup/recovery readiness | The strict release phase classified 33 Worker storage families, planned snapshot v2, found required credential names and an encryption backend, accepted current provider/rehearsal evidence, and reported zero failures. The missing live encrypted snapshot receipt remains an explicit warning. |
+| PASS | Representative restore rehearsal | The Podman drill verified 19 integrity artifacts and 36 actions, restored 17 records and one R2 object across physical, digital, ticket, RSVP, failed-payment, idempotency, reminder, audit, and inventory-control classes, compared four fake Stripe-backed orders with zero mismatches/writes, excluded quarantine/derived state, and received `401` plus `private, no-store` from the Worker admin probe. |
+| PASS | Backup/recovery readiness | The strict release phase classified 34 Worker storage families, planned snapshot v2, found required credential names and an encryption backend, accepted current provider/rehearsal evidence, and reported zero failures. Its generic release invocation did not receive the separate operator-owned live receipt and therefore retained one explicit warning; captured drill evidence is recorded below. |
 | PASS | Retention and artifact safety | Tests cover exact acknowledgement, newest/release/bucket protection, invalid receipts, checksum mismatch, symlinked roots, real-root containment, immediate pre-delete eligibility revalidation, and temporary detailed restore output excluded from uploaded artifacts. |
 | PASS | Dependency audit | `npm audit` and `npm audit --omit=dev` both reported zero vulnerabilities. |
 
@@ -27,6 +27,7 @@
 - **Recovery Readiness** is scheduled for `03:43 America/Denver` each Sunday and uses synthetic data plus read-only provider metadata.
 - **Quarterly Recovery Operations** is scheduled for `04:17 America/Denver` on the first day of each quarter. Its captured-data job is disabled by default and protected by the `production-recovery` environment, a required reviewer, Worker-wide traffic/error evidence, and preview-only restore targets.
 - Deploy, cache evidence, and protected recovery share `production-operations` concurrency. Repository secret/variable names and environment protections were configured without storing values in this evidence file.
+- The dedicated recovery age identity/recipient are configured in `production-recovery`; the empty preview KV namespace and `store-downloads-preview` R2 bucket are available. The protected job remains disabled because the fresh one-time admin token, restricted live Stripe read key, approved off-account S3 destination/credentials, and operator retention/RPO/RTO approval are not configured.
 
 ## Post-Deployment Operations Evidence
 
@@ -34,18 +35,29 @@
 - [Workers Cache Evidence run 29070218894](https://github.com/aindaco1/store/actions/runs/29070218894) passed its low-traffic gate and uploaded sanitized evidence. The production probe recorded a full `EXPIRED` read in 51 ms, a no-change warmup `EXPIRED` read in 62 ms, and an identical no-change repeat `HIT` in 4 ms with zero order-data KV reads/lists. Both no-change reads returned `unchanged: true`; credential and customer-data flags were false. Aggregate hit-ratio evidence remained `insufficient_data` because only two eligible telemetry rows existed, so no rollout conclusion was inferred.
 - [Recovery Readiness run 29070260385](https://github.com/aindaco1/store/actions/runs/29070260385) passed provider evidence, the representative Podman rehearsal, and six readiness checks with zero failures. Its single warning correctly records the missing live encrypted snapshot receipt.
 - [Quarterly Recovery Operations run 29070592197](https://github.com/aindaco1/store/actions/runs/29070592197) passed the Worker-wide 15-minute preflight with 18 requests, 7 subrequests, and zero errors against a 100-request/zero-error ceiling. The artifact reported no credentials or customer data. The protected preview-restore job was correctly skipped because `RECOVERY_DRILL_ENABLED=false`.
+- A later deployment-scoped live collector identified deployment churn as the reason prior 24-hour evidence mixed versions. The current schema queries only the current deployment and returns `inconclusive` during its stability window. Its slowest Orders row was `59,383 ms` with an expected 417 KV reads plus one list, tracing the tail-latency cliff to the ten-minute materialized-index expiry rather than a cache hit; the index now uses a seven-day safety TTL with explicit mutation invalidation.
+- A controlled production Orders probe after that investigation recorded a full `EXPIRED` read in 39 ms, no-change warmup `EXPIRED` in 46 ms, and repeat `HIT` in 3 ms with zero order-data KV reads/lists. This remains bounded probe evidence, not the required disabled/enabled 30-sample comparison.
+
+## Captured Recovery Drill Evidence
+
+- At `2026-07-10T13:58:27Z`, an operator-controlled age snapshot outside the repository captured 444 KV records across 14 authoritative/control families and one R2 object from a complete provider enumeration. Encryption decryptability and the encrypted archive checksum were verified; the final receipt contains warning categories/counts only. The sole warning was an expired Stripe CLI metadata inventory probe.
+- Isolated planning verified 70 checksum-covered artifacts, 417 order shapes, zero invalid actions, and zero missing value families. The restore performed seven writes only to the empty preview KV namespace and `store-downloads-preview` bucket.
+- Readback compared five non-empty KV families containing all 444 records plus the R2 object checksum using ten read commands, with zero command failures or mismatches. Exact-snapshot cleanup then targeted 444 KV records and one R2 object and verified zero residual snapshot-owned data. No production KV/R2 write or delete occurred.
+- The drill exposed and fixed three live-format defects before sign-off: Wrangler bulk-get's 100-key request limit, Wrangler v4 raw-string value output, and missing-object R2 CLI exit/file behavior. Regression coverage now protects chunking, dual-format normalization, complete R2 capture, preview readback, idempotent cleanup, and sanitized evidence.
+- Store inventory aggregation covered 417 confirmed orders, 33 sold SKUs, and 639 sold units without emitting identifiers. Live Stripe comparison was intentionally blocked before provider access because Store/Pool local files contain a test-mode key; protected reconciliation now requires a dedicated restricted live-mode read key.
+- Admin exports were not included because a fresh one-time super-admin login token was unavailable. Decryption was verified on the originating operator machine, not a second isolated device. The encrypted archive is retained in operator-controlled storage, but no durable off-account S3 copy has been proven.
 
 ## Cache Evidence Boundary
 
 Unit, integration, security, and Podman tests prove canonical key policy, role/scope partitioning, no-change responses, browser `private, no-store`, search bypass, mutation invalidation, purge failure behavior, operation budgets, evidence redaction, and dashboard refresh UX. Podman does not implement or prove Cloudflare's real edge cache behavior.
 
-The required 30-sample cache-disabled/cache-enabled `Cf-Cache-Status`, p50/p95/p99, operation-budget, and post-purge Cloudflare edge comparison remains open. It requires an authorized short-lived super-admin login token and controlled sequential deployments. Analytics, order-derived inventory, and download-readiness caching therefore remain disabled by default.
+The required 30-sample cache-disabled/cache-enabled `Cf-Cache-Status`, p50/p95/p99, operation-budget, and post-purge Cloudflare edge comparison remains open. It requires authorized short-lived super-admin login tokens and controlled sequential deployments. Normal-traffic deployment-scoped aggregate evidence also remains below a decision-quality sample count. Analytics, order-derived inventory, and download-readiness caching therefore remain disabled by default.
 
 ## Recovery Evidence Boundary
 
-The metadata plan and synthetic Podman drill contain no production customer/provider data and perform no production writes. Business approval of RPO/RTO and retention remains open, as do an operator-controlled live encrypted KV/admin/R2 snapshot, isolated decryption, durable off-device retention, complete captured-data preview rehearsal, and Durable Object/Stripe reconciliation.
+The live encrypted KV/R2 snapshot, preview restore, readback, cleanup, and reviewed Durable Object inventory recovery implementation are complete. This does not prove the complete recurring objective: business approval of RPO/RTO/retention, encrypted admin exports, second-device/location decryption, restricted live Stripe comparison, durable off-account S3 retention, and a fully enabled protected quarterly run remain open.
 
-`RECOVERY_DRILL_ENABLED` remains `false`. Enabling the captured-data job requires a dedicated recovery age identity, a fresh one-time super-admin token, reviewed preview resources, the protected environment reviewer, and an approved off-account retention destination. Production restore remains a separate manual incident operation with maintenance, Stripe, inventory, pre-snapshot, conflict-policy, and exact-acknowledgement gates.
+`RECOVERY_DRILL_ENABLED` remains `false`. The age identity, reviewed preview resources, and protected reviewer are present. Enabling the captured-data job still requires a fresh one-time super-admin token, restricted live Stripe read key, approved S3 destination/credentials, and operator retention/RPO/RTO approval. Production restore remains a separate manual incident operation with maintenance, Stripe, inventory, pre-snapshot, conflict-policy, and exact-acknowledgement gates.
 
 ## Sign-Off
 

@@ -295,6 +295,26 @@ describe('Film Stripe summary adapter for Store', () => {
     expect(listSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps a no-change one-day-old order index available instead of rescanning every order', async () => {
+    const storeState = new MockKVNamespace();
+    await storeState.put(ADMIN_STORE_ORDER_INDEX_KEY, JSON.stringify(buildAdminStoreOrderIndexSnapshot({
+      generatedAt: new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString(),
+      scanned: 417,
+      indexed: 1,
+      listCalls: 1,
+      truncated: false,
+      orders: [buildIndexedOrder()]
+    })));
+    const listSpy = vi.spyOn(storeState, 'list');
+    const getSpy = vi.spyOn(storeState, 'get');
+
+    const response = await fetchStoreSummary(buildEnv(storeState));
+
+    expect(response.status).toBe(200);
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(getSpy).toHaveBeenCalledWith(ADMIN_STORE_ORDER_INDEX_KEY, { type: 'json' });
+  });
+
   it('rejects requests without the adapter bearer token', async () => {
     const response = await fetchStoreSummary(buildEnv(), 'wrong-token');
 

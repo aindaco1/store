@@ -6,6 +6,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { buildChecksumManifest } from './lib/file-integrity.mjs';
 import { loadStoreDataInventory } from './lib/store-data-inventory.mjs';
+import { reconcileCapturedStoreOrders } from './recovery-reconciliation.mjs';
 import {
   buildStoreRestorePlan,
   executeStoreRestorePlan,
@@ -174,6 +175,21 @@ export async function runSyntheticRestoreRehearsal(options = {}) {
     const restoredOrders = restoredRecords
       .filter((record) => String(record.key).startsWith('orders:'))
       .map((record) => JSON.parse(String(record.value)));
+    const recoveryReconciliation = await reconcileCapturedStoreOrders(restoredOrders, {
+      stripeMode: 'required',
+      stripeSecretKey: 'sk_test_recovery_fixture',
+      fetchImpl: async (input) => {
+        const paymentIntentId = decodeURIComponent(new URL(String(input)).pathname.split('/').pop() || '');
+        const suffix = paymentIntentId.replace(/^pi_restore_/, '');
+        return new Response(JSON.stringify({
+          id: paymentIntentId,
+          status: suffix === 'failed-payment' ? 'requires_payment_method' : 'succeeded',
+          amount: 1200,
+          currency: 'usd',
+          metadata: { orderToken: `store-order-restore-${suffix}` }
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+    });
     const representativeTypes = Array.from(new Set(restoredOrders.flatMap((order) => (
       order.orderDraft?.items || []
     )).map((item) => String(item.fulfillmentType || '')))).filter((type) => REPRESENTATIVE_ORDER_TYPES.includes(type)).sort();
@@ -196,6 +212,8 @@ export async function runSyntheticRestoreRehearsal(options = {}) {
         representativeTypes.join(',') === REPRESENTATIVE_ORDER_TYPES.join(',') &&
         restoredR2Objects.length === 1 &&
         sideEffectCommands.length === 0 &&
+        recoveryReconciliation.stripe.mismatches === 0 &&
+        recoveryReconciliation.providerWritesExecuted === false &&
         probe.status === 401 &&
         probe.privateNoStore,
       containsProductionData: false,
@@ -207,6 +225,13 @@ export async function runSyntheticRestoreRehearsal(options = {}) {
       representativeOrderTypes: representativeTypes,
       failedPaymentOrderRestored: restoredKeys.includes('orders:store-order-restore-failed-payment'),
       paymentIdempotencyRestored: restoredKeys.includes('stripe-event:evt_restore_fixture'),
+      recoveryReconciliation: {
+        orders: recoveryReconciliation.orders.total,
+        soldSkus: recoveryReconciliation.orders.soldSkus,
+        stripeCompared: recoveryReconciliation.stripe.compared,
+        stripeMismatches: recoveryReconciliation.stripe.mismatches,
+        providerWritesExecuted: recoveryReconciliation.providerWritesExecuted
+      },
       reminderControlsRestored: restoredKeys.some((key) => key.startsWith('store-event-reminder-sent:')) &&
         restoredKeys.some((key) => key.startsWith('abandoned-cart-suppressed:')),
       auditEvidenceRestored: restoredKeys.includes('admin-audit:restore-fixture'),
