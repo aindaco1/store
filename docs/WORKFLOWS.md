@@ -327,6 +327,16 @@ PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --worke
 
 ## Deployment Workflow
 
+Before a release or high-risk data/configuration change, start with metadata-only planning:
+
+```bash
+npm run backup:inventory:audit
+npm run backup:plan
+npm run restore:rehearse
+```
+
+Use `npm run backup:snapshot` for an operator-owned snapshot outside the repository. Remote metadata is opt-in; KV values, R2 objects, and admin exports additionally require exact acknowledgement plus age/GPG encryption and decryptability verification. `npm run restore:plan -- --snapshot <path>` verifies checksums and emits a no-write plan by default. Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for local/preview execution and the additional maintenance, Stripe, inventory, pre-snapshot, and typed-confirmation gates for production.
+
 1. Merge catalog/settings/media changes.
 2. Run release smoke and backup planning before tagging.
 3. Dispatch the **Deploy Production** workflow manually when the operator is ready to deploy.

@@ -5,8 +5,9 @@ Store performance depends on static public pages, lazy cart loading, generated m
 ## Current Baseline
 
 - Public pages remain statically rendered and cart runtime loading remains lazy.
-- Store order lookup/admin reads use cached/indexed paths from the current Store mainline.
-- Admin Orders list reads can use Cloudflare Workers Cache through the `CachedAdminStoreOrders` inner entrypoint after the gateway authenticates the admin session.
+- Store order-derived reads share `admin-store-orders:index:v2`, including a deterministic non-PII watermark. Orders, Analytics, inventory sold counts, Film summaries, dashboard totals, and exports no longer require parallel order namespace scans.
+- Admin Orders can use Cloudflare Workers Cache through `CachedAdminStoreReads`; Analytics, inventory, and download readiness use the same policy entrypoint but remain off by default pending real-edge evidence.
+- Admin login no longer requests and discards `/admin/dashboard/summary`.
 - Order Success adds totals and fulfillment details without adding new public bundle dependencies.
 - Spanish public shells share the English page includes and runtime message payloads; they do not duplicate product rendering or add locale-specific bundles.
 - Admin dashboard tab restoration reads and writes one small sanitized `localStorage` object only when an admin tab or Settings section changes; it does not add network calls or polling.
@@ -42,18 +43,40 @@ npm run assets:minify:check
 
 The default Worker entrypoint stays uncached. Authentication, role/scope checks, CSRF checks, rate limits, route dispatch, mutations, checkout, webhooks, tokenized order routes, signed downloads, shipping, and tax all continue to execute through the gateway and return private/no-store responses where appropriate.
 
-`GET /admin/store/orders` can use the named `CachedAdminStoreOrders` entrypoint when `cache.workers_admin_orders_enabled` / `WORKERS_CACHE_ADMIN_ORDERS_ENABLED` is not set to `false`. The gateway authenticates the admin, builds a normalized internal request, strips credentials and CSRF headers, and passes minimal role/scope props with `ctx.exports`. The inner response is cacheable for `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`; the browser-facing response remains `private, no-store`.
+The `CachedAdminStoreReads` policy registry owns canonical paths/query fields, non-PII props, route flags, TTLs, tags, and purge dependencies:
 
-Cacheable admin Orders requests include only safe filter/page parameters: `status`, `fulfillment`, `limit`, `cursor`, `lang`, and `locale`. Free-text `q` searches bypass Workers Cache because search terms can contain customer names, email addresses, or order tokens.
+| Route | TTL | Default | Backend work avoided on hit |
+| --- | --- | --- | --- |
+| `/admin/store/orders` | `max-age=15`, no stale serving | enabled | order-index KV read or cold order list/get scan |
+| `/admin/store/analytics` | `max-age=60, stale-while-revalidate=120` | disabled | order snapshot and referral-label KV reads |
+| `/admin/store/inventory` | `max-age=15`, no stale serving | disabled | order snapshot/list/get work |
+| `/admin/store/downloads` | `max-age=30`, no stale serving | disabled | R2 list/readiness work |
+
+The gateway authenticates every request, strips credentials/CSRF, and passes only props version, route, normalized role, scope key, and Store access scope. Inner responses are public-cacheable; outer browser responses remain `private, no-store`.
+
+Orders keys accept only safe filter/page/locale fields plus validated ISO `since` and `orders-v2-<hash>` watermark values. Free-text `q` bypasses Workers Cache because search terms can contain names, email addresses, or order tokens. A matching first-page watermark returns a minimal `unchanged: true` response and leaves the existing PII-bearing payload in memory only.
 
 Performance expectations:
 
-- repeated no-change Orders reads should avoid repeated Worker CPU/KV index work while the cache entry is fresh
-- cache hits still count as Cloudflare Workers requests, but should reduce billed CPU and backend reads
-- order mutations call the existing order-index invalidation path, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available
-- super-admins can clear known Workers Cache entries from Settings -> Runtime diagnostics, and production deploys can call the Worker purge endpoint with `WORKERS_CACHE_PURGE_SECRET`
-- short TTLs bound staleness if a purge cannot run, such as from an older helper path without `ctx`
-- dashboard responses include `page.cache.workers` metadata and `X-Store-Workers-Cache` / `X-Store-Workers-Cache-Entry` headers for operator diagnostics
+- every `ctx.exports.fetch()` is an additional billed Workers request, including a cache hit; the benefit is avoided inner CPU and backend reads, not a lower request count
+- order mutations invalidate Orders, Analytics, and order-derived inventory; inventory, download-library, and referral mutations invalidate their dependent policies
+- purge failure does not fail a write and records only a bounded failure diagnostic; short TTLs cap stale exposure
+- download readiness lists R2 once and derives attached-file readiness from that listing, avoiding duplicate per-file `head` calls when the list is complete
+- response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters
+- super-admin and deploy-secret purges clear all known cache domains; deploy/version isolation remains enabled because `cross_version_cache` is off
+
+Run the metadata-only harness with a fresh one-time super-admin token supplied only through the environment:
+
+```bash
+export STORE_CACHE_SMOKE_ADMIN_LOGIN_TOKEN='<one-time-token>'
+npm run cache:benchmark -- \
+  --worker-base=https://checkout.example.com \
+  --site-base=https://shop.example.com \
+  --samples=30 \
+  --output=/secure/evidence/workers-cache.json
+```
+
+The evidence file contains timings, byte counts, cache statuses, and operation budgets, not response bodies or credentials. Require at least 30 samples, zero order-data KV list/get operations on warm no-change hits, at least 40% p95 improvement over an uncached comparison deployment, and fresh post-mutation reads before enabling another route. Podman validates the application contract but cannot prove Cloudflare edge hit behavior.
 
 Verify Worker Cache config before deploys that touch cached entrypoints:
 
@@ -62,6 +85,12 @@ cd worker
 npx wrangler --version
 npx wrangler deploy --dry-run --env=""
 ```
+
+Configuration:
+
+- `cache.workers_enabled` / `WORKERS_CACHE_ENABLED`: global kill switch.
+- `cache.workers_admin_*_enabled` / `WORKERS_CACHE_ADMIN_*_ENABLED`: route switches.
+- Re-enable after a purge or new Worker version so an old still-fresh response cannot reappear.
 
 ## Prefetch
 

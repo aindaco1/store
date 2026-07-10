@@ -15,6 +15,8 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, check-in links, Resend receipts, abandoned-checkout reminders, and event reminders.
 - Public Spanish shells exist for home, Terms, Orders, and Order Success; product titles/descriptions stay creator-authored unless a product defines localized overrides.
 - Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
+- Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, and the `CachedAdminStoreReads` Workers Cache entrypoint. Analytics, inventory, and download readiness use the same reviewed entrypoint but remain disabled by default pending real-edge benchmark evidence.
+- Backup and disaster recovery use a canonical Store data inventory, checksum-verified snapshot v2 manifests, encrypted sensitive exports, guarded restore planning, and a Podman-backed synthetic restore drill.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
 ## Local Development
@@ -46,6 +48,8 @@ npm run test:security
 npm run test:e2e:headless
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 npm run test:premerge
+npm run backup:inventory:audit
+npm run restore:rehearse
 ```
 
 For release environment setup:
@@ -53,6 +57,7 @@ For release environment setup:
 ```bash
 npm run setup:deploy -- --mode=local
 npm run backup:plan
+npm run restore:plan -- --snapshot "$HOME/store-backups/<snapshot>"
 npm run setup:deploy -- --mode=production --dry-run
 npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 ```
@@ -65,10 +70,13 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 - `assets/js/cart-provider.js` - first-party cart, checkout, shipping/tax preview, coupon, add-on, and reminder-consent runtime.
 - `assets/js/admin-dashboard.js` - admin dashboard client.
 - `worker/src/index.js` - Worker routes, checkout, admin, fulfillment, cron, and observability.
+- `worker/src/admin-store-read-model.js` and `worker/src/workers-cache-policy.js` - shared order snapshot and cache policy contracts.
 - `worker/src/generated/catalog-snapshot.js` - generated Worker catalog snapshot.
 - `worker/src/tier-inventory-do.js` - reservation-aware SKU inventory coordinator.
 - `worker/src/coupons.js` - coupon normalization, storage, and discount application.
 - `worker/src/local-repo-service.mjs` - local admin publish sidecar for dev.
+- `config/store-data-inventory.json` - canonical KV/R2/Durable Object backup and restore classification.
+- `scripts/store-backup.mjs` and `scripts/store-restore.mjs` - guarded snapshot and restore tooling.
 
 ## Docs
 

@@ -54,10 +54,10 @@ Current Settings sections:
 - Users: admin users, roles, and access scopes. Newly added users can receive notification email.
 - Store readiness: launch/runtime checks, audit CSV export, and reconciliation CSV export.
 - Plan usage: Cloudflare and Resend quota/usage posture.
-- Advanced performance: intent prefetch, live inventory cache controls, and the admin Orders Workers Cache kill switch.
+- Advanced performance: intent prefetch, live inventory cache controls, the global Workers Cache switch, and per-route Orders, Analytics, inventory, and download-readiness switches.
 - Debug: console logging flags.
 - Secrets & credentials: read-only status checks for required and optional runtime secrets.
-- Runtime diagnostics: current site base, Worker base, CORS allowed origin, Workers Cache gateway state, cached admin Orders entrypoint state, and a super-admin Workers Cache clear action.
+- Runtime diagnostics: current site base, Worker base, CORS allowed origin, the uncached Workers Cache gateway state, each cached admin read policy state, and a super-admin Workers Cache clear action.
 
 Settings media fields use upload controls and image previews rather than manual path-only editing where supported.
 
@@ -186,14 +186,17 @@ Current behavior:
 - Mark ticket/RSVP rows checked in or unchecked. Single-action check-in controls use the same responsive button sizing as other order actions so they fit inside desktop tables and mobile rows.
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
+- Explicitly refresh Orders. When the first-page filter has not changed, the dashboard reuses its in-memory payload and announces that no new orders were found.
 
 Performance/cache behavior:
 
-- Non-search list/filter/page reads can use the Worker `CachedAdminStoreOrders` inner entrypoint after the gateway authenticates the admin.
+- Non-search list/filter/page reads use the Worker `CachedAdminStoreReads` inner entrypoint after the gateway authenticates and authorizes the admin. The legacy JavaScript alias is compatibility-only and is not a configured Wrangler entrypoint.
 - The browser still receives a private/no-store response with the authenticated `user`; the cacheable inner response omits user identity.
-- Free-text search requests bypass Workers Cache.
+- The v2 order snapshot provides a deterministic non-PII watermark. A matching first-page request returns `unchanged: true` without order/customer rows; payloads and watermarks remain in memory and are not written to browser storage.
+- Free-text search requests bypass Workers Cache because query text can contain customer data or order tokens.
 - The response payload includes `page.cache.workers` metadata, and the response headers include `X-Store-Workers-Cache` and `X-Store-Workers-Cache-Entry` when the cached entrypoint is used.
-- Order mutations purge the admin Orders cache tags through the same invalidation path that refreshes the order index.
+- Order mutations purge Orders, Analytics, and order-derived inventory tags through the centralized dependency map. Purge failure does not fail the mutation; short TTLs and the manual refresh control bound stale exposure.
+- Analytics, inventory, and download-readiness cache policies are visible in Settings but default off until each passes a real Cloudflare edge benchmark.
 
 Snipcart import:
 

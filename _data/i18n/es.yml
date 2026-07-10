@@ -74,6 +74,8 @@ admin:
   search_label: Buscar
   export_csv: Exportar CSV
   export_attendees: Exportar asistentes
+  refresh_orders: Actualizar pedidos
+  orders_unchanged: No hay cambios en los pedidos desde la ultima actualizacion.
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
   store_coupons_intro: Crea, edita y elimina códigos de cupón para descuentos de carrito completo o productos específicos.

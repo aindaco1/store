@@ -165,7 +165,11 @@ add_ons:
 cache:
   live_inventory_cache_ttl_seconds: 300
   live_inventory_ttl_seconds: 300
+  workers_enabled: true
   workers_admin_orders_enabled: true
+  workers_admin_analytics_enabled: false
+  workers_admin_inventory_enabled: false
+  workers_admin_downloads_enabled: false
 performance:
   intent_prefetch_enabled: true
   intent_prefetch_delay_ms: 90

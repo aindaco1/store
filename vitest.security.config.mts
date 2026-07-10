@@ -8,10 +8,6 @@ export default defineConfig({
     hookTimeout: 10000,
     reporters: ['verbose'],
     pool: 'forks', // Use forks for network test isolation
-    poolOptions: {
-      forks: {
-        singleFork: true, // Run sequentially to avoid overwhelming the Worker
-      },
-    },
+    fileParallelism: false, // Run security files serially against one shared Worker.
   },
 });

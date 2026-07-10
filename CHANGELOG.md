@@ -1,11 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Consolidated authenticated admin caching under `CachedAdminStoreReads`, added the v2 order snapshot/watermark and minimal no-change Orders refresh contract, removed the unused login summary request, and made inventory reuse the shared order snapshot instead of repeating KV namespace reads.
+- Added disabled-by-default cache policies for Analytics, order-derived inventory, and R2 download readiness with route-specific TTLs, canonical keys, global/per-route switches, dependency tags, mutation-driven purge, failure-only diagnostics, and explicit Workers/KV/R2/provider operation budgets.
+- Added a localized manual Orders refresh control, in-memory watermark reuse, cache benchmark/smoke tooling, and expanded policy, endpoint, mutation, no-change, benchmark, and Podman dashboard coverage.
+- Expanded backup/restore automation with a canonical machine-readable data inventory, maintained TOML parsing, shared CLI/provider helpers, snapshot v2 checksums and private permissions, isolated build evidence, deployment/version/secret-name evidence, one-time admin exports, complete R2 library discovery, and encryption/acknowledgement gates for sensitive data.
+- Added guarded restore planning and execution for local, preview, and production targets, including checksum validation, authoritative-record validation, quarantine exclusions, derived-index repair, production traffic/Stripe/inventory/pre-snapshot interlocks, and a passing Podman synthetic restore drill.
+- Hardened operator backup/restore paths against non-TLS token exchange, admin URL and R2 path traversal, symlink/unlisted snapshot artifacts, repository or repository-linked sensitive output paths, missing value artifacts, unverified/reused pre-restore snapshots, plaintext archive residue, and continued writes after a failed restore command.
+- Upgraded Vitest and esbuild, refreshed vulnerable development transitive dependencies to reach a clean npm audit, migrated security tests to Vitest 4's serial file configuration, and serialized same-isolate rate-limit KV updates so concurrent bursts cannot lose increments.
+
 ## v1.0.6 - 2026-07-09
 
 - Added a Cloudflare Workers Cache integration for authenticated admin Orders list reads using a cached named Worker entrypoint while keeping the default gateway and browser-facing admin responses private/no-store.
 - Added a super-admin Workers Cache clear action, a deploy-time Workers Cache purge hook with `WORKERS_CACHE_PURGE_SECRET`, and a `_config.yml`/Settings kill switch for admin Orders caching.
 - Added Workers Cache policy tests for admin Orders request normalization, search bypasses, kill-switch behavior, role/scope partitioning, cache headers, shared purge helpers, and internal purge authorization.
 - Added repeatable backup/restore snapshot automation with dry-run planning, Git/config/provider inventory, KV/R2 backup plans, secret presence inventory without values, and restore-plan generation.
+- Made runtime-dependent security and E2E test defaults Podman-backed, reset isolated Wrangler/Miniflare state for Podman test wrappers, tightened Podman readiness around real Worker cart validation, and fixed Podman teardown so skipped Stripe forwarding cannot terminate the parent test process group.
 - Changed production deploys to run only from the manual **Deploy Production** workflow so release merges and tags can be prepared without deploying.
 - Updated Worker, performance, security, dashboard, testing, workflows, and backup/restore docs for the cached admin Orders path, manual production deploys, and backup automation.
 

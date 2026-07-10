@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
 import dns from 'node:dns/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { commandAvailable, runCommand } from './lib/command-runner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -13,6 +13,11 @@ const DEV_VARS_PATH = path.join(WORKER_DIR, '.dev.vars');
 
 const args = process.argv.slice(2);
 const hasArg = (name) => args.includes(name);
+const valueArg = (name, fallback = '') => {
+  const prefix = `${name}=`;
+  const found = args.find((arg) => arg.startsWith(prefix));
+  return found ? found.slice(prefix.length) : fallback;
+};
 const strict = hasArg('--strict') || process.env.RELEASE_PROVIDER_STRICT === '1';
 const noDevVars = hasArg('--no-dev-vars') ||
   process.env.RELEASE_PROVIDER_USE_DEV_VARS === '0' ||
@@ -21,6 +26,7 @@ const useDevVars = !noDevVars;
 const cloudflareDnsOnly = hasArg('--cloudflare-dns-only') ||
   process.env.RELEASE_PROVIDER_CLOUDFLARE_DNS_ONLY === '1';
 const help = hasArg('--help') || hasArg('-h');
+const jsonOutput = valueArg('--json-output', '');
 const CHECK_TIMEOUT_MS = Number(process.env.RELEASE_PROVIDER_TIMEOUT_MS || 10000);
 
 if (help) {
@@ -34,6 +40,8 @@ Options:
              injected but unrelated provider secrets may not be available.
   --no-dev-vars
              Do not read worker/.dev.vars. Use this for clean-shell CI probes.
+  --json-output=FILE
+             Write structured, redacted provider results for release/backup evidence.
   --help     Show this help.
 
 The provider probe is read-only. It checks public DNS and, when credentials are
@@ -55,6 +63,20 @@ function add(status, label, detail = '') {
 
 function failOrWarn(label, detail) {
   add(strict ? 'FAIL' : 'WARN', label, detail);
+}
+
+function writeStructuredEvidence(summary) {
+  if (!jsonOutput) return;
+  const outputPath = path.resolve(jsonOutput);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(outputPath, `${JSON.stringify({
+    schemaVersion: 1,
+    checkedAt: new Date().toISOString(),
+    strict,
+    cloudflareDnsOnly,
+    summary,
+    results
+  }, null, 2)}\n`, { mode: 0o600 });
 }
 
 function readKeyValueFile(filePath) {
@@ -152,13 +174,7 @@ async function fetchJson(url, { headers = {}, method = 'GET', body = null } = {}
 }
 
 function run(command, commandArgs = [], options = {}) {
-  return spawnSync(command, commandArgs, {
-    cwd: options.cwd || ROOT,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
-    env: process.env
-  });
+  return runCommand(command, commandArgs, { ...options, cwd: options.cwd || ROOT });
 }
 
 function parseJsonOutput(text) {
@@ -167,11 +183,6 @@ function parseJsonOutput(text) {
   } catch {
     return null;
   }
-}
-
-function commandAvailable(command) {
-  const result = run(command, ['--version']);
-  return result.status === 0 && !result.error;
 }
 
 function expectedEmailDomains(vars) {
@@ -513,6 +524,7 @@ async function main() {
     const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
     console.log('');
     console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
+    writeStructuredEvidence({ failCount, warnCount, skipCount });
 
     if (failCount || (strict && (warnCount || skipCount))) process.exit(1);
     return;
@@ -594,6 +606,7 @@ async function main() {
   const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
   console.log('');
   console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
+  writeStructuredEvidence({ failCount, warnCount, skipCount });
 
   if (failCount || (strict && (warnCount || skipCount))) process.exit(1);
 }

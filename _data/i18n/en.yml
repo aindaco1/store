@@ -74,6 +74,8 @@ admin:
   search_label: Search
   export_csv: Export CSV
   export_attendees: Export attendees
+  refresh_orders: Refresh orders
+  orders_unchanged: No order changes since the last refresh.
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
   store_coupons_intro: Create, edit, and delete Store coupon codes for cart-wide or product-specific discounts.

@@ -69,20 +69,29 @@ Secret storage rules:
 | `admin-audit:{date}:{action}:{id}` | KV | Recent admin mutation audit metadata | Medium |
 | `admin-store-marketing-referrals:v1` | KV | Saved referral/UTM links | Medium |
 | `observability:*` | KV | Bounded webhook/performance telemetry summaries | Low |
+| `workers-cache-purge-failure:recent` | KV | Failure-only cache domains/status/error with seven-day TTL | Low |
 | `rl:{endpoint}:{ip}` | KV | Rate-limit counters | Low |
+
+The complete backup/restore classification, including quarantine and idempotency handling, lives in `config/store-data-inventory.json` and is checked by `npm run backup:inventory:audit`.
+
+Rate-limit counters are shared through `RATELIMIT` KV and protected by a short-lived per-key queue within each Worker isolate, preventing concurrent requests handled by that isolate from overwriting one another's increments. Protected routes fail closed when the binding or counter operation is unavailable. KV is still not a globally atomic abuse ledger; use Cloudflare edge/WAF controls as an additional production layer for distributed attacks.
+
+Operator backup/cache clients accept one-time admin tokens only through environment variables, require HTTPS except for loopback development, require an origin-only Worker base, and reject normalized paths outside `/admin/`. Sensitive snapshot destinations are checked through existing filesystem ancestors to reject repository symlink targets, while checksum verification rejects unlisted files and symbolic links before restore planning.
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
 
 Workers Cache rule:
 
 - The default Worker gateway entrypoint remains uncached so auth, CSRF, role/scope checks, rate limits, route dispatch, and mutations always run.
-- Only reviewed inner `GET`/`HEAD` entrypoints may emit cacheable responses. Today that means `CachedAdminStoreOrders` for non-search admin Orders list reads.
-- The gateway authenticates the admin before calling the cached entrypoint and sends only minimal `ctx.props` role/scope partitioning. Do not key cached admin data on `Cookie`, `Authorization`, raw session tokens, email addresses, names, CSRF tokens, or signed-link values.
+- Only routes in the reviewed `CachedAdminStoreReads` policy registry may emit cacheable inner responses: Orders, Analytics, inventory, and download readiness. Orders is enabled by default; the three additional routes default off until real-edge evidence passes.
+- The gateway authenticates the admin before calling the cached entrypoint and sends only props version, route, role, normalized scope key, and Store access scope. Do not key cached data on cookies, authorization/CSRF values, identity, search text, order tokens, or signed capabilities.
 - Browser-facing admin responses stay `private, no-store` even when the inner Workers Cache response is public-cacheable.
 - Free-text admin Orders searches bypass Workers Cache because `q` may contain customer PII or order tokens.
-- Cache tags must stay low-cardinality and non-PII. Use route/domain tags such as `admin-orders`, `orders`, `order-index`, and version tags only.
-- Purge requests to cached inner entrypoints must require trusted internal props and should be triggered from the same mutation boundaries that invalidate KV/order projections.
+- Cache tags stay low-cardinality and non-PII. The dependency map is limited to reviewed route/version plus `orders`, `order-index`, `analytics`, `inventory`, `products`, `downloads`, and `marketing` domains.
+- Purge requests require trusted internal props and originate from centralized mutation boundaries. A purge failure does not roll back a successful write; only a bounded, seven-day, non-PII failure row is stored.
 - External purge requests are limited to `POST /admin/workers-cache/purge` and require either a super-admin session with CSRF or the dedicated `WORKERS_CACHE_PURGE_SECRET`; callers cannot submit arbitrary cache tags.
+- `WORKERS_CACHE_ENABLED` is the global runtime kill switch, route switches can bypass immediately, and `cross_version_cache` remains off so deploy versions do not share entries.
+- Browser refresh watermarks are deterministic hashes only. Order payloads and customer PII remain in memory and are never added to `localStorage` or `sessionStorage`.
 
 Browser storage:
 

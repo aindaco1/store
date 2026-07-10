@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { commandAvailable, runCommand } from './lib/command-runner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -122,10 +122,6 @@ Examples:
 `);
 }
 
-function commandName(name) {
-  return process.platform === 'win32' && ['npm', 'npx'].includes(name) ? `${name}.cmd` : name;
-}
-
 function logStep(message) {
   console.log(`\n==> ${message}`);
 }
@@ -148,15 +144,13 @@ function run(command, runArgs = [], { cwd = ROOT, input = '', allowFailure = fal
     return { status: 0, stdout: '', stderr: '' };
   }
 
-  const result = spawnSync(commandName(command), runArgs, {
+  const result = runCommand(command, runArgs, {
     cwd,
     input,
-    encoding: 'utf8',
-    stdio: capture ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'inherit', 'inherit'],
-    shell: false
+    capture
   });
   if (result.error && !allowFailure) {
-    throw result.error;
+    throw new Error(result.error);
   }
   if (result.status !== 0 && !allowFailure) {
     const stderr = String(result.stderr || '').trim();
@@ -167,16 +161,6 @@ function run(command, runArgs = [], { cwd = ROOT, input = '', allowFailure = fal
     stdout: String(result.stdout || ''),
     stderr: String(result.stderr || '')
   };
-}
-
-function commandAvailable(command) {
-  const result = spawnSync(commandName(command), ['--version'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false
-  });
-  return !result.error && result.status === 0;
 }
 
 function ensureCommands(commands, { required = true } = {}) {

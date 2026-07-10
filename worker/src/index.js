@@ -73,6 +73,35 @@ import { normalizeShippingDestination, quoteStoreShipment } from './shipping.js'
 import { normalizeTaxDestination, quoteTax } from './tax.js';
 import { parseSnipcartOrdersCsv, SNIPCART_IMPORT_MAX_CSV_BYTES } from './snipcart-import.js';
 import {
+  ADMIN_STORE_ORDER_INDEX_KEY,
+  adminStoreOrdersSnapshotIsUnchanged,
+  buildAdminStoreOrderIndexSnapshot,
+  buildStoreInventorySoldCountsFromOrders,
+  compareAdminStoreOrders,
+  normalizeAdminStoreOrderIndex,
+  normalizeAdminStoreOrdersSince,
+  normalizeAdminStoreOrdersWatermark,
+  parseReadModelTimestamp as parseTimestampMs
+} from './admin-store-read-model.js';
+import {
+  ADMIN_STORE_READ_CACHE_POLICIES,
+  ADMIN_STORE_READS_CACHE_ENTRYPOINT,
+  ADMIN_STORE_READS_CACHE_INTERNAL_ORIGIN,
+  ADMIN_STORE_READS_CACHE_LEGACY_ENTRYPOINT,
+  ADMIN_STORE_READS_CACHE_PURGE_PATH,
+  adminStoreReadCacheBypassReason,
+  adminStoreReadCachePoliciesForDomains,
+  adminStoreReadCachePolicy,
+  adminStoreReadCacheTagsForDomains,
+  buildAdminStoreReadCacheProps,
+  buildAdminStoreReadCachePurgeProps,
+  buildAdminStoreReadCacheRequest,
+  readAdminStoreReadCacheProps,
+  storeReadCacheDomainsForMutation,
+  workersCacheGloballyEnabled,
+  workersCacheEnabledForAdminStoreRead
+} from './workers-cache-policy.js';
+import {
   getPlatformDateKey,
   getPlatformTimeZone,
   getTimeZoneOptions,
@@ -339,19 +368,14 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
-const ADMIN_STORE_ORDER_INDEX_KEY = 'admin-store-orders:index:v1';
-const ADMIN_STORE_ORDER_INDEX_VERSION = 1;
 const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 10 * 60;
 const ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS = ADMIN_STORE_ORDER_INDEX_TTL_SECONDS * 1000;
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT = 'CachedAdminStoreOrders';
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE = 'store-admin-orders-cache-gateway';
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION = 1;
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS = ['admin-orders', 'orders', 'order-index', 'admin-orders-v1'];
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL = 'public, max-age=20, stale-while-revalidate=40, stale-if-error=0';
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH = '/__store-cache/admin-orders/purge';
 const ADMIN_WORKERS_CACHE_PURGE_PATH = '/admin/workers-cache/purge';
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_ALLOWED_PARAMS = ['status', 'fulfillment', 'limit', 'cursor', 'lang', 'locale'];
-const ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN = 'https://store-cache.internal';
+const WORKERS_CACHE_PURGE_FAILURE_KEY = 'workers-cache-purge-failure:recent';
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT = ADMIN_STORE_READS_CACHE_ENTRYPOINT;
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_POLICY = ADMIN_STORE_READ_CACHE_POLICIES.orders;
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS = ADMIN_STORE_ORDERS_WORKERS_CACHE_POLICY.tags;
+const ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL = ADMIN_STORE_ORDERS_WORKERS_CACHE_POLICY.cacheControl;
 
 let adminStoreOrderScanCache = null;
 let adminStoreOrderIndexCache = null;
@@ -366,86 +390,31 @@ function invalidateAdminStoreOrderScanCache(env = null, ctx = null) {
       'admin Store order index invalidation'
     );
   }
-  purgeAdminStoreOrdersWorkersCache(ctx);
+  invalidateStoreReadCaches(env, ctx, storeReadCacheDomainsForMutation('checkout_confirmation'));
 }
 
 function workersCacheEnabledForAdminStoreOrders(env = {}) {
-  return String(env.WORKERS_CACHE_ADMIN_ORDERS_ENABLED ?? 'true').trim().toLowerCase() !== 'false';
+  return workersCacheEnabledForAdminStoreRead(env, 'orders');
 }
 
 function adminStoreOrdersWorkersCacheBypassReason(request) {
-  const url = new URL(request.url);
-  const query = String(url.searchParams.get('q') || '').trim();
-  return query ? 'search_query' : '';
-}
-
-function sanitizeAdminStoreOrdersCacheParam(key, value) {
-  const text = String(value || '').trim();
-  if (!text) return '';
-  if (key === 'limit') {
-    return String(clampAdminPageLimit(text));
-  }
-  if (key === 'cursor') {
-    return String(Math.max(0, Number.parseInt(text, 10) || 0));
-  }
-  if (key === 'lang' || key === 'locale') {
-    return text.toLowerCase().replace(/[^a-z-]/g, '').slice(0, 12);
-  }
-  return text.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+  return adminStoreReadCacheBypassReason(request, 'orders');
 }
 
 function buildAdminStoreOrdersCacheRequest(request) {
-  const sourceUrl = new URL(request.url);
-  const cacheUrl = new URL('/admin/store/orders', ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN);
-  for (const key of ADMIN_STORE_ORDERS_WORKERS_CACHE_ALLOWED_PARAMS) {
-    if (!sourceUrl.searchParams.has(key)) continue;
-    const value = sanitizeAdminStoreOrdersCacheParam(key, sourceUrl.searchParams.get(key));
-    if (value) cacheUrl.searchParams.set(key, value);
-  }
-  return new Request(cacheUrl.toString(), {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json'
-    },
-    cf: {
-      cacheControl: ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL
-    }
-  });
+  return buildAdminStoreReadCacheRequest(request, 'orders');
 }
 
 function buildAdminStoreOrdersWorkersCacheProps(auth = {}) {
-  const user = auth.user || {};
-  const role = String(user.role || '').trim().toLowerCase() === 'super_admin'
-    ? 'super_admin'
-    : 'limited_admin';
-  const scopes = role === 'super_admin'
-    ? ['super_admin']
-    : normalizeAdminAccessScopes(user.accessScopes || []).sort();
-  return {
-    source: ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE,
-    version: ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION,
-    role,
-    scopeKey: scopes.join('|') || 'none',
-    accessScope: STORE_ADMIN_SCOPE
-  };
+  return buildAdminStoreReadCacheProps(auth, 'orders');
 }
 
 function readAdminStoreOrdersWorkersCacheProps(ctx = null) {
-  const props = ctx?.props && typeof ctx.props === 'object' ? ctx.props : {};
-  if (props.source !== ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE) return null;
-  if (Number(props.version || 0) !== ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION) return null;
-  const role = String(props.role || '').trim().toLowerCase();
-  if (role !== 'super_admin' && role !== 'limited_admin') return null;
-  const scopeKey = String(props.scopeKey || '').trim().toLowerCase();
-  if (!scopeKey || /[^a-z0-9:_|-]/.test(scopeKey)) return null;
-  return {
-    role,
-    scopeKey,
-    accessScope: String(props.accessScope || STORE_ADMIN_SCOPE).trim() || STORE_ADMIN_SCOPE
-  };
+  const props = readAdminStoreReadCacheProps(ctx);
+  return props?.routeId === 'orders' ? props : null;
 }
 
-function authFromAdminStoreOrdersWorkersCacheProps(props = {}) {
+function authFromAdminStoreReadWorkersCacheProps(props = {}) {
   return {
     ok: true,
     user: {
@@ -457,13 +426,14 @@ function authFromAdminStoreOrdersWorkersCacheProps(props = {}) {
   };
 }
 
-function getAdminStoreOrdersWorkersCacheBinding(ctx = null) {
-  const binding = ctx?.exports?.[ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT];
+function getAdminStoreReadWorkersCacheBinding(ctx = null, routeId = '') {
+  const binding = ctx?.exports?.[ADMIN_STORE_READS_CACHE_ENTRYPOINT]
+    || (routeId === 'orders' ? ctx?.exports?.[ADMIN_STORE_READS_CACHE_LEGACY_ENTRYPOINT] : null);
   return binding || null;
 }
 
-function fetchAdminStoreOrdersWorkersCache(ctx = null, request, props = {}) {
-  const binding = getAdminStoreOrdersWorkersCacheBinding(ctx);
+function fetchAdminStoreReadWorkersCache(ctx = null, request, props = {}) {
+  const binding = getAdminStoreReadWorkersCacheBinding(ctx, props.routeId);
   if (!binding) return null;
   if (typeof binding.fetch === 'function') {
     return binding.fetch(request, { props });
@@ -477,21 +447,43 @@ function fetchAdminStoreOrdersWorkersCache(ctx = null, request, props = {}) {
   return null;
 }
 
-function adminStoreOrdersWorkersCacheMetadata(response = null, { enabled = true, bypass = '' } = {}) {
+function fetchAdminStoreOrdersWorkersCache(ctx = null, request, props = {}) {
+  return fetchAdminStoreReadWorkersCache(ctx, request, props);
+}
+
+function adminStoreReadWorkersCacheMetadata(routeId, response = null, { enabled = true, bypass = '' } = {}) {
+  const policy = adminStoreReadCachePolicy(routeId);
   return {
     enabled,
-    entrypoint: ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT,
+    routeId,
+    entrypoint: ADMIN_STORE_READS_CACHE_ENTRYPOINT,
     status: response?.headers?.get?.('Cf-Cache-Status') || (enabled ? 'unavailable' : 'disabled'),
     bypass,
-    tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS,
-    cacheControl: ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL
+    tags: policy?.tags || [],
+    cacheControl: policy?.cacheControl || ''
   };
 }
 
-function attachAdminStoreOrdersGatewayUser(payload = {}, auth = {}, workersCache = null) {
+function adminStoreOrdersWorkersCacheMetadata(response = null, options = {}) {
+  return adminStoreReadWorkersCacheMetadata('orders', response, options);
+}
+
+function attachAdminStoreReadGatewayUser(payload = {}, auth = {}, workersCache = null) {
+  const servedFromCache = ['HIT', 'UPDATING'].includes(String(workersCache?.status || '').toUpperCase());
+  const writeBudget = {
+    ...(payload.writeBudget || adminReadBudget()),
+    workersRequestsExpected: workersCache?.enabled && !workersCache?.bypass ? 1 : 0
+  };
+  if (servedFromCache) {
+    for (const key of ['kvReadsExpected', 'kvListExpected', 'r2ReadsExpected', 'r2ListExpected', 'providerCallsExpected']) {
+      if (key in writeBudget) writeBudget[key] = 0;
+    }
+  }
   return {
     ...payload,
     user: auth.user || null,
+    workersCache,
+    writeBudget,
     page: {
       ...(payload.page || {}),
       cache: {
@@ -502,31 +494,39 @@ function attachAdminStoreOrdersGatewayUser(payload = {}, auth = {}, workersCache
   };
 }
 
-function cacheableAdminStoreOrdersJsonResponse(payload = {}, status = 200, env = null) {
+function attachAdminStoreOrdersGatewayUser(payload = {}, auth = {}, workersCache = null) {
+  return attachAdminStoreReadGatewayUser(payload, auth, workersCache);
+}
+
+function cacheableAdminStoreReadJsonResponse(payload = {}, routeId, status = 200, env = null) {
+  const policy = adminStoreReadCachePolicy(routeId);
   return jsonResponse(payload, status, env, false, {
-    'Cache-Control': ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL,
-    'Cache-Tag': ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS.join(',')
+    'Cache-Control': policy?.cacheControl || 'public, max-age=0',
+    'Cache-Tag': (policy?.tags || []).join(',')
   });
 }
 
-function noStoreAdminStoreOrdersCacheResponse(data = {}, status = 200, env = null) {
+function cacheableAdminStoreOrdersJsonResponse(payload = {}, status = 200, env = null) {
+  return cacheableAdminStoreReadJsonResponse(payload, 'orders', status, env);
+}
+
+function noStoreAdminStoreReadCacheResponse(data = {}, status = 200, env = null) {
   return jsonResponse(data, status, env, false, {
     'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL
   });
 }
 
 function buildAdminStoreOrdersWorkersCachePurgeProps() {
-  return {
-    source: ADMIN_STORE_ORDERS_WORKERS_CACHE_SOURCE,
-    version: ADMIN_STORE_ORDERS_WORKERS_CACHE_PROPS_VERSION,
-    role: 'super_admin',
-    scopeKey: 'purge',
-    accessScope: STORE_ADMIN_SCOPE
-  };
+  return buildAdminStoreReadCachePurgeProps('orders');
 }
 
-function buildAdminStoreOrdersWorkersCachePurgeRequest() {
-  return new Request(`${ADMIN_STORE_ORDERS_WORKERS_CACHE_INTERNAL_ORIGIN}${ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH}`, {
+function buildAdminStoreReadWorkersCachePurgeRequest(domains = []) {
+  const url = new URL(ADMIN_STORE_READS_CACHE_PURGE_PATH, ADMIN_STORE_READS_CACHE_INTERNAL_ORIGIN);
+  const normalizedDomains = Array.from(new Set((Array.isArray(domains) ? domains : [domains])
+    .map((domain) => String(domain || '').trim().toLowerCase())
+    .filter(Boolean))).sort();
+  if (normalizedDomains.length) url.searchParams.set('domains', normalizedDomains.join(','));
+  return new Request(url.toString(), {
     method: 'POST',
     headers: {
       Accept: 'application/json'
@@ -534,11 +534,15 @@ function buildAdminStoreOrdersWorkersCachePurgeRequest() {
   });
 }
 
-function adminStoreOrdersWorkersCachePurgeResult(overrides = {}) {
+function buildAdminStoreOrdersWorkersCachePurgeRequest() {
+  return buildAdminStoreReadWorkersCachePurgeRequest(['orders', 'order-index']);
+}
+
+function adminStoreReadWorkersCachePurgeResult(domains = [], overrides = {}) {
   return {
-    entrypoint: ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT,
-    tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS,
-    cacheControl: ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL,
+    entrypoint: ADMIN_STORE_READS_CACHE_ENTRYPOINT,
+    domains: Array.from(new Set(domains)).sort(),
+    tags: adminStoreReadCacheTagsForDomains(domains),
     ok: false,
     status: 0,
     purgedAt: new Date().toISOString(),
@@ -546,18 +550,21 @@ function adminStoreOrdersWorkersCachePurgeResult(overrides = {}) {
   };
 }
 
-async function purgeAdminStoreOrdersWorkersCacheNow(ctx = null) {
-  const responsePromise = fetchAdminStoreOrdersWorkersCache(
-    ctx,
-    buildAdminStoreOrdersWorkersCachePurgeRequest(),
-    buildAdminStoreOrdersWorkersCachePurgeProps()
-  );
-  if (!responsePromise) {
-    return adminStoreOrdersWorkersCachePurgeResult({
-      error: 'Workers Cache entrypoint unavailable'
-    });
-  }
+async function purgeStoreReadCachesNow(ctx = null, domains = []) {
+  const normalizedDomains = Array.from(new Set((Array.isArray(domains) ? domains : [domains])
+    .map((domain) => String(domain || '').trim().toLowerCase())
+    .filter(Boolean))).sort();
   try {
+    const responsePromise = fetchAdminStoreReadWorkersCache(
+      ctx,
+      buildAdminStoreReadWorkersCachePurgeRequest(normalizedDomains),
+      buildAdminStoreOrdersWorkersCachePurgeProps()
+    );
+    if (!responsePromise) {
+      return adminStoreReadWorkersCachePurgeResult(normalizedDomains, {
+        error: 'Workers Cache entrypoint unavailable'
+      });
+    }
     const response = await responsePromise;
     let body = {};
     try {
@@ -566,25 +573,50 @@ async function purgeAdminStoreOrdersWorkersCacheNow(ctx = null) {
       body = {};
     }
     const ok = response.ok && body?.ok !== false;
-    return adminStoreOrdersWorkersCachePurgeResult({
+    return adminStoreReadWorkersCachePurgeResult(normalizedDomains, {
       ok,
       status: response.status,
+      tags: Array.isArray(body?.tags) ? body.tags : adminStoreReadCacheTagsForDomains(normalizedDomains),
       purgedAt: body?.purgedAt || new Date().toISOString(),
       error: ok ? undefined : body?.error || `Workers Cache purge failed with status ${response.status}`
     });
   } catch (error) {
-    return adminStoreOrdersWorkersCachePurgeResult({
+    return adminStoreReadWorkersCachePurgeResult(normalizedDomains, {
       error: error?.message || 'Workers Cache purge failed'
     });
   }
 }
 
-function purgeAdminStoreOrdersWorkersCache(ctx = null) {
+async function purgeAdminStoreOrdersWorkersCacheNow(ctx = null) {
+  return purgeStoreReadCachesNow(ctx, ['orders', 'order-index']);
+}
+
+async function recordStoreReadCachePurgeFailure(env = null, result = {}) {
+  if (!env?.STORE_STATE?.put || result.ok !== false) return;
+  await env.STORE_STATE.put(WORKERS_CACHE_PURGE_FAILURE_KEY, JSON.stringify({
+    failedAt: new Date().toISOString(),
+    entrypoint: ADMIN_STORE_READS_CACHE_ENTRYPOINT,
+    domains: Array.isArray(result.domains) ? result.domains.slice(0, 12) : [],
+    status: Number(result.status || 0),
+    error: String(result.error || 'Workers Cache purge failed').slice(0, 240)
+  }), { expirationTtl: 7 * 24 * 60 * 60 });
+}
+
+function invalidateStoreReadCaches(env = null, ctx = null, domains = []) {
+  if (!adminStoreReadCachePoliciesForDomains(domains).length) return;
+  const task = purgeStoreReadCachesNow(ctx, domains).then(async (result) => {
+    if (!result.ok) await recordStoreReadCachePurgeFailure(env, result);
+    return result;
+  });
   queueBackgroundTask(
     ctx,
-    purgeAdminStoreOrdersWorkersCacheNow(ctx),
-    'admin Store orders Workers Cache purge'
+    task,
+    'admin Store read Workers Cache purge'
   );
+}
+
+function invalidateStoreReadCachesForMutation(env = null, ctx = null, mutationId = '') {
+  invalidateStoreReadCaches(env, ctx, storeReadCacheDomainsForMutation(mutationId));
 }
 
 
@@ -853,7 +885,26 @@ function isProductionWorkerRequest(request, env = {}) {
   }
 }
 
-  // SEC-005: Rate limiting helper
+const rateLimitKeyQueues = new Map();
+
+async function withRateLimitKeyLock(key, operation) {
+  const previous = rateLimitKeyQueues.get(key) || Promise.resolve();
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const queued = previous.catch(() => undefined).then(() => gate);
+  rateLimitKeyQueues.set(key, queued);
+  await previous.catch(() => undefined);
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (rateLimitKeyQueues.get(key) === queued) rateLimitKeyQueues.delete(key);
+  }
+}
+
+// SEC-005: Rate limiting helper
 // Returns { allowed: true } or { allowed: false, response: Response }
 async function checkRateLimit(request, env, options = {}) {
   const {
@@ -884,70 +935,74 @@ async function checkRateLimit(request, env, options = {}) {
              request.headers.get('X-Forwarded-For')?.split(',')[0] || 
              'unknown';
   const key = keyFn ? `${prefix}:${keyFn(request)}` : `${prefix}:${ip}`;
-  
-  try {
-    const now = Math.floor(Date.now() / 1000);
-    const record = await env.RATELIMIT.get(key, { type: 'json' }) || { count: 0, reset: now + windowSeconds };
-    
-    // Reset window if expired
-    if (now > record.reset) {
-      record.count = 0;
-      record.reset = now + windowSeconds;
-    }
 
-    // Once a client is already over limit inside the current window,
-    // fail closed without rewriting the same counter on every blocked hit.
-    if (record.count >= limit) {
-      const retryAfter = Math.max(0, record.reset - now);
+  // Serialize same-isolate updates so concurrent requests cannot overwrite the
+  // same KV count. KV remains the shared cross-isolate backing store.
+  return withRateLimitKeyLock(key, async () => {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const record = await env.RATELIMIT.get(key, { type: 'json' }) || { count: 0, reset: now + windowSeconds };
+
+      // Reset window if expired
+      if (now > record.reset) {
+        record.count = 0;
+        record.reset = now + windowSeconds;
+      }
+
+      // Once a client is already over limit inside the current window,
+      // fail closed without rewriting the same counter on every blocked hit.
+      if (record.count >= limit) {
+        const retryAfter = Math.max(0, record.reset - now);
+        return {
+          allowed: false,
+          response: rateLimitResponse({
+            error: 'Too many requests',
+            retryAfter
+          }, 429, {
+            'Retry-After': String(retryAfter),
+            'X-RateLimit-Limit': String(limit),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(record.reset)
+          })
+        };
+      }
+
+      record.count++;
+
+      // Store updated count
+      await env.RATELIMIT.put(key, JSON.stringify(record), {
+        expirationTtl: windowSeconds + 10
+      });
+
+      if (record.count > limit) {
+        const retryAfter = record.reset - now;
+        return {
+          allowed: false,
+          response: rateLimitResponse({
+            error: 'Too many requests',
+            retryAfter
+          }, 429, {
+            'Retry-After': String(retryAfter),
+            'X-RateLimit-Limit': String(limit),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(record.reset)
+          })
+        };
+      }
+
+      return {
+        allowed: true,
+        remaining: limit - record.count,
+        reset: record.reset
+      };
+    } catch (err) {
+      console.error('Rate limit check failed:', err);
       return {
         allowed: false,
-        response: rateLimitResponse({
-          error: 'Too many requests',
-          retryAfter
-        }, 429, {
-          'Retry-After': String(retryAfter),
-          'X-RateLimit-Limit': String(limit),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': String(record.reset)
-        })
+        response: rateLimitResponse({ error: 'Rate limiting unavailable' }, 503)
       };
     }
-    
-    record.count++;
-    
-    // Store updated count
-    await env.RATELIMIT.put(key, JSON.stringify(record), { 
-      expirationTtl: windowSeconds + 10 
-    });
-    
-    if (record.count > limit) {
-      const retryAfter = record.reset - now;
-      return {
-        allowed: false,
-        response: rateLimitResponse({
-          error: 'Too many requests',
-          retryAfter 
-        }, 429, {
-          'Retry-After': String(retryAfter),
-          'X-RateLimit-Limit': String(limit),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': String(record.reset)
-        })
-      };
-    }
-    
-    return { 
-      allowed: true,
-      remaining: limit - record.count,
-      reset: record.reset
-    };
-  } catch (err) {
-    console.error('Rate limit check failed:', err);
-    return {
-      allowed: false,
-      response: rateLimitResponse({ error: 'Rate limiting unavailable' }, 503)
-    };
-  }
+  });
 }
 
 function getRequestContentLength(request) {
@@ -1458,6 +1513,9 @@ async function requireWorkersCachePurgeAccess(request, env) {
 function normalizeWorkersCachePurgeTarget(value) {
   const target = String(value || 'admin_orders').trim().toLowerCase().replace(/-/g, '_');
   if (target === 'admin_orders' || target === 'orders') return { ok: true, value: 'admin_orders' };
+  if (target === 'analytics' || target === 'admin_analytics') return { ok: true, value: 'admin_analytics' };
+  if (target === 'inventory' || target === 'admin_inventory') return { ok: true, value: 'admin_inventory' };
+  if (target === 'downloads' || target === 'admin_downloads') return { ok: true, value: 'admin_downloads' };
   if (target === 'all' || target === 'all_known' || target === 'known') return { ok: true, value: 'all_known' };
   return { ok: false, error: 'Unsupported Workers Cache purge target.' };
 }
@@ -1484,10 +1542,14 @@ async function handleAdminWorkersCachePurge(request, env, ctx, body = {}) {
     }, 400, env);
   }
 
-  const purges = [];
-  if (target.value === 'admin_orders' || target.value === 'all_known') {
-    purges.push(await purgeAdminStoreOrdersWorkersCacheNow(ctx));
-  }
+  const targetDomains = {
+    admin_orders: ['orders', 'order-index'],
+    admin_analytics: ['analytics', 'marketing'],
+    admin_inventory: ['inventory'],
+    admin_downloads: ['downloads'],
+    all_known: storeReadCacheDomainsForMutation('deployment')
+  };
+  const purges = [await purgeStoreReadCachesNow(ctx, targetDomains[target.value] || [])];
   const success = purges.length > 0 && purges.every((purge) => purge.ok);
   const auditKey = await recordAdminAuditEvent(env, {
     action: 'workers_cache:purge',
@@ -2230,50 +2292,194 @@ function resolveCheckoutUiRuntime(env) {
   };
 }
 
-export const CachedAdminStoreOrders = {
+function buildAdminStoreInventoryReadPayload(snapshot = {}) {
+  return {
+    scope: STORE_ADMIN_SCOPE,
+    rows: snapshot.rows,
+    overridesUpdatedAt: snapshot.overridesUpdatedAt,
+    updatedAt: snapshot.updatedAt,
+    page: {
+      scanned: snapshot.scanned,
+      indexed: snapshot.indexed,
+      truncated: snapshot.truncated,
+      cache: snapshot.cache || null,
+      generatedAt: snapshot.ordersGeneratedAt || '',
+      latestKnownUpdatedAt: snapshot.latestKnownUpdatedAt || '',
+      watermark: snapshot.watermark || ''
+    },
+    writeBudget: adminReadBudget({
+      kvListExpected: snapshot.cache?.hit ? 0 : (snapshot.listCalls ?? 1),
+      kvReadsExpected: snapshot.cache?.hit
+        ? (snapshot.cache?.source === 'kv_index' ? 1 : 0)
+        : snapshot.scanned
+    })
+  };
+}
+
+function buildAdminStoreDownloadsReadPayload(snapshot = {}) {
+  return {
+    scope: STORE_ADMIN_SCOPE,
+    bucketConfigured: snapshot.bucketConfigured,
+    rows: snapshot.rows,
+    files: snapshot.files,
+    totals: snapshot.totals,
+    updatedAt: snapshot.updatedAt,
+    page: {
+      r2Checks: snapshot.r2Checks,
+      r2ListCalls: snapshot.r2ListCalls || 0,
+      r2HeadCalls: snapshot.r2HeadCalls || 0,
+      r2ListComplete: snapshot.r2ListComplete === true
+    },
+    writeBudget: adminReadBudget({
+      kvListExpected: 0,
+      r2ListExpected: snapshot.r2ListCalls || 0,
+      r2ReadsExpected: snapshot.r2HeadCalls || 0
+    })
+  };
+}
+
+async function buildAdminStoreCachedReadPayload(routeId, request, env, options = {}) {
+  const auth = options.auth;
+  if (routeId === 'orders') {
+    return buildAdminStoreOrdersPayload(request, env, {
+      ctx: options.ctx || null,
+      auth,
+      includeUser: false
+    });
+  }
+  if (routeId === 'analytics') {
+    const built = await buildAdminStoreOrdersPayload(request, env, {
+      paginate: false,
+      ctx: options.ctx || null,
+      auth,
+      includeUser: false
+    });
+    if (!built.ok) return built;
+    const payload = buildAdminStoreAnalyticsPayload(built.payload);
+    const referralRows = await readAdminStoreMarketingReferrals(env);
+    payload.referralLabels = Object.fromEntries(referralRows.map((row) => [
+      row.code,
+      row.referrer || row.name || row.code
+    ]));
+    return { ok: true, payload };
+  }
+  if (routeId === 'inventory') {
+    const snapshot = await buildAdminStoreInventorySnapshot(env, { ctx: options.ctx || null });
+    if (!snapshot.ok) {
+      return { ok: false, response: privateJsonResponse({ error: snapshot.error }, snapshot.status || 503, env) };
+    }
+    return { ok: true, payload: buildAdminStoreInventoryReadPayload(snapshot) };
+  }
+  if (routeId === 'downloads') {
+    const snapshot = await buildAdminStoreDownloadsSnapshot(env);
+    return { ok: true, payload: buildAdminStoreDownloadsReadPayload(snapshot) };
+  }
+  return { ok: false, response: noStoreAdminStoreReadCacheResponse({ error: 'Not found' }, 404, env) };
+}
+
+async function tryAdminStoreReadWorkersCache(request, env, ctx, auth, routeId) {
+  const enabled = workersCacheEnabledForAdminStoreRead(env, routeId);
+  const bypass = adminStoreReadCacheBypassReason(request, routeId);
+  if (enabled && !bypass) {
+    const props = buildAdminStoreReadCacheProps(auth, routeId);
+    const cacheRequest = buildAdminStoreReadCacheRequest(request, routeId);
+    const responsePromise = cacheRequest && props
+      ? fetchAdminStoreReadWorkersCache(ctx, cacheRequest, props)
+      : null;
+    if (responsePromise) {
+      try {
+        const response = await responsePromise;
+        const text = await response.text();
+        const payload = text ? JSON.parse(text) : {};
+        if (response.ok) {
+          const workersCache = adminStoreReadWorkersCacheMetadata(routeId, response);
+          return {
+            response: privateJsonResponse(
+              attachAdminStoreReadGatewayUser(payload, auth, workersCache),
+              200,
+              env,
+              {
+                'X-Store-Workers-Cache': workersCache.status,
+                'X-Store-Workers-Cache-Entry': ADMIN_STORE_READS_CACHE_ENTRYPOINT,
+                'X-Store-Workers-Cache-Route': routeId
+              }
+            ),
+            metadata: workersCache
+          };
+        }
+        if (response.status < 500) {
+          return {
+            response: privateJsonResponse(payload, response.status || 503, env),
+            metadata: adminStoreReadWorkersCacheMetadata(routeId, response)
+          };
+        }
+      } catch (error) {
+        console.warn(`Admin Store ${routeId} Workers Cache bypassed:`, error?.message || String(error));
+      }
+    }
+  }
+  return {
+    response: null,
+    metadata: adminStoreReadWorkersCacheMetadata(routeId, null, {
+      enabled,
+      bypass: bypass || (enabled ? 'entrypoint_unavailable' : 'disabled')
+    })
+  };
+}
+
+export const CachedAdminStoreReads = {
   async fetch(request, env, ctx) {
     configureWorkerLogging(env);
     const url = new URL(request.url);
 
-    if (url.pathname === ADMIN_STORE_ORDERS_WORKERS_CACHE_PURGE_PATH && request.method === 'POST') {
-      const props = readAdminStoreOrdersWorkersCacheProps(ctx);
+    if (url.pathname === ADMIN_STORE_READS_CACHE_PURGE_PATH && request.method === 'POST') {
+      const props = readAdminStoreReadCacheProps(ctx);
       if (!props || props.scopeKey !== 'purge') {
-        return noStoreAdminStoreOrdersCacheResponse({ error: 'Forbidden' }, 403, env);
+        return noStoreAdminStoreReadCacheResponse({ error: 'Forbidden' }, 403, env);
       }
+      const domains = String(url.searchParams.get('domains') || '')
+        .split(',')
+        .map((domain) => domain.trim().toLowerCase())
+        .filter(Boolean);
+      const knownDomains = new Set(Object.values(ADMIN_STORE_READ_CACHE_POLICIES)
+        .flatMap((policy) => policy.domains));
+      if (!domains.length || domains.some((domain) => !knownDomains.has(domain))) {
+        return noStoreAdminStoreReadCacheResponse({ error: 'Invalid purge domains' }, 400, env);
+      }
+      const tags = adminStoreReadCacheTagsForDomains(domains);
       if (ctx?.cache && typeof ctx.cache.purge === 'function') {
-        await ctx.cache.purge({ tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS });
+        await ctx.cache.purge({ tags });
       }
-      return noStoreAdminStoreOrdersCacheResponse({
+      return noStoreAdminStoreReadCacheResponse({
         ok: true,
-        entrypoint: ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT,
-        tags: ADMIN_STORE_ORDERS_WORKERS_CACHE_TAGS,
+        entrypoint: ADMIN_STORE_READS_CACHE_ENTRYPOINT,
+        domains,
+        tags,
         purgedAt: new Date().toISOString()
       }, 200, env);
     }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return noStoreAdminStoreOrdersCacheResponse({ error: 'Method not allowed' }, 405, env);
+      return noStoreAdminStoreReadCacheResponse({ error: 'Method not allowed' }, 405, env);
     }
 
-    if (url.pathname !== '/admin/store/orders') {
-      return noStoreAdminStoreOrdersCacheResponse({ error: 'Not found' }, 404, env);
+    const props = readAdminStoreReadCacheProps(ctx);
+    const policy = props ? adminStoreReadCachePolicy(props.routeId) : null;
+    if (!props || !policy || policy.path !== url.pathname) {
+      return noStoreAdminStoreReadCacheResponse({ error: 'Forbidden' }, 403, env);
     }
 
-    const props = readAdminStoreOrdersWorkersCacheProps(ctx);
-    if (!props) {
-      return noStoreAdminStoreOrdersCacheResponse({ error: 'Forbidden' }, 403, env);
-    }
-
-    const built = await buildAdminStoreOrdersPayload(request, env, {
+    const built = await buildAdminStoreCachedReadPayload(props.routeId, request, env, {
       ctx,
-      auth: authFromAdminStoreOrdersWorkersCacheProps(props),
-      includeUser: false
+      auth: authFromAdminStoreReadWorkersCacheProps(props)
     });
     if (!built.ok) return built.response;
 
-    return cacheableAdminStoreOrdersJsonResponse(built.payload, 200, env);
+    return cacheableAdminStoreReadJsonResponse(built.payload, props.routeId, 200, env);
   }
 };
+
+export const CachedAdminStoreOrders = CachedAdminStoreReads;
 
 export default {
   async fetch(request, env, ctx) {
@@ -2338,7 +2544,7 @@ export default {
       }
 
       if (path === '/admin/dashboard/summary' && method === 'GET') {
-        return handleAdminDashboardSummary(request, env);
+        return handleAdminDashboardSummary(request, env, ctx);
       }
 
       if (path === '/admin/audit.csv' && method === 'GET') {
@@ -2438,7 +2644,7 @@ export default {
       }
 
       if (path === '/admin/store/analytics' && method === 'GET') {
-        return handleAdminStoreAnalytics(request, env);
+        return handleAdminStoreAnalytics(request, env, ctx);
       }
 
       if (path === '/film/stripe-summary' && method === 'POST') {
@@ -2490,7 +2696,7 @@ export default {
         if (!parsedBody.ok) return parsedBody.response;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreMarketingReferralSave(request, env, parsedBody.body || {});
+        return handleAdminStoreMarketingReferralSave(request, env, parsedBody.body || {}, ctx);
       }
 
       if (path === '/admin/store/marketing/referrals' && method === 'DELETE') {
@@ -2502,7 +2708,7 @@ export default {
         if (!parsedBody.ok) return parsedBody.response;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreMarketingReferralDelete(request, env, parsedBody.body || {});
+        return handleAdminStoreMarketingReferralDelete(request, env, parsedBody.body || {}, ctx);
       }
 
       if (path === '/admin/store/marketing/draft' && method === 'GET') {
@@ -2591,35 +2797,35 @@ export default {
       }
 
       if (path === '/admin/store/downloads' && method === 'GET') {
-        return handleAdminStoreDownloads(request, env);
+        return handleAdminStoreDownloads(request, env, ctx);
       }
 
       if (path === '/admin/store/downloads/upload' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreDownloadUpload(request, env);
+        return handleAdminStoreDownloadUpload(request, env, ctx);
       }
 
       if (path === '/admin/store/downloads/create' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreDownloadCreate(request, env);
+        return handleAdminStoreDownloadCreate(request, env, ctx);
       }
 
       if (path === '/admin/store/downloads/delete' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreDownloadDelete(request, env);
+        return handleAdminStoreDownloadDelete(request, env, ctx);
       }
 
       if (path === '/admin/store/inventory' && method === 'GET') {
-        return handleAdminStoreInventory(request, env);
+        return handleAdminStoreInventory(request, env, ctx);
       }
 
       if (path === '/admin/store/inventory' && method === 'POST') {
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreInventoryMutation(request, env);
+        return handleAdminStoreInventoryMutation(request, env, ctx);
       }
 
       if (path === '/admin/store/orders/download-access' && method === 'POST') {
@@ -2818,11 +3024,6 @@ export default {
     }
   }
 };
-
-function parseTimestampMs(value) {
-  const parsed = Date.parse(String(value || ''));
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function getStoreOrderEmailSentKey(orderToken) {
   return `store-order-email-sent:${String(orderToken || '').trim()}`;
@@ -5493,14 +5694,40 @@ async function inspectStoreDownloadObject(env, fileKey = '') {
   }
 }
 
-async function buildAdminStoreDownloadRow(env, product = {}, variant = null) {
+async function buildAdminStoreDownloadRow(env, product = {}, variant = null, options = {}) {
   const item = buildStoreCatalogDownloadItem(product, variant);
   const productId = String(product.id || '').trim();
   const variantId = String(item.variantId || '').trim();
   const fileKey = getStoreDownloadFileKey(item);
   const filename = getStoreDownloadFilename(item);
   const directUrl = resolveStoreDownloadUrl(env, item);
-  const object = await inspectStoreDownloadObject(env, fileKey);
+  const listedFile = options.listedByFileKey?.get(fileKey) || null;
+  const object = listedFile
+    ? {
+      bucketConfigured: true,
+      checked: true,
+      exists: true,
+      contentType: listedFile.contentType || '',
+      size: listedFile.size ?? null,
+      uploaded: listedFile.uploadedAt || '',
+      error: '',
+      source: 'list'
+    }
+    : options.listComplete === true && fileKey
+      ? {
+        bucketConfigured: true,
+        checked: true,
+        exists: false,
+        contentType: '',
+        size: null,
+        uploaded: '',
+        error: '',
+        source: 'list'
+      }
+      : {
+        ...(await inspectStoreDownloadObject(env, fileKey)),
+        source: fileKey ? 'head' : 'none'
+      };
   const ready = object.exists === true || Boolean(directUrl);
   let status = 'not_configured';
   if (ready) {
@@ -5533,15 +5760,19 @@ async function buildAdminStoreDownloadRow(env, product = {}, variant = null) {
 }
 
 async function listAdminStoreDownloadLibraryFiles(env) {
-  if (!env.STORE_DOWNLOADS || typeof env.STORE_DOWNLOADS.list !== 'function') return [];
+  if (!env.STORE_DOWNLOADS || typeof env.STORE_DOWNLOADS.list !== 'function') {
+    return { files: [], listCalls: 0, complete: false };
+  }
   const files = [];
   let cursor = undefined;
   let truncated = true;
+  let listCalls = 0;
   while (truncated && files.length < 500) {
     const page = await env.STORE_DOWNLOADS.list({
       cursor,
       limit: Math.min(100, 500 - files.length)
     });
+    listCalls += 1;
     for (const object of page.objects || []) {
       const key = String(object.key || '').trim();
       if (!key) continue;
@@ -5563,26 +5794,34 @@ async function listAdminStoreDownloadLibraryFiles(env) {
     cursor = page.cursor;
   }
   files.sort((a, b) => a.filename.localeCompare(b.filename) || a.fileKey.localeCompare(b.fileKey));
-  return files;
+  return { files, listCalls, complete: truncated !== true };
 }
 
 async function buildAdminStoreDownloadsSnapshot(env) {
   const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
-  const rows = [];
+  const library = await listAdminStoreDownloadLibraryFiles(env);
+  const libraryFiles = library.files;
+  const listedByFileKey = new Map(libraryFiles.map((file) => [file.fileKey, file]));
+  const targets = [];
 
   for (const product of catalog.products || []) {
     if (!isStoreCatalogDownloadProduct(product)) continue;
     const variants = Array.isArray(product.variants) ? product.variants : [];
     if (variants.length > 0) {
       for (const variant of variants) {
-        rows.push(await buildAdminStoreDownloadRow(env, product, variant));
+        targets.push([product, variant]);
       }
       continue;
     }
-    rows.push(await buildAdminStoreDownloadRow(env, product));
+    targets.push([product, null]);
   }
 
-  const libraryFiles = await listAdminStoreDownloadLibraryFiles(env);
+  const rows = await Promise.all(targets.map(([product, variant]) => (
+    buildAdminStoreDownloadRow(env, product, variant, {
+      listedByFileKey,
+      listComplete: library.complete
+    })
+  )));
   const attachedByFileKey = new Map();
   for (const row of rows) {
     if (!row.fileKey) continue;
@@ -5621,6 +5860,9 @@ async function buildAdminStoreDownloadsSnapshot(env) {
     files,
     bucketConfigured: Boolean(env.STORE_DOWNLOADS),
     r2Checks: rows.filter((row) => row.r2?.checked).length,
+    r2HeadCalls: rows.filter((row) => row.r2?.source === 'head').length,
+    r2ListCalls: library.listCalls,
+    r2ListComplete: library.complete,
     totals: {
       count: rows.length,
       ready: rows.filter((row) => row.ready).length,
@@ -5814,26 +6056,21 @@ function normalizeAdminStoreDownloadCreateBody(body = {}) {
   };
 }
 
-async function handleAdminStoreDownloads(request, env) {
+async function handleAdminStoreDownloads(request, env, ctx = null) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return auth.response;
 
+  const cached = await tryAdminStoreReadWorkersCache(request, env, ctx, auth, 'downloads');
+  if (cached.response) return cached.response;
   const snapshot = await buildAdminStoreDownloadsSnapshot(env);
-  return privateJsonResponse({
-    scope: STORE_ADMIN_SCOPE,
-    bucketConfigured: snapshot.bucketConfigured,
-    rows: snapshot.rows,
-    files: snapshot.files,
-    totals: snapshot.totals,
-    updatedAt: snapshot.updatedAt,
-    page: {
-      r2Checks: snapshot.r2Checks
-    },
-    writeBudget: adminReadBudget({ kvListExpected: 0 })
-  }, 200, env);
+  return privateJsonResponse(
+    attachAdminStoreReadGatewayUser(buildAdminStoreDownloadsReadPayload(snapshot), auth, cached.metadata),
+    200,
+    env
+  );
 }
 
-async function handleAdminStoreDownloadUpload(request, env) {
+async function handleAdminStoreDownloadUpload(request, env, ctx = null) {
   const parsedBody = await parseJsonRequestBody(request, env, {
     maxBytes: MAX_ADMIN_STORE_DOWNLOAD_UPLOAD_BODY_BYTES,
     privateResponse: true,
@@ -5910,6 +6147,7 @@ async function handleAdminStoreDownloadUpload(request, env) {
     contentType: normalized.contentType,
     bytes: bytes.byteLength
   });
+  invalidateStoreReadCachesForMutation(env, ctx, 'download_library');
 
   return privateJsonResponse({
     success: true,
@@ -5932,7 +6170,7 @@ async function handleAdminStoreDownloadUpload(request, env) {
   }, 200, env);
 }
 
-async function handleAdminStoreDownloadCreate(request, env) {
+async function handleAdminStoreDownloadCreate(request, env, ctx = null) {
   const parsedBody = await parseJsonRequestBody(request, env, {
     maxBytes: MAX_ADMIN_STORE_DOWNLOAD_UPLOAD_BODY_BYTES,
     privateResponse: true,
@@ -6005,6 +6243,7 @@ async function handleAdminStoreDownloadCreate(request, env) {
     contentType: normalized.contentType,
     bytes: bytes.byteLength
   });
+  invalidateStoreReadCachesForMutation(env, ctx, 'download_library');
 
   return privateJsonResponse({
     success: true,
@@ -6025,7 +6264,7 @@ async function handleAdminStoreDownloadCreate(request, env) {
   }, 200, env);
 }
 
-async function handleAdminStoreDownloadDelete(request, env) {
+async function handleAdminStoreDownloadDelete(request, env, ctx = null) {
   const parsedBody = await parseJsonRequestBody(request, env, {
     maxBytes: 4096,
     privateResponse: true,
@@ -6079,6 +6318,7 @@ async function handleAdminStoreDownloadDelete(request, env) {
     contentType: existing.contentType || '',
     bytes: existing.size ?? null
   });
+  invalidateStoreReadCachesForMutation(env, ctx, 'download_library');
 
   return privateJsonResponse({
     success: true,
@@ -6585,16 +6825,6 @@ function adminStoreFulfillmentMatchesFilter(item = {}, filters = {}) {
   return true;
 }
 
-function adminStoreOrderSortTime(order = {}) {
-  const timestamp = Date.parse(order.confirmedAt || order.createdAt || order.updatedAt || '');
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function compareAdminStoreOrders(a = {}, b = {}) {
-  return adminStoreOrderSortTime(b) - adminStoreOrderSortTime(a) ||
-    String(b.orderToken || '').localeCompare(String(a.orderToken || ''));
-}
-
 function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
   return {
     orderToken: order.orderToken || '',
@@ -6771,31 +7001,10 @@ async function listAdminStoreOrderKeys(env) {
   return { ok: true, keys: keys.slice(0, 5000), listCalls, truncated };
 }
 
-function normalizeAdminStoreOrderIndex(index = {}) {
-  if (!index || typeof index !== 'object' || Array.isArray(index)) return null;
-  if (Number(index.version || 0) !== ADMIN_STORE_ORDER_INDEX_VERSION) return null;
-  const generatedAtMs = parseTimestampMs(index.generatedAt || index.createdAt || '');
-  if (!Number.isFinite(generatedAtMs)) return null;
-  if (Date.now() - generatedAtMs > ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS) return null;
-  const orders = Array.isArray(index.orders)
-    ? index.orders.filter((order) => STORE_ORDER_TOKEN_PATTERN.test(String(order?.orderToken || '')))
-    : [];
-  if (!orders.length && Number(index.indexed || 0) > 0) return null;
-  return {
-    orders: orders.sort(compareAdminStoreOrders),
-    scanned: Math.max(0, Number(index.scanned || 0) || 0),
-    indexed: Math.max(orders.length, Number(index.indexed || orders.length) || orders.length),
-    listCalls: Math.max(0, Number(index.listCalls || 0) || 0),
-    truncated: index.truncated === true,
-    generatedAt: new Date(generatedAtMs).toISOString(),
-    ageMs: Math.max(0, Date.now() - generatedAtMs)
-  };
-}
-
 async function readAdminStoreOrderIndex(env) {
   const storeStateBinding = env?.STORE_STATE || null;
   const memoryIndex = adminStoreOrderIndexCache?.storeState === storeStateBinding
-    ? normalizeAdminStoreOrderIndex(adminStoreOrderIndexCache.index)
+    ? normalizeAdminStoreOrderIndex(adminStoreOrderIndexCache.index, { maxAgeMs: ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS })
     : null;
   if (memoryIndex) {
     return {
@@ -6807,7 +7016,7 @@ async function readAdminStoreOrderIndex(env) {
 
   if (!env?.STORE_STATE?.get) return { ok: false, skipped: 'store_state_unavailable' };
   const storedIndex = await env.STORE_STATE.get(ADMIN_STORE_ORDER_INDEX_KEY, { type: 'json' });
-  const normalized = normalizeAdminStoreOrderIndex(storedIndex);
+  const normalized = normalizeAdminStoreOrderIndex(storedIndex, { maxAgeMs: ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS });
   if (!normalized) return { ok: false, skipped: 'missing_or_stale_index' };
   adminStoreOrderIndexCache = {
     storeState: storeStateBinding,
@@ -6822,16 +7031,7 @@ async function readAdminStoreOrderIndex(env) {
 
 async function writeAdminStoreOrderIndex(env, data = {}) {
   if (!env?.STORE_STATE?.put || !Array.isArray(data.orders)) return;
-  const generatedAt = data.generatedAt || new Date().toISOString();
-  const index = {
-    version: ADMIN_STORE_ORDER_INDEX_VERSION,
-    generatedAt,
-    scanned: Math.max(0, Number(data.scanned || 0) || 0),
-    indexed: Math.max(0, Number(data.indexed || data.orders.length) || data.orders.length),
-    listCalls: Math.max(0, Number(data.listCalls || 0) || 0),
-    truncated: data.truncated === true,
-    orders: data.orders
-  };
+  const index = buildAdminStoreOrderIndexSnapshot(data);
   adminStoreOrderIndexCache = {
     storeState: env?.STORE_STATE || null,
     index
@@ -6872,6 +7072,8 @@ async function readAdminStoreOrderScan(env, options = {}) {
         listCalls: indexed.listCalls,
         truncated: indexed.truncated,
         generatedAt: indexed.generatedAt,
+        latestKnownUpdatedAt: indexed.latestKnownUpdatedAt,
+        watermark: indexed.watermark,
         cache: {
           hit: true,
           source: indexed.source,
@@ -6898,14 +7100,14 @@ async function readAdminStoreOrderScan(env, options = {}) {
   }
   orders.sort(compareAdminStoreOrders);
 
-  const data = {
+  const data = buildAdminStoreOrderIndexSnapshot({
     orders,
     scanned,
     indexed: listed.keys.length,
     listCalls: listed.listCalls || 1,
     truncated: listed.truncated === true,
     generatedAt: new Date().toISOString()
-  };
+  });
   adminStoreOrderScanCache = {
     storeState: storeStateBinding,
     createdAtMs: nowMs,
@@ -6929,39 +7131,21 @@ async function readAdminStoreOrderScan(env, options = {}) {
   };
 }
 
-async function buildStoreInventorySoldCounts(env) {
-  const listed = await listAdminStoreOrderKeys(env);
-  if (!listed.ok) {
-    return { ok: false, status: listed.status || 503, error: listed.error };
-  }
-
-  const soldBySku = {};
-  let scanned = 0;
-  for (const key of listed.keys) {
-    const keyName = String(key?.name || '').trim();
-    if (!keyName) continue;
-    const storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
-    scanned += 1;
-    if (!storedOrder || typeof storedOrder !== 'object') continue;
-    const orderDraft = storedOrder.orderDraft || {};
-    const status = String(storedOrder.status || orderDraft.status || '').trim();
-    if (status !== STORE_ORDER_STATUS_CONFIRMED) continue;
-
-    for (const item of Array.isArray(orderDraft.items) ? orderDraft.items : []) {
-      const sku = String(item?.sku || '').trim();
-      const quantity = Math.max(0, Number(item?.quantity || 0) || 0);
-      if (!sku || quantity <= 0) continue;
-      soldBySku[sku] = (soldBySku[sku] || 0) + quantity;
-    }
-  }
-
+async function buildStoreInventorySoldCounts(env, options = {}) {
+  const scanned = await readAdminStoreOrderScan(env, { ctx: options.ctx || null });
+  if (!scanned.ok) return scanned;
+  const counts = buildStoreInventorySoldCountsFromOrders(scanned.orders);
   return {
     ok: true,
-    soldBySku,
-    scanned,
-    listCalls: listed.listCalls || 1,
-    indexed: listed.keys.length,
-    truncated: listed.truncated === true
+    soldBySku: counts.soldBySku,
+    scanned: scanned.scanned,
+    indexed: scanned.indexed,
+    listCalls: scanned.listCalls || 0,
+    truncated: scanned.truncated === true,
+    cache: scanned.cache || null,
+    generatedAt: scanned.generatedAt || '',
+    latestKnownUpdatedAt: scanned.latestKnownUpdatedAt || '',
+    watermark: scanned.watermark || ''
   };
 }
 
@@ -9520,13 +9704,13 @@ async function handleAdminStoreProductOrderPublish(request, env) {
   }, 200, env);
 }
 
-async function buildAdminStoreInventorySnapshot(env) {
+async function buildAdminStoreInventorySnapshot(env, options = {}) {
   const baseSnapshot = getStoreCatalogSnapshot(env);
   const overrides = await getStoreInventoryOverrides(env);
   const effectiveSnapshot = applyStoreInventoryOverridesToSnapshot(baseSnapshot, overrides);
   const baseCatalog = normalizeStoreCatalogSnapshot(baseSnapshot);
   const effectiveCatalog = normalizeStoreCatalogSnapshot(effectiveSnapshot);
-  const sold = await buildStoreInventorySoldCounts(env);
+  const sold = await buildStoreInventorySoldCounts(env, { ctx: options.ctx || null });
   if (!sold.ok) return sold;
 
   const rows = [];
@@ -9567,7 +9751,11 @@ async function buildAdminStoreInventorySnapshot(env) {
     scanned: sold.scanned,
     indexed: sold.indexed,
     listCalls: sold.listCalls,
-    truncated: sold.truncated
+    truncated: sold.truncated,
+    cache: sold.cache || null,
+    ordersGeneratedAt: sold.generatedAt || '',
+    latestKnownUpdatedAt: sold.latestKnownUpdatedAt || '',
+    watermark: sold.watermark || ''
   };
 }
 
@@ -9680,30 +9868,25 @@ async function mutateStoreInventoryOverride(env, mutation = {}) {
   };
 }
 
-async function handleAdminStoreInventory(request, env) {
+async function handleAdminStoreInventory(request, env, ctx = null) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return auth.response;
 
-  const snapshot = await buildAdminStoreInventorySnapshot(env);
+  const cached = await tryAdminStoreReadWorkersCache(request, env, ctx, auth, 'inventory');
+  if (cached.response) return cached.response;
+  const snapshot = await buildAdminStoreInventorySnapshot(env, { ctx });
   if (!snapshot.ok) {
     return privateJsonResponse({ error: snapshot.error }, snapshot.status || 503, env);
   }
 
-  return privateJsonResponse({
-    scope: STORE_ADMIN_SCOPE,
-    rows: snapshot.rows,
-    overridesUpdatedAt: snapshot.overridesUpdatedAt,
-    updatedAt: snapshot.updatedAt,
-    page: {
-      scanned: snapshot.scanned,
-      indexed: snapshot.indexed,
-      truncated: snapshot.truncated
-    },
-    writeBudget: adminReadBudget({ kvListExpected: snapshot.listCalls || 1 })
-  }, 200, env);
+  return privateJsonResponse(
+    attachAdminStoreReadGatewayUser(buildAdminStoreInventoryReadPayload(snapshot), auth, cached.metadata),
+    200,
+    env
+  );
 }
 
-async function handleAdminStoreInventoryMutation(request, env) {
+async function handleAdminStoreInventoryMutation(request, env, ctx = null) {
   const parsedBody = await parseJsonRequestBody(request, env, {
     maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
     privateResponse: true,
@@ -9729,6 +9912,7 @@ async function handleAdminStoreInventoryMutation(request, env) {
       before: mutation.before,
       after: mutation.after
     });
+    invalidateStoreReadCachesForMutation(env, ctx, 'inventory_override');
 
     return privateJsonResponse({
       success: true,
@@ -9767,6 +9951,48 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
 
   const url = new URL(request.url);
   const filters = storeAdminOrderFiltersFromUrl(url);
+  const requestState = {
+    since: url.searchParams.get('since'),
+    watermark: url.searchParams.get('watermark')
+  };
+  const cursorOffset = options.paginate === false
+    ? 0
+    : Math.max(0, Number.parseInt(String(url.searchParams.get('cursor') || '0'), 10) || 0);
+  if (
+    options.paginate !== false &&
+    cursorOffset === 0 &&
+    !filters.query &&
+    adminStoreOrdersSnapshotIsUnchanged(scannedOrders, requestState)
+  ) {
+    const scanCache = scannedOrders.cache || null;
+    return {
+      ok: true,
+      payload: {
+        user: options.includeUser === false ? null : auth.user,
+        scope: STORE_ADMIN_SCOPE,
+        unchanged: true,
+        latestKnownUpdatedAt: scannedOrders.latestKnownUpdatedAt || '',
+        watermark: scannedOrders.watermark || '',
+        page: {
+          scanned: scannedOrders.scanned,
+          indexed: scannedOrders.indexed,
+          truncated: scannedOrders.truncated === true,
+          cache: scanCache,
+          generatedAt: scannedOrders.generatedAt || '',
+          latestKnownUpdatedAt: scannedOrders.latestKnownUpdatedAt || '',
+          watermark: scannedOrders.watermark || ''
+        },
+        filters,
+        writeBudget: adminReadBudget({
+          kvListExpected: scanCache?.hit ? 0 : (scannedOrders.listCalls || 1),
+          kvReadsExpected: scanCache?.hit
+            ? (scanCache.source === 'kv_index' ? 1 : 0)
+            : scannedOrders.scanned
+        }),
+        generatedAt: new Date().toISOString()
+      }
+    };
+  }
   const orders = scannedOrders.orders.filter((order) => adminStoreOrderMatchesFilters(order, filters));
 
   const allFulfillmentRows = orders.flatMap((order) => (
@@ -9779,7 +10005,6 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   const matchedOrders = orders.filter((order) => matchedOrderTokens.has(order.orderToken));
   const paginate = options.paginate !== false;
   const limit = paginate ? clampAdminPageLimit(url.searchParams.get('limit')) : matchedOrders.length || 0;
-  const cursorOffset = paginate ? Math.max(0, Number.parseInt(String(url.searchParams.get('cursor') || '0'), 10) || 0) : 0;
   const pageOrders = paginate
     ? matchedOrders.slice(cursorOffset, cursorOffset + limit)
     : matchedOrders;
@@ -9797,6 +10022,9 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
     payload: {
       user: options.includeUser === false ? null : auth.user,
       scope: STORE_ADMIN_SCOPE,
+      unchanged: false,
+      latestKnownUpdatedAt: scannedOrders.latestKnownUpdatedAt || '',
+      watermark: scannedOrders.watermark || '',
       orders: pageOrders,
       fulfillments: fulfillmentRows,
       totals: {
@@ -9820,7 +10048,9 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
         indexed: scannedOrders.indexed,
         truncated: scannedOrders.truncated === true,
         cache: scannedOrders.cache || null,
-        generatedAt: scannedOrders.generatedAt || ''
+        generatedAt: scannedOrders.generatedAt || '',
+        latestKnownUpdatedAt: scannedOrders.latestKnownUpdatedAt || '',
+        watermark: scannedOrders.watermark || ''
       },
       filters,
       writeBudget: adminReadBudget({
@@ -9977,45 +10207,13 @@ async function handleAdminStoreOrders(request, env, ctx = null) {
   const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return auth.response;
 
-  const cacheBypassReason = adminStoreOrdersWorkersCacheBypassReason(request);
-  if (workersCacheEnabledForAdminStoreOrders(env) && !cacheBypassReason) {
-    const props = buildAdminStoreOrdersWorkersCacheProps(auth);
-    const responsePromise = fetchAdminStoreOrdersWorkersCache(ctx, buildAdminStoreOrdersCacheRequest(request), props);
-    if (responsePromise) {
-      try {
-        const response = await responsePromise;
-        const text = await response.text();
-        const payload = text ? JSON.parse(text) : {};
-        if (response.ok) {
-          const workersCache = adminStoreOrdersWorkersCacheMetadata(response);
-          return privateJsonResponse(
-            attachAdminStoreOrdersGatewayUser(payload, auth, workersCache),
-            200,
-            env,
-            {
-              'X-Store-Workers-Cache': workersCache.status,
-              'X-Store-Workers-Cache-Entry': ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT
-            }
-          );
-        }
-        return privateJsonResponse(payload, response.status || 503, env);
-      } catch (error) {
-        console.warn('Admin Store orders Workers Cache bypassed:', error?.message || String(error));
-      }
-    }
-  }
+  const cached = await tryAdminStoreReadWorkersCache(request, env, ctx, auth, 'orders');
+  if (cached.response) return cached.response;
 
   const built = await buildAdminStoreOrdersPayload(request, env, { ctx, auth });
   if (!built.ok) return built.response;
   return privateJsonResponse(
-    attachAdminStoreOrdersGatewayUser(
-      built.payload,
-      auth,
-      adminStoreOrdersWorkersCacheMetadata(null, {
-        enabled: workersCacheEnabledForAdminStoreOrders(env),
-        bypass: cacheBypassReason || (workersCacheEnabledForAdminStoreOrders(env) ? 'entrypoint_unavailable' : 'disabled')
-      })
-    ),
+    attachAdminStoreOrdersGatewayUser(built.payload, auth, cached.metadata),
     200,
     env
   );
@@ -10124,16 +10322,19 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
   };
 }
 
-async function handleAdminStoreAnalytics(request, env) {
-  const built = await buildAdminStoreOrdersPayload(request, env, { paginate: false });
+async function handleAdminStoreAnalytics(request, env, ctx = null) {
+  const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+
+  const cached = await tryAdminStoreReadWorkersCache(request, env, ctx, auth, 'analytics');
+  if (cached.response) return cached.response;
+  const built = await buildAdminStoreCachedReadPayload('analytics', request, env, { ctx, auth });
   if (!built.ok) return built.response;
-  const payload = buildAdminStoreAnalyticsPayload(built.payload);
-  const referralRows = await readAdminStoreMarketingReferrals(env);
-  payload.referralLabels = Object.fromEntries(referralRows.map((row) => [
-    row.code,
-    row.referrer || row.name || row.code
-  ]));
-  return privateJsonResponse(payload, 200, env);
+  return privateJsonResponse(
+    attachAdminStoreReadGatewayUser(built.payload, auth, cached.metadata),
+    200,
+    env
+  );
 }
 
 function filmStripeSummaryAdapterSecret(env = {}) {
@@ -10419,7 +10620,7 @@ async function handleAdminStoreMarketingReferrals(request, env) {
   }, 200, env);
 }
 
-async function handleAdminStoreMarketingReferralSave(request, env, body = {}) {
+async function handleAdminStoreMarketingReferralSave(request, env, body = {}, ctx = null) {
   const auth = await requireAdminSession(request, env, 'settings:publish', {
     accessScope: STORE_ADMIN_SCOPE,
     requireCsrf: true
@@ -10484,6 +10685,7 @@ async function handleAdminStoreMarketingReferralSave(request, env, body = {}) {
     referrer: normalizedReferrer.value,
     url
   });
+  invalidateStoreReadCachesForMutation(env, ctx, 'marketing_referrals');
 
   return privateJsonResponse({
     success: true,
@@ -10496,7 +10698,7 @@ async function handleAdminStoreMarketingReferralSave(request, env, body = {}) {
   }, 200, env);
 }
 
-async function handleAdminStoreMarketingReferralDelete(request, env, body = {}) {
+async function handleAdminStoreMarketingReferralDelete(request, env, body = {}, ctx = null) {
   const auth = await requireAdminSession(request, env, 'settings:publish', {
     accessScope: STORE_ADMIN_SCOPE,
     requireCsrf: true
@@ -10527,6 +10729,7 @@ async function handleAdminStoreMarketingReferralDelete(request, env, body = {}) 
     adminRole: auth.user.role,
     code
   });
+  invalidateStoreReadCachesForMutation(env, ctx, 'marketing_referrals');
 
   return privateJsonResponse({
     success: true,
@@ -12741,14 +12944,14 @@ async function handleAdminStoreHealth(request, env) {
   }, 200, env);
 }
 
-async function handleAdminDashboardSummary(request, env) {
+async function handleAdminDashboardSummary(request, env, ctx = null) {
   const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return auth.response;
 
   const [ordersResult, productsResult, inventoryResult, downloadsResult] = await Promise.allSettled([
-    buildAdminStoreOrdersPayload(request, env, { paginate: false }),
+    buildAdminStoreOrdersPayload(request, env, { paginate: false, ctx, auth }),
     buildAdminStoreProductsSnapshot(env),
-    buildAdminStoreInventorySnapshot(env),
+    buildAdminStoreInventorySnapshot(env, { ctx }),
     buildAdminStoreDownloadsSnapshot(env)
   ]);
   const ordersPayload = ordersResult.status === 'fulfilled' && ordersResult.value?.ok
@@ -13068,7 +13271,11 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['performance.intent_prefetch_delay_ms', { label: 'Intent prefetch delay ms', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
   ['performance.intent_prefetch_limit', { label: 'Intent prefetch limit', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
   ['cache.live_inventory_ttl_seconds', { label: 'Live inventory cache TTL seconds', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
+  ['cache.workers_enabled', { label: 'Workers Cache enabled', type: 'boolean', layoutGroup: 'performance', help: 'Global kill switch for every authenticated Store admin Workers Cache route.' }],
   ['cache.workers_admin_orders_enabled', { label: 'Workers Cache admin Orders enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls the route-level Workers Cache gateway for non-search admin Orders list reads.' }],
+  ['cache.workers_admin_analytics_enabled', { label: 'Workers Cache admin Analytics enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached order-derived Analytics reads.' }],
+  ['cache.workers_admin_inventory_enabled', { label: 'Workers Cache admin Inventory enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached order-derived inventory summary reads.' }],
+  ['cache.workers_admin_downloads_enabled', { label: 'Workers Cache admin Downloads enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached R2-backed download readiness reads.' }],
   ['debug.console_logging_enabled', { label: 'Console logging enabled', type: 'boolean', layoutGroup: 'debug' }],
   ['debug.verbose_console_logging', { label: 'Verbose console logging', type: 'boolean', layoutGroup: 'debug' }]
 ]);
@@ -13953,7 +14160,11 @@ async function handleAdminSettings(request, env) {
         ['Intent prefetch delay ms', env.INTENT_PREFETCH_DELAY_MS || '90', editableAdminSetting('performance.intent_prefetch_delay_ms', 'number')],
         ['Intent prefetch limit', env.INTENT_PREFETCH_LIMIT || '3', editableAdminSetting('performance.intent_prefetch_limit', 'number')],
         ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')],
-        ['Workers Cache admin Orders enabled', workersCacheEnabledForAdminStoreOrders(env), editableAdminSetting('cache.workers_admin_orders_enabled', 'boolean')]
+        ['Workers Cache enabled', workersCacheGloballyEnabled(env), editableAdminSetting('cache.workers_enabled', 'boolean')],
+        ['Workers Cache admin Orders enabled', workersCacheEnabledForAdminStoreRead(env, 'orders'), editableAdminSetting('cache.workers_admin_orders_enabled', 'boolean')],
+        ['Workers Cache admin Analytics enabled', workersCacheEnabledForAdminStoreRead(env, 'analytics'), editableAdminSetting('cache.workers_admin_analytics_enabled', 'boolean')],
+        ['Workers Cache admin Inventory enabled', workersCacheEnabledForAdminStoreRead(env, 'inventory'), editableAdminSetting('cache.workers_admin_inventory_enabled', 'boolean')],
+        ['Workers Cache admin Downloads enabled', workersCacheEnabledForAdminStoreRead(env, 'downloads'), editableAdminSetting('cache.workers_admin_downloads_enabled', 'boolean')]
       ]),
       adminSettingsSection('Debug', [
         ['Console logging enabled', env.DEBUG_CONSOLE_LOGGING_ENABLED, editableAdminSetting('debug.console_logging_enabled', 'boolean')],
@@ -13965,7 +14176,11 @@ async function handleAdminSettings(request, env) {
         ['Current Worker base', env.WORKER_BASE, readOnlyAdminSettingHelp('The Worker API base URL used by the current runtime environment.')],
         ['CORS allowed origin', env.CORS_ALLOWED_ORIGIN, readOnlyAdminSettingHelp('The browser origin allowed to make credentialed admin and checkout requests to the Worker.')],
         ['Workers Cache gateway', 'disabled', readOnlyAdminSettingHelp('The default Worker entrypoint stays uncached so authentication, CSRF, routing, and mutations always run.')],
-        ['Workers Cache admin Orders', workersCacheEnabledForAdminStoreOrders(env) ? 'enabled' : 'disabled', readOnlyAdminSettingHelp(`Admin Orders list reads can use the ${ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT} entrypoint with ${ADMIN_STORE_ORDERS_WORKERS_CACHE_CONTROL}. Search requests bypass this cache.`)],
+        ...Object.values(ADMIN_STORE_READ_CACHE_POLICIES).map((policy) => [
+          `Workers Cache ${policy.label}`,
+          workersCacheEnabledForAdminStoreRead(env, policy.routeId) ? 'enabled' : 'disabled',
+          readOnlyAdminSettingHelp(`${policy.path} can use ${ADMIN_STORE_READS_CACHE_ENTRYPOINT} with ${policy.cacheControl}.`)
+        ]),
         ['Workers Cache controls', '', {
           input: 'workers-cache-controls',
           hideLabel: true
@@ -15434,22 +15649,47 @@ async function handleAdminSettingsPublish(request, env) {
   }, 200, env);
 }
 
-function adminWriteBudget({ readOnly = true, kvWritesExpected = 0, kvListExpected, r2WritesExpected } = {}) {
+function adminWriteBudget({
+  readOnly = true,
+  kvReadsExpected,
+  kvWritesExpected = 0,
+  kvListExpected,
+  r2ReadsExpected,
+  r2ListExpected,
+  r2WritesExpected,
+  workersRequestsExpected,
+  providerCallsExpected
+} = {}) {
   const budget = {
     readOnly: Boolean(readOnly),
     kvWritesExpected: Number(kvWritesExpected || 0)
   };
+  if (kvReadsExpected !== undefined) {
+    budget.kvReadsExpected = Number(kvReadsExpected || 0);
+  }
   if (kvListExpected !== undefined) {
     budget.kvListExpected = Number(kvListExpected || 0);
   }
   if (r2WritesExpected !== undefined) {
     budget.r2WritesExpected = Number(r2WritesExpected || 0);
   }
+  if (r2ReadsExpected !== undefined) {
+    budget.r2ReadsExpected = Number(r2ReadsExpected || 0);
+  }
+  if (r2ListExpected !== undefined) {
+    budget.r2ListExpected = Number(r2ListExpected || 0);
+  }
+  if (workersRequestsExpected !== undefined) {
+    budget.workersRequestsExpected = Number(workersRequestsExpected || 0);
+  }
+  if (providerCallsExpected !== undefined) {
+    budget.providerCallsExpected = Number(providerCallsExpected || 0);
+  }
   return budget;
 }
 
-function adminReadBudget({ kvListExpected = 0 } = {}) {
-  return adminWriteBudget({ readOnly: true, kvWritesExpected: 0, kvListExpected });
+function adminReadBudget(options = {}) {
+  return adminWriteBudget({ ...options, readOnly: true, kvWritesExpected: 0 });
 }
 
 
