@@ -365,13 +365,13 @@ case "$PODMAN_E2E_MODE" in
     record_skip "3. Podman headless E2E suite" "Skipped by --skip-podman-e2e"
     ;;
   required)
-    run_required_phase "3a. Podman doctor" npm run podman:doctor
+    run_required_phase "3a. Podman doctor" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor
     run_required_phase "3b. Podman headless E2E suite" npm run test:e2e:headless:podman
     PODMAN_E2E_RAN=true
     ;;
   auto)
     if podman_ready; then
-      run_required_phase "3a. Podman doctor" npm run podman:doctor
+      run_required_phase "3a. Podman doctor" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor
       run_required_phase "3b. Podman headless E2E suite" npm run test:e2e:headless:podman
       PODMAN_E2E_RAN=true
     else

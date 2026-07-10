@@ -292,5 +292,13 @@ describe('tax engine scaffold', () => {
       valid: false,
       error: 'Billing postal code is required'
     });
+    expect(normalizeTaxDestination({ country: '<script>', postalCode: '80205' })).toMatchObject({
+      valid: false,
+      error: 'Billing country must use a two-letter code'
+    });
+    expect(normalizeTaxDestination({ country: 'US', postalCode: "'; DROP TABLE orders; --" })).toMatchObject({
+      valid: false,
+      error: 'Billing postal code is invalid'
+    });
   });
 });

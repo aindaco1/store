@@ -378,6 +378,7 @@ const OBSERVABILITY_MAX_DAYS = 7;
 const DEFAULT_OBSERVABILITY_SAMPLE_RATE = 0.1;
 const ADMIN_AUDIT_EVENT_TTL_SECONDS = 400 * 24 * 60 * 60;
 const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
+const ADMIN_STORE_ORDER_BULK_READ_LIMIT = 100;
 const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 7 * 24 * 60 * 60;
 const ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS = ADMIN_STORE_ORDER_INDEX_TTL_SECONDS * 1000;
 const STORE_RECOVERY_INVENTORY_PLAN_PREFIX = 'store-recovery-approval:inventory:';
@@ -7251,6 +7252,23 @@ async function writeAdminStoreOrderIndex(env, data = {}) {
   });
 }
 
+async function readAdminStoreOrderBatch(env, keys = []) {
+  const keyNames = keys
+    .map((key) => String(key?.name || key || '').trim())
+    .filter(Boolean);
+  const bulkValues = await env.STORE_STATE.get(keyNames, { type: 'json' });
+  if (bulkValues && typeof bulkValues.get === 'function') {
+    return keyNames.map((keyName) => bulkValues.get(keyName) ?? null);
+  }
+
+  // Keep local/legacy adapters functional without weakening production bulk reads.
+  const values = [];
+  for (const keyName of keyNames) {
+    values.push(await env.STORE_STATE.get(keyName, { type: 'json' }));
+  }
+  return values;
+}
+
 async function readAdminStoreOrderScan(env, options = {}) {
   const nowMs = Date.now();
   const storeStateBinding = env?.STORE_STATE || null;
@@ -7299,14 +7317,15 @@ async function readAdminStoreOrderScan(env, options = {}) {
 
   const orders = [];
   let scanned = 0;
-  for (const key of listed.keys) {
-    const keyName = String(key?.name || '').trim();
-    if (!keyName) continue;
-    const storedOrder = await env.STORE_STATE.get(keyName, { type: 'json' });
-    scanned += 1;
-    if (!storedOrder || typeof storedOrder !== 'object') continue;
-    const order = buildAdminStoreOrderRecord(storedOrder);
-    if (order.orderToken) orders.push(order);
+  for (let offset = 0; offset < listed.keys.length; offset += ADMIN_STORE_ORDER_BULK_READ_LIMIT) {
+    const batch = listed.keys.slice(offset, offset + ADMIN_STORE_ORDER_BULK_READ_LIMIT);
+    const storedOrders = await readAdminStoreOrderBatch(env, batch);
+    for (const storedOrder of storedOrders) {
+      scanned += 1;
+      if (!storedOrder || typeof storedOrder !== 'object') continue;
+      const order = buildAdminStoreOrderRecord(storedOrder);
+      if (order.orderToken) orders.push(order);
+    }
   }
   orders.sort(compareAdminStoreOrders);
 

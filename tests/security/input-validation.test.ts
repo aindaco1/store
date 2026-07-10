@@ -86,23 +86,22 @@ describe('Store input validation', () => {
   });
 
   it('handles malicious shipping and tax destinations without crashing', async () => {
-    for (const endpoint of ['/shipping/quote', '/tax/quote']) {
+    for (const [endpoint, body] of [
+      ['/shipping/quote', {
+        items: [STORE_CART_ITEM],
+        destination: { country: '<script>', postalCode: '../../../etc/passwd' }
+      }],
+      ['/tax/quote', {
+        subtotalCents: 2500,
+        shippingAddress: { country: 'US', postalCode: "'; DROP TABLE orders; --" }
+      }]
+    ] as const) {
       const res = await securityFetch(endpoint, {
         method: 'POST',
-        body: JSON.stringify({
-          items: [STORE_CART_ITEM],
-          destination: {
-            name: '<script>alert(1)</script>',
-            line1: "'; DROP TABLE orders; --",
-            city: '../../../etc/passwd',
-            state: 'NM',
-            postalCode: '87101',
-            country: 'US'
-          }
-        })
+        body: JSON.stringify(body)
       });
 
-      expectStatusIn(res, [200, 400, 422, 503], endpoint);
+      expect(res.status).toBe(400);
     }
   });
 });

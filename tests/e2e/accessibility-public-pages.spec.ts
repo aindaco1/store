@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
+import { gotoDomReady } from './helpers/navigation';
+import { applyTextScale } from './helpers/rendering';
 
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
@@ -41,26 +43,10 @@ async function expectAriaSnapshotToContain(locator: any, fragments: string[]) {
   }
 }
 
-async function applyTextScale(page: any, percent = 200) {
-  const stylesheetPath = `/__store-text-scale-${percent}.css`;
-  await page.route(`**${stylesheetPath}`, async (route: any) => {
-    await route.fulfill({
-      contentType: 'text/css',
-      body: `:root { font-size: ${percent}% !important; }`
-    });
-  });
-  await page.addStyleTag({ url: stylesheetPath });
-  await page.evaluate(async () => {
-    await document.fonts?.ready;
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  });
-}
-
 test.describe('Public Page Accessibility', () => {
   test('home page stays tidy on a small phone viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await expect(page.locator('main')).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
@@ -71,7 +57,7 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('home page has no obvious axe violations', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await expect(page.locator('main')).toBeVisible();
     await expect.poll(() => page.locator('.store-product-card').count()).toBeGreaterThan(0);
     await expectNoAxeViolations(page);
@@ -82,7 +68,7 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('product detail page has no obvious axe violations', async ({ page }) => {
-    await page.goto('/products/fronteras-poster-big/');
+    await gotoDomReady(page, '/products/fronteras-poster-big/');
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('h1')).toContainText('Fronteras Poster (Big)');
     await expectNoAxeViolations(page);
@@ -94,7 +80,7 @@ test.describe('Public Page Accessibility', () => {
 
   test('product detail page stays tidy on a small phone viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/products/fronteras-poster-big/');
+    await gotoDomReady(page, '/products/fronteras-poster-big/');
     await expect(page.locator('main')).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
@@ -105,7 +91,7 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('cart and checkout panel have no obvious axe violations', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     const productCard = page.locator('.store-product-card').filter({ hasText: 'Fronteras T-Shirt' });
     await expect(productCard).toHaveCount(1);
     await productCard.locator('button.store-add-item').click();
@@ -122,7 +108,7 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('terms page has no obvious axe violations', async ({ page }) => {
-    await page.goto('/terms/');
+    await gotoDomReady(page, '/terms/');
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('h1')).toContainText('Terms & Privacy');
     await expectNoAxeViolations(page);
@@ -147,7 +133,7 @@ test.describe('Public Page Accessibility', () => {
         })
       });
     });
-    await page.goto('/orders/');
+    await gotoDomReady(page, '/orders/');
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('h1')).toContainText('Find your order');
     await page.getByLabel('Email address').fill('customer@example.com');
@@ -185,7 +171,7 @@ test.describe('Public Page Accessibility', () => {
         })
       });
     });
-    await page.goto('/order-success/?orderToken=store-order-demo123');
+    await gotoDomReady(page, '/order-success/?orderToken=store-order-demo123');
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('h1')).toContainText('Order received');
     await expect(page.locator('[data-store-order-status]')).toContainText('Ready for fulfillment.');
@@ -200,7 +186,7 @@ test.describe('Public Page Accessibility', () => {
 
   test('release checkout and order surfaces tolerate 200% text scaling', async ({ page }) => {
     await page.setViewportSize({ width: 640, height: 900 });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await applyTextScale(page);
     await expect(page.locator('main')).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -219,7 +205,7 @@ test.describe('Public Page Accessibility', () => {
     await expect(cart).toContainText('Order summary');
     await expectNoHorizontalOverflow(page);
 
-    await page.goto('/orders/');
+    await gotoDomReady(page, '/orders/');
     await applyTextScale(page);
     await expect(page.locator('main')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Email lookup link' })).toBeVisible();
@@ -245,7 +231,7 @@ test.describe('Public Page Accessibility', () => {
         })
       });
     });
-    await page.goto('/order-success/?orderToken=store-order-zoom');
+    await gotoDomReady(page, '/order-success/?orderToken=store-order-zoom');
     await applyTextScale(page);
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('[data-store-order-status]')).toContainText('Ready for fulfillment.');

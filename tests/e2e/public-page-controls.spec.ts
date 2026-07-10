@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
+import { gotoDomReady } from './helpers/navigation';
+import { waitForStableRendering } from './helpers/rendering';
 
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
 
@@ -26,11 +28,7 @@ async function firstProductCard(page: any) {
 }
 
 async function storefrontLayoutMetrics(page: any) {
-  await page.evaluate(async () => {
-    await document.fonts?.ready;
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  });
+  await waitForStableRendering(page);
 
   return page.evaluate((productCardSelector) => {
     function renderedLineCount(element: Element) {
@@ -93,7 +91,7 @@ test.describe('Store Public Page Controls', () => {
 
   test('storefront grid uses wider cards and reserves two-line product titles', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await expect(page.locator(PRODUCT_CARD).first()).toBeVisible();
     await expect(page.locator('.store-product-card__eyebrow').first()).toBeVisible();
     await expect.poll(async () => {
@@ -126,7 +124,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('product card images survive product navigation and browser back', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await expect.poll(async () => {
       const images = await productCardImageMetrics(page, 3);
       return images.length === 3 && images.every((image) => image.complete && image.naturalWidth > 0);
@@ -150,7 +148,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('storefront filters products by collection and category metadata', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
 
     const filters = page.locator('[data-store-product-filters]');
     await expect(filters.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
@@ -193,7 +191,7 @@ test.describe('Store Public Page Controls', () => {
 
   test('product controls render with Store-only markup on desktop and mobile', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
 
     await expect(page).toHaveTitle(/Shop/);
     await expect(page.locator(CART_ROOT)).toHaveCount(1);
@@ -219,7 +217,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('product pages expose language-prefixed localized routes with canonical product controls', async ({ page }) => {
-    await page.goto('/products/fronteras-t-shirt/');
+    await gotoDomReady(page, '/products/fronteras-t-shirt/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('h1')).toContainText('Fronteras T-Shirt');
     const englishCard = page.locator('.storefront__product-detail > .store-product-card').first();
@@ -231,7 +229,7 @@ test.describe('Store Public Page Controls', () => {
     await expect(page.locator('link[rel="alternate"][hreflang="es"]')).toHaveAttribute('href', /\/es\/products\/fronteras-t-shirt\/$/);
     await expect(page.getByRole('link', { name: 'Español' })).toHaveAttribute('href', '/es/products/fronteras-t-shirt/');
 
-    await page.goto('/es/products/fronteras-t-shirt/');
+    await gotoDomReady(page, '/es/products/fronteras-t-shirt/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
     await expect(page.locator('.storefront--product .storefront__eyebrow')).toHaveCount(0);
     await expect(page.locator('.storefront--product .store-product-card__eyebrow')).toHaveCount(0);
@@ -252,7 +250,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('product availability warning follows selected variant inventory', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
 
     const card = await firstProductCard(page);
     const variantSelect = card.locator('[data-store-variant-select]');
@@ -269,7 +267,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('product quantity stepper updates the card button total', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
 
     const card = await firstProductCard(page);
     await card.locator('[data-store-quantity-step="1"]').click();
@@ -284,7 +282,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('cart quantity controls update item quantity and order totals', async ({ page }) => {
-    await page.goto('/');
+    await gotoDomReady(page, '/');
 
     const card = await firstProductCard(page);
     await card.locator('[data-store-quantity-step="1"]').click();
@@ -356,7 +354,7 @@ test.describe('Store Public Page Controls', () => {
       return fulfillJson({ error: 'Unexpected lookup request' }, 500);
     });
 
-    await page.goto('/orders/');
+    await gotoDomReady(page, '/orders/');
     await expect(page.locator('h1')).toContainText('Find your order');
     await page.getByLabel('Email address').fill('customer@example.com');
     await page.getByRole('button', { name: 'Email lookup link' }).click();
@@ -364,7 +362,7 @@ test.describe('Store Public Page Controls', () => {
     await expect(page.locator('[data-store-order-lookup-status]')).toContainText('If that email has Shop orders');
     expect(lookupCalls).toEqual([{ email: 'customer@example.com' }]);
 
-    await page.goto('/orders/?token=lookup-token');
+    await gotoDomReady(page, '/orders/?token=lookup-token');
     await expect(page.locator('[data-store-order-lookup-status]')).toContainText('Lookup link verified.');
     await expect(page.locator('.store-order-lookup__order')).toContainText('Fronteras Poster (Big)');
     await expect(page.locator('.store-order-lookup__order')).toContainText('$35.00');
@@ -374,7 +372,7 @@ test.describe('Store Public Page Controls', () => {
 
   test('supports keyboard-only product add-to-cart flow', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
 
     const card = await firstProductCard(page);
     const increase = card.locator('[data-store-quantity-step="1"]');

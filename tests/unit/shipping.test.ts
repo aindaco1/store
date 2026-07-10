@@ -71,6 +71,14 @@ describe('shipping utilities', () => {
         postalCode: '80205'
       }
     });
+    expect(normalizeShippingDestination({ country: '<script>', postalCode: '80205' })).toMatchObject({
+      valid: false,
+      error: 'Shipping country must use a two-letter code'
+    });
+    expect(normalizeShippingDestination({ country: 'US', postalCode: '../../../etc/passwd' })).toMatchObject({
+      valid: false,
+      error: 'Shipping postal code is invalid'
+    });
   });
 
   it('aggregates quantity-aware Store shipments', () => {

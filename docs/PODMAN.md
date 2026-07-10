@@ -49,6 +49,16 @@ Not included:
 
 On macOS and Windows, `./scripts/dev.sh --podman` will initialize/start the default `podman machine` when needed. On Linux, it talks directly to the local rootless Podman engine.
 
+Release and pre-merge suites require at least 6 GiB of Podman machine memory on macOS and Windows. Browser traces, Jekyll, Wrangler/Miniflare, and the production-like Worker can exhaust a 4 GiB VM during repeated full-suite runs even when individual focused tests pass. Configure the machine while it is stopped:
+
+```bash
+podman machine stop podman-machine-default
+podman machine set --memory 6144 podman-machine-default
+podman machine start podman-machine-default
+```
+
+`npm run podman:doctor` reports the configured memory. Ordinary development gets a warning below 6 GiB; `npm run test:premerge` and `npm run release:smoke` fail before starting long Podman phases. After resizing, run the doctor because the selected VM backend must remain reachable with the configured value.
+
 ## Start
 
 Run:

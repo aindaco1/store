@@ -11,6 +11,7 @@ import {
   getUspsTimeoutMs,
   isUspsEnabled
 } from './provider-config.js';
+import { normalizeDestinationCountry, normalizeDestinationPostalCode } from './destination-validation.js';
 
 const DEFAULT_DIMENSION_INCHES = 1;
 const SHIPPING_OPTION_STANDARD = 'standard';
@@ -58,20 +59,20 @@ export function __resetShippingRuntimeStateForTests() {
 }
 
 export function normalizeShippingDestination(address = {}) {
-  const country = String(address?.country || '')
-    .trim()
-    .toUpperCase();
-  const postalCode = String(address?.postalCode || address?.postal_code || '')
-    .trim()
-    .toUpperCase();
+  const rawCountry = String(address?.country || '').trim();
+  const rawPostalCode = String(address?.postalCode || address?.postal_code || '').trim();
+  const country = normalizeDestinationCountry(rawCountry);
+  const postalCode = normalizeDestinationPostalCode(rawPostalCode, country);
 
-  if (!country || !/^[A-Z]{2}$/.test(country)) {
+  if (!rawCountry) {
     return { valid: false, error: 'Shipping country is required' };
   }
+  if (!country) return { valid: false, error: 'Shipping country must use a two-letter code' };
 
-  if (!postalCode) {
+  if (!rawPostalCode) {
     return { valid: false, error: 'Shipping postal code is required' };
   }
+  if (!postalCode) return { valid: false, error: 'Shipping postal code is invalid' };
 
   return {
     valid: true,

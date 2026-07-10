@@ -39,6 +39,7 @@ describe('package test scripts', () => {
     const preMergeScript = readFileSync(join(repoRoot, 'scripts/pre-merge-regression.sh'), 'utf8');
 
     expect(preMergeScript).toContain('run_phase "8. Security suite" npm run test:security');
+    expect(preMergeScript).toContain('run_phase "7b. Podman release resource check" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor');
     expect(preMergeScript).toContain('run_phase "9. Podman Store Worker smoke" ./scripts/test-worker.sh --podman');
     expect(preMergeScript).toContain('run_phase "10. Podman E2E suite" npm run test:e2e:headless');
     expect(preMergeScript).not.toContain('run_phase "9a. Host Store Worker smoke"');

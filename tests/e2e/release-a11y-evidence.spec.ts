@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
+import { gotoDomReady } from './helpers/navigation';
 
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
 
@@ -35,7 +36,7 @@ function hasVisibleFocusStyle(summary: any) {
 test.describe('Release Accessibility Evidence', () => {
   test('release focus order reaches named purchase controls with visible focus', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await expect(page.locator('main')).toBeVisible();
 
     let foundAddToCart = false;
@@ -72,7 +73,7 @@ test.describe('Release Accessibility Evidence', () => {
       });
     });
 
-    await page.goto('/orders/');
+    await gotoDomReady(page, '/orders/');
     const status = page.locator('[data-store-order-lookup-status]');
     await expect(status).toHaveAttribute('role', 'status');
     await expect(status).toHaveAttribute('aria-live', 'polite');
@@ -85,7 +86,7 @@ test.describe('Release Accessibility Evidence', () => {
 
   test('release reduced motion preference keeps checkout surfaces usable', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
+    await gotoDomReady(page, '/');
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('[data-store-cart-root]')).toHaveCount(1);
     await expect(page.locator('.store-product-card').first()).toBeVisible();

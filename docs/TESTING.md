@@ -38,6 +38,8 @@ These cover public layout/accessibility, product-card and product-detail control
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 
+E2E navigation uses the shared `gotoDomReady` helper, then asserts the page-specific application state. Tests do not wait for every late asset before beginning interaction. Layout and text-scaling checks use a bounded font-readiness wait plus animation frames so an invalid or slow font cannot hang the suite; the visible layout/overflow assertions still determine pass or failure.
+
 ## Unit Coverage
 
 ```bash
@@ -97,7 +99,7 @@ The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, soci
 npm run test:premerge
 ```
 
-The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, Podman Worker smoke, asset minification checks, and the Podman headless Playwright suite. When host Jekyll gems are unavailable it falls back to a Podman-backed build path.
+The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, Podman Worker smoke, asset minification checks, and the Podman headless Playwright suite. When host Jekyll gems are unavailable it falls back to a Podman-backed build path. On macOS/Windows, its strict Podman doctor phase requires a stable machine with at least 6 GiB before container-heavy checks begin.
 
 For changes that trigger [ETHICAL_RISK.md](ETHICAL_RISK.md), record the review result in the PR before merge. Automated checks can prove many mitigations, such as private/no-store routes, consent state, suppression, access control, content safety, i18n completeness, and accessibility. Residual risks that require human review should name the owner/date in the PR or release evidence.
 
