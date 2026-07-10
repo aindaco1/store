@@ -313,7 +313,7 @@ describe('Workers Cache admin endpoints', () => {
     expect(body.workersCache).toMatchObject({ enabled: false, bypass: 'disabled' });
   });
 
-  it('returns a sanitized, rate-limited two-read probe only to the evidence credential', async () => {
+  it('returns a sanitized, rate-limited three-read warmup probe only to the evidence credential', async () => {
     const writeDataPoint = vi.fn();
     const env = buildEnv({ STORE_CACHE_METRICS: { writeDataPoint } });
     let reads = 0;
@@ -328,15 +328,15 @@ describe('Workers Cache admin endpoints', () => {
         writeBudget: {
           readOnly: true,
           workersRequestsExpected: 1,
-          kvReadsExpected: reads === 1 ? 1 : 0,
+          kvReadsExpected: reads <= 2 ? 1 : 0,
           kvWritesExpected: 0,
-          kvListExpected: reads === 1 ? 1 : 0
+          kvListExpected: reads <= 2 ? 1 : 0
         }
       }), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Cf-Cache-Status': reads === 1 ? 'MISS' : 'HIT'
+          'Cf-Cache-Status': reads <= 2 ? 'MISS' : 'HIT'
         }
       });
     });
@@ -376,19 +376,27 @@ describe('Workers Cache admin endpoints', () => {
         unchanged: false,
         writeBudget: { kvReadsExpected: 1, kvListExpected: 1 }
       },
+      warmup: {
+        status: 'MISS',
+        unchanged: true,
+        writeBudget: { kvReadsExpected: 1, kvListExpected: 1 }
+      },
       repeat: {
         status: 'HIT',
         unchanged: true,
         writeBudget: { kvReadsExpected: 0, kvListExpected: 0 }
       },
       requestBudget: {
-        probeReads: 2,
+        probeReads: 3,
+        fullLookupReads: 1,
+        noChangeWarmupReads: 1,
+        noChangeRepeatReads: 1,
         rateLimitKvReadsExpected: 1,
         rateLimitKvWritesExpected: 1
       }
     });
-    expect(cacheFetch).toHaveBeenCalledTimes(2);
-    expect(writeDataPoint).toHaveBeenCalledTimes(2);
+    expect(cacheFetch).toHaveBeenCalledTimes(3);
+    expect(writeDataPoint).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(body)).not.toContain('admin@example.com');
     expect(JSON.stringify(body)).not.toContain('store-order');
     expect(JSON.stringify(body)).not.toContain('evidence_secret');

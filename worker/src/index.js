@@ -1644,6 +1644,15 @@ async function handleAdminWorkersCacheEvidence(request, env, ctx, body = {}) {
   const repeatUrl = new URL(firstUrl);
   const watermark = String(first.payload.watermark || first.payload.page?.watermark || '');
   if (routeId === 'orders' && watermark) repeatUrl.searchParams.set('watermark', watermark);
+  const warmup = await collectWorkersCacheRouteEvidence(
+    routeId,
+    new Request(repeatUrl.toString(), { headers: { Accept: 'application/json' } }),
+    env,
+    ctx,
+    auth
+  );
+  if (!warmup.ok) return warmup.response;
+
   const repeat = await collectWorkersCacheRouteEvidence(
     routeId,
     new Request(repeatUrl.toString(), { headers: { Accept: 'application/json' } }),
@@ -1661,9 +1670,13 @@ async function handleAdminWorkersCacheEvidence(request, env, ctx, body = {}) {
     containsCredentials: false,
     containsCustomerData: false,
     probe: first.summary,
+    warmup: warmup.summary,
     repeat: repeat.summary,
     requestBudget: {
-      probeReads: 2,
+      probeReads: 3,
+      fullLookupReads: 1,
+      noChangeWarmupReads: 1,
+      noChangeRepeatReads: 1,
       rateLimitKvReadsExpected: 1,
       rateLimitKvWritesExpected: 1
     }
