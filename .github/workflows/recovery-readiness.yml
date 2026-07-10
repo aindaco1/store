@@ -1,0 +1,80 @@
+name: Recovery Readiness
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '43 3 * * 0'
+      timezone: 'America/Denver'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recovery-readiness-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  synthetic-readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_DNS_API_TOKEN: ${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}
+      CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
+      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      SITE_BASE: http://127.0.0.1:4002
+      WORKER_BASE: http://127.0.0.1:8989
+      WORKER_URL: http://127.0.0.1:8989
+      APP_MODE: test
+      STRIPE_SECRET_KEY: sk_test_smoke
+      STRIPE_WEBHOOK_SECRET: whsec_smoke
+      ADMIN_SECRET: test-admin-secret
+      ADMIN_BOOTSTRAP_EMAILS: admin@example.com
+      MAGIC_LINK_SECRET: test-magic-link-secret
+      RESEND_API_KEY: re_test_smoke
+      SKIP_STRIPE: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Run read-only Cloudflare provider evidence
+        run: npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars --json-output=provider-evidence.json
+
+      - name: Run representative Podman restore rehearsal
+        run: npm run restore:rehearse -- --output=recovery-rehearsal.json
+
+      - name: Run backup and recovery readiness
+        run: >-
+          npm run backup:readiness --
+          --strict
+          --provider-evidence=provider-evidence.json
+          --rehearsal-evidence=recovery-rehearsal.json
+          --required-credentials=CLOUDFLARE_ACCOUNT_ID,CLOUDFLARE_API_TOKEN
+          --output=recovery-readiness.json
+
+      - name: Upload sanitized recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: recovery-readiness-${{ github.run_id }}
+          path: |
+            provider-evidence.json
+            recovery-rehearsal.json
+            recovery-readiness.json
+          if-no-files-found: ignore
+          retention-days: 90

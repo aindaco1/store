@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { commandAvailable, runCommand } from './lib/command-runner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -45,7 +45,8 @@ const LOCAL_GENERATED_SECRETS = [
   'CHECKOUT_INTENT_SECRET',
   'MAGIC_LINK_SECRET',
   'STORE_DOWNLOAD_SECRET',
-  'WORKERS_CACHE_PURGE_SECRET'
+  'WORKERS_CACHE_PURGE_SECRET',
+  'WORKERS_CACHE_EVIDENCE_SECRET'
 ];
 const LOCAL_OPTIONAL_SECRETS = [
   'STRIPE_SECRET_KEY',
@@ -80,6 +81,7 @@ const WORKER_SECRETS = [
   { name: 'MAGIC_LINK_SECRET', label: 'Admin/order magic-link HMAC secret', required: true, generate: true },
   { name: 'STORE_DOWNLOAD_SECRET', label: 'Signed download and fulfillment link secret', required: false, generate: true },
   { name: 'WORKERS_CACHE_PURGE_SECRET', label: 'Workers Cache deploy purge bearer secret', required: false, generate: true },
+  { name: 'WORKERS_CACHE_EVIDENCE_SECRET', label: 'Workers Cache read-only scheduled evidence bearer secret', required: false, generate: true },
   { name: 'TURNSTILE_SECRET_KEY', label: 'Cloudflare Turnstile secret key', required: true },
   { name: 'ADMIN_TURNSTILE_SECRET_KEY', label: 'Admin-specific Turnstile secret key', required: false },
   { name: 'STORE_ORDER_TURNSTILE_SECRET_KEY', label: 'Store order lookup Turnstile secret key', required: false },
@@ -92,6 +94,8 @@ const GITHUB_SECRETS = [
   { name: 'CLOUDFLARE_API_TOKEN', label: 'Cloudflare Workers deploy API token', required: true },
   { name: 'CLOUDFLARE_ACCOUNT_ID', label: 'Cloudflare account ID', required: true },
   { name: 'WORKERS_CACHE_PURGE_SECRET', label: 'Workers Cache deploy purge bearer secret (must match Worker secret)', required: false },
+  { name: 'WORKERS_CACHE_EVIDENCE_SECRET', label: 'Workers Cache scheduled evidence bearer secret (must match Worker secret)', required: false },
+  { name: 'CLOUDFLARE_ANALYTICS_API_TOKEN', label: 'Cloudflare Account Analytics Read token', required: false },
   { name: 'CLOUDFLARE_CACHE_PURGE_TOKEN', label: 'Cloudflare cache purge token (defaults to deploy token if skipped)', required: false }
 ];
 
@@ -122,10 +126,6 @@ Examples:
 `);
 }
 
-function commandName(name) {
-  return process.platform === 'win32' && ['npm', 'npx'].includes(name) ? `${name}.cmd` : name;
-}
-
 function logStep(message) {
   console.log(`\n==> ${message}`);
 }
@@ -148,15 +148,13 @@ function run(command, runArgs = [], { cwd = ROOT, input = '', allowFailure = fal
     return { status: 0, stdout: '', stderr: '' };
   }
 
-  const result = spawnSync(commandName(command), runArgs, {
+  const result = runCommand(command, runArgs, {
     cwd,
     input,
-    encoding: 'utf8',
-    stdio: capture ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'inherit', 'inherit'],
-    shell: false
+    capture
   });
   if (result.error && !allowFailure) {
-    throw result.error;
+    throw new Error(result.error);
   }
   if (result.status !== 0 && !allowFailure) {
     const stderr = String(result.stderr || '').trim();
@@ -167,16 +165,6 @@ function run(command, runArgs = [], { cwd = ROOT, input = '', allowFailure = fal
     stdout: String(result.stdout || ''),
     stderr: String(result.stderr || '')
   };
-}
-
-function commandAvailable(command) {
-  const result = spawnSync(commandName(command), ['--version'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false
-  });
-  return !result.error && result.status === 0;
 }
 
 function ensureCommands(commands, { required = true } = {}) {
@@ -666,6 +654,9 @@ async function configureSecrets() {
   const githubDefaults = new Map();
   if (workerValues.WORKERS_CACHE_PURGE_SECRET) {
     githubDefaults.set('WORKERS_CACHE_PURGE_SECRET', workerValues.WORKERS_CACHE_PURGE_SECRET);
+  }
+  if (workerValues.WORKERS_CACHE_EVIDENCE_SECRET) {
+    githubDefaults.set('WORKERS_CACHE_EVIDENCE_SECRET', workerValues.WORKERS_CACHE_EVIDENCE_SECRET);
   }
   const githubValues = await collectSecretValues(GITHUB_SECRETS, githubDefaults);
   for (const [name, value] of Object.entries(githubValues)) {

@@ -5,8 +5,9 @@ Store performance depends on static public pages, lazy cart loading, generated m
 ## Current Baseline
 
 - Public pages remain statically rendered and cart runtime loading remains lazy.
-- Store order lookup/admin reads use cached/indexed paths from the current Store mainline.
-- Admin Orders list reads can use Cloudflare Workers Cache through the `CachedAdminStoreOrders` inner entrypoint after the gateway authenticates the admin session.
+- Store order-derived reads share `admin-store-orders:index:v2`, including a deterministic non-PII watermark. Orders, Analytics, inventory sold counts, Film summaries, dashboard totals, and exports no longer require parallel order namespace scans.
+- Admin Orders can use Cloudflare Workers Cache through `CachedAdminStoreReads`; Analytics, inventory, and download readiness use the same policy entrypoint but remain off by default pending real-edge evidence.
+- Admin login no longer requests and discards `/admin/dashboard/summary`.
 - Order Success adds totals and fulfillment details without adding new public bundle dependencies.
 - Spanish public shells share the English page includes and runtime message payloads; they do not duplicate product rendering or add locale-specific bundles.
 - Admin dashboard tab restoration reads and writes one small sanitized `localStorage` object only when an admin tab or Settings section changes; it does not add network calls or polling.
@@ -42,18 +43,61 @@ npm run assets:minify:check
 
 The default Worker entrypoint stays uncached. Authentication, role/scope checks, CSRF checks, rate limits, route dispatch, mutations, checkout, webhooks, tokenized order routes, signed downloads, shipping, and tax all continue to execute through the gateway and return private/no-store responses where appropriate.
 
-`GET /admin/store/orders` can use the named `CachedAdminStoreOrders` entrypoint when `cache.workers_admin_orders_enabled` / `WORKERS_CACHE_ADMIN_ORDERS_ENABLED` is not set to `false`. The gateway authenticates the admin, builds a normalized internal request, strips credentials and CSRF headers, and passes minimal role/scope props with `ctx.exports`. The inner response is cacheable for `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`; the browser-facing response remains `private, no-store`.
+The `CachedAdminStoreReads` policy registry owns canonical paths/query fields, non-PII props, route flags, TTLs, tags, and purge dependencies:
 
-Cacheable admin Orders requests include only safe filter/page parameters: `status`, `fulfillment`, `limit`, `cursor`, `lang`, and `locale`. Free-text `q` searches bypass Workers Cache because search terms can contain customer names, email addresses, or order tokens.
+| Route | TTL | Default | Backend work avoided on hit |
+| --- | --- | --- | --- |
+| `/admin/store/orders` | `max-age=15`, no stale serving | enabled | order-index KV read or cold order list/get scan |
+| `/admin/store/analytics` | `max-age=60, stale-while-revalidate=120` | disabled | order snapshot and referral-label KV reads |
+| `/admin/store/inventory` | `max-age=15`, no stale serving | disabled | order snapshot/list/get work |
+| `/admin/store/downloads` | `max-age=30`, no stale serving | disabled | R2 list/readiness work |
+
+The gateway authenticates every request, strips credentials/CSRF, and passes only props version, route, normalized role, scope key, and Store access scope. Inner responses are public-cacheable; outer browser responses remain `private, no-store`.
+
+Orders keys accept only safe filter/page/locale fields plus validated ISO `since` and `orders-v2-<hash>` watermark values. Free-text `q` bypasses Workers Cache because search terms can contain names, email addresses, or order tokens. A matching first-page watermark returns a minimal `unchanged: true` response and leaves the existing PII-bearing payload in memory only.
 
 Performance expectations:
 
-- repeated no-change Orders reads should avoid repeated Worker CPU/KV index work while the cache entry is fresh
-- cache hits still count as Cloudflare Workers requests, but should reduce billed CPU and backend reads
-- order mutations call the existing order-index invalidation path, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available
-- super-admins can clear known Workers Cache entries from Settings -> Runtime diagnostics, and production deploys can call the Worker purge endpoint with `WORKERS_CACHE_PURGE_SECRET`
-- short TTLs bound staleness if a purge cannot run, such as from an older helper path without `ctx`
-- dashboard responses include `page.cache.workers` metadata and `X-Store-Workers-Cache` / `X-Store-Workers-Cache-Entry` headers for operator diagnostics
+- every `ctx.exports.fetch()` is an additional billed Workers request, including a cache hit; the benefit is avoided inner CPU and backend reads, not a lower request count
+- order mutations invalidate Orders, Analytics, and order-derived inventory; inventory, download-library, and referral mutations invalidate their dependent policies
+- purge failure does not fail a write and records only a bounded failure diagnostic; short TTLs cap stale exposure
+- download readiness lists R2 once and derives attached-file readiness from that listing, avoiding duplicate per-file `head` calls when the list is complete
+- response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters
+- the authenticated gateway writes one asynchronous `STORE_CACHE_METRICS` Analytics Engine point per eligible admin read when `WORKERS_CACHE_TELEMETRY_ENABLED=true`; fields are limited to route, cache status/bypass, duration, response bytes, and expected operation counts
+- Analytics Engine telemetry adds one data-point write per eligible read and the nightly collector adds one SQL query plus, only below its recent cache-read threshold, a two-read evidence probe with one rate-limit KV read/write; it never adds order-store KV counters
+- super-admin and deploy-secret purges clear all known cache domains; deploy/version isolation remains enabled because `cross_version_cache` is off
+
+Capture the disabled baseline and enabled candidate separately with a fresh one-time super-admin token supplied only through the environment. Disabled runs do not purge; enabled runs use two bounded purges rather than purging once per sample because every purge writes an audit KV row:
+
+```bash
+export STORE_CACHE_SMOKE_ADMIN_LOGIN_TOKEN='<one-time-token>'
+npm run cache:benchmark -- \
+  --mode=disabled \
+  --route=orders \
+  --worker-base=https://checkout.example.com \
+  --site-base=https://shop.example.com \
+  --samples=30 \
+  --output=/secure/evidence/workers-cache-disabled.json
+
+# Use a new one-time token after enabling Orders and deploying.
+export STORE_CACHE_SMOKE_ADMIN_LOGIN_TOKEN='<fresh-one-time-token>'
+npm run cache:benchmark -- \
+  --mode=enabled \
+  --route=orders \
+  --worker-base=https://checkout.example.com \
+  --site-base=https://shop.example.com \
+  --samples=30 \
+  --output=/secure/evidence/workers-cache-enabled.json
+
+npm run cache:compare -- \
+  --baseline=/secure/evidence/workers-cache-disabled.json \
+  --candidate=/secure/evidence/workers-cache-enabled.json \
+  --output=/secure/evidence/workers-cache-comparison.json
+```
+
+The evidence files contain timings, byte counts, cache statuses, bypass reasons, and operation budgets, not response bodies or credentials. The comparator requires correctly labeled schema-v2 artifacts, at least 30 repeated samples, zero order-data KV list/get operations on warm/no-change hits, at least 40% p95 improvement, expected search bypasses, and a bounded post-purge refill. Mutation freshness and normal-traffic aggregate hit ratios remain separate production gates. Podman validates the application contract but cannot prove Cloudflare edge behavior.
+
+`.github/workflows/workers-cache-evidence.yml` runs at `03:17 America/Denver` on `main`. It queries the prior 24 hours from Analytics Engine and calls `POST /admin/workers-cache/evidence` only when recent cache-read traffic is below the configured threshold. That endpoint requires `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs two fixed read-only route probes, and returns metrics only. The scheduled workflow cannot purge or change configuration.
 
 Verify Worker Cache config before deploys that touch cached entrypoints:
 
@@ -62,6 +106,31 @@ cd worker
 npx wrangler --version
 npx wrangler deploy --dry-run --env=""
 ```
+
+Configuration:
+
+- `cache.workers_enabled` / `WORKERS_CACHE_ENABLED`: global kill switch.
+- `cache.workers_telemetry_enabled` / `WORKERS_CACHE_TELEMETRY_ENABLED`: sanitized Analytics Engine telemetry switch.
+- `cache.workers_admin_*_enabled` / `WORKERS_CACHE_ADMIN_*_ENABLED`: route switches.
+- Re-enable after a purge or new Worker version so an old still-fresh response cannot reappear.
+
+### Cache Incident Procedure
+
+1. Preserve the current sanitized benchmark/observability evidence and note the affected route, cache status, deployment version, and last covered mutation. Never capture response bodies, cookies, tokens, cache keys, or customer rows.
+2. For a single candidate problem, set its `cache.workers_admin_*_enabled` value to `false`; for uncertain scope, set `cache.workers_enabled: false`. A super-admin may publish the setting, but the runtime change takes effect only after the resulting Worker deployment.
+3. Dispatch **Deploy Production**. Deploy, cache evidence, and protected recovery share the `production-operations` concurrency group and cannot overlap.
+4. Purge all known entries from the super-admin cache control or the deploy-secret endpoint. Do not send arbitrary tags:
+
+   ```bash
+   curl --fail-with-body \
+     -X POST https://checkout.example.com/admin/workers-cache/purge \
+     -H "Authorization: Bearer ${WORKERS_CACHE_PURGE_SECRET}" \
+     -H 'Content-Type: application/json' \
+     --data '{"target":"all_known","source":"incident"}'
+   ```
+
+5. Verify the affected admin read is fresh, browser-facing headers remain `private, no-store`, cache metadata reports `disabled`, search still bypasses, and the underlying mutation remains present. If the deployment itself is suspect, redeploy the last reviewed commit with caching disabled rather than enabling cross-version sharing.
+6. Keep `cross_version_cache=false`. Re-enable one route only after its disabled/enabled comparison, mutation/purge freshness check, and normal-traffic hit/read/CPU evidence pass again; purge immediately after the enabling deployment.
 
 ## Prefetch
 

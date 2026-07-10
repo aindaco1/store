@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import worker, { buildAdminStoreOrdersWorkersCachePurgeProps } from '../../worker/src/index.js';
+import {
+  adminStoreReadCacheTagsForDomains
+} from '../../worker/src/workers-cache-policy.js';
 
 class MockKVNamespace {
   store = new Map<string, string>();
@@ -57,6 +60,7 @@ function buildEnv(overrides: Record<string, unknown> = {}) {
     ADMIN_SECRET: 'test_admin_secret',
     ADMIN_EXPOSE_LOGIN_LINK: 'true',
     WORKERS_CACHE_PURGE_SECRET: 'deploy_secret',
+    WORKERS_CACHE_EVIDENCE_SECRET: 'evidence_secret',
     OBSERVABILITY_SAMPLE_RATE: '0',
     STORE_STATE: new MockKVNamespace(),
     RATELIMIT: new MockKVNamespace(),
@@ -72,7 +76,7 @@ function buildCtx(cacheFetch = vi.fn()) {
       waitUntilTasks.push(Promise.resolve(task));
     }),
     exports: {
-      CachedAdminStoreOrders: {
+      CachedAdminStoreReads: {
         fetch: cacheFetch
       }
     }
@@ -203,7 +207,8 @@ describe('Workers Cache admin endpoints', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
     expect(response.headers.get('X-Store-Workers-Cache')).toBe('HIT');
-    expect(response.headers.get('X-Store-Workers-Cache-Entry')).toBe('CachedAdminStoreOrders');
+    expect(response.headers.get('X-Store-Workers-Cache-Entry')).toBe('CachedAdminStoreReads');
+    expect(response.headers.get('X-Store-Workers-Cache-Route')).toBe('orders');
     expect(cacheFetch).toHaveBeenCalledOnce();
 
     const [cacheRequest, cacheInit] = cacheFetch.mock.calls[0] as [Request, { props: Record<string, unknown> }];
@@ -220,8 +225,9 @@ describe('Workers Cache admin endpoints', () => {
     expect(cacheRequest.headers.has('x-store-admin-csrf')).toBe(false);
     expect(JSON.stringify(cacheInit.props)).not.toContain('admin@example.com');
     expect(cacheInit.props).toMatchObject({
-      source: 'store-admin-orders-cache-gateway',
-      version: 1,
+      source: 'store-admin-read-cache-gateway',
+      version: 2,
+      routeId: 'orders',
       role: 'super_admin',
       scopeKey: 'super_admin',
       accessScope: 'store'
@@ -234,7 +240,7 @@ describe('Workers Cache admin endpoints', () => {
     });
     expect(body.page.cache.workers).toMatchObject({
       enabled: true,
-      entrypoint: 'CachedAdminStoreOrders',
+      entrypoint: 'CachedAdminStoreReads',
       status: 'HIT',
       bypass: ''
     });
@@ -260,7 +266,7 @@ describe('Workers Cache admin endpoints', () => {
     const body = await response.json();
     expect(body.page.cache.workers).toMatchObject({
       enabled: true,
-      entrypoint: 'CachedAdminStoreOrders',
+      entrypoint: 'CachedAdminStoreReads',
       status: 'unavailable',
       bypass: 'search_query'
     });
@@ -285,10 +291,192 @@ describe('Workers Cache admin endpoints', () => {
     const body = await response.json();
     expect(body.page.cache.workers).toMatchObject({
       enabled: false,
-      entrypoint: 'CachedAdminStoreOrders',
+      entrypoint: 'CachedAdminStoreReads',
       status: 'disabled',
       bypass: 'disabled'
     });
+  });
+
+  it('honors the global Workers Cache kill switch', async () => {
+    const env = buildEnv({ WORKERS_CACHE_ENABLED: 'false' });
+    const cacheFetch = vi.fn();
+    const ctx = buildCtx(cacheFetch);
+    const session = await createAdminSession(env, ctx);
+
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/store/orders?status=confirmed`, {
+      headers: { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() }
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    expect(cacheFetch).not.toHaveBeenCalled();
+    const body = await response.json();
+    expect(body.workersCache).toMatchObject({ enabled: false, bypass: 'disabled' });
+  });
+
+  it('returns a sanitized, rate-limited two-read probe only to the evidence credential', async () => {
+    const writeDataPoint = vi.fn();
+    const env = buildEnv({ STORE_CACHE_METRICS: { writeDataPoint } });
+    let reads = 0;
+    const cacheFetch = vi.fn(async (request: Request) => {
+      reads += 1;
+      const noChange = new URL(request.url).searchParams.has('watermark');
+      return new Response(JSON.stringify({
+        ...cachedOrdersPayload(),
+        ...(noChange ? { orders: undefined, fulfillments: undefined } : {}),
+        watermark: 'orders-v2-0123456789abcdef',
+        unchanged: noChange,
+        writeBudget: {
+          readOnly: true,
+          workersRequestsExpected: 1,
+          kvReadsExpected: reads === 1 ? 1 : 0,
+          kvWritesExpected: 0,
+          kvListExpected: reads === 1 ? 1 : 0
+        }
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cf-Cache-Status': reads === 1 ? 'MISS' : 'HIT'
+        }
+      });
+    });
+    const ctx = buildCtx(cacheFetch);
+    const unauthorized = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/evidence`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer wrong-secret',
+        'Content-Type': 'application/json',
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ route: 'orders' })
+    }), env, ctx);
+    expect(unauthorized.status).toBe(401);
+    expect(cacheFetch).not.toHaveBeenCalled();
+
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/evidence`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer evidence_secret',
+        'Content-Type': 'application/json',
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ route: 'orders' })
+    }), env, ctx);
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    expect(body).toMatchObject({
+      schemaVersion: 1,
+      route: 'orders',
+      containsResponseBodies: false,
+      containsCredentials: false,
+      containsCustomerData: false,
+      probe: {
+        status: 'MISS',
+        unchanged: false,
+        writeBudget: { kvReadsExpected: 1, kvListExpected: 1 }
+      },
+      repeat: {
+        status: 'HIT',
+        unchanged: true,
+        writeBudget: { kvReadsExpected: 0, kvListExpected: 0 }
+      },
+      requestBudget: {
+        probeReads: 2,
+        rateLimitKvReadsExpected: 1,
+        rateLimitKvWritesExpected: 1
+      }
+    });
+    expect(cacheFetch).toHaveBeenCalledTimes(2);
+    expect(writeDataPoint).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(body)).not.toContain('admin@example.com');
+    expect(JSON.stringify(body)).not.toContain('store-order');
+    expect(JSON.stringify(body)).not.toContain('evidence_secret');
+  });
+
+  it('routes Analytics, Inventory, and Downloads through the cohesive cached entrypoint', async () => {
+    const env = buildEnv();
+    const cacheFetch = vi.fn(async (request: Request, init: { props: Record<string, unknown> }) => {
+      const routeId = String(init.props.routeId || '');
+      return new Response(JSON.stringify({
+        scope: 'store',
+        routeId,
+        rows: [],
+        files: [],
+        page: {},
+        writeBudget: { readOnly: true, kvWritesExpected: 0 }
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cf-Cache-Status': 'HIT' }
+      });
+    });
+    const ctx = buildCtx(cacheFetch);
+    const session = await createAdminSession(env, ctx);
+
+    for (const [path, routeId] of [
+      ['/admin/store/analytics', 'analytics'],
+      ['/admin/store/inventory', 'inventory'],
+      ['/admin/store/downloads', 'downloads']
+    ]) {
+      const response = await worker.fetch(new Request(`${WORKER_BASE}${path}`, {
+        headers: { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() }
+      }), env, ctx);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+      expect(response.headers.get('X-Store-Workers-Cache-Route')).toBe(routeId);
+      const body = await response.json();
+      expect(body.user.email).toBe('admin@example.com');
+      expect(body.workersCache).toMatchObject({ routeId, status: 'HIT' });
+      expect(body.writeBudget).toMatchObject({ workersRequestsExpected: 1 });
+    }
+
+    expect(cacheFetch).toHaveBeenCalledTimes(3);
+    expect(cacheFetch.mock.calls.map((call) => new URL(String(call[0].url)).pathname)).toEqual([
+      '/admin/store/analytics',
+      '/admin/store/inventory',
+      '/admin/store/downloads'
+    ]);
+    expect(cacheFetch.mock.calls.map((call) => call[1].props.routeId)).toEqual([
+      'analytics', 'inventory', 'downloads'
+    ]);
+  });
+
+  it('returns a minimal unchanged Orders payload for a matching non-PII watermark', async () => {
+    const env = buildEnv({ WORKERS_CACHE_ENABLED: 'false' });
+    env.STORE_STATE.store.set('orders:store-order-alpha', JSON.stringify({
+      orderToken: 'store-order-alpha',
+      status: 'confirmed',
+      createdAt: '2026-07-09T12:00:00.000Z',
+      confirmedAt: '2026-07-09T12:01:00.000Z',
+      updatedAt: '2026-07-09T12:02:00.000Z',
+      orderDraft: {
+        status: 'confirmed',
+        customer: { email: 'buyer@example.com', name: 'Private Buyer' },
+        items: [{ id: 'line-1', sku: 'poster', quantity: 1, fulfillmentType: 'physical' }],
+        totals: { totalCents: 2500, currency: 'USD' }
+      }
+    }));
+    const ctx = buildCtx();
+    const session = await createAdminSession(env, ctx);
+    const headers = { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() };
+    const first = await worker.fetch(new Request(`${WORKER_BASE}/admin/store/orders?status=all`, { headers }), env, ctx);
+    const firstBody = await first.json();
+    expect(firstBody.unchanged).toBe(false);
+    expect(firstBody.watermark).toMatch(/^orders-v2-[a-f0-9]{16}$/);
+    expect(Array.isArray(firstBody.orders)).toBe(true);
+
+    const second = await worker.fetch(new Request(
+      `${WORKER_BASE}/admin/store/orders?status=all&watermark=${encodeURIComponent(firstBody.watermark)}`,
+      { headers: { ...headers, 'CF-Connecting-IP': requestIp() } }
+    ), env, ctx);
+    const secondBody = await second.json();
+    expect(secondBody).toMatchObject({
+      unchanged: true,
+      watermark: firstBody.watermark,
+      latestKnownUpdatedAt: '2026-07-09T12:02:00.000Z'
+    });
+    expect(secondBody.orders).toBeUndefined();
+    expect(secondBody.fulfillments).toBeUndefined();
   });
 
   it('falls back to KV order scanning when the Workers Cache entrypoint is unavailable', async () => {
@@ -315,9 +503,81 @@ describe('Workers Cache admin endpoints', () => {
     const body = await response.json();
     expect(body.page.cache.workers).toMatchObject({
       enabled: true,
-      entrypoint: 'CachedAdminStoreOrders',
+      entrypoint: 'CachedAdminStoreReads',
       status: 'unavailable',
       bypass: 'entrypoint_unavailable'
+    });
+  });
+
+  it('keeps mutations successful and records bounded diagnostics when background purge fails', async () => {
+    const env = buildEnv();
+    const cacheFetch = vi.fn().mockRejectedValue(new Error('synthetic purge outage'));
+    const ctx = buildCtx(cacheFetch);
+    const session = await createAdminSession(env, ctx);
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/store/marketing/referrals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: session.cookie,
+        Origin: SITE_BASE,
+        'x-store-admin-csrf': session.csrfToken,
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({
+        code: 'cache-test',
+        referrer: 'Cache Test',
+        url: `${SITE_BASE}/?ref=cache-test`
+      })
+    }), env, ctx);
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).success).toBe(true);
+    await Promise.all(ctx.waitUntilTasks);
+    const failure = JSON.parse(env.STORE_STATE.store.get('workers-cache-purge-failure:recent') || '{}');
+    expect(failure).toMatchObject({
+      entrypoint: 'CachedAdminStoreReads',
+      domains: ['marketing'],
+      status: 0,
+      error: 'synthetic purge outage'
+    });
+    expect(JSON.stringify(failure)).not.toContain('admin@example.com');
+    expect(JSON.stringify(failure)).not.toContain('Cache Test');
+  });
+
+  it('returns a bounded purge failure when the cache binding throws synchronously', async () => {
+    const env = buildEnv();
+    const cacheFetch = vi.fn(() => {
+      throw new Error('synthetic synchronous binding failure');
+    });
+    const ctx = buildCtx(cacheFetch);
+    const session = await createAdminSession(env, ctx);
+
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/purge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: session.cookie,
+        Origin: SITE_BASE,
+        'x-store-admin-csrf': session.csrfToken,
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ target: 'admin_orders', source: 'dashboard' })
+    }), env, ctx);
+
+    expect(response.status).toBe(502);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      success: false,
+      target: 'admin_orders',
+      purges: [expect.objectContaining({
+        ok: false,
+        status: 0,
+        error: 'synthetic synchronous binding failure'
+      })]
+    });
+    expect(auditEvents(env)[0]).toMatchObject({
+      action: 'workers_cache:purge',
+      target: 'admin_orders'
     });
   });
 
@@ -353,8 +613,8 @@ describe('Workers Cache admin endpoints', () => {
     });
     expect(body.purges[0]).toMatchObject({
       ok: true,
-      entrypoint: 'CachedAdminStoreOrders',
-      tags: ['admin-orders', 'orders', 'order-index', 'admin-orders-v1']
+      entrypoint: 'CachedAdminStoreReads',
+      tags: adminStoreReadCacheTagsForDomains(['orders', 'order-index'])
     });
     expect(cacheFetch).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST' }), {
       props: buildAdminStoreOrdersWorkersCachePurgeProps()
@@ -401,7 +661,9 @@ describe('Workers Cache admin endpoints', () => {
     });
 
     const [purgeRequest, purgeInit] = cacheFetch.mock.calls[0] as [Request, { props: Record<string, unknown> }];
-    expect(purgeRequest.url).toBe('https://store-cache.internal/__store-cache/admin-orders/purge');
+    expect(purgeRequest.url).toBe(
+      'https://store-cache.internal/__store-cache/admin-reads/purge?domains=analytics%2Cdownloads%2Cinventory%2Cmarketing%2Corder-index%2Corders%2Cproducts'
+    );
     expect(purgeRequest.method).toBe('POST');
     expect(purgeInit.props).toEqual(buildAdminStoreOrdersWorkersCachePurgeProps());
 

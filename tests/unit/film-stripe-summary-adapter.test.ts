@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
 import worker from '../../worker/src/index.js';
+import {
+  ADMIN_STORE_ORDER_INDEX_KEY,
+  buildAdminStoreOrderIndexSnapshot
+} from '../../worker/src/admin-store-read-model.js';
 
 class MockKVNamespace {
   store = new Map<string, string>();
@@ -259,15 +263,14 @@ describe('Film Stripe summary adapter for Store', () => {
 
   it('uses the Store order index for Film summary reads when the index is fresh', async () => {
     const storeState = new MockKVNamespace();
-    await storeState.put('admin-store-orders:index:v1', JSON.stringify({
-      version: 1,
+    await storeState.put(ADMIN_STORE_ORDER_INDEX_KEY, JSON.stringify(buildAdminStoreOrderIndexSnapshot({
       generatedAt: new Date().toISOString(),
       scanned: 2500,
       indexed: 1,
       listCalls: 18,
       truncated: false,
       orders: [buildIndexedOrder()]
-    }));
+    })));
     const listSpy = vi.spyOn(storeState, 'list');
 
     const response = await fetchStoreSummary(buildEnv(storeState));

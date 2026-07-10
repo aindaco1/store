@@ -28,7 +28,7 @@ Local defaults:
 ## Core Bindings
 
 - `STORE_STATE`: KV for orders, admin sessions/users/audit, inventory overrides, coupon definitions, order lookup indexes, reminders, observability summaries, and retry/queue state.
-- `RATELIMIT`: KV-backed request throttling. The Worker fails closed for protected paths when this binding is absent.
+- `RATELIMIT`: KV-backed request throttling. The Worker fails closed for protected paths when this binding is absent and serializes same-isolate updates per key so concurrent requests do not overwrite one another's increments.
 - `STORE_INVENTORY_COORDINATOR`: Durable Object coordinator for SKU reservations, commits, releases, and availability snapshots.
 - `STORE_DOWNLOADS`: R2 bucket for signed digital download files and reusable download library objects.
 
@@ -56,7 +56,7 @@ Legacy aliases `/cart/validate` and `/checkout/intent` still route to the Store 
 
 - `POST /film/stripe-summary`: Film-facing summary-only Stripe aggregate adapter. Requires `Authorization: Bearer <FILM_STRIPE_SUMMARY_ADAPTER_SECRET>`, `dataBoundary: "summary_only"`, `source: "store"`, and mapped refs in `mappedRefs`. Accepted refs are Store order tokens, marketing ref codes, product IDs, variant IDs, SKUs, or item IDs. The response is limited to aggregate money/count fields, mapped-ref/order counts, status, generated timestamp, and currency; it does not return customer emails, payment intent IDs, charge IDs, balance transaction IDs, or card/payment-method data.
 
-The Film summary adapter uses the admin order scan cache and `admin-store-orders:index:v1` when fresh. A cold request may still build that index with a bounded `orders:` scan, but warm reads avoid repeated KV namespace listings while preserving the summary-only response boundary.
+The Film summary adapter uses the shared admin order read model and `admin-store-orders:index:v2` when fresh. A cold request may still build that index with a bounded `orders:` scan, but warm reads avoid repeated KV namespace listings while preserving the summary-only response boundary and non-PII watermark contract.
 
 ## Admin API
 
@@ -77,19 +77,25 @@ Some maintenance/observability routes also accept the configured admin recovery 
 
 ## Workers Cache
 
-Wrangler config keeps the default Worker gateway entrypoint uncached and enables cache only for the named `CachedAdminStoreOrders` entrypoint. This requires Wrangler `4.107+` and `compatibility_date = "2026-07-09"`; `ctx.exports` support is available by default at that compatibility date.
+Wrangler config keeps the default Worker gateway uncached and enables cache only for `CachedAdminStoreReads`. This requires Wrangler `4.107+` and `compatibility_date = "2026-07-09"`.
 
-Admin Orders cache flow:
+Authenticated cache flow:
 
 1. The browser calls `GET /admin/store/orders` with the normal admin session cookie.
 2. The gateway authenticates the session and role/scope first.
-3. Non-search reads call `ctx.exports.CachedAdminStoreOrders` with a normalized internal request and minimal role/scope props.
-4. The inner response can be cached with `public, max-age=20, stale-while-revalidate=40, stale-if-error=0`.
+3. Eligible reads call `ctx.exports.CachedAdminStoreReads` with a canonical internal request and minimal route/role/scope props.
+4. The inner response uses the route policy: Orders `max-age=15` without stale serving; Analytics `max-age=60, stale-while-revalidate=120`; inventory `max-age=15`; downloads `max-age=30`.
 5. The gateway returns a browser-facing `private, no-store` response with the authenticated user restored.
 
-Free-text `q` searches bypass Workers Cache. Set `cache.workers_admin_orders_enabled: false` in `_config.yml`, publish the Advanced performance setting, or set `WORKERS_CACHE_ADMIN_ORDERS_ENABLED=false` to disable this route-level cache without changing Wrangler entrypoint config.
+Orders accepts validated `since` and `watermark` values. A matching first-page non-search refresh returns `unchanged: true` without order/customer rows, and the browser retains its existing in-memory payload. Order payloads are never persisted to browser storage. Free-text `q` searches bypass Workers Cache.
 
-Order mutations call the shared order-index invalidation helper, which also purges `admin-orders`, `orders`, `order-index`, and `admin-orders-v1` cache tags when `ctx.cache` is available. Super-admins can also clear known Workers Cache entries from Settings -> Runtime diagnostics, and production deploys can call `POST /admin/workers-cache/purge` with `WORKERS_CACHE_PURGE_SECRET`. The short TTL bounds staleness if a purge path cannot run.
+`WORKERS_CACHE_ENABLED` / `cache.workers_enabled` is the global kill switch. Route switches are `WORKERS_CACHE_ADMIN_ORDERS_ENABLED`, `WORKERS_CACHE_ADMIN_ANALYTICS_ENABLED`, `WORKERS_CACHE_ADMIN_INVENTORY_ENABLED`, and `WORKERS_CACHE_ADMIN_DOWNLOADS_ENABLED`. Orders is enabled by default; the other routes are implemented but default off until real-edge benchmark evidence passes. `WORKERS_CACHE_TELEMETRY_ENABLED` independently controls the sanitized `STORE_CACHE_METRICS` Analytics Engine data point written after eligible gateway reads. Re-enable a route only after a purge or deploy/version change.
+
+Mutation invalidation maps low-cardinality `orders`, `order-index`, `analytics`, `inventory`, `products`, `downloads`, and `marketing` domains to cache tags. Purge failure never fails the underlying mutation; it writes only a bounded seven-day `workers-cache-purge-failure:recent` diagnostic. Super-admin and deploy-secret purges clear all known route tags. The default versioned cache key remains in place; `cross_version_cache` stays off.
+
+Every cached inner fetch is an additional billed Workers request, including hits. `writeBudget` and the benchmark harness distinguish that request from avoided order KV list/get and R2 list/head work. Analytics Engine adds one asynchronous data-point write per eligible read but avoids per-hit KV counters. Use labeled disabled/enabled `npm run cache:benchmark` runs plus `npm run cache:compare` for metadata-only latency/status evidence; never persist response bodies, cookies, or tokens.
+
+`POST /admin/workers-cache/evidence` is the scheduled read-only probe. It accepts only `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs two fixed route reads, and returns cache status, timing, response-size, unchanged state, and operation budgets without Store rows. It cannot purge, change settings, or call checkout/fulfillment/provider mutations. `.github/workflows/workers-cache-evidence.yml` queries `store_workers_cache_metrics` nightly and calls this probe only under its configured cache-read traffic ceiling.
 
 ## Secrets
 
@@ -109,6 +115,7 @@ Operationally important optional secrets:
 - `FILM_STRIPE_SUMMARY_ADAPTER_SECRET`: shared bearer secret for Film summary-only aggregate reads through `/film/stripe-summary`.
 - `STORE_DOWNLOAD_SECRET`: dedicated signed download/fulfillment secret.
 - `WORKERS_CACHE_PURGE_SECRET`: dedicated bearer secret for deploy-time Workers Cache purges. Store the same value as a Cloudflare Worker secret and a GitHub repository secret.
+- `WORKERS_CACHE_EVIDENCE_SECRET`: dedicated bearer secret for the read-only scheduled cache probe. Store the same value as a Cloudflare Worker secret and GitHub `production-observability` secret; do not reuse the purge or admin secret.
 - `STORE_ORDER_LOOKUP_SECRET`: dedicated customer lookup-token secret.
 - `ABANDONED_CART_TOKEN_SECRET`: dedicated reminder resume/unsubscribe secret.
 - `ADMIN_TURNSTILE_SECRET_KEY`: admin-specific Turnstile secret.
@@ -116,7 +123,8 @@ Operationally important optional secrets:
 - `USPS_CLIENT_SECRET`: required for live USPS quotes when `USPS_ENABLED=true`.
 - `ZIP_TAX_API_KEY`: required only when `TAX_PROVIDER=zip_tax`.
 - `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_REF`, `GITHUB_WORKFLOW`, and `GITHUB_MEDIA_OPTIMIZATION_WORKFLOW`: production admin publish/rebuild/media workflow integration. Set owner/repo/ref explicitly; do not rely on legacy helper fallbacks.
-- `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN`: optional read-only plan usage telemetry.
+- `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN`: read-only Cloudflare GraphQL/Analytics Engine access for plan usage, cache evidence, and recovery traffic preflight. Keep it separate from the deploy token where possible.
+- `STORE_BACKUP_ENCRYPTION_RECIPIENT`, `STORE_BACKUP_AGE_IDENTITY`, and a fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN`: approval-gated quarterly captured-data drill inputs. Use a dedicated recovery identity and never treat the one-time admin token as a reusable scheduled credential.
 - `ADMIN_LOCAL_REPO_TOKEN`: optional local sidecar bearer token; falls back to `ADMIN_SECRET` in local dev.
 
 Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in Cloudflare Worker secrets or GitHub repository secrets for deploy-only credentials.
@@ -159,7 +167,9 @@ Worker-backed release evidence is split by risk:
 - `npm run release:providers` is read-only and can use shell credentials, authenticated `gh`/`wrangler`/`stripe` CLIs, or `worker/.dev.vars` defaults unless `--no-dev-vars` is passed.
 - `npm run release:payment-smoke` runs payment contract checks. With `PAYMENT_SMOKE_ALLOW_MUTATION=1 -- --direct-webhook`, it targets only a local/non-production Worker, signs local Stripe webhook events, and verifies Store settlement.
 - `npm run backup:plan` dry-runs the backup/restore snapshot plan without writing artifacts or calling provider CLIs.
-- `npm run backup:snapshot` writes a local backup manifest and restore plan. Add `--remote`, `--kv-values`, or `--r2-objects` only when the operator is ready to handle production data.
+- `npm run backup:snapshot` writes a checksum-verified v2 manifest, canonical classification, isolated build evidence, and restore plan. Sensitive `--kv-values`, `--r2-objects`, or `--admin-exports` capture requires explicit acknowledgement and an age/GPG recipient outside the repository.
+- `npm run restore:plan -- --snapshot <dir>` verifies and plans only; provider writes require `--execute --conflict=overwrite` and target-specific gates.
+- `npm run restore:rehearse` runs the synthetic checksum/quarantine/derived-repair drill against the Podman-backed stack.
 
 Set `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` on the target Worker when running the direct payment matrix. The Worker records email delivery markers so release smoke can prove customer/admin order emails would render without calling Resend.
 

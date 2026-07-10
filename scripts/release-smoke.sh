@@ -12,11 +12,15 @@ RUN_FULFILLMENT_EVIDENCE=true
 RUN_SCREEN_READER_EVIDENCE=false
 RUN_PROVIDER_CHECKS=true
 RUN_PAYMENT_SMOKE=true
+RUN_RECOVERY_EVIDENCE=true
 USE_DEV_VARS=true
 PODMAN_E2E_MODE="auto"
 PODMAN_E2E_RAN=false
 EVIDENCE_FILE=""
 LOG_DIR="${RELEASE_SMOKE_LOG_DIR:-$(mktemp -d /tmp/store-release-smoke-logs.XXXXXX)}"
+PROVIDER_EVIDENCE_FILE="${LOG_DIR}/provider-evidence.json"
+RECOVERY_REHEARSAL_FILE="${LOG_DIR}/recovery-rehearsal.json"
+RECOVERY_READINESS_FILE="${LOG_DIR}/recovery-readiness.json"
 declare -a PHASE_RESULTS=()
 declare -a SCREEN_READER_EVIDENCE_ARGS=()
 
@@ -48,6 +52,8 @@ Options:
                          Required phrase in the Whisper transcript. Repeatable.
   --skip-provider-checks Skip read-only external provider probes.
   --skip-payment-smoke   Skip payment contract/local smoke probes.
+  --skip-recovery-evidence
+                         Skip backup readiness and Podman restore rehearsal evidence.
   --no-dev-vars          Do not let provider/payment probes read worker/.dev.vars.
                          Use this for clean-shell CI probes.
   --help                 Show this help.
@@ -55,10 +61,21 @@ Options:
 Default behavior runs the pre-merge gate, launch readiness, and Podman E2E
 when Podman is available. It also records focused accessibility evidence,
 rendered i18n/SEO evidence, Worker-backed fulfillment evidence, read-only
-provider probes, and payment smoke readiness. The screen-reader transcript
+provider probes, payment smoke readiness, and recovery evidence. The screen-reader transcript
 helper is opt-in because it depends on controlled local audio and
 assistive-technology setup.
 EOF
+}
+
+run_recovery_readiness() {
+  local -a args=(run backup:readiness -- --strict "--output=${RECOVERY_READINESS_FILE}")
+  if [ -f "$PROVIDER_EVIDENCE_FILE" ]; then
+    args+=("--provider-evidence=${PROVIDER_EVIDENCE_FILE}")
+  fi
+  if [ -f "$RECOVERY_REHEARSAL_FILE" ]; then
+    args+=("--rehearsal-evidence=${RECOVERY_REHEARSAL_FILE}")
+  fi
+  npm "${args[@]}"
 }
 
 phase_slug() {
@@ -194,10 +211,12 @@ write_evidence() {
     printf '%s\n' '- [ ] SEO: rendered canonical, hreflang, social metadata, Product JSON-LD, sitemap, robots, and private-route noindex evidence passed.'
     printf '%s\n' '- [ ] Providers: automated provider probes passed or each skip has owner/date/reason and external evidence.'
     printf '%s\n' '- [ ] Store checkout and fulfillment: automated payment and fulfillment evidence passed or each skip has owner/date/reason; signed downloads, revoke/refresh, check-in, CSV exports, webhook settlement, and failure release covered.'
+    printf '%s\n' '- [ ] Recovery: inventory audit, metadata-only backup plan, provider evidence, and representative Podman restore rehearsal passed; any missing live encrypted snapshot receipt is recorded as an operational warning rather than fabricated evidence.'
     printf '%s\n\n' '- [ ] Admin: settings, products, coupons, downloads, orders, analytics, marketing, scoped access, Spanish admin, tab persistence, and CSV exports reviewed.'
     printf '## External Evidence Gates\n\n'
     printf '%s\n' '- Production Cloudflare DNS evidence must come from the GitHub Actions workflow when local credentials cannot prove production DNS state.'
     printf '%s\n' '- External provider evidence is required for any Cloudflare, Stripe, Resend, USPS, DNS, or R2 surface skipped by automated provider probes.'
+    printf '%s\n' '- Synthetic recovery evidence does not replace an approved encrypted live snapshot, isolated decryptability check, durable off-account copy, or protected captured-data preview drill.'
     printf '%s\n\n' '- Any skipped Podman, payment, accessibility, provider, i18n/SEO, or fulfillment check must include owner, date, reason, and follow-up.'
     printf '## Sign-Off\n\n'
     printf '%s\n' '- Automated gate owner/date:'
@@ -304,6 +323,10 @@ while [ "$#" -gt 0 ]; do
       RUN_PAYMENT_SMOKE=false
       shift
       ;;
+    --skip-recovery-evidence)
+      RUN_RECOVERY_EVIDENCE=false
+      shift
+      ;;
     --no-dev-vars)
       USE_DEV_VARS=false
       shift
@@ -320,6 +343,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+mkdir -p "$LOG_DIR"
 trap finish EXIT
 
 printf '==> Store release smoke\n\n'
@@ -390,9 +414,9 @@ fi
 
 if [ "$RUN_PROVIDER_CHECKS" = "true" ]; then
   if [ "$USE_DEV_VARS" = "true" ]; then
-    run_required_phase "8. Read-only provider readiness probes" env RELEASE_USE_DEV_VARS=1 npm run release:providers
+    run_required_phase "8. Read-only provider readiness probes" env RELEASE_USE_DEV_VARS=1 npm run release:providers -- "--json-output=${PROVIDER_EVIDENCE_FILE}"
   else
-    run_required_phase "8. Read-only provider readiness probes" env RELEASE_USE_DEV_VARS=0 npm run release:providers
+    run_required_phase "8. Read-only provider readiness probes" env RELEASE_USE_DEV_VARS=0 npm run release:providers -- "--json-output=${PROVIDER_EVIDENCE_FILE}"
   fi
 else
   record_skip "8. Read-only provider readiness probes" "Skipped by --skip-provider-checks"
@@ -406,4 +430,16 @@ if [ "$RUN_PAYMENT_SMOKE" = "true" ]; then
   fi
 else
   record_skip "9. Payment smoke readiness" "Skipped by --skip-payment-smoke"
+fi
+
+if [ "$RUN_RECOVERY_EVIDENCE" = "true" ]; then
+  if podman_ready; then
+    run_required_phase "10. Representative Podman restore rehearsal" npm run restore:rehearse -- "--output=${RECOVERY_REHEARSAL_FILE}"
+  else
+    record_skip "10. Representative Podman restore rehearsal" "Podman is not available; no captured or production data was substituted"
+  fi
+  run_required_phase "11. Backup and recovery readiness evidence" run_recovery_readiness
+else
+  record_skip "10. Representative Podman restore rehearsal" "Skipped by --skip-recovery-evidence"
+  record_skip "11. Backup and recovery readiness evidence" "Skipped by --skip-recovery-evidence"
 fi

@@ -42,7 +42,7 @@ The Worker must be able to explain what happened to an order even when Stripe we
 Current state surfaces:
 
 - `orders:<orderToken>` stores the order draft, payment state, settlement state, fulfillment state, and selected Stripe IDs.
-- `admin-store-orders:index:v1` indexes Store orders for admin reads where available; order records remain the source of truth.
+- `admin-store-orders:index:v2` stores the versioned normalized admin read snapshot, latest update time, and non-PII watermark where available; order records remain the source of truth.
 - `store-order-email:*` indexes confirmed orders by customer email hash for order lookup.
 - `store-order-email-sent:*` and `store-order-admin-email-sent:*` track transactional email delivery attempts.
 - `store-inventory-overrides:v1` and `store-inventory:v1:*` store inventory baselines and derived projections.
@@ -391,7 +391,7 @@ Admin analytics and reconciliation prefer actual Stripe balance transaction data
 
 These are useful state, but they are not accounting truth:
 
-- `admin-store-orders:index:v1`
+- `admin-store-orders:index:v2`
 - `store-order-email:*`
 - `store-inventory:v1:*`
 - `store-order-email-sent:*`

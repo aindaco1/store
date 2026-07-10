@@ -29,6 +29,7 @@ ADMIN_SESSION_SECRET=
 CHECKOUT_INTENT_SECRET=
 MAGIC_LINK_SECRET=
 WORKERS_CACHE_PURGE_SECRET=
+WORKERS_CACHE_EVIDENCE_SECRET=
 TURNSTILE_SECRET_KEY=
 ADMIN_TURNSTILE_REQUIRED=false
 ADMIN_TURNSTILE_BYPASS=false
@@ -58,6 +59,7 @@ ADMIN_LOCAL_REPO_SERVICE_PORT=8799
 # GitHub Actions deploys need a separate user API token created from the
 # "Edit Cloudflare Workers" template and stored as a repository secret.
 CLOUDFLARE_API_TOKEN=
+CLOUDFLARE_ANALYTICS_API_TOKEN=
 CLOUDFLARE_ACCOUNT_ID=
 
 # Shipping and tax provider credentials.

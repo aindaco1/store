@@ -29,6 +29,7 @@ describe('workflow security posture', () => {
     expect(deploy).not.toContain("github.event_name == 'push'");
     expect(deploy).toContain('npx wrangler deploy -c wrangler.toml --env=""');
     expect(deploy).toContain('actions/deploy-pages@v5');
+    expect(deploy).toContain('group: "production-operations"');
   });
 
   it('sends media optimization changes through a pull request', () => {
@@ -64,5 +65,55 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('CLOUDFLARE_ZONE_ID');
     expect(workflow).toContain('npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars');
     expect(workflow).not.toMatch(/wrangler deploy|deploy:worker|purge_cache|contents: write|pull-requests: write/);
+  });
+
+  it('collects scheduled Workers Cache evidence without purge or configuration mutations', () => {
+    const workflow = readWorkflow('workers-cache-evidence.yml');
+
+    expect(workflow).toContain("cron: '17 3 * * *'");
+    expect(workflow).toContain("timezone: 'America/Denver'");
+    expect(workflow).toContain('environment: production-observability');
+    expect(workflow).toContain('group: production-operations');
+    expect(workflow).toContain('CLOUDFLARE_ANALYTICS_API_TOKEN');
+    expect(workflow).toContain('WORKERS_CACHE_EVIDENCE_SECRET');
+    expect(workflow).toContain('npm run cache:observability');
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).not.toMatch(/workers-cache\/purge|wrangler deploy|deploy:worker|contents: write|pull-requests: write/);
+  });
+
+  it('runs weekly recovery readiness with synthetic data and read-only provider evidence', () => {
+    const workflow = readWorkflow('recovery-readiness.yml');
+
+    expect(workflow).toContain("cron: '43 3 * * 0'");
+    expect(workflow).toContain("timezone: 'America/Denver'");
+    expect(workflow).toContain('npm run restore:rehearse');
+    expect(workflow).toContain('npm run backup:readiness');
+    expect(workflow).toContain('--cloudflare-dns-only --strict --no-dev-vars');
+    expect(workflow).toContain('SKIP_STRIPE: "true"');
+    expect(workflow).not.toMatch(/backup:snapshot|--kv-values|--r2-objects|wrangler deploy|contents: write|pull-requests: write/);
+  });
+
+  it('keeps quarterly captured-data recovery approval-gated and preview-only', () => {
+    const workflow = readWorkflow('recovery-operations.yml');
+    const drill = fs.readFileSync(path.join(repoRoot, 'scripts', 'protected-recovery-drill.sh'), 'utf8');
+
+    expect(workflow).toContain("cron: '17 4 1 1,4,7,10 *'");
+    expect(workflow).toContain("timezone: 'America/Denver'");
+    expect(workflow).toContain("vars.RECOVERY_DRILL_ENABLED == 'true'");
+    expect(workflow).toContain('environment: production-recovery');
+    expect(workflow).toContain('group: production-operations');
+    expect(workflow).toContain('STORE_BACKUP_AGE_IDENTITY');
+    expect(workflow).toContain('STORE_BACKUP_ADMIN_LOGIN_TOKEN');
+    expect(workflow).toContain('npm run recovery:traffic-preflight');
+    expect(workflow).toContain('CLOUDFLARE_WORKER_SCRIPT_NAME');
+    expect(workflow).toContain('protected-recovery-drill.sh');
+    expect(drill).toContain('--target=preview');
+    expect(drill).toContain('--preview-r2-bucket=');
+    expect(drill).toContain('--acknowledge-sensitive=STORE_SENSITIVE_BACKUP');
+    expect(drill).toContain('RESTORE_RESULT="${WORK_DIR}/restore-result.json"');
+    expect(drill).not.toContain('${EVIDENCE_DIR}/restore-result.json');
+    expect(drill).not.toContain('--target=production');
+    expect(drill).not.toContain('STORE_PRODUCTION_RESTORE');
+    expect(workflow).not.toMatch(/contents: write|pull-requests: write|wrangler deploy|deploy:worker/);
   });
 });

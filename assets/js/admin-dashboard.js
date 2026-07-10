@@ -457,7 +457,8 @@
         logoSizeError: 'Logo must be 512 KB or smaller.',
         imageSizeError: 'Image must be 8 MB or smaller.',
         noFileChosen: 'No file chosen',
-        noImageSelected: 'No image selected.'
+        noImageSelected: 'No image selected.',
+        ordersUnchanged: 'No order changes since the last refresh.'
       },
       es: {
         about: 'Acerca de',
@@ -472,7 +473,8 @@
         logoSizeError: 'El logo debe ser de 512 KB o menos.',
         imageSizeError: 'La imagen debe ser de 8 MB o menos.',
         noFileChosen: 'Ningun archivo seleccionado',
-        noImageSelected: 'Ninguna imagen seleccionada.'
+        noImageSelected: 'Ninguna imagen seleccionada.',
+        ordersUnchanged: 'No hay cambios en los pedidos desde la ultima actualizacion.'
       }
     };
     if (runtimeAdminMessages[key]) return runtimeAdminMessages[key];
@@ -883,13 +885,6 @@
     var email = currentUser.email || 'admin';
     $('#admin-session-summary').textContent = 'Signed in as ' + email;
     configureTabsForRole(currentUser);
-    loadDashboardSummary();
-  }
-
-  function loadDashboardSummary() {
-    requestJson('/admin/dashboard/summary').catch(function(error) {
-      logger.warn('Admin summary failed', error);
-    });
   }
 
   function exchangeLoginToken(token) {
@@ -3651,9 +3646,10 @@
     var status = $('#admin-store-orders-status');
     var params = orderFilters(opts.cursor || 0);
     var cacheKey = storeOrderCacheKey(params);
+    var cachedPayload = storeOrderPayloadCache.get(cacheKey);
     var requestId = ++storeOrderLoadRequestCounter;
-    if (!opts.force && !opts.append && storeOrderPayloadCache.has(cacheKey)) {
-      var cached = storeOrderPayloadCache.get(cacheKey);
+    if (!opts.force && !opts.append && cachedPayload) {
+      var cached = cachedPayload;
       storeOrdersLoaded = true;
       storeOrderNextCursor = cached && cached.page ? cached.page.nextCursor : null;
       currentStoreOrdersPayload = cached;
@@ -3661,9 +3657,31 @@
       return Promise.resolve(cached);
     }
 
+    if (opts.force && !opts.append && !params.q && cachedPayload) {
+      if (cachedPayload.latestKnownUpdatedAt) params.since = cachedPayload.latestKnownUpdatedAt;
+      if (cachedPayload.watermark) params.watermark = cachedPayload.watermark;
+    }
+
     setStatus(status, opts.append ? 'Loading more orders...' : 'Loading Store orders...');
     return requestJson('/admin/store/orders', { params: params }).then(function(data) {
       if (requestId !== storeOrderLoadRequestCounter) return data;
+      if (data && data.unchanged === true && cachedPayload) {
+        var refreshed = Object.assign({}, cachedPayload, {
+          generatedAt: data.generatedAt || cachedPayload.generatedAt,
+          latestKnownUpdatedAt: data.latestKnownUpdatedAt || cachedPayload.latestKnownUpdatedAt,
+          watermark: data.watermark || cachedPayload.watermark,
+          page: Object.assign({}, cachedPayload.page || {}, data.page || {}),
+          writeBudget: data.writeBudget || cachedPayload.writeBudget,
+          workersCache: data.workersCache || cachedPayload.workersCache
+        });
+        storeOrdersLoaded = true;
+        storeOrderNextCursor = refreshed.page ? refreshed.page.nextCursor : null;
+        currentStoreOrdersPayload = refreshed;
+        storeOrderPayloadCache.set(cacheKey, refreshed);
+        renderCurrentStoreOrders();
+        setStatus(status, localizedAdminText('ordersUnchanged'));
+        return refreshed;
+      }
       storeOrdersLoaded = true;
       storeOrderNextCursor = data.page ? data.page.nextCursor : null;
       currentStoreOrdersPayload = opts.append
@@ -3813,6 +3831,12 @@
 
   function setupStoreOrdersEvents() {
     setupStoreOrdersFieldHelp();
+    var refresh = $('#admin-store-orders-refresh');
+    if (refresh) {
+      refresh.addEventListener('click', function() {
+        loadStoreOrders({ force: true });
+      });
+    }
     var filters = $('#admin-store-order-filters');
     if (filters) {
       filters.addEventListener('submit', function(event) {

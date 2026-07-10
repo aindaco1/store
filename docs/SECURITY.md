@@ -38,13 +38,14 @@ Default posture:
 | Admin roles/scopes | Admin APIs | `super_admin` plus Store access scopes for limited admins. |
 | Optional Turnstile | Admin sign-in | Local/test bypasses are accepted only in local/test mode. |
 | API/admin recovery secrets | Operator routes | Bearer/header secrets stay in Worker secrets or ignored local files. |
+| Cache evidence secret | `POST /admin/workers-cache/evidence` | Dedicated read-only bearer; returns bounded metrics only and cannot purge or expose Store rows. |
 
 Secret storage rules:
 
 - Local development secrets belong in ignored `worker/.dev.vars`.
 - Production Worker secrets belong in Cloudflare Worker secrets via `wrangler secret put`.
 - GitHub repository secrets are for CI/deploy/operator workflows only; they are not runtime Worker secrets.
-- `WORKERS_CACHE_PURGE_SECRET` is the exception that must be present in both places with the same value: Worker runtime verifies deploy purge requests, and GitHub Actions sends the bearer token after `wrangler deploy`.
+- `WORKERS_CACHE_PURGE_SECRET` and `WORKERS_CACHE_EVIDENCE_SECRET` are narrow exceptions that must be present in both Worker and GitHub secrets with matching values. The purge secret authorizes reviewed tag targets after deploy; the evidence secret authorizes only the fixed read-only metrics probe.
 - `_config.yml`, product markdown, and admin-published settings must never contain Stripe, Resend, USPS, ZIP.TAX, Cloudflare, GitHub, or admin session secrets.
 - The admin dashboard may show configured/missing status for credentials, but must not expose, edit, serialize, or publish secret values.
 
@@ -69,20 +70,34 @@ Secret storage rules:
 | `admin-audit:{date}:{action}:{id}` | KV | Recent admin mutation audit metadata | Medium |
 | `admin-store-marketing-referrals:v1` | KV | Saved referral/UTM links | Medium |
 | `observability:*` | KV | Bounded webhook/performance telemetry summaries | Low |
+| `workers-cache-purge-failure:recent` | KV | Failure-only cache domains/status/error with seven-day TTL | Low |
+| `store_workers_cache_metrics` | Analytics Engine | Route/status/bypass, latency, response size, and expected operation counts | Low |
 | `rl:{endpoint}:{ip}` | KV | Rate-limit counters | Low |
+
+The complete backup/restore classification, including quarantine and idempotency handling, lives in `config/store-data-inventory.json` and is checked by `npm run backup:inventory:audit`.
+
+Rate-limit counters are shared through `RATELIMIT` KV and protected by a short-lived per-key queue within each Worker isolate, preventing concurrent requests handled by that isolate from overwriting one another's increments. Protected routes fail closed when the binding or counter operation is unavailable. KV is still not a globally atomic abuse ledger; use Cloudflare edge/WAF controls as an additional production layer for distributed attacks.
+
+Operator backup/cache clients accept one-time admin tokens only through environment variables, require HTTPS except for loopback development, require an origin-only Worker base, and reject normalized paths outside `/admin/`. Sensitive snapshot destinations are checked through existing filesystem ancestors to reject repository symlink targets, while checksum verification rejects unlisted files and symbolic links before restore planning.
+
+Recovery workflows separate trust levels. Weekly CI handles synthetic data and sanitized provider metadata only. The quarterly captured-data path is disabled by default, requires a Worker-wide low-traffic/error preflight, shares deployment concurrency, waits on the protected `production-recovery` environment, uses a dedicated recovery age identity plus a fresh one-time super-admin token, and hard-codes preview restore. Plaintext snapshot/decryption files and detailed restore output stay in private temporary storage and are removed on exit; only sanitized evidence and the encrypted archive may become GitHub artifacts. No workflow can invoke the production restore acknowledgement.
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
 
 Workers Cache rule:
 
 - The default Worker gateway entrypoint remains uncached so auth, CSRF, role/scope checks, rate limits, route dispatch, and mutations always run.
-- Only reviewed inner `GET`/`HEAD` entrypoints may emit cacheable responses. Today that means `CachedAdminStoreOrders` for non-search admin Orders list reads.
-- The gateway authenticates the admin before calling the cached entrypoint and sends only minimal `ctx.props` role/scope partitioning. Do not key cached admin data on `Cookie`, `Authorization`, raw session tokens, email addresses, names, CSRF tokens, or signed-link values.
+- Only routes in the reviewed `CachedAdminStoreReads` policy registry may emit cacheable inner responses: Orders, Analytics, inventory, and download readiness. Orders is enabled by default; the three additional routes default off until real-edge evidence passes.
+- The gateway authenticates the admin before calling the cached entrypoint and sends only props version, route, role, normalized scope key, and Store access scope. Do not key cached data on cookies, authorization/CSRF values, identity, search text, order tokens, or signed capabilities.
 - Browser-facing admin responses stay `private, no-store` even when the inner Workers Cache response is public-cacheable.
 - Free-text admin Orders searches bypass Workers Cache because `q` may contain customer PII or order tokens.
-- Cache tags must stay low-cardinality and non-PII. Use route/domain tags such as `admin-orders`, `orders`, `order-index`, and version tags only.
-- Purge requests to cached inner entrypoints must require trusted internal props and should be triggered from the same mutation boundaries that invalidate KV/order projections.
+- Cache tags stay low-cardinality and non-PII. The dependency map is limited to reviewed route/version plus `orders`, `order-index`, `analytics`, `inventory`, `products`, `downloads`, and `marketing` domains.
+- Purge requests require trusted internal props and originate from centralized mutation boundaries. A purge failure does not roll back a successful write; only a bounded, seven-day, non-PII failure row is stored.
 - External purge requests are limited to `POST /admin/workers-cache/purge` and require either a super-admin session with CSRF or the dedicated `WORKERS_CACHE_PURGE_SECRET`; callers cannot submit arbitrary cache tags.
+- Scheduled evidence is limited to `POST /admin/workers-cache/evidence`, requires `WORKERS_CACHE_EVIDENCE_SECRET`, and is rate-limited before it performs two fixed route reads. The response excludes Store rows, identities, order tokens, URLs, query strings, cookies, credentials, and response bodies; the credential cannot purge or change cache switches.
+- `STORE_CACHE_METRICS` receives one bounded Analytics Engine point after an eligible authenticated gateway read when telemetry is enabled. Its schema is fixed to route, cache status/bypass, enabled state, latency, response bytes, and expected Workers/KV/R2/provider operations. Analytics Engine replaces per-hit KV counters and can be disabled independently with `WORKERS_CACHE_TELEMETRY_ENABLED=false`.
+- `WORKERS_CACHE_ENABLED` is the global runtime kill switch, route switches can bypass immediately, and `cross_version_cache` remains off so deploy versions do not share entries.
+- Browser refresh watermarks are deterministic hashes only. Order payloads and customer PII remain in memory and are never added to `localStorage` or `sessionStorage`.
 
 Browser storage:
 

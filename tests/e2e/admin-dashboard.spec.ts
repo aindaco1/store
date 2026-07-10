@@ -360,10 +360,10 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         success: true,
         target: body.target || 'admin_orders',
         purges: [{
-          entrypoint: 'CachedAdminStoreOrders',
+          entrypoint: 'CachedAdminStoreReads',
           ok: true,
           status: 200,
-          tags: ['admin-orders', 'orders', 'order-index', 'admin-orders-v1'],
+          tags: ['admin-store-reads', 'orders', 'order-index'],
           purgedAt: '2026-07-09T00:00:00.000Z'
         }],
         writeBudget: { readOnly: false, kvWritesExpected: 1 }
@@ -836,7 +836,11 @@ function storeSettingsSections(lang = 'en') {
       settingsRow({ label: 'Intent prefetch delay ms', value: '90', rawValue: '90', editable: true, path: 'performance.intent_prefetch_delay_ms', type: 'number', input: 'integer', min: 0, step: 10 }),
       settingsRow({ label: 'Intent prefetch limit', value: '3', rawValue: '3', editable: true, path: 'performance.intent_prefetch_limit', type: 'number', input: 'integer', min: 0, step: 1 }),
       settingsRow({ label: 'Live inventory cache TTL seconds', value: '300', rawValue: '300', editable: true, path: 'cache.live_inventory_ttl_seconds', type: 'number', input: 'integer' }),
-      settingsRow({ label: 'Workers Cache admin Orders enabled', value: 'true', rawValue: 'true', editable: true, path: 'cache.workers_admin_orders_enabled', type: 'boolean', input: 'boolean' })
+      settingsRow({ label: 'Workers Cache enabled', value: 'true', rawValue: 'true', editable: true, path: 'cache.workers_enabled', type: 'boolean', input: 'boolean' }),
+      settingsRow({ label: 'Workers Cache admin Orders enabled', value: 'true', rawValue: 'true', editable: true, path: 'cache.workers_admin_orders_enabled', type: 'boolean', input: 'boolean' }),
+      settingsRow({ label: 'Workers Cache admin Analytics enabled', value: 'false', rawValue: 'false', editable: true, path: 'cache.workers_admin_analytics_enabled', type: 'boolean', input: 'boolean' }),
+      settingsRow({ label: 'Workers Cache admin Inventory enabled', value: 'false', rawValue: 'false', editable: true, path: 'cache.workers_admin_inventory_enabled', type: 'boolean', input: 'boolean' }),
+      settingsRow({ label: 'Workers Cache admin Downloads enabled', value: 'false', rawValue: 'false', editable: true, path: 'cache.workers_admin_downloads_enabled', type: 'boolean', input: 'boolean' })
     ]
   }, {
     title: 'Secrets & credentials',
@@ -853,6 +857,9 @@ function storeSettingsSections(lang = 'en') {
       settingsRow({ label: 'CORS allowed origin', value: SITE_BASE }),
       settingsRow({ label: 'Workers Cache gateway', value: 'disabled' }),
       settingsRow({ label: 'Workers Cache admin Orders', value: 'enabled' }),
+      settingsRow({ label: 'Workers Cache admin Analytics', value: 'disabled' }),
+      settingsRow({ label: 'Workers Cache admin Inventory', value: 'disabled' }),
+      settingsRow({ label: 'Workers Cache admin Download readiness', value: 'disabled' }),
       settingsRow({ label: 'Workers Cache controls', value: '', rawValue: '', input: 'workers-cache-controls', hideLabel: true })
     ]
   }];
@@ -1144,8 +1151,27 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
         },
         events: []
       };
+  const watermark = Object.keys(checkIns).length
+    ? 'orders-v2-1111111111111111'
+    : 'orders-v2-0000000000000000';
+  if (!query && params.watermark === watermark) {
+    return {
+      scope: 'store',
+      unchanged: true,
+      latestKnownUpdatedAt: '2026-06-11T12:10:00.000Z',
+      watermark,
+      page: {
+        watermark,
+        latestKnownUpdatedAt: '2026-06-11T12:10:00.000Z'
+      },
+      writeBudget: { readOnly: true, kvWritesExpected: 0 }
+    };
+  }
   return {
     scope: 'store',
+    unchanged: false,
+    latestKnownUpdatedAt: '2026-06-11T12:10:00.000Z',
+    watermark,
     orders,
     totals: {
       orders: orders.length,
@@ -1161,7 +1187,9 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       returned: orders.length,
       matched: fulfillments.length,
       matchedOrders: orders.length,
-      nextCursor: null
+      nextCursor: null,
+      latestKnownUpdatedAt: '2026-06-11T12:10:00.000Z',
+      watermark
     },
     attendance,
     fulfillments,
@@ -1738,7 +1766,7 @@ test.describe('Admin Dashboard', () => {
 	      'Analytics',
 	      'Marketing'
 	    ]);
-	    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+	    expect(calls.summary).toHaveLength(0);
 	    await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
 	    await expect(page.locator('#admin-settings-section-tabs [data-settings-section-label="Marketing"]')).toHaveCount(0);
 	    await expect(page.locator('#admin-settings-section-tabs [data-settings-section-label="Analytics"]')).toHaveCount(0);
@@ -1982,7 +2010,11 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_enabled"]')).toHaveValue('true');
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_delay_ms"]')).toHaveValue('90');
     await expect(page.locator('[data-settings-path="performance.intent_prefetch_limit"]')).toHaveValue('3');
+    await expect(page.locator('[data-settings-path="cache.workers_enabled"]')).toHaveValue('true');
     await expect(page.locator('[data-settings-path="cache.workers_admin_orders_enabled"]')).toHaveValue('true');
+    await expect(page.locator('[data-settings-path="cache.workers_admin_analytics_enabled"]')).toHaveValue('false');
+    await expect(page.locator('[data-settings-path="cache.workers_admin_inventory_enabled"]')).toHaveValue('false');
+    await expect(page.locator('[data-settings-path="cache.workers_admin_downloads_enabled"]')).toHaveValue('false');
 
     await selectSettingsSection(page, 'Users');
     const adminUsersEditor = page.locator('[data-settings-path="admin.users"]');
@@ -2051,6 +2083,12 @@ test.describe('Admin Dashboard', () => {
       });
     })).toBe(true);
     const ticketRow = page.locator('#admin-store-orders-results tbody tr').filter({ hasText: TICKET_ORDER_TOKEN });
+    const storeOrdersBeforeRefresh = calls.storeOrders.length;
+    await page.locator('#admin-store-orders-refresh').click();
+    await expect.poll(() => calls.storeOrders.length).toBeGreaterThan(storeOrdersBeforeRefresh);
+    expect(calls.storeOrders.at(-1)).toMatchObject({ watermark: 'orders-v2-0000000000000000' });
+    await expect(page.locator('#admin-store-orders-status')).toContainText('No order changes since the last refresh.');
+    await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
     const storeOrdersBeforeCheckIn = calls.storeOrders.length;
     await ticketRow.getByRole('button', { name: 'Check in' }).click();
     await expect.poll(() => calls.storeOrderCheckIns.length).toBe(1);
@@ -2871,7 +2909,7 @@ test.describe('Admin Dashboard', () => {
 
     await page.goto('/es/admin/?admin_login=admin-token-es-tablet');
     await expect(page.locator('#admin-app')).toBeVisible();
-    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    expect(calls.summary).toHaveLength(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
     await expect(calls.settings[0].params).toMatchObject({ preferredLang: 'es' });
 
@@ -2913,7 +2951,7 @@ test.describe('Admin Dashboard', () => {
 
     await page.goto('/admin/?admin_login=admin-token-products-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
-    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    expect(calls.summary).toHaveLength(0);
 
     await selectAdminSection(page, 'Products');
     await expect.poll(() => calls.storeProducts.length).toBe(1);
@@ -2968,7 +3006,7 @@ test.describe('Admin Dashboard', () => {
 
     await page.goto('/admin/?admin_login=admin-token-orders-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
-    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    expect(calls.summary).toHaveLength(0);
 
     await selectAdminSection(page, 'Orders');
     await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
@@ -3028,7 +3066,7 @@ test.describe('Admin Dashboard', () => {
 
     await page.goto('/admin/?admin_login=admin-token-downloads-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
-    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    expect(calls.summary).toHaveLength(0);
 
     await selectAdminSection(page, 'Downloads');
     await expect.poll(() => calls.storeDownloads.length).toBe(1);
@@ -3102,7 +3140,7 @@ test.describe('Admin Dashboard', () => {
     await page.goto('/admin/?admin_login=admin-token-text-scale');
     await expect(page.locator('#admin-app')).toBeVisible();
     await applyTextScale(page);
-    await expect.poll(() => calls.summary.length).toBeGreaterThan(0);
+    expect(calls.summary).toHaveLength(0);
     await expectNoHorizontalOverflow(page);
 
     await selectAdminSection(page, 'Products');

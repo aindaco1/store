@@ -1,6 +1,6 @@
 # Testing
 
-The current `v1.0.6` release gate keeps Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering, and adds Workers Cache plus backup/restore coverage. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
+The current post-`v1.0.6` gate keeps Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering, and extends Workers Cache plus backup/restore coverage. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -13,6 +13,8 @@ npm run test:seo
 npm run test:content-security
 npm run test:security
 npm run backup:plan
+npm run backup:inventory:audit
+npm run restore:rehearse
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 npm run test:e2e:headless
 ```
@@ -47,7 +49,12 @@ Focused Store runs:
 ```bash
 npx vitest run \
   tests/unit/workers-cache-policy.test.ts \
+  tests/unit/workers-cache-endpoints.test.ts \
+  tests/unit/workers-cache-benchmark.test.ts \
+  tests/unit/admin-store-read-model.test.ts \
   tests/unit/store-backup-script.test.ts \
+  tests/unit/store-restore-script.test.ts \
+  tests/unit/store-data-inventory.test.ts \
   tests/unit/store-catalog.test.ts \
   tests/unit/store-coupons.test.ts \
   tests/unit/shipping.test.ts \
@@ -67,13 +74,13 @@ npm run test:content-security
 npm run test:security
 ```
 
-The default security suite starts or reuses the Podman Storefront and Worker stack through `npm run test:security:podman`. It checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and rate-limit behavior. Use `npm run test:security:host` only when you intentionally want to target an already-running host Worker.
+The default security suite starts or reuses the Podman Storefront and Worker stack through `npm run test:security:podman`. It runs files serially against the shared Worker and checks Store admin auth boundaries, cart/checkout input validation, oversized payload rejection, Stripe webhook signature enforcement, CORS preflight resilience, and concurrent rate-limit behavior. Use `npm run test:security:host` only when you intentionally want to target an already-running host Worker.
 
 Podman-backed security, Worker smoke, and headless E2E wrappers reset local Wrangler state for their isolated stack before running. This avoids stale Miniflare SQLite state from turning `RATELIMIT` reads into false `503` failures while leaving normal manual `./scripts/dev.sh --podman` state intact.
 
-Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`. It checks admin Orders request normalization, credential stripping, search bypasses, kill-switch behavior, non-PII role/scope props, cacheable inner response headers, shared purge helpers, and internal-props enforcement for cache purges.
+Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`, `tests/unit/workers-cache-endpoints.test.ts`, `tests/unit/workers-cache-benchmark.test.ts`, `tests/unit/workers-cache-telemetry.test.ts`, `tests/unit/workers-cache-observability.test.ts`, and `tests/unit/admin-store-read-model.test.ts`. It checks canonical request normalization, watermark validation and no-change/full responses, credential stripping, role/scope isolation, global/route/telemetry switches, search and unsafe-route bypasses, TTL/header/tag policy, mutation dependencies, scoped evidence authorization, Analytics Engine field minimization, aggregate hit ratios/traffic gates, entrypoint/purge failure fallback, operation budgets, benchmark comparison gates, and evidence redaction.
 
-Backup automation coverage lives in `tests/unit/store-backup-script.test.ts`. It checks KV prefix classification, Wrangler inventory parsing, command generation, KV restore-shape transforms, download key discovery, secret inventory redaction, and dry-run behavior.
+Backup and restore coverage lives in `tests/unit/store-backup-script.test.ts`, `tests/unit/store-restore-script.test.ts`, `tests/unit/store-data-inventory.test.ts`, `tests/unit/restore-rehearsal.test.ts`, `tests/unit/backup-readiness.test.ts`, `tests/unit/backup-retention.test.ts`, and `tests/unit/recovery-traffic-preflight.test.ts`. It checks canonical storage-family coverage, maintained Wrangler TOML parsing, private permissions, checksum manifests, encryption/acknowledgement gates, admin/R2 discovery, secret-name redaction, representative Store classes, KV restore transforms, quarantine exclusions, production interlocks, explicit/distinct preview R2 targets, derived repair planning, retention protection and pre-delete revalidation, evidence ages, Worker-wide traffic/error gates, command generation, temporary detailed restore output, and dry-run behavior. `npm run restore:rehearse` adds the representative Podman-backed restore/Worker probe without touching production resources.
 
 ## SEO
 
@@ -100,7 +107,7 @@ For changes that trigger [ETHICAL_RISK.md](ETHICAL_RISK.md), record the review r
 npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 ```
 
-The release smoke wrapper reuses the pre-merge gate, runs launch readiness, runs the Podman headless E2E path when Podman is available, records accessibility automation evidence, runs optional VoiceOver/Whisper transcript evidence when requested, runs rendered i18n/SEO evidence, runs Worker fulfillment evidence, runs read-only provider probes, runs payment smoke readiness, and writes a Markdown evidence file with sign-off placeholders for accessibility, i18n, Podman, SEO, providers, checkout/fulfillment, and admin review. Use `--podman-e2e` to require Podman on the current host and `--skip-podman-e2e` only with a documented environment reason.
+The release smoke wrapper reuses the pre-merge gate, runs launch readiness, runs the Podman headless E2E path when Podman is available, records accessibility automation evidence, runs optional VoiceOver/Whisper transcript evidence when requested, runs rendered i18n/SEO evidence, runs Worker fulfillment evidence, runs read-only provider probes, runs payment smoke readiness, then records the representative Podman restore rehearsal and backup/recovery readiness. The Markdown evidence includes recovery alongside accessibility, i18n, Podman, SEO, providers, checkout/fulfillment, and admin review. Use `--podman-e2e` to require Podman and `--skip-recovery-evidence` only with a documented environment reason.
 
 Focused release commands are also available when a gate needs to be rerun independently:
 
@@ -111,6 +118,10 @@ npm run release:i18n-seo-evidence
 npm run release:fulfillment-evidence
 npm run release:providers
 npm run release:payment-smoke
+npm run backup:readiness
+npm run restore:rehearse
+npm run cache:observability
+npm run recovery:traffic-preflight
 ```
 
 `npm run release:i18n-seo-evidence` rebuilds the rendered site, runs the i18n and SEO test suites, and samples English/Spanish public, product, order, admin, sitemap, and robots routes for canonical, hreflang, noindex, copy, and Product JSON-LD expectations. `npm run release:fulfillment-evidence` runs an in-process Worker with mock KV/R2 data and proves signed downloads, download revoke/refresh, ticket/RSVP check-in, order CSV, attendee CSV, reconciliation CSV, and audit CSV behavior without calling external providers.

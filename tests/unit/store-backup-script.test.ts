@@ -6,20 +6,29 @@ import { describe, expect, it } from 'vitest';
 import {
   KV_BACKUP_PREFIXES,
   KV_QUARANTINE_PREFIXES,
+  KV_VALUE_BACKUP_PREFIXES,
   buildKvBackupPlan,
   buildSecretInventory,
   createBackupSnapshot,
   discoverDownloadKeys,
   parseWranglerTomlInventory,
-  transformKvBulkGetToPutRecords
+  resolveR2BackupObjectPath,
+  transformKvBulkGetToPutRecords,
+  validateBackupSafety
 } from '../../scripts/store-backup.mjs';
+import { verifyChecksumManifest } from '../../scripts/lib/file-integrity.mjs';
+import { loadStoreDataInventory } from '../../scripts/lib/store-data-inventory.mjs';
 
 describe('store backup script', () => {
   it('classifies authoritative and quarantine KV prefixes explicitly', () => {
     expect(KV_BACKUP_PREFIXES).toContain('orders:');
-    expect(KV_BACKUP_PREFIXES).toContain('admin-store-orders:index:v1');
+    expect(KV_BACKUP_PREFIXES).toContain('admin-store-orders:index:v2');
     expect(KV_BACKUP_PREFIXES).toContain('store-coupons:v1');
     expect(KV_BACKUP_PREFIXES).toContain('abandoned-cart-suppressed:');
+    expect(KV_BACKUP_PREFIXES).toContain('stripe-event:');
+    expect(KV_BACKUP_PREFIXES).toContain('store-order-admin-email-sent:');
+    expect(KV_VALUE_BACKUP_PREFIXES).toContain('orders:');
+    expect(KV_VALUE_BACKUP_PREFIXES).not.toContain('admin-store-orders:index:v2');
     expect(KV_QUARANTINE_PREFIXES).toContain('admin-session:');
     expect(KV_QUARANTINE_PREFIXES).toContain('rl:');
     expect(KV_QUARANTINE_PREFIXES).toContain('store-order-lookup:');
@@ -35,10 +44,10 @@ compatibility_flags = ["nodejs_compat"]
 [cache]
 enabled = false
 
-[exports.CachedAdminStoreOrders]
+[exports.CachedAdminStoreReads]
 type = "worker"
 
-  [exports.CachedAdminStoreOrders.cache]
+  [exports.CachedAdminStoreReads.cache]
   enabled = true
 
 [[kv_namespaces]]
@@ -56,7 +65,7 @@ preview_bucket_name = "store-downloads-preview"
     expect(inventory.compatibilityDate).toBe('2026-07-09');
     expect(inventory.compatibilityFlags).toEqual(['nodejs_compat']);
     expect(inventory.cache).toMatchObject({ enabled: false, crossVersionCache: false });
-    expect(inventory.cachedExports).toEqual(['CachedAdminStoreOrders']);
+    expect(inventory.cachedExports).toEqual(['CachedAdminStoreReads']);
     expect(inventory.kvNamespaces[0]).toMatchObject({ binding: 'STORE_STATE', id: 'state-id' });
     expect(inventory.r2Buckets[0]).toMatchObject({ binding: 'STORE_DOWNLOADS', bucket_name: 'store-downloads' });
   });
@@ -78,6 +87,16 @@ preview_bucket_name = "store-downloads-preview"
       'npx',
       ['wrangler', 'kv', 'bulk', 'get', 'kv/orders.keys.json', '--remote', '--binding', 'STORE_STATE']
     ]);
+  });
+
+  it('does not export derived KV values when a value allowlist is supplied', () => {
+    const plan = buildKvBackupPlan(['orders:', 'admin-store-orders:index:v2'], {
+      includeValues: true,
+      valuePrefixes: ['orders:']
+    });
+    expect(plan[0].valuesFile).toBe('kv/orders.values.json');
+    expect(plan[1].valuesFile).toBe('');
+    expect(plan[1].commands).toHaveLength(1);
   });
 
   it('transforms Wrangler KV bulk get output to bulk put records', () => {
@@ -108,6 +127,16 @@ Body.
     expect(discoverDownloadKeys(root)).toEqual(['downloads/file-one.pdf', 'downloads/file-two.zip']);
   });
 
+  it('keeps R2 object paths inside the private snapshot directory', () => {
+    const objectsDir = path.join(os.tmpdir(), 'store-r2-object-paths');
+    expect(resolveR2BackupObjectPath(objectsDir, 'downloads/releases/file.pdf')).toBe(
+      path.join(objectsDir, 'downloads', 'releases', 'file.pdf')
+    );
+    expect(() => resolveR2BackupObjectPath(objectsDir, '../outside.pdf')).toThrow(/safely/i);
+    expect(() => resolveR2BackupObjectPath(objectsDir, 'downloads//file.pdf')).toThrow(/safely/i);
+    expect(() => resolveR2BackupObjectPath(objectsDir, 'downloads\\file.pdf')).toThrow(/safely/i);
+  });
+
   it('records secret presence without exporting values', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-backup-secrets-'));
     const devVars = path.join(root, '.dev.vars');
@@ -135,13 +164,77 @@ Body.
       output,
       dryRun: true,
       remote: false,
-      skipGitBundle: true
+      skipGitBundle: true,
+      skipBuild: true
     });
 
     expect(manifest.dryRun).toBe(true);
+    expect(manifest.version).toBe(2);
     expect(manifest.remote).toBe(false);
     expect(manifest.commands.some((command) => command.label === 'git status.txt')).toBe(true);
     expect(manifest.warnings).toContain('Remote provider inventory skipped; rerun with --remote for read-only Wrangler/GitHub/Stripe probes.');
     expect(fs.existsSync(output)).toBe(false);
+  });
+
+  it('requires explicit acknowledgement, encryption, and an external path for sensitive snapshots', () => {
+    const unsafe = validateBackupSafety({ remote: true, kvValues: true }, path.join(process.cwd(), 'backup-output'));
+    expect(unsafe.ok).toBe(false);
+    expect(unsafe.errors).toEqual(expect.arrayContaining([
+      expect.stringContaining('acknowledge-sensitive'),
+      expect.stringContaining('encryption-recipient'),
+      expect.stringContaining('inside the repository')
+    ]));
+    expect(validateBackupSafety({
+      remote: true,
+      kvValues: true,
+      acknowledgeSensitive: 'STORE_SENSITIVE_BACKUP',
+      encryptionRecipient: 'operator@example.com',
+      encryptionBackend: 'gpg'
+    }, process.cwd())).toMatchObject({ ok: false });
+    expect(validateBackupSafety({
+      remote: true,
+      adminExports: true,
+      acknowledgeSensitive: 'STORE_SENSITIVE_BACKUP',
+      encryptionRecipient: 'operator@example.com',
+      encryptionBackend: 'gpg'
+    }, path.join(os.homedir(), 'store-backups', 'safe'))).toMatchObject({ ok: true, sensitive: true });
+  });
+
+  it('writes private checksum-verified metadata snapshots', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-backup-checksum-'));
+    const output = path.join(root, 'snapshot');
+    const manifest = await createBackupSnapshot({
+      output,
+      remote: false,
+      skipGitBundle: true,
+      skipFileCopy: true,
+      skipBuild: true
+    });
+    const checksumFile = JSON.parse(fs.readFileSync(path.join(output, 'checksums.json'), 'utf8'));
+
+    expect(manifest.version).toBe(2);
+    expect(manifest.artifacts.length).toBeGreaterThan(0);
+    expect(verifyChecksumManifest(output, checksumFile.artifacts)).toMatchObject({ ok: true });
+    expect(fs.statSync(output).mode & 0o777).toBe(0o700);
+    expect(fs.statSync(path.join(output, 'manifest.json')).mode & 0o777).toBe(0o600);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it('loads a complete canonical data inventory', () => {
+    const inventory = loadStoreDataInventory();
+    expect(inventory.families.find((family: any) => family.id === 'store-downloads')).toMatchObject({
+      binding: 'STORE_DOWNLOADS',
+      classification: 'authoritative'
+    });
+    expect(inventory.families.find((family: any) => family.id === 'marketing-draft')).toMatchObject({
+      classification: 'ephemeral-quarantined',
+      restoreDefault: 'quarantine'
+    });
+    expect(inventory.families.find((family: any) => family.id === 'workers-cache-metrics')).toMatchObject({
+      binding: 'STORE_CACHE_METRICS',
+      type: 'analytics-engine',
+      classification: 'incident-evidence',
+      restoreDefault: 'do-not-restore'
+    });
   });
 });

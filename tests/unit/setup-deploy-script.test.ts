@@ -5,6 +5,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
 const sourceSetupScript = path.join(repoRoot, 'scripts', 'setup-deploy.mjs');
+const sourceCommandRunner = path.join(repoRoot, 'scripts', 'lib', 'command-runner.mjs');
 
 function writeExecutable(filePath: string, body: string) {
   fs.writeFileSync(filePath, body, 'utf8');
@@ -25,12 +26,15 @@ ${body}
 function createTempSetupRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-setup-deploy-'));
   const scriptsDir = path.join(root, 'scripts');
+  const scriptsLibDir = path.join(scriptsDir, 'lib');
   const workerDir = path.join(root, 'worker');
   const binDir = path.join(root, 'fake-bin');
   fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.mkdirSync(scriptsLibDir, { recursive: true });
   fs.mkdirSync(workerDir, { recursive: true });
   fs.mkdirSync(binDir, { recursive: true });
   fs.copyFileSync(sourceSetupScript, path.join(scriptsDir, 'setup-deploy.mjs'));
+  fs.copyFileSync(sourceCommandRunner, path.join(scriptsLibDir, 'command-runner.mjs'));
   fs.writeFileSync(path.join(scriptsDir, 'sync-worker-config.rb'), 'puts "synced"\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, '.dev.vars.example'), '# local dev secrets\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, 'wrangler.toml'), `name = "store-worker"
@@ -204,7 +208,8 @@ describe('setup-deploy script', () => {
       'CHECKOUT_INTENT_SECRET',
       'MAGIC_LINK_SECRET',
       'STORE_DOWNLOAD_SECRET',
-      'WORKERS_CACHE_PURGE_SECRET'
+      'WORKERS_CACHE_PURGE_SECRET',
+      'WORKERS_CACHE_EVIDENCE_SECRET'
     ]) {
       expect(devVars).toMatch(new RegExp(`${key}=[a-f0-9]{64}`));
     }
@@ -232,6 +237,7 @@ describe('setup-deploy script', () => {
     expect(log).toContain('npx wrangler secret put ADMIN_SECRET');
     expect(log).toContain('npx wrangler secret put STORE_DOWNLOAD_SECRET');
     expect(log).toContain('npx wrangler secret put WORKERS_CACHE_PURGE_SECRET');
+    expect(log).toContain('npx wrangler secret put WORKERS_CACHE_EVIDENCE_SECRET');
     expect(log).not.toContain('npx wrangler secret put STRIPE_SECRET_KEY');
     expect(log).not.toContain('gh secret set');
   });

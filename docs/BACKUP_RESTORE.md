@@ -1,221 +1,244 @@
-# Backup And Restore
+# Backup, Restore, And Disaster Recovery
 
-This runbook covers Store-owned data that is not already recoverable from a normal deploy: Cloudflare KV state, R2 download objects, and Git product/config history.
+This runbook covers Store Git/config/build artifacts, Cloudflare KV, private R2 downloads, provider evidence, and guarded recovery. Do not commit snapshots, exports, decrypted archives, or customer data.
 
-Do not commit backup files to this repository. Store exports in an encrypted operator location with restricted access.
+## Recovery Objectives
 
-References:
+The machine-readable source of truth is [`config/store-data-inventory.json`](../config/store-data-inventory.json). `npm run backup:inventory:audit` compares known Worker storage families with that inventory.
 
-- [Cloudflare Wrangler KV commands](https://developers.cloudflare.com/kv/reference/kv-commands/)
-- [Cloudflare Wrangler R2 commands](https://developers.cloudflare.com/r2/reference/wrangler-commands/)
+Initial objectives:
 
-## What To Back Up
+| Data | RPO | RTO |
+| --- | --- | --- |
+| Git/config/build artifacts | every release | 1 hour |
+| Orders, payment/fulfillment, admin state | every 4 hours during active sales | 4 hours |
+| R2 objects | after create/replace and before delete | 4 hours |
+| Bulk import, restore, inventory reset, provider migration | pre-change snapshot | 1 hour |
 
-Back up these before major production releases, after production smoke, before bulk admin changes, and before replacing production downloads:
+Recommended retention is 7 daily, 5 weekly, and 12 monthly encrypted snapshots plus release snapshots. Keep at least one verified copy outside the production Cloudflare account and off the primary operator device.
 
-- Git history: `_products/`, `_config.yml`, localized public source pages, `api/products.json`, `worker/src/generated/catalog-snapshot.js`, and the commit hash deployed to the storefront and Worker.
-- `STORE_STATE` KV authoritative records: `orders:`, `admin-store-orders:index:v1`, `store-inventory-overrides:v1`, `store-inventory:v1:`, `store-coupons:v1`, `add-on-inventory-overrides`, `add-on-inventory-sold:v1`, `admin-users:v1`, `admin-user:`, `admin-audit:`, `store-order-email:`, `store-order-email-sent:`, `admin-store-marketing-referrals:v1`, and reminder queue/sent records.
-- `STORE_DOWNLOADS` R2 objects referenced by active product `download.file_key` values.
-- Operator exports: Store orders CSV, attendee CSV, reconciliation CSV, audit CSV, release notes, configured Cloudflare resource IDs, Stripe webhook endpoint ID, coupon/referral review notes, and manual inventory adjustments.
+These objectives and retention counts remain provisional until the business/operator owner records approval. Automation enforces the checked-in values but does not manufacture that approval.
 
-Do not restore ephemeral records unless you are deliberately debugging an incident:
+## Data Classes
 
-- `admin-session:` and `admin-login:` records, including one-time super-admin order notification login links.
-- `rl:` rate-limit records.
-- `store-order-lookup:` one-time tokens.
-- `abandoned-cart-resume:` signed resume snapshots, unless you are reconstructing reminder behavior.
-- `abandoned-cart-suppressed:` suppression records are usually user preference records; restore them only when preserving suppression state is required and privacy review has approved it.
-- Stripe webhook idempotency markers, unless replay behavior is the incident being repaired.
-- `cron:lastRun` and `cron:lastError`, unless restoring an isolated local/Podman rehearsal namespace for diagnostics.
-- `observability:` summaries, unless restoring them for incident review.
+- **Authoritative:** `orders:`, inventory overrides, coupons, admin users, saved referrals, reminder suppressions, and `STORE_DOWNLOADS` objects.
+- **Idempotency/control:** `stripe-event:`, customer/admin email sent markers, abandoned-cart sent markers, and event-reminder sent markers. Restore these before unpausing webhooks/email jobs to prevent duplicate side effects.
+- **Derived/rebuildable:** `admin-store-orders:index:v2`, inventory projections, email lookup indexes, queue summaries, health rows, and address lookup cache. Do not restore these as authoritative records.
+- **Incident evidence:** admin audit and selected observability/purge-failure records. Restore only when incident retention requires it.
+- **Ephemeral/quarantined:** sessions, login nonces, rate limits, one-time lookup/resume capabilities, pending reminder records, marketing drafts, and cron markers. Never restore them to production.
 
-Durable Object inventory state should be treated as derived live state. Restore orders and inventory overrides first, then verify inventory through the admin dashboard rather than writing Durable Object storage directly.
+Durable Object inventory reservations are live derived state. Restore orders and inventory overrides, then reconcile the coordinator; do not import Durable Object storage directly.
 
-## Backup Directory
+## Snapshot Modes
 
-Use the snapshot helper for the normal plan and local artifact structure:
+Dry-run first:
 
 ```bash
 npm run backup:plan
+```
+
+A local metadata snapshot writes a v2 manifest, private `0700` directories/`0600` files, SHA-256 artifact checksums, Git head/status/diff/bundle, selected config files, isolated Jekyll/minification/Wrangler dry-run build evidence, canonical KV classification, secret-name presence without values, and a restore plan:
+
+```bash
 npm run backup:snapshot -- --output "$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-The helper writes a manifest, Git status/head/diff details, an optional Git bundle, selected config/build files, Wrangler cache/KV/R2 inventory, secret presence inventory without values, KV backup classification, R2 download key inventory, and a generated restore plan. It does not call remote provider APIs unless `--remote` is passed.
+Pass `--release-snapshot` for an encrypted release snapshot that the retention planner must preserve.
 
-Remote reads are opt-in:
-
-```bash
-npm run backup:snapshot -- --remote
-npm run backup:snapshot -- --remote --kv-values
-npm run backup:snapshot -- --remote --r2-objects
-```
-
-`--kv-values` can export customer/order/admin data and `--r2-objects` can download private fulfillment files. Store those snapshots only outside the repository in encrypted operator storage. The helper never exports production secret values.
-
-Manual fallback from the repository root:
+Read-only remote metadata adds Worker deployments/versions/secret names, shared provider readiness, and KV key inventories:
 
 ```bash
-export STORE_BACKUP_DIR="$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$STORE_BACKUP_DIR"/{exports,git,kv,r2}
-git rev-parse HEAD > "$STORE_BACKUP_DIR/git/store-head.txt"
-git bundle create "$STORE_BACKUP_DIR/git/store.bundle" --all
-git status --short > "$STORE_BACKUP_DIR/git/status.txt"
-git diff --binary > "$STORE_BACKUP_DIR/git/worktree.patch"
+npm run backup:snapshot -- --remote --output "$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-If `git status --short` is not clean, read `status.txt` before relying on the bundle as a full catalog backup. Untracked files are not included in a bundle.
+Cloudflare KV key listing is billable even when values are not exported. R2 listing is Class A; object head/get is Class B. Do not schedule remote inventory more frequently than the recovery objective requires.
 
-## KV Backup
+## Sensitive Snapshot
 
-Run Wrangler commands from `worker/`. Production commands use the root environment and `--remote`; local verification can add `--env dev --local`.
+`--kv-values`, `--r2-objects`, and `--admin-exports` are sensitive. They require:
+
+- an output path outside this repository
+- `--acknowledge-sensitive=STORE_SENSITIVE_BACKUP`
+- an age or GPG recipient
+- local decryptability verification before plaintext staging is deleted
+- `STORE_BACKUP_ADMIN_LOGIN_TOKEN` in the environment for admin exports; never pass the token as a CLI argument
+
+The helper resolves existing output ancestors before accepting the destination, so a symlink into the repository is rejected as well. R2 keys must map to contained snapshot paths; unsafe `..`, empty-segment, backslash, or NUL forms stop capture. The temporary plaintext tar is always `0600` and is removed even when encryption or decryptability verification fails; the private staging directory remains for operator recovery.
+
+Example with a GPG recipient that has a locally available secret key for verification:
 
 ```bash
-cd worker
+export STORE_BACKUP_ADMIN_LOGIN_TOKEN='<fresh-one-time-super-admin-token>'
+export STORE_BACKUP_ENCRYPTION_RECIPIENT='<gpg-key-id-or-email>'
 
-for prefix in \
-  'orders:' \
-  'admin-store-orders:index:v1' \
-  'store-inventory-overrides:v1' \
-  'store-inventory:v1:' \
-  'store-coupons:v1' \
-  'add-on-inventory-overrides' \
-  'add-on-inventory-sold:v1' \
-  'admin-users:v1' \
-  'admin-user:' \
-  'admin-audit:' \
-  'store-order-email:' \
-  'store-order-email-sent:' \
-  'admin-store-marketing-referrals:v1' \
-  'abandoned-cart:' \
-  'abandoned-cart-sent:' \
-  'abandoned-cart-suppressed:' \
-  'abandoned-cart-queue:v1' \
-  'abandoned-cart-health:v1' \
-  'store-event-reminder:' \
-  'store-event-reminder-sent:' \
-  'store-event-reminder-queue:v1'
-do
-  safe_prefix=$(printf '%s' "$prefix" | tr -c 'A-Za-z0-9._-' '_')
-  keys_file="$STORE_BACKUP_DIR/kv/${safe_prefix}.keys.json"
-  values_file="$STORE_BACKUP_DIR/kv/${safe_prefix}.values.json"
-  npx wrangler kv key list --remote --binding STORE_STATE --prefix "$prefix" > "$keys_file"
-  npx wrangler kv bulk get "$keys_file" --remote --binding STORE_STATE > "$values_file"
-done
+npm run backup:snapshot -- \
+  --remote \
+  --kv-values \
+  --r2-objects \
+  --admin-exports \
+  --worker-base=https://checkout.example.com \
+  --acknowledge-sensitive=STORE_SENSITIVE_BACKUP \
+  --encryption-backend=gpg \
+  --encryption-recipient="$STORE_BACKUP_ENCRYPTION_RECIPIENT" \
+  --output="$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
-`kv key list` outputs objects with `name`; `kv bulk get` accepts that file directly. `kv bulk put` uses a different restore shape, so transform before restore.
+For age, set `STORE_BACKUP_AGE_IDENTITY` to the local identity file used for decryptability verification. The final directory contains only the encrypted archive and a sanitized receipt with archive size/checksum. If encryption or verification fails, plaintext staging is retained for operator diagnosis and must be secured or removed manually.
 
-## KV Restore
+The snapshot never exports secret values. Back up and rotate Cloudflare, Stripe, Resend, GitHub, USPS, and tax credentials through their provider-specific secure recovery process.
 
-Always take a fresh backup before restoring over an existing namespace.
+## Admin And R2 Inventory
 
-Rehearse the transform and restore shape against an isolated local/Podman namespace first when possible:
+Admin export capture exchanges a one-time token in memory, keeps the session cookie/CSRF token in memory, and writes Orders, attendee, reconciliation, audit, download-library, and health artifacts only inside encrypted staging. Production Worker bases must use HTTPS; loopback HTTP is allowed only for local development, and normalized export paths must remain under `/admin/`. Tokens, cookies, response bodies, object keys, and customer rows are not written to logs or the sanitized receipt.
+
+The admin Downloads export discovers attached and unattached library objects. `--r2-objects` downloads the union of that inventory and catalog-referenced keys, closing the catalog-only discovery gap.
+
+## Verify And Plan Restore
+
+Decrypt an encrypted archive into a new isolated `0700` directory. Then run:
 
 ```bash
-values_file="$STORE_BACKUP_DIR/kv/orders_.values.json"
-restore_file="$STORE_BACKUP_DIR/kv/orders_.restore.json"
-
-jq 'to_entries | map({ key: .key, value: (.value.value // "") } + (if .value.metadata then { metadata: .value.metadata } else {} end))' \
-  "$values_file" > "$restore_file"
-
-npx wrangler kv bulk put "$restore_file" --env dev --local --binding STORE_STATE
+npm run restore:plan -- --snapshot /secure/decrypted/store-snapshot
 ```
 
-Only after that rehearsal and operator review should you restore a production binding:
+Planning is the default. It verifies every listed checksum, including the finalized `manifest.json`, rejects duplicate, unlisted, symlink, unsupported, or path-escaping artifacts, validates authoritative record shapes, identifies missing value artifacts, excludes quarantine families, schedules derived-record rebuilds, and lists R2 objects. It performs no provider writes. A metadata-only snapshot remains useful evidence but cannot execute until every required value artifact is present.
+
+Rehearse the same contracts with the production-like local stack:
 
 ```bash
-npx wrangler kv bulk put "$restore_file" --remote --binding STORE_STATE
+npm run restore:rehearse
 ```
 
-Restore production in this order:
+The drill uses synthetic PII, proves session data is excluded, verifies the v2 index rebuild action, and confirms the Podman Worker keeps unauthenticated admin responses private/no-store.
 
-1. `admin-users:v1` and `admin-user:` only if admin users were lost or intentionally rolled back.
-2. `orders:` records.
-3. `admin-store-orders:index:v1` only after order records are present, or let the Worker rebuild/index through normal admin reads.
-4. Inventory override records, then derived inventory projection records only if you are restoring a known-good production snapshot.
-5. Coupon, add-on inventory, and marketing referral records.
-6. Email index/sent records.
-7. Reminder records only after reviewing whether queued sends should still happen.
-8. `admin-audit:` records only when preserving historical audit context matters.
+The representative fixture includes physical, digital, ticket, RSVP, failed-payment, Stripe/email/reminder idempotency, audit, inventory-control, R2, quarantined, and derived-rebuild classes. Its runner permits only reviewed Wrangler KV/R2 commands and asserts that no Stripe, email, webhook, or check-in provider command is generated. This is application-contract evidence, not proof that a captured production snapshot is recoverable.
 
-After restore, use the admin dashboard to verify orders, inventory, downloads, marketing referrals, and audit export. Run the Worker smoke script against the target environment before accepting new checkout traffic.
+## Execute Local Or Preview Restore
 
-## R2 Backup
-
-The production bucket is `store-downloads`; local/dev uses `store-downloads-preview`. See [DOWNLOADS.md](DOWNLOADS.md) for the download entitlement and fallback-URL model.
-
-Build a manifest of configured download keys from `_products/` or the admin Downloads tab, then fetch each object:
+Execution requires an explicit overwrite decision:
 
 ```bash
-mkdir -p "$STORE_BACKUP_DIR/r2/objects"
-
-ruby -rdate -ryaml -e '
-  Dir["_products/*.md"].sort.each do |path|
-    text = File.read(path)
-    next unless text =~ /\A---\n(.*?)\n---/m
-    data = YAML.safe_load($1, permitted_classes: [Date], aliases: true) || {}
-    keys = [data.dig("download", "file_key")]
-    Array(data["variants"]).each { |variant| keys << variant.dig("download", "file_key") if variant.respond_to?(:dig) }
-    keys.compact.map(&:to_s).map(&:strip).reject(&:empty?).each { |key| puts key }
-  end
-' | sort -u > "$STORE_BACKUP_DIR/r2/download-keys.txt"
-
-while IFS= read -r key
-do
-  [ -n "$key" ] || continue
-  mkdir -p "$STORE_BACKUP_DIR/r2/objects/$(dirname "$key")"
-  npx wrangler r2 object get "store-downloads/$key" --remote --file "$STORE_BACKUP_DIR/r2/objects/$key"
-done < "$STORE_BACKUP_DIR/r2/download-keys.txt"
+npm run restore:plan -- \
+  --snapshot /secure/decrypted/store-snapshot \
+  --target=local \
+  --execute \
+  --conflict=overwrite \
+  --persist-to=/tmp/store-restore-wrangler
 ```
 
-## R2 Restore
-
-Prefer the admin Downloads tab for replacement restores, because it writes to the configured key and records an audit event.
-
-For CLI restores:
+Use `--target=preview` only when the Wrangler preview namespaces and R2 bucket are isolated and reviewed. KV supports Wrangler's `--preview` namespace selection, but R2 object commands do not; preview execution therefore requires an explicit bucket distinct from the captured source bucket:
 
 ```bash
-while IFS= read -r key
-do
-  [ -n "$key" ] || continue
-  npx wrangler r2 object put "store-downloads/$key" \
-    --remote \
-    --file "$STORE_BACKUP_DIR/r2/objects/$key" \
-    --content-type "application/octet-stream"
-done < "$STORE_BACKUP_DIR/r2/download-keys.txt"
+npm run restore:plan -- \
+  --snapshot /secure/decrypted/store-snapshot \
+  --target=preview \
+  --preview-r2-bucket=store-downloads-preview \
+  --execute \
+  --conflict=overwrite
 ```
 
-If the restored file needs a specific MIME type or filename, set the correct `--content-type` and `--content-disposition`, or re-upload through the admin Downloads tab.
+The command transforms KV bulk-get output to bulk-put records in a private temporary directory, restores only reviewed authoritative/control artifacts, uploads included R2 objects to the explicit preview bucket, and deletes `admin-store-orders:index:v2` so normal admin reads rebuild it. It rejects a missing preview bucket or one equal to the captured source bucket.
 
-## Git Catalog Restore
+## Readiness And Retention
 
-Use Git restore for product/catalog mistakes before touching KV:
+Generate a sanitized readiness report:
+
+```bash
+npm run backup:readiness -- \
+  --provider-evidence=/secure/evidence/providers.json \
+  --snapshot-receipt=/secure/backups/latest/manifest.json \
+  --rehearsal-evidence=/secure/evidence/recovery-rehearsal.json \
+  --strict \
+  --output=/secure/evidence/recovery-readiness.json
+```
+
+It checks the canonical inventory, metadata-only snapshot plan, credential names without values, required tools/encryption backend, provider failures, encrypted snapshot age, and rehearsal age. Missing live receipts are warnings unless `--require-current-evidence` is supplied.
+
+Retention is plan-only by default:
+
+```bash
+npm run backup:retention -- --root="$HOME/store-backups"
+```
+
+The planner revalidates encrypted receipt/archive checksums and never selects the newest, release, daily, weekly, monthly, invalid, unencrypted, symlinked, or checksum-mismatched entry. Deletion additionally requires a real, non-symlinked root outside the repository, recomputes retention eligibility immediately before deletion, revalidates each receipt/archive, and requires both `--execute` and `--acknowledge=STORE_BACKUP_RETENTION_PRUNE`. Review the plan and verify the off-device copy before executing it.
+
+## Scheduled Evidence And Drills
+
+- **Recovery Readiness** runs weekly at `03:43 America/Denver`. It performs read-only Cloudflare provider evidence, the representative Podman rehearsal, and backup readiness, then uploads sanitized evidence only.
+- **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of January, April, July, and October. The captured-data job remains disabled unless `RECOVERY_DRILL_ENABLED=true`.
+- The captured-data job shares production concurrency with deploy/cache operations and requires approval through the `production-recovery` environment. It requires a dedicated age recipient/identity, a fresh one-time super-admin token, and an explicit preview R2 bucket. It captures encrypted KV/admin/R2 data, decrypts only in private temporary runner storage, restores only to preview, derives artifacts from sanitized counts/status, and removes detailed restore output and plaintext material before artifact upload.
+- Store the dedicated recovery identity as a protected environment secret only after review; do not reuse an operator's personal/master key. A fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN` must be supplied immediately before approval because it is short-lived and one-time.
+- GitHub's 90-day encrypted drill artifact is an off-account test copy, not the approved long-term 7-daily/5-weekly/12-monthly destination and not proof of decryption on a second isolated device.
+- No scheduled or protected workflow contains a production restore acknowledgement or production target. A production restore remains a separate manual incident procedure governed by the gates below.
+
+## Production Restore Gates
+
+Do not execute a production restore until all of these are true:
+
+1. Checkout/admin mutation traffic is in maintenance mode or otherwise frozen.
+2. Stripe webhook delivery is paused or safely buffered.
+3. Inventory reservations and in-flight PaymentIntents are reviewed.
+4. A fresh verified pre-restore snapshot exists.
+5. The restore plan has no invalid actions or missing value artifacts and conflict policy is explicitly `overwrite`.
+6. A local/preview rehearsal passed with the same snapshot format.
+
+The CLI enforces the first five interlocks. The pre-restore snapshot must be checksum-valid and distinct from the snapshot being restored. Restore commands stop after the first provider failure rather than continuing into later phases:
+
+```bash
+npm run restore:plan -- \
+  --snapshot /secure/decrypted/store-snapshot \
+  --target=production \
+  --execute \
+  --conflict=overwrite \
+  --acknowledge-production=STORE_PRODUCTION_RESTORE \
+  --maintenance-confirmed \
+  --stripe-webhooks-paused \
+  --inventory-reservations-reviewed \
+  --pre-restore-snapshot=/secure/pre-restore-snapshot
+```
+
+Restore order:
+
+1. Git/config/build artifacts and matching storefront/Worker version.
+2. Admin users only when break-glass access requires it.
+3. Orders and payment/fulfillment records.
+4. Inventory overrides, coupons, referrals, and suppression preferences.
+5. Stripe/email/reminder idempotency markers before side effects resume.
+6. R2 objects, verified by size/checksum.
+7. Rebuild order/email/inventory projections and reconcile Durable Object reservations.
+8. Preserve audit evidence when required; do not restore observability or purge-failure rows as runtime state.
+
+## Git-Only Rollback
+
+Use Git restore before touching KV for catalog/config mistakes:
 
 ```bash
 git log --oneline -- _products worker/src/generated/catalog-snapshot.js api/products.json
-git show <good-sha>:_products/fronteras-t-shirt.md
+git show <good-sha>:_products/<product>.md
 git restore --source <good-sha> -- _products worker/src/generated/catalog-snapshot.js api/products.json
 npm run sync:worker-config
 bundle exec jekyll build --config _config.yml,_config.local.yml
 ```
 
-For a full clone from the bundle:
+For a full clone from the snapshot bundle:
 
 ```bash
-git clone "$STORE_BACKUP_DIR/git/store.bundle" store-restore
+git clone /secure/decrypted/store-snapshot/git/store.bundle store-restore
 ```
 
-After restoring catalog files, deploy storefront and Worker together so public product JSON and Worker catalog validation stay aligned.
+Deploy storefront and Worker together so public catalog JSON and Worker validation remain aligned.
 
-## Verification
+## Recovery Verification
 
-After any restore:
+Before reopening production traffic:
 
 ```bash
-bundle exec jekyll build --config _config.yml,_config.local.yml
-npm run test:seo
+npm run sync:worker-config
+npm run backup:inventory:audit
 npm run test:content-security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
+npm run test:seo
+npm run test:security
+npm run test:e2e:headless
 ```
 
-For production restore, also complete a real **Settings -> Store readiness** refresh, audit CSV export, order CSV export, and one non-destructive order lookup before reopening checkout traffic.
+Also verify Settings -> Store readiness, orders/audit/reconciliation exports, a non-destructive order lookup, R2 download delivery, inventory totals, Stripe idempotency markers, cron state after a fresh scheduler run, and a Workers Cache purge followed by a fresh Orders read. Resume Stripe webhooks before checkout traffic and monitor duplicate/missing side effects.
