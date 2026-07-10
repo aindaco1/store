@@ -28,6 +28,7 @@ export function parseRestoreArgs(args = []) {
     execute: args.includes('--execute'),
     conflict: valueArg(args, '--conflict', 'abort'),
     persistTo: valueArg(args, '--persist-to', ''),
+    previewR2Bucket: valueArg(args, '--preview-r2-bucket', ''),
     acknowledgeProduction: valueArg(args, '--acknowledge-production', ''),
     maintenanceConfirmed: args.includes('--maintenance-confirmed'),
     stripeWebhooksPaused: args.includes('--stripe-webhooks-paused'),
@@ -47,6 +48,7 @@ Options:
   --execute                     Execute the generated local/preview/production plan.
   --conflict=abort|overwrite    Required as overwrite for execution.
   --persist-to=DIR              Isolated Wrangler local-state directory.
+  --preview-r2-bucket=NAME      Required distinct R2 bucket for preview object restore.
   --acknowledge-production=${PRODUCTION_ACKNOWLEDGEMENT}
   --maintenance-confirmed
   --stripe-webhooks-paused
@@ -264,6 +266,14 @@ export function executeStoreRestorePlan(plan, options = {}) {
   if (plan.missingValueFamilies?.length) {
     throw new Error(`Restore execution blocked: missing value artifacts for ${plan.missingValueFamilies.map((family) => family.familyId).join(', ')}.`);
   }
+  const r2Actions = plan.actions.filter((action) => action.type === 'r2-restore');
+  if (options.target === 'preview' && r2Actions.length) {
+    const previewR2Bucket = String(options.previewR2Bucket || '').trim();
+    if (!previewR2Bucket) throw new Error('Preview R2 restore requires --preview-r2-bucket.');
+    if (r2Actions.some((action) => String(action.bucket || '').trim() === previewR2Bucket)) {
+      throw new Error('Preview R2 restore bucket must be distinct from the captured source bucket.');
+    }
+  }
   if (options.target === 'production') {
     const gate = productionRestoreGate({ ...options, restoreSnapshot: plan.snapshot });
     if (!gate.ok) throw new Error(`Production restore blocked: ${gate.missing.join(', ')}.`);
@@ -289,11 +299,14 @@ export function executeStoreRestorePlan(plan, options = {}) {
         if (result.status !== 0) break actionLoop;
       }
       if (action.type === 'r2-restore') {
+        const targetBucket = options.target === 'preview'
+          ? String(options.previewR2Bucket || '').trim()
+          : action.bucket;
         const result = runner('npx', [
-          'wrangler', 'r2', 'object', 'put', `${action.bucket}/${action.key}`,
+          'wrangler', 'r2', 'object', 'put', `${targetBucket}/${action.key}`,
           '--file', action.objectPath,
           '--force',
-          ...targetFlags(options)
+          ...(options.target === 'preview' ? ['--remote'] : targetFlags(options))
         ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
         results.push(result);
         if (result.status !== 0) break actionLoop;
@@ -328,12 +341,15 @@ async function main() {
   if (options.help) return printHelp();
   if (!options.snapshot) throw new Error('--snapshot is required.');
   const result = await runStoreRestore(options);
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   console.log(`Restore plan verified ${result.plan.integrity.checked} artifacts and prepared ${result.plan.actions.length} actions.`);
   if (result.plan.missingValueFamilies.length) {
     console.log(`Restore execution remains blocked because ${result.plan.missingValueFamilies.length} value artifacts are missing.`);
   }
   if (result.execution) console.log(`Restore execution ${result.execution.ok ? 'completed' : 'failed'}.`);
-  if (options.json) console.log(JSON.stringify(result, null, 2));
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

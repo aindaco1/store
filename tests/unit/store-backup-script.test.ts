@@ -230,5 +230,11 @@ Body.
       classification: 'ephemeral-quarantined',
       restoreDefault: 'quarantine'
     });
+    expect(inventory.families.find((family: any) => family.id === 'workers-cache-metrics')).toMatchObject({
+      binding: 'STORE_CACHE_METRICS',
+      type: 'analytics-engine',
+      classification: 'incident-evidence',
+      restoreDefault: 'do-not-restore'
+    });
   });
 });

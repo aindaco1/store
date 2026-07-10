@@ -1,0 +1,122 @@
+name: Quarterly Recovery Operations
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_protected_drill:
+        description: 'Request the protected captured-data preview restore after preflight'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 4 1 1,4,7,10 *'
+      timezone: 'America/Denver'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-operations
+  cancel-in-progress: false
+
+jobs:
+  traffic-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production-observability
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_ANALYTICS_API_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_WORKER_SCRIPT_NAME: ${{ vars.CLOUDFLARE_WORKER_SCRIPT_NAME || 'store-worker' }}
+      RECOVERY_MAX_RECENT_WORKER_REQUESTS: ${{ vars.RECOVERY_MAX_RECENT_WORKER_REQUESTS || '100' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify low-traffic recovery window
+        run: >-
+          npm run recovery:traffic-preflight --
+          --strict
+          --recent-minutes=15
+          --maximum-requests="${RECOVERY_MAX_RECENT_WORKER_REQUESTS}"
+          --maximum-errors=0
+          --output=recovery-traffic-preflight.json
+
+      - name: Require the traffic gate
+        run: node -e 'const e=require("./recovery-traffic-preflight.json"); if(e.traffic.lowTraffic!==true) process.exit(1)'
+
+      - name: Upload traffic preflight
+        uses: actions/upload-artifact@v7
+        with:
+          name: recovery-traffic-preflight-${{ github.run_id }}
+          path: recovery-traffic-preflight.json
+          retention-days: 7
+
+  protected-preview-restore:
+    if: ${{ vars.RECOVERY_DRILL_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.run_protected_drill) }}
+    needs: traffic-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production-recovery
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      STORE_BACKUP_ENCRYPTION_RECIPIENT: ${{ secrets.STORE_BACKUP_ENCRYPTION_RECIPIENT }}
+      STORE_BACKUP_AGE_IDENTITY: ${{ secrets.STORE_BACKUP_AGE_IDENTITY }}
+      STORE_BACKUP_ADMIN_LOGIN_TOKEN: ${{ secrets.STORE_BACKUP_ADMIN_LOGIN_TOKEN }}
+      STORE_RECOVERY_PREVIEW_R2_BUCKET: ${{ vars.STORE_RECOVERY_PREVIEW_R2_BUCKET }}
+      WORKER_BASE: ${{ vars.WORKER_BASE || 'https://checkout.dustwave.xyz' }}
+      STORE_RECOVERY_TRAFFIC_EVIDENCE: ${{ runner.temp }}/recovery-preflight/recovery-traffic-preflight.json
+      STORE_RECOVERY_ENCRYPTED_DIR: ${{ runner.temp }}/store-quarterly-encrypted
+      STORE_RECOVERY_DRILL_EVIDENCE_DIR: ${{ runner.temp }}/store-quarterly-evidence
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix worker
+          sudo apt-get update
+          sudo apt-get install -y age
+
+      - name: Download traffic preflight
+        uses: actions/download-artifact@v8
+        with:
+          name: recovery-traffic-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/recovery-preflight
+
+      - name: Run protected encrypted snapshot and preview restore
+        run: ./scripts/protected-recovery-drill.sh
+
+      - name: Upload sanitized drill evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quarterly-recovery-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/store-quarterly-evidence
+          if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Upload encrypted off-account snapshot
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quarterly-encrypted-snapshot-${{ github.run_id }}
+          path: ${{ runner.temp }}/store-quarterly-encrypted
+          retention-days: 90

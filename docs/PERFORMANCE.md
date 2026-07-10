@@ -63,20 +63,41 @@ Performance expectations:
 - purge failure does not fail a write and records only a bounded failure diagnostic; short TTLs cap stale exposure
 - download readiness lists R2 once and derives attached-file readiness from that listing, avoiding duplicate per-file `head` calls when the list is complete
 - response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters
+- the authenticated gateway writes one asynchronous `STORE_CACHE_METRICS` Analytics Engine point per eligible admin read when `WORKERS_CACHE_TELEMETRY_ENABLED=true`; fields are limited to route, cache status/bypass, duration, response bytes, and expected operation counts
+- Analytics Engine telemetry adds one data-point write per eligible read and the nightly collector adds one SQL query plus, only below its recent cache-read threshold, a two-read evidence probe with one rate-limit KV read/write; it never adds order-store KV counters
 - super-admin and deploy-secret purges clear all known cache domains; deploy/version isolation remains enabled because `cross_version_cache` is off
 
-Run the metadata-only harness with a fresh one-time super-admin token supplied only through the environment:
+Capture the disabled baseline and enabled candidate separately with a fresh one-time super-admin token supplied only through the environment. Disabled runs do not purge; enabled runs use two bounded purges rather than purging once per sample because every purge writes an audit KV row:
 
 ```bash
 export STORE_CACHE_SMOKE_ADMIN_LOGIN_TOKEN='<one-time-token>'
 npm run cache:benchmark -- \
+  --mode=disabled \
+  --route=orders \
   --worker-base=https://checkout.example.com \
   --site-base=https://shop.example.com \
   --samples=30 \
-  --output=/secure/evidence/workers-cache.json
+  --output=/secure/evidence/workers-cache-disabled.json
+
+# Use a new one-time token after enabling Orders and deploying.
+export STORE_CACHE_SMOKE_ADMIN_LOGIN_TOKEN='<fresh-one-time-token>'
+npm run cache:benchmark -- \
+  --mode=enabled \
+  --route=orders \
+  --worker-base=https://checkout.example.com \
+  --site-base=https://shop.example.com \
+  --samples=30 \
+  --output=/secure/evidence/workers-cache-enabled.json
+
+npm run cache:compare -- \
+  --baseline=/secure/evidence/workers-cache-disabled.json \
+  --candidate=/secure/evidence/workers-cache-enabled.json \
+  --output=/secure/evidence/workers-cache-comparison.json
 ```
 
-The evidence file contains timings, byte counts, cache statuses, and operation budgets, not response bodies or credentials. Require at least 30 samples, zero order-data KV list/get operations on warm no-change hits, at least 40% p95 improvement over an uncached comparison deployment, and fresh post-mutation reads before enabling another route. Podman validates the application contract but cannot prove Cloudflare edge hit behavior.
+The evidence files contain timings, byte counts, cache statuses, bypass reasons, and operation budgets, not response bodies or credentials. The comparator requires correctly labeled schema-v2 artifacts, at least 30 repeated samples, zero order-data KV list/get operations on warm/no-change hits, at least 40% p95 improvement, expected search bypasses, and a bounded post-purge refill. Mutation freshness and normal-traffic aggregate hit ratios remain separate production gates. Podman validates the application contract but cannot prove Cloudflare edge behavior.
+
+`.github/workflows/workers-cache-evidence.yml` runs at `03:17 America/Denver` on `main`. It queries the prior 24 hours from Analytics Engine and calls `POST /admin/workers-cache/evidence` only when recent cache-read traffic is below the configured threshold. That endpoint requires `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs two fixed read-only route probes, and returns metrics only. The scheduled workflow cannot purge or change configuration.
 
 Verify Worker Cache config before deploys that touch cached entrypoints:
 
@@ -89,8 +110,27 @@ npx wrangler deploy --dry-run --env=""
 Configuration:
 
 - `cache.workers_enabled` / `WORKERS_CACHE_ENABLED`: global kill switch.
+- `cache.workers_telemetry_enabled` / `WORKERS_CACHE_TELEMETRY_ENABLED`: sanitized Analytics Engine telemetry switch.
 - `cache.workers_admin_*_enabled` / `WORKERS_CACHE_ADMIN_*_ENABLED`: route switches.
 - Re-enable after a purge or new Worker version so an old still-fresh response cannot reappear.
+
+### Cache Incident Procedure
+
+1. Preserve the current sanitized benchmark/observability evidence and note the affected route, cache status, deployment version, and last covered mutation. Never capture response bodies, cookies, tokens, cache keys, or customer rows.
+2. For a single candidate problem, set its `cache.workers_admin_*_enabled` value to `false`; for uncertain scope, set `cache.workers_enabled: false`. A super-admin may publish the setting, but the runtime change takes effect only after the resulting Worker deployment.
+3. Dispatch **Deploy Production**. Deploy, cache evidence, and protected recovery share the `production-operations` concurrency group and cannot overlap.
+4. Purge all known entries from the super-admin cache control or the deploy-secret endpoint. Do not send arbitrary tags:
+
+   ```bash
+   curl --fail-with-body \
+     -X POST https://checkout.example.com/admin/workers-cache/purge \
+     -H "Authorization: Bearer ${WORKERS_CACHE_PURGE_SECRET}" \
+     -H 'Content-Type: application/json' \
+     --data '{"target":"all_known","source":"incident"}'
+   ```
+
+5. Verify the affected admin read is fresh, browser-facing headers remain `private, no-store`, cache metadata reports `disabled`, search still bypasses, and the underlying mutation remains present. If the deployment itself is suspect, redeploy the last reviewed commit with caching disabled rather than enabling cross-version sharing.
+6. Keep `cross_version_cache=false`. Re-enable one route only after its disabled/enabled comparison, mutation/purge freshness check, and normal-traffic hit/read/CPU evidence pass again; purge immediately after the enabling deployment.
 
 ## Prefetch
 

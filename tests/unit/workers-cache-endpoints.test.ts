@@ -60,6 +60,7 @@ function buildEnv(overrides: Record<string, unknown> = {}) {
     ADMIN_SECRET: 'test_admin_secret',
     ADMIN_EXPOSE_LOGIN_LINK: 'true',
     WORKERS_CACHE_PURGE_SECRET: 'deploy_secret',
+    WORKERS_CACHE_EVIDENCE_SECRET: 'evidence_secret',
     OBSERVABILITY_SAMPLE_RATE: '0',
     STORE_STATE: new MockKVNamespace(),
     RATELIMIT: new MockKVNamespace(),
@@ -310,6 +311,87 @@ describe('Workers Cache admin endpoints', () => {
     expect(cacheFetch).not.toHaveBeenCalled();
     const body = await response.json();
     expect(body.workersCache).toMatchObject({ enabled: false, bypass: 'disabled' });
+  });
+
+  it('returns a sanitized, rate-limited two-read probe only to the evidence credential', async () => {
+    const writeDataPoint = vi.fn();
+    const env = buildEnv({ STORE_CACHE_METRICS: { writeDataPoint } });
+    let reads = 0;
+    const cacheFetch = vi.fn(async (request: Request) => {
+      reads += 1;
+      const noChange = new URL(request.url).searchParams.has('watermark');
+      return new Response(JSON.stringify({
+        ...cachedOrdersPayload(),
+        ...(noChange ? { orders: undefined, fulfillments: undefined } : {}),
+        watermark: 'orders-v2-0123456789abcdef',
+        unchanged: noChange,
+        writeBudget: {
+          readOnly: true,
+          workersRequestsExpected: 1,
+          kvReadsExpected: reads === 1 ? 1 : 0,
+          kvWritesExpected: 0,
+          kvListExpected: reads === 1 ? 1 : 0
+        }
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cf-Cache-Status': reads === 1 ? 'MISS' : 'HIT'
+        }
+      });
+    });
+    const ctx = buildCtx(cacheFetch);
+    const unauthorized = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/evidence`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer wrong-secret',
+        'Content-Type': 'application/json',
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ route: 'orders' })
+    }), env, ctx);
+    expect(unauthorized.status).toBe(401);
+    expect(cacheFetch).not.toHaveBeenCalled();
+
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/evidence`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer evidence_secret',
+        'Content-Type': 'application/json',
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ route: 'orders' })
+    }), env, ctx);
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store, max-age=0');
+    expect(body).toMatchObject({
+      schemaVersion: 1,
+      route: 'orders',
+      containsResponseBodies: false,
+      containsCredentials: false,
+      containsCustomerData: false,
+      probe: {
+        status: 'MISS',
+        unchanged: false,
+        writeBudget: { kvReadsExpected: 1, kvListExpected: 1 }
+      },
+      repeat: {
+        status: 'HIT',
+        unchanged: true,
+        writeBudget: { kvReadsExpected: 0, kvListExpected: 0 }
+      },
+      requestBudget: {
+        probeReads: 2,
+        rateLimitKvReadsExpected: 1,
+        rateLimitKvWritesExpected: 1
+      }
+    });
+    expect(cacheFetch).toHaveBeenCalledTimes(2);
+    expect(writeDataPoint).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(body)).not.toContain('admin@example.com');
+    expect(JSON.stringify(body)).not.toContain('store-order');
+    expect(JSON.stringify(body)).not.toContain('evidence_secret');
   });
 
   it('routes Analytics, Inventory, and Downloads through the cohesive cached entrypoint', async () => {

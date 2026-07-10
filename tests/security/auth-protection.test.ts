@@ -48,6 +48,14 @@ describe('Store auth protection', () => {
     }
   });
 
+  it('keeps the scheduled Workers Cache evidence probe behind its dedicated credential', async () => {
+    const response = await securityFetch('/admin/workers-cache/evidence', {
+      method: 'POST',
+      body: JSON.stringify({ route: 'orders' })
+    });
+    expectStatusIn(response, [401, 503], '/admin/workers-cache/evidence');
+  });
+
   it('does not expose legacy campaign routes', async () => {
     const endpoints = [
       '/votes?token=dev-token&decisions=poster',

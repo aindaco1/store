@@ -8,15 +8,15 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
-- Source catalog: 49 `_products/*.md` records at this sweep, with 27 active and 22 archived products across physical merch, event tickets, one digital product, and one free RSVP fixture.
+- Source catalog: 50 `_products/*.md` records at this sweep, with 26 active and 24 archived products across physical merch, event tickets, one digital product, and one free RSVP fixture.
 - Current public catalog grouping uses `category: dustwave` and `category: fronteras` as collection-compatible legacy values; the taxonomy include derives product-type categories such as apparel, prints, stickers, downloads, event access, media, and objects.
 - Browser cart runtime is Store-owned: `store-add-item`, `STORE_CONFIG`, `StoreCartProvider`, `StoreCartRuntime`, `window.Store`, and `storecart.*` events.
 - Worker checkout validates carts through `/api/cart/validate`, creates paid/free order drafts through `/api/checkout/intent`, reserves positive-count SKU inventory through a Durable Object, and settles paid orders only from signed Stripe webhooks.
 - Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, check-in links, Resend receipts, abandoned-checkout reminders, and event reminders.
 - Public Spanish shells exist for home, Terms, Orders, and Order Success; product titles/descriptions stay creator-authored unless a product defines localized overrides.
 - Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
-- Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, and the `CachedAdminStoreReads` Workers Cache entrypoint. Analytics, inventory, and download readiness use the same reviewed entrypoint but remain disabled by default pending real-edge benchmark evidence.
-- Backup and disaster recovery use a canonical Store data inventory, checksum-verified snapshot v2 manifests, encrypted sensitive exports, guarded restore planning, and a Podman-backed synthetic restore drill.
+- Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, and the `CachedAdminStoreReads` Workers Cache entrypoint. Analytics, inventory, and download readiness use the same reviewed entrypoint but remain disabled by default pending real-edge benchmark evidence. Sanitized Analytics Engine telemetry, disabled/enabled comparison gates, a scoped nightly probe, kill switches, and the incident runbook support measured rollout.
+- Backup and disaster recovery use a canonical Store data inventory, checksum-verified snapshot v2 manifests, encrypted sensitive exports, guarded restore planning, preview-only R2 isolation, retention/readiness planning, release-smoke evidence, weekly representative Podman drills, and a disabled-by-default protected quarterly captured-data workflow.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
 ## Local Development
@@ -49,7 +49,10 @@ npm run test:e2e:headless
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
 npm run test:premerge
 npm run backup:inventory:audit
+npm run backup:readiness
+npm run backup:retention -- --root "$HOME/store-backups"
 npm run restore:rehearse
+npm run recovery:traffic-preflight -- --maximum-requests=100
 ```
 
 For release environment setup:
@@ -70,13 +73,13 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 - `assets/js/cart-provider.js` - first-party cart, checkout, shipping/tax preview, coupon, add-on, and reminder-consent runtime.
 - `assets/js/admin-dashboard.js` - admin dashboard client.
 - `worker/src/index.js` - Worker routes, checkout, admin, fulfillment, cron, and observability.
-- `worker/src/admin-store-read-model.js` and `worker/src/workers-cache-policy.js` - shared order snapshot and cache policy contracts.
+- `worker/src/admin-store-read-model.js`, `worker/src/workers-cache-policy.js`, and `worker/src/workers-cache-telemetry.js` - shared order snapshot, cache policy, and privacy-safe telemetry contracts.
 - `worker/src/generated/catalog-snapshot.js` - generated Worker catalog snapshot.
 - `worker/src/tier-inventory-do.js` - reservation-aware SKU inventory coordinator.
 - `worker/src/coupons.js` - coupon normalization, storage, and discount application.
 - `worker/src/local-repo-service.mjs` - local admin publish sidecar for dev.
 - `config/store-data-inventory.json` - canonical KV/R2/Durable Object backup and restore classification.
-- `scripts/store-backup.mjs` and `scripts/store-restore.mjs` - guarded snapshot and restore tooling.
+- `scripts/store-backup.mjs`, `scripts/store-restore.mjs`, `scripts/backup-readiness.mjs`, and `scripts/backup-retention.mjs` - guarded snapshot, restore, readiness, and retention tooling.
 
 ## Docs
 
@@ -95,4 +98,4 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 
 ## Production Operations
 
-Store is live on the production storefront and Worker domains. Production deploys are manual through the **Deploy Production** GitHub Actions workflow; merging a release branch or pushing a release tag does not deploy by itself. Ongoing production work is operational: keep Cloudflare Worker secrets and external accounts current, verify Stripe webhooks, Resend senders, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, and real inventory baselines, and rerun the production smoke/reconciliation path after checkout, fulfillment, admin, or catalog changes.
+Store is live on the production storefront and Worker domains. Production deploys are manual through **Deploy Production**; merging a release branch or pushing a release tag does not deploy by itself. Deploy, cache evidence, and protected recovery share production concurrency. **Workers Cache Evidence** runs nightly with read-only credentials, **Recovery Readiness** runs weekly with synthetic data, and **Quarterly Recovery Operations** runs a Worker-wide traffic preflight while keeping captured-data restore disabled until the protected recovery environment, dedicated key, fresh one-time admin token, and preview resources are approved. Ongoing production work remains operational: keep provider credentials/accounts current and rerun production smoke/reconciliation after checkout, fulfillment, admin, or catalog changes.

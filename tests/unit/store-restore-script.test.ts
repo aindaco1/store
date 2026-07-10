@@ -154,6 +154,45 @@ describe('Store restore automation', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  it('requires a distinct explicit preview bucket and never passes unsupported R2 preview flags', () => {
+    const root = fixtureSnapshot();
+    fs.mkdirSync(path.join(root, 'r2', 'objects', 'downloads'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'r2', 'objects', 'downloads', 'fixture.txt'), 'private fixture', { mode: 0o600 });
+    const artifacts = buildChecksumManifest(root, { exclude: ['checksums.json'] });
+    writeJson(path.join(root, 'checksums.json'), { schemaVersion: 1, artifacts });
+    const plan = buildStoreRestorePlan(readAndVerifySnapshot(root), { target: 'preview' });
+
+    expect(() => executeStoreRestorePlan(plan, {
+      target: 'preview',
+      conflict: 'overwrite'
+    })).toThrow(/preview-r2-bucket/i);
+    expect(() => executeStoreRestorePlan(plan, {
+      target: 'preview',
+      conflict: 'overwrite',
+      previewR2Bucket: 'store-downloads-preview'
+    })).toThrow(/distinct/i);
+
+    const calls: string[][] = [];
+    const execution = executeStoreRestorePlan(plan, {
+      target: 'preview',
+      conflict: 'overwrite',
+      previewR2Bucket: 'store-recovery-drill-preview',
+      runner: (_command: string, args: string[]) => {
+        calls.push(args);
+        return { status: 0, stdout: '', stderr: '', error: '' };
+      }
+    });
+    expect(execution.ok).toBe(true);
+    const r2Call = calls.find((args) => args.includes('r2'));
+    expect(r2Call).toEqual(expect.arrayContaining([
+      'put',
+      'store-recovery-drill-preview/downloads/fixture.txt',
+      '--remote'
+    ]));
+    expect(r2Call).not.toContain('--preview');
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
   it('blocks metadata-only execution and stops after the first command failure', () => {
     const root = fixtureSnapshot();
     fs.rmSync(path.join(root, 'kv', 'orders.values.json'));

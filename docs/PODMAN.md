@@ -159,9 +159,19 @@ For host-side commands that need a temporary Podman-backed Storefront and Worker
 ./scripts/podman-stack-run.sh <command...>
 ```
 
+The recovery rehearsal uses that wrapper directly:
+
+```bash
+npm run restore:rehearse -- --output=/tmp/store-recovery-rehearsal.json
+```
+
+It creates a checksum-covered synthetic snapshot with physical, digital, ticket, RSVP, failed-payment, idempotency, reminder, audit, inventory, quarantine, derived-repair, and R2 fixtures. Restore commands are injected/no-op provider calls; the live Podman Worker is used only to prove unauthenticated admin responses remain private/no-store. No production value or provider write enters the drill.
+
 ## CI And Release Evidence
 
 `.github/workflows/podman-e2e.yml` runs the headless Podman E2E path on a weekly schedule and by manual dispatch. The workflow is read-only and non-deploying; it installs Podman, runs `npm run podman:doctor`, then runs `npm run test:e2e:headless:podman`.
+
+`.github/workflows/recovery-readiness.yml` separately runs the representative Podman restore rehearsal each Sunday at `03:43 America/Denver`, combines it with inventory/backup/provider readiness, and uploads sanitized JSON evidence. It does not fetch production KV/R2 values. The quarterly captured-data workflow is a separate protected preview operation and must not be represented as part of ordinary Podman CI.
 
 For release evidence, run:
 

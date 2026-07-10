@@ -17,6 +17,10 @@ type = "worker"
   [exports.CachedAdminStoreReads.cache]
   enabled = true
 
+[[analytics_engine_datasets]]
+binding = "STORE_CACHE_METRICS"
+dataset = "store_workers_cache_metrics"
+
 # Cron trigger:
 # - `* * * * *`: timezone-aware platform scheduler. Individual tasks gate on
 #   the configured platform timezone and idempotency markers.
@@ -105,6 +109,7 @@ INTENT_PREFETCH_DELAY_MS = "90"
 INTENT_PREFETCH_LIMIT = "3"
 LIVE_INVENTORY_CACHE_TTL_SECONDS = "300"
 WORKERS_CACHE_ENABLED = "true"
+WORKERS_CACHE_TELEMETRY_ENABLED = "true"
 WORKERS_CACHE_ADMIN_ORDERS_ENABLED = "true"
 WORKERS_CACHE_ADMIN_ANALYTICS_ENABLED = "false"
 WORKERS_CACHE_ADMIN_INVENTORY_ENABLED = "false"
@@ -159,6 +164,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - ADMIN_TURNSTILE_SECRET_KEY (admin-specific Turnstile secret if not using TURNSTILE_SECRET_KEY)
 # - STORE_DOWNLOAD_SECRET      (optional dedicated HMAC secret for signed download/fulfillment links)
 # - WORKERS_CACHE_PURGE_SECRET (dedicated bearer secret for deploy-time Workers Cache purge)
+# - WORKERS_CACHE_EVIDENCE_SECRET (dedicated bearer secret for the read-only scheduled cache probe)
 #
 # Optional (for GitHub rebuild trigger):
 # - GITHUB_TOKEN               (GitHub PAT with workflow scope)
@@ -256,6 +262,7 @@ INTENT_PREFETCH_DELAY_MS = "90"
 INTENT_PREFETCH_LIMIT = "3"
 LIVE_INVENTORY_CACHE_TTL_SECONDS = "300"
 WORKERS_CACHE_ENABLED = "true"
+WORKERS_CACHE_TELEMETRY_ENABLED = "true"
 WORKERS_CACHE_ADMIN_ORDERS_ENABLED = "true"
 WORKERS_CACHE_ADMIN_ANALYTICS_ENABLED = "false"
 WORKERS_CACHE_ADMIN_INVENTORY_ENABLED = "false"

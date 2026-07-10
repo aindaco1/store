@@ -40,6 +40,7 @@ export const SECRET_INVENTORY_NAMES = [
   'MAGIC_LINK_SECRET',
   'STORE_DOWNLOAD_SECRET',
   'WORKERS_CACHE_PURGE_SECRET',
+  'WORKERS_CACHE_EVIDENCE_SECRET',
   'TURNSTILE_SECRET_KEY',
   'ADMIN_TURNSTILE_SECRET_KEY',
   'STORE_ORDER_TURNSTILE_SECRET_KEY',
@@ -52,6 +53,7 @@ export const SECRET_INVENTORY_NAMES = [
   'GITHUB_WORKFLOW',
   'CLOUDFLARE_ACCOUNT_ID',
   'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_ANALYTICS_API_TOKEN',
   'CLOUDFLARE_DNS_API_TOKEN'
 ];
 
@@ -96,6 +98,7 @@ Options:
   --skip-git-bundle     Skip git bundle creation.
   --skip-file-copy      Skip copying selected config/build files into the snapshot.
   --skip-build          Skip isolated Jekyll/minification/Wrangler dry-run build evidence.
+  --release-snapshot    Mark the encrypted receipt as retention-protected release evidence.
   --dry-run             Print the plan without creating files or calling provider CLIs.
   --json                Print the final manifest JSON to stdout.
   -h, --help            Show this help.
@@ -129,6 +132,7 @@ export function parseBackupArgs(args = []) {
     skipGitBundle: args.includes('--skip-git-bundle'),
     skipFileCopy: args.includes('--skip-file-copy'),
     skipBuild: args.includes('--skip-build'),
+    releaseSnapshot: args.includes('--release-snapshot'),
     dryRun: args.includes('--dry-run'),
     json: args.includes('--json')
   };
@@ -639,6 +643,7 @@ function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
     archiveBytes: fs.statSync(encryptedPath).size,
     archiveSha256: sha256File(encryptedPath),
     sourceCommit: manifest.git?.head || '',
+    releaseSnapshot: manifest.releaseSnapshot === true,
     includedDataClasses: manifest.includedDataClasses,
     warnings: manifest.warnings
   };
@@ -661,6 +666,7 @@ export async function createBackupSnapshot(rawOptions = {}) {
     skipGitBundle: rawOptions.skipGitBundle === true,
     skipFileCopy: rawOptions.skipFileCopy === true,
     skipBuild: rawOptions.skipBuild === true,
+    releaseSnapshot: rawOptions.releaseSnapshot === true,
     dryRun: rawOptions.dryRun === true
   };
   const outputDir = path.resolve(options.output);
@@ -690,6 +696,7 @@ export async function createBackupSnapshot(rawOptions = {}) {
     includesR2Objects: options.remote && options.r2Objects,
     includesAdminExports: options.remote && options.adminExports,
     encrypted: safety.sensitive,
+    releaseSnapshot: options.releaseSnapshot,
     includedDataClasses: [
       'git-config-build',
       'provider-metadata',

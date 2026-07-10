@@ -101,6 +101,7 @@ import {
   workersCacheGloballyEnabled,
   workersCacheEnabledForAdminStoreRead
 } from './workers-cache-policy.js';
+import { recordWorkersCacheMetric, workersCacheTelemetryEnabled } from './workers-cache-telemetry.js';
 import {
   getPlatformDateKey,
   getPlatformTimeZone,
@@ -371,6 +372,7 @@ const MAX_ADMIN_AUDIT_EXPORT_EVENTS = 2000;
 const ADMIN_STORE_ORDER_INDEX_TTL_SECONDS = 10 * 60;
 const ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS = ADMIN_STORE_ORDER_INDEX_TTL_SECONDS * 1000;
 const ADMIN_WORKERS_CACHE_PURGE_PATH = '/admin/workers-cache/purge';
+const ADMIN_WORKERS_CACHE_EVIDENCE_PATH = '/admin/workers-cache/evidence';
 const WORKERS_CACHE_PURGE_FAILURE_KEY = 'workers-cache-purge-failure:recent';
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_ENTRYPOINT = ADMIN_STORE_READS_CACHE_ENTRYPOINT;
 const ADMIN_STORE_ORDERS_WORKERS_CACHE_POLICY = ADMIN_STORE_READ_CACHE_POLICIES.orders;
@@ -496,6 +498,30 @@ function attachAdminStoreReadGatewayUser(payload = {}, auth = {}, workersCache =
 
 function attachAdminStoreOrdersGatewayUser(payload = {}, auth = {}, workersCache = null) {
   return attachAdminStoreReadGatewayUser(payload, auth, workersCache);
+}
+
+function jsonByteLength(payload = {}) {
+  try {
+    return new TextEncoder().encode(JSON.stringify(payload)).byteLength;
+  } catch {
+    return 0;
+  }
+}
+
+function privateAdminStoreReadGatewayResponse(payload, auth, workersCache, env, options = {}) {
+  const gatewayPayload = attachAdminStoreReadGatewayUser(payload, auth, workersCache);
+  if (workersCacheTelemetryEnabled(env)) {
+    recordWorkersCacheMetric(env, {
+      routeId: options.routeId || workersCache?.routeId,
+      status: workersCache?.status,
+      bypass: workersCache?.bypass,
+      enabled: workersCache?.enabled,
+      durationMs: Math.max(0, performance.now() - Number(options.startedAt || performance.now())),
+      responseBytes: options.responseBytes ?? jsonByteLength(gatewayPayload),
+      writeBudget: gatewayPayload.writeBudget
+    });
+  }
+  return privateJsonResponse(gatewayPayload, options.status || 200, env, options.headers || {});
 }
 
 function cacheableAdminStoreReadJsonResponse(payload = {}, routeId, status = 200, env = null) {
@@ -1399,6 +1425,7 @@ const RATE_LIMITS = {
   adminProductPreview: { prefix: 'rl:admin-product-preview', limit: 90, windowSeconds: 60 },
   adminProductPublish: { prefix: 'rl:admin-product-publish', limit: 12, windowSeconds: 60 },
   adminAddressLookup: { prefix: 'rl:admin-address-lookup', limit: 30, windowSeconds: 60 },
+  workersCacheEvidence: { prefix: 'rl:workers-cache-evidence', limit: 6, windowSeconds: 60 * 60, privateResponse: true },
   filmStripeSummary: { prefix: 'rl:film-stripe-summary', limit: 30, windowSeconds: 60, privateResponse: true },
   orderRead: { prefix: 'rl:order-read', limit: 120, windowSeconds: 60 },   // 120 order reads/min/IP
   orderLookup: { prefix: 'rl:order-lookup', limit: 8, windowSeconds: 60 }   // 8 order lookup requests/min/IP
@@ -1508,6 +1535,138 @@ async function requireWorkersCachePurgeAccess(request, env) {
     source: 'admin_session',
     user: auth.user
   };
+}
+
+function requireWorkersCacheEvidenceAccess(request, env) {
+  const secret = configuredSecret(env?.WORKERS_CACHE_EVIDENCE_SECRET);
+  if (!secret) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Workers Cache evidence is not configured' }, 503, env)
+    };
+  }
+  const bearerToken = bearerTokenFromRequest(request);
+  if (!bearerToken || !timingSafeEqual(bearerToken, secret)) {
+    return {
+      ok: false,
+      response: privateJsonResponse({ error: 'Unauthorized' }, 401, env)
+    };
+  }
+  return { ok: true };
+}
+
+function sanitizedWorkersCacheEvidenceBudget(value = {}) {
+  const budget = {};
+  for (const key of [
+    'workersRequestsExpected',
+    'kvReadsExpected',
+    'kvWritesExpected',
+    'kvListExpected',
+    'r2ReadsExpected',
+    'r2WritesExpected',
+    'r2ListExpected',
+    'providerCallsExpected'
+  ]) {
+    budget[key] = Math.max(0, Number(value[key] || 0));
+  }
+  return budget;
+}
+
+async function collectWorkersCacheRouteEvidence(routeId, routeRequest, env, ctx, auth) {
+  const startedAt = performance.now();
+  const cached = await tryAdminStoreReadWorkersCache(routeRequest, env, ctx, auth, routeId);
+  let response = cached.response;
+  if (!response) {
+    const built = await buildAdminStoreCachedReadPayload(routeId, routeRequest, env, { ctx, auth });
+    if (!built.ok) return { ok: false, response: built.response };
+    response = privateAdminStoreReadGatewayResponse(
+      built.payload,
+      auth,
+      cached.metadata,
+      env,
+      { routeId, startedAt: cached.startedAt || startedAt }
+    );
+  }
+  const bytes = new Uint8Array(await response.clone().arrayBuffer());
+  const payload = JSON.parse(new TextDecoder().decode(bytes));
+  const workersCache = payload.workersCache || payload.page?.cache?.workers || cached.metadata || {};
+  return {
+    ok: true,
+    payload,
+    summary: {
+      status: String(workersCache.status || 'unavailable').toUpperCase(),
+      bypass: String(workersCache.bypass || ''),
+      durationMs: Number((performance.now() - startedAt).toFixed(2)),
+      responseBytes: bytes.byteLength,
+      unchanged: payload.unchanged === true,
+      writeBudget: sanitizedWorkersCacheEvidenceBudget(payload.writeBudget)
+    }
+  };
+}
+
+async function handleAdminWorkersCacheEvidence(request, env, ctx, body = {}) {
+  const access = requireWorkersCacheEvidenceAccess(request, env);
+  if (!access.ok) return access.response;
+  const rateLimit = await checkRateLimit(request, env, RATE_LIMITS.workersCacheEvidence);
+  if (!rateLimit.allowed) return rateLimit.response;
+
+  const routeId = String(body.route || 'orders').trim().toLowerCase();
+  const policy = adminStoreReadCachePolicy(routeId);
+  if (!policy) {
+    return privateJsonResponse({ error: 'Unsupported Workers Cache evidence route' }, 400, env);
+  }
+
+  const auth = {
+    ok: true,
+    user: {
+      email: '',
+      name: '',
+      role: 'super_admin',
+      accessScopes: []
+    }
+  };
+  const workerBase = String(env.WORKER_BASE || new URL(request.url).origin).replace(/\/+$/, '');
+  const firstUrl = new URL(policy.path, `${workerBase}/`);
+  if (routeId === 'orders') {
+    firstUrl.searchParams.set('status', 'confirmed');
+    firstUrl.searchParams.set('limit', '25');
+  }
+  const first = await collectWorkersCacheRouteEvidence(
+    routeId,
+    new Request(firstUrl.toString(), { headers: { Accept: 'application/json' } }),
+    env,
+    ctx,
+    auth
+  );
+  if (!first.ok) return first.response;
+
+  const repeatUrl = new URL(firstUrl);
+  const watermark = String(first.payload.watermark || first.payload.page?.watermark || '');
+  if (routeId === 'orders' && watermark) repeatUrl.searchParams.set('watermark', watermark);
+  const repeat = await collectWorkersCacheRouteEvidence(
+    routeId,
+    new Request(repeatUrl.toString(), { headers: { Accept: 'application/json' } }),
+    env,
+    ctx,
+    auth
+  );
+  if (!repeat.ok) return repeat.response;
+
+  return privateJsonResponse({
+    schemaVersion: 1,
+    measuredAt: new Date().toISOString(),
+    route: routeId,
+    containsResponseBodies: false,
+    containsCredentials: false,
+    containsCustomerData: false,
+    probe: first.summary,
+    repeat: repeat.summary,
+    requestBudget: {
+      probeReads: 2,
+      rateLimitKvReadsExpected: 1,
+      rateLimitKvWritesExpected: 1
+    }
+  }, 200, env);
 }
 
 function normalizeWorkersCachePurgeTarget(value) {
@@ -2378,6 +2537,7 @@ async function buildAdminStoreCachedReadPayload(routeId, request, env, options =
 }
 
 async function tryAdminStoreReadWorkersCache(request, env, ctx, auth, routeId) {
+  const startedAt = performance.now();
   const enabled = workersCacheEnabledForAdminStoreRead(env, routeId);
   const bypass = adminStoreReadCacheBypassReason(request, routeId);
   if (enabled && !bypass) {
@@ -2394,16 +2554,16 @@ async function tryAdminStoreReadWorkersCache(request, env, ctx, auth, routeId) {
         if (response.ok) {
           const workersCache = adminStoreReadWorkersCacheMetadata(routeId, response);
           return {
-            response: privateJsonResponse(
-              attachAdminStoreReadGatewayUser(payload, auth, workersCache),
-              200,
-              env,
-              {
+            response: privateAdminStoreReadGatewayResponse(payload, auth, workersCache, env, {
+              routeId,
+              startedAt,
+              responseBytes: new TextEncoder().encode(text).byteLength,
+              headers: {
                 'X-Store-Workers-Cache': workersCache.status,
                 'X-Store-Workers-Cache-Entry': ADMIN_STORE_READS_CACHE_ENTRYPOINT,
                 'X-Store-Workers-Cache-Route': routeId
               }
-            ),
+            }),
             metadata: workersCache
           };
         }
@@ -2420,6 +2580,7 @@ async function tryAdminStoreReadWorkersCache(request, env, ctx, auth, routeId) {
   }
   return {
     response: null,
+    startedAt,
     metadata: adminStoreReadWorkersCacheMetadata(routeId, null, {
       enabled,
       bypass: bypass || (enabled ? 'entrypoint_unavailable' : 'disabled')
@@ -2561,6 +2722,16 @@ export default {
 
       if (path === '/admin/settings' && method === 'GET') {
         return handleAdminSettings(request, env);
+      }
+
+      if (path === ADMIN_WORKERS_CACHE_EVIDENCE_PATH && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        return handleAdminWorkersCacheEvidence(request, env, ctx, parsedBody.body || {});
       }
 
       if (path === ADMIN_WORKERS_CACHE_PURGE_PATH && method === 'POST') {
@@ -6063,10 +6234,12 @@ async function handleAdminStoreDownloads(request, env, ctx = null) {
   const cached = await tryAdminStoreReadWorkersCache(request, env, ctx, auth, 'downloads');
   if (cached.response) return cached.response;
   const snapshot = await buildAdminStoreDownloadsSnapshot(env);
-  return privateJsonResponse(
-    attachAdminStoreReadGatewayUser(buildAdminStoreDownloadsReadPayload(snapshot), auth, cached.metadata),
-    200,
-    env
+  return privateAdminStoreReadGatewayResponse(
+    buildAdminStoreDownloadsReadPayload(snapshot),
+    auth,
+    cached.metadata,
+    env,
+    { routeId: 'downloads', startedAt: cached.startedAt }
   );
 }
 
@@ -9879,10 +10052,12 @@ async function handleAdminStoreInventory(request, env, ctx = null) {
     return privateJsonResponse({ error: snapshot.error }, snapshot.status || 503, env);
   }
 
-  return privateJsonResponse(
-    attachAdminStoreReadGatewayUser(buildAdminStoreInventoryReadPayload(snapshot), auth, cached.metadata),
-    200,
-    env
+  return privateAdminStoreReadGatewayResponse(
+    buildAdminStoreInventoryReadPayload(snapshot),
+    auth,
+    cached.metadata,
+    env,
+    { routeId: 'inventory', startedAt: cached.startedAt }
   );
 }
 
@@ -10212,10 +10387,12 @@ async function handleAdminStoreOrders(request, env, ctx = null) {
 
   const built = await buildAdminStoreOrdersPayload(request, env, { ctx, auth });
   if (!built.ok) return built.response;
-  return privateJsonResponse(
-    attachAdminStoreOrdersGatewayUser(built.payload, auth, cached.metadata),
-    200,
-    env
+  return privateAdminStoreReadGatewayResponse(
+    built.payload,
+    auth,
+    cached.metadata,
+    env,
+    { routeId: 'orders', startedAt: cached.startedAt }
   );
 }
 
@@ -10330,10 +10507,12 @@ async function handleAdminStoreAnalytics(request, env, ctx = null) {
   if (cached.response) return cached.response;
   const built = await buildAdminStoreCachedReadPayload('analytics', request, env, { ctx, auth });
   if (!built.ok) return built.response;
-  return privateJsonResponse(
-    attachAdminStoreReadGatewayUser(built.payload, auth, cached.metadata),
-    200,
-    env
+  return privateAdminStoreReadGatewayResponse(
+    built.payload,
+    auth,
+    cached.metadata,
+    env,
+    { routeId: 'analytics', startedAt: cached.startedAt }
   );
 }
 
@@ -13272,6 +13451,7 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['performance.intent_prefetch_limit', { label: 'Intent prefetch limit', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
   ['cache.live_inventory_ttl_seconds', { label: 'Live inventory cache TTL seconds', type: 'number', input: 'integer', min: 0, layoutGroup: 'performance' }],
   ['cache.workers_enabled', { label: 'Workers Cache enabled', type: 'boolean', layoutGroup: 'performance', help: 'Global kill switch for every authenticated Store admin Workers Cache route.' }],
+  ['cache.workers_telemetry_enabled', { label: 'Workers Cache telemetry enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls sanitized Analytics Engine cache status, latency, response-size, and operation-budget evidence without customer or order identifiers.' }],
   ['cache.workers_admin_orders_enabled', { label: 'Workers Cache admin Orders enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls the route-level Workers Cache gateway for non-search admin Orders list reads.' }],
   ['cache.workers_admin_analytics_enabled', { label: 'Workers Cache admin Analytics enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached order-derived Analytics reads.' }],
   ['cache.workers_admin_inventory_enabled', { label: 'Workers Cache admin Inventory enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached order-derived inventory summary reads.' }],
@@ -13377,6 +13557,8 @@ function adminSecretStatusRows(env) {
     ['Abandoned checkout token secret', abandonedCartSecretStatus, secretStatusHelp('Optional dedicated signing secret for reminder resume and unsubscribe links. If unset, Store uses the checkout intent or magic link secret.')],
     ['Admin session secret', status(env.ADMIN_SESSION_SECRET, false), secretStatusHelp('Dedicated signing secret for browser admin sessions. Optional in development because the Worker has fallbacks, but production should set it explicitly.')],
     ['Admin recovery secret', status(env.ADMIN_SECRET), secretStatusHelp('Bearer secret used by protected admin automation and recovery endpoints. Keep this in Worker or GitHub secrets only.')],
+    ['Workers Cache purge secret', status(env.WORKERS_CACHE_PURGE_SECRET, false), secretStatusHelp('Optional dedicated bearer used only for reviewed deploy-time or incident cache purge targets. Keep the matching value in Worker and GitHub secrets.')],
+    ['Workers Cache evidence secret', status(env.WORKERS_CACHE_EVIDENCE_SECRET, false), secretStatusHelp('Optional dedicated bearer used only by the rate-limited read-only cache metrics probe. Never reuse the purge or admin recovery secret.')],
     ['Admin Turnstile secret', status(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY, turnstileRequired), secretStatusHelp('Cloudflare Turnstile secret used to verify admin email sign-in challenges. Required when the admin Turnstile widget is enabled.')],
     ['Resend API key', status(env.RESEND_API_KEY), secretStatusHelp('Email provider API key used for admin magic links and Store order emails. Never store it in _config.yml.')],
     ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), secretStatusHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
@@ -14161,6 +14343,7 @@ async function handleAdminSettings(request, env) {
         ['Intent prefetch limit', env.INTENT_PREFETCH_LIMIT || '3', editableAdminSetting('performance.intent_prefetch_limit', 'number')],
         ['Live inventory cache TTL seconds', env.LIVE_INVENTORY_CACHE_TTL_SECONDS || '300', editableAdminSetting('cache.live_inventory_ttl_seconds', 'number')],
         ['Workers Cache enabled', workersCacheGloballyEnabled(env), editableAdminSetting('cache.workers_enabled', 'boolean')],
+        ['Workers Cache telemetry enabled', String(env.WORKERS_CACHE_TELEMETRY_ENABLED || 'true').trim().toLowerCase() !== 'false', editableAdminSetting('cache.workers_telemetry_enabled', 'boolean')],
         ['Workers Cache admin Orders enabled', workersCacheEnabledForAdminStoreRead(env, 'orders'), editableAdminSetting('cache.workers_admin_orders_enabled', 'boolean')],
         ['Workers Cache admin Analytics enabled', workersCacheEnabledForAdminStoreRead(env, 'analytics'), editableAdminSetting('cache.workers_admin_analytics_enabled', 'boolean')],
         ['Workers Cache admin Inventory enabled', workersCacheEnabledForAdminStoreRead(env, 'inventory'), editableAdminSetting('cache.workers_admin_inventory_enabled', 'boolean')],

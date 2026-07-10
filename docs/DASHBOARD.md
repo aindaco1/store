@@ -197,6 +197,7 @@ Performance/cache behavior:
 - The response payload includes `page.cache.workers` metadata, and the response headers include `X-Store-Workers-Cache` and `X-Store-Workers-Cache-Entry` when the cached entrypoint is used.
 - Order mutations purge Orders, Analytics, and order-derived inventory tags through the centralized dependency map. Purge failure does not fail the mutation; short TTLs and the manual refresh control bound stale exposure.
 - Analytics, inventory, and download-readiness cache policies are visible in Settings but default off until each passes a real Cloudflare edge benchmark.
+- Settings also exposes the global cache and sanitized telemetry switches. Publishing either switch requires the normal reviewed configuration/deployment path; the dashboard never receives Analytics Engine credentials or raw telemetry rows.
 
 Snipcart import:
 

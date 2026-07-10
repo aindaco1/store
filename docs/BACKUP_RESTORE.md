@@ -17,6 +17,8 @@ Initial objectives:
 
 Recommended retention is 7 daily, 5 weekly, and 12 monthly encrypted snapshots plus release snapshots. Keep at least one verified copy outside the production Cloudflare account and off the primary operator device.
 
+These objectives and retention counts remain provisional until the business/operator owner records approval. Automation enforces the checked-in values but does not manufacture that approval.
+
 ## Data Classes
 
 - **Authoritative:** `orders:`, inventory overrides, coupons, admin users, saved referrals, reminder suppressions, and `STORE_DOWNLOADS` objects.
@@ -40,6 +42,8 @@ A local metadata snapshot writes a v2 manifest, private `0700` directories/`0600
 ```bash
 npm run backup:snapshot -- --output "$HOME/store-backups/$(date -u +%Y%m%dT%H%M%SZ)"
 ```
+
+Pass `--release-snapshot` for an encrypted release snapshot that the retention planner must preserve.
 
 Read-only remote metadata adds Worker deployments/versions/secret names, shared provider readiness, and KV key inventories:
 
@@ -107,6 +111,8 @@ npm run restore:rehearse
 
 The drill uses synthetic PII, proves session data is excluded, verifies the v2 index rebuild action, and confirms the Podman Worker keeps unauthenticated admin responses private/no-store.
 
+The representative fixture includes physical, digital, ticket, RSVP, failed-payment, Stripe/email/reminder idempotency, audit, inventory-control, R2, quarantined, and derived-rebuild classes. Its runner permits only reviewed Wrangler KV/R2 commands and asserts that no Stripe, email, webhook, or check-in provider command is generated. This is application-contract evidence, not proof that a captured production snapshot is recoverable.
+
 ## Execute Local Or Preview Restore
 
 Execution requires an explicit overwrite decision:
@@ -120,7 +126,50 @@ npm run restore:plan -- \
   --persist-to=/tmp/store-restore-wrangler
 ```
 
-Use `--target=preview` only when the Wrangler preview namespaces/bucket are isolated and reviewed. The command transforms KV bulk-get output to bulk-put records in a private temporary directory, restores only reviewed authoritative/control artifacts, uploads included R2 objects, and deletes `admin-store-orders:index:v2` so normal admin reads rebuild it.
+Use `--target=preview` only when the Wrangler preview namespaces and R2 bucket are isolated and reviewed. KV supports Wrangler's `--preview` namespace selection, but R2 object commands do not; preview execution therefore requires an explicit bucket distinct from the captured source bucket:
+
+```bash
+npm run restore:plan -- \
+  --snapshot /secure/decrypted/store-snapshot \
+  --target=preview \
+  --preview-r2-bucket=store-downloads-preview \
+  --execute \
+  --conflict=overwrite
+```
+
+The command transforms KV bulk-get output to bulk-put records in a private temporary directory, restores only reviewed authoritative/control artifacts, uploads included R2 objects to the explicit preview bucket, and deletes `admin-store-orders:index:v2` so normal admin reads rebuild it. It rejects a missing preview bucket or one equal to the captured source bucket.
+
+## Readiness And Retention
+
+Generate a sanitized readiness report:
+
+```bash
+npm run backup:readiness -- \
+  --provider-evidence=/secure/evidence/providers.json \
+  --snapshot-receipt=/secure/backups/latest/manifest.json \
+  --rehearsal-evidence=/secure/evidence/recovery-rehearsal.json \
+  --strict \
+  --output=/secure/evidence/recovery-readiness.json
+```
+
+It checks the canonical inventory, metadata-only snapshot plan, credential names without values, required tools/encryption backend, provider failures, encrypted snapshot age, and rehearsal age. Missing live receipts are warnings unless `--require-current-evidence` is supplied.
+
+Retention is plan-only by default:
+
+```bash
+npm run backup:retention -- --root="$HOME/store-backups"
+```
+
+The planner revalidates encrypted receipt/archive checksums and never selects the newest, release, daily, weekly, monthly, invalid, unencrypted, symlinked, or checksum-mismatched entry. Deletion additionally requires a real, non-symlinked root outside the repository, recomputes retention eligibility immediately before deletion, revalidates each receipt/archive, and requires both `--execute` and `--acknowledge=STORE_BACKUP_RETENTION_PRUNE`. Review the plan and verify the off-device copy before executing it.
+
+## Scheduled Evidence And Drills
+
+- **Recovery Readiness** runs weekly at `03:43 America/Denver`. It performs read-only Cloudflare provider evidence, the representative Podman rehearsal, and backup readiness, then uploads sanitized evidence only.
+- **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of January, April, July, and October. The captured-data job remains disabled unless `RECOVERY_DRILL_ENABLED=true`.
+- The captured-data job shares production concurrency with deploy/cache operations and requires approval through the `production-recovery` environment. It requires a dedicated age recipient/identity, a fresh one-time super-admin token, and an explicit preview R2 bucket. It captures encrypted KV/admin/R2 data, decrypts only in private temporary runner storage, restores only to preview, derives artifacts from sanitized counts/status, and removes detailed restore output and plaintext material before artifact upload.
+- Store the dedicated recovery identity as a protected environment secret only after review; do not reuse an operator's personal/master key. A fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN` must be supplied immediately before approval because it is short-lived and one-time.
+- GitHub's 90-day encrypted drill artifact is an off-account test copy, not the approved long-term 7-daily/5-weekly/12-monthly destination and not proof of decryption on a second isolated device.
+- No scheduled or protected workflow contains a production restore acknowledgement or production target. A production restore remains a separate manual incident procedure governed by the gates below.
 
 ## Production Restore Gates
 

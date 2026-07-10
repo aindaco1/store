@@ -45,7 +45,8 @@ const LOCAL_GENERATED_SECRETS = [
   'CHECKOUT_INTENT_SECRET',
   'MAGIC_LINK_SECRET',
   'STORE_DOWNLOAD_SECRET',
-  'WORKERS_CACHE_PURGE_SECRET'
+  'WORKERS_CACHE_PURGE_SECRET',
+  'WORKERS_CACHE_EVIDENCE_SECRET'
 ];
 const LOCAL_OPTIONAL_SECRETS = [
   'STRIPE_SECRET_KEY',
@@ -80,6 +81,7 @@ const WORKER_SECRETS = [
   { name: 'MAGIC_LINK_SECRET', label: 'Admin/order magic-link HMAC secret', required: true, generate: true },
   { name: 'STORE_DOWNLOAD_SECRET', label: 'Signed download and fulfillment link secret', required: false, generate: true },
   { name: 'WORKERS_CACHE_PURGE_SECRET', label: 'Workers Cache deploy purge bearer secret', required: false, generate: true },
+  { name: 'WORKERS_CACHE_EVIDENCE_SECRET', label: 'Workers Cache read-only scheduled evidence bearer secret', required: false, generate: true },
   { name: 'TURNSTILE_SECRET_KEY', label: 'Cloudflare Turnstile secret key', required: true },
   { name: 'ADMIN_TURNSTILE_SECRET_KEY', label: 'Admin-specific Turnstile secret key', required: false },
   { name: 'STORE_ORDER_TURNSTILE_SECRET_KEY', label: 'Store order lookup Turnstile secret key', required: false },
@@ -92,6 +94,8 @@ const GITHUB_SECRETS = [
   { name: 'CLOUDFLARE_API_TOKEN', label: 'Cloudflare Workers deploy API token', required: true },
   { name: 'CLOUDFLARE_ACCOUNT_ID', label: 'Cloudflare account ID', required: true },
   { name: 'WORKERS_CACHE_PURGE_SECRET', label: 'Workers Cache deploy purge bearer secret (must match Worker secret)', required: false },
+  { name: 'WORKERS_CACHE_EVIDENCE_SECRET', label: 'Workers Cache scheduled evidence bearer secret (must match Worker secret)', required: false },
+  { name: 'CLOUDFLARE_ANALYTICS_API_TOKEN', label: 'Cloudflare Account Analytics Read token', required: false },
   { name: 'CLOUDFLARE_CACHE_PURGE_TOKEN', label: 'Cloudflare cache purge token (defaults to deploy token if skipped)', required: false }
 ];
 
@@ -650,6 +654,9 @@ async function configureSecrets() {
   const githubDefaults = new Map();
   if (workerValues.WORKERS_CACHE_PURGE_SECRET) {
     githubDefaults.set('WORKERS_CACHE_PURGE_SECRET', workerValues.WORKERS_CACHE_PURGE_SECRET);
+  }
+  if (workerValues.WORKERS_CACHE_EVIDENCE_SECRET) {
+    githubDefaults.set('WORKERS_CACHE_EVIDENCE_SECRET', workerValues.WORKERS_CACHE_EVIDENCE_SECRET);
   }
   const githubValues = await collectSecretValues(GITHUB_SECRETS, githubDefaults);
   for (const [name, value] of Object.entries(githubValues)) {

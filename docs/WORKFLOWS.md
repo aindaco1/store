@@ -332,10 +332,11 @@ Before a release or high-risk data/configuration change, start with metadata-onl
 ```bash
 npm run backup:inventory:audit
 npm run backup:plan
+npm run backup:readiness
 npm run restore:rehearse
 ```
 
-Use `npm run backup:snapshot` for an operator-owned snapshot outside the repository. Remote metadata is opt-in; KV values, R2 objects, and admin exports additionally require exact acknowledgement plus age/GPG encryption and decryptability verification. `npm run restore:plan -- --snapshot <path>` verifies checksums and emits a no-write plan by default. Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for local/preview execution and the additional maintenance, Stripe, inventory, pre-snapshot, and typed-confirmation gates for production.
+Use `npm run backup:snapshot` for an operator-owned snapshot outside the repository. Remote metadata is opt-in; KV values, R2 objects, and admin exports additionally require exact acknowledgement plus age/GPG encryption and decryptability verification. `npm run backup:retention -- --root <path>` plans retention without deleting by default. `npm run restore:plan -- --snapshot <path>` verifies checksums and emits a no-write plan by default; preview R2 execution additionally requires `--preview-r2-bucket` with a bucket distinct from the captured source. Follow [BACKUP_RESTORE.md](BACKUP_RESTORE.md) for the additional production gates.
 
 1. Merge catalog/settings/media changes.
 2. Run release smoke and backup planning before tagging.
@@ -348,10 +349,16 @@ Before production deploys that touch Worker bindings or runtime config:
 - confirm `worker/wrangler.toml` production bindings point at production `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` resources
 - set production Worker secrets with `wrangler secret put`
 - set `WORKERS_CACHE_PURGE_SECRET` to the same generated value in Cloudflare Worker secrets and GitHub repository secrets when deploy-time Workers Cache purge is enabled
+- set `WORKERS_CACHE_EVIDENCE_SECRET` to the same dedicated value in Cloudflare Worker secrets and GitHub `production-observability` secrets; do not reuse the purge or admin secret
+- set a read-only `CLOUDFLARE_ANALYTICS_API_TOKEN` for cache evidence and Worker-wide recovery traffic preflight
 - keep Cloudflare deploy tokens in GitHub or local operator environments only, not Worker runtime config
 - confirm DNS records for `shop.dustwave.xyz` and `checkout.dustwave.xyz`
 - confirm the cron trigger remains enabled for background maintenance
 - use `npm run deploy:worker` only for an explicit Worker-only manual deploy outside the production workflow
+
+Deploy, nightly cache evidence, and protected recovery use the shared `production-operations` concurrency group. **Workers Cache Evidence** runs at `03:17 America/Denver`, reads Analytics Engine, and performs only a bounded metrics probe below its cache-read threshold. **Recovery Readiness** runs at `03:43 America/Denver` each Sunday with synthetic data and read-only provider metadata. **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of each quarter.
+
+The quarterly captured-data job is disabled unless `RECOVERY_DRILL_ENABLED=true` and requires approval through `production-recovery`. Before enabling it, configure a dedicated age recipient/private identity, a fresh one-time `STORE_BACKUP_ADMIN_LOGIN_TOKEN`, and an explicit preview R2 bucket. The job can write only preview KV/R2 through `scripts/protected-recovery-drill.sh`; detailed restore output remains temporary and is removed before artifact upload, and the script has no production restore target or acknowledgement. Its encrypted GitHub artifact is 90-day drill evidence, not the long-term retention destination.
 
 Production non-secret config should match the intended public domains and providers unless an operator intentionally changes them:
 

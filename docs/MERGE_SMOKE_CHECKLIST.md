@@ -45,6 +45,8 @@ npm run release:i18n-seo-evidence
 npm run release:fulfillment-evidence
 npm run release:providers
 npm run release:payment-smoke
+npm run backup:readiness
+npm run restore:rehearse
 ```
 
 `npm run release:providers` can use authenticated `gh`, `wrangler`, and `stripe` CLIs for read-only evidence. Record any remaining warnings or skips in the generated evidence file.
@@ -113,6 +115,7 @@ Block merge or release when any of these fail:
 - A triggered ethical risk review identifies a high-impact misuse, privacy, fairness, consent, or customer-trust risk without a mitigation, owner, rollback path, or communication plan.
 - Accessibility smoke finds a keyboard trap, missing visible focus, broken status announcement, unusable high-zoom layout, or mobile overflow.
 - Podman release paths cannot build and run the Store/Worker stack.
+- Recovery evidence contains production/customer data, restores quarantined/derived state, targets production, or omits preview R2 isolation.
 
 ## Automated Gate
 
@@ -125,6 +128,7 @@ Block merge or release when any of these fail:
 - [ ] Confirm Worker fulfillment evidence passed.
 - [ ] Confirm `npm run release:providers` passed, or record each credential-based skip with owner/date/reason and provider-console evidence.
 - [ ] Confirm `npm run release:payment-smoke` passed. For direct local settlement, confirm the Worker used email dry-run flags and the matrix reported customer/admin order email dry-run evidence without Resend sends.
+- [ ] Confirm the representative Podman restore rehearsal and backup/recovery readiness phases passed. Treat a missing live encrypted snapshot receipt as an explicit operational warning, not as synthetic proof.
 - [ ] Confirm triggered ethical risk review is recorded in the PR or evidence file, or marked `N/A` with a reason.
 - [ ] Attach or archive the generated evidence file with release notes.
 
