@@ -8,7 +8,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 
 - Store is live at `https://shop.dustwave.xyz` with the Cloudflare Worker at `https://checkout.dustwave.xyz`.
 - The primary implementation scope for checkout, fulfillment, admin operations, i18n, accessibility, SEO, Podman, and release evidence is complete.
-- `v1.0.6` added the first Workers Cache hardening slice for authenticated admin Orders list reads, repeatable backup/snapshot planning automation, and Podman-backed default runtime tests.
+- `v1.0.6` added Workers Cache performance/read-efficiency hardening, versioned backup/restore/disaster-recovery automation, and Podman-backed default runtime tests.
 - Production Cloudflare DNS API evidence is covered by the non-deploying `Release Provider Evidence` GitHub Actions workflow on `main`; ongoing external evidence remains an operations gate, not a Store code gap.
 
 ## Completed
@@ -107,12 +107,14 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 - [x] Performance baseline
   - Public pages are statically rendered, the cart runtime loads lazily, generated assets are minified, and media optimizer checks keep responsive derivatives aligned.
   - Worker reads use generated catalog snapshots, indexed order state, bounded queue-state markers, and explicit admin reads instead of background polling.
+- [x] Cloudflare Workers Cache performance and read-efficiency hardening
   - Authenticated Store admin reads use the single `CachedAdminStoreReads` policy entrypoint after the uncached gateway authenticates and authorizes every request. Orders is enabled by default; Analytics, order-derived inventory, and R2 download readiness are implemented behind route switches and remain disabled pending real Cloudflare edge evidence.
   - The shared v2 order snapshot supplies Orders, analytics, and sold-count consumers without parallel namespace scans. Deterministic non-PII watermarks let repeated first-page Orders refreshes return `unchanged: true` without retransmitting customer/order rows; browser payloads remain memory-only.
   - Cache policies centralize canonical keys, short route-specific TTLs, low-cardinality tags, mutation dependencies, global/per-route kill switches, deploy/super-admin purge, search bypasses, private/no-store outer responses, non-PII props, failure-only diagnostics, and Workers/KV/R2/provider operation budgets.
   - Download readiness performs one R2 listing and derives attached-object readiness from it when the listing is complete. The discarded post-login dashboard summary request was removed.
   - `npm run cache:benchmark` captures cold, warm, no-change, search-bypass, purge, and disabled comparisons without persisting credentials, response bodies, or customer data. Unit/integration and Podman tests protect policy, security, failure fallback, mutation invalidation, and dashboard refresh behavior.
-  - Formal real-edge latency/hit-ratio evidence and Lighthouse automation remain future hardening.
+  - The default gateway and unsafe/tokenized/search routes remain uncached, `cross_version_cache` remains off, and deploy-time purge is retained as defense in depth rather than as a version-isolation dependency.
+  - Real Cloudflare edge latency/hit-ratio evidence, candidate enablement, and complementary Lighthouse budgets remain future operations work.
 
 **Security, privacy, backup, and production resilience**
 
@@ -124,13 +126,16 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
   - Tokenized order/download/admin routes use private/no-store response handling and stay out of public sitemap and social metadata.
   - Customer order lookup avoids existence leaks by returning generic request responses.
   - Digital download object keys stay out of public catalog data unless exposed through signed, order-scoped fulfillment.
-- [x] Backup, restore, and rollback guidance
+- [x] Backup, restore, and disaster recovery automation
   - [BACKUP_RESTORE.md](BACKUP_RESTORE.md) and `config/store-data-inventory.json` define recovery objectives, retention guidance, source-of-truth/sensitivity/restore classifications, quarantine rules, restore order, and verification for all known Store KV, R2, and Durable Object families. `npm run backup:inventory:audit` prevents unclassified storage families from shipping.
-  - Snapshot v2 captures private-permission Git/config/build/Wrangler/deployment/version/secret-name/provider evidence with SHA-256 checksums. Remote reads remain opt-in; secret values are never exported.
-  - Sensitive KV values, R2 objects, and one-time authenticated admin exports require an outside-repository destination, exact acknowledgement, operator-selected age/GPG encryption, and decryptability verification before plaintext staging is removed. Download discovery includes attached and unattached R2 library objects.
-  - `npm run restore:plan` verifies manifests/checksums and defaults to no writes. Local/preview execution requires an explicit conflict policy; production additionally requires maintenance, paused Stripe webhooks, inventory review, a verified pre-restore snapshot, and exact typed acknowledgement.
+  - Shared command, Wrangler/TOML, file-integrity, data-inventory, admin-export, and structured provider helpers keep setup, provider evidence, backup, restore, and release tooling DRY.
+  - Snapshot v2 captures private-permission Git/config/build/Wrangler/deployment/version/secret-name/provider evidence with SHA-256 coverage for every payload plus the finalized manifest. Remote reads remain opt-in; secret values are never exported.
+  - Sensitive KV values, R2 objects, and one-time authenticated admin exports require an outside-repository destination, exact acknowledgement, HTTPS except for loopback development, contained admin/R2 paths, operator-selected age/GPG encryption, and decryptability verification. Temporary plaintext archives are removed on success or failure, while protected staging remains available for operator recovery.
+  - Download discovery includes attached and unattached R2 library objects, records requested/completed object counts, and refuses missing bucket identity or path-escaping keys.
+  - `npm run restore:plan` verifies complete manifests/checksums and defaults to no writes. It rejects duplicate, unlisted, symbolic-link, unsupported, path-escaping, malformed, or missing-value artifacts and stops execution after the first failed provider command.
+  - Local/preview execution requires an explicit conflict policy; production additionally requires maintenance, paused Stripe webhooks, inventory review, a checksum-valid and distinct pre-restore snapshot, and exact typed acknowledgement. Production restore remains operator-gated and is never scheduled automatically.
   - Restore excludes sessions, nonces, rate limits, one-time capabilities, and other quarantined state; it schedules the v2 order index and other derived data for repair rather than treating projections or Durable Object reservations as authoritative.
-  - `npm run restore:rehearse` runs a synthetic Podman-backed integrity/restore drill with no production data or provider writes. Unit tests cover inventory completeness, snapshot safety, manifest verification, restore gates, repair planning, and command generation.
+  - `npm run restore:rehearse` runs a synthetic Podman-backed integrity/restore drill with no production data or provider writes. Unit tests cover inventory completeness, snapshot safety, transport/path containment, manifest tampering/completeness, restore gates, missing-value blocks, quarantine, repair planning, and fail-fast command generation.
   - Rollback guidance covers storefront deploys, Worker deploys, bad order state, stuck inventory reservations, and token rotation boundaries.
 - [x] Production operations posture
   - Operators are expected to keep Cloudflare Worker secrets, Stripe webhooks, Resend sender domains, USPS/NM GRT settings, `STORE_DOWNLOADS` objects, real inventory baselines, coupons, reminders, lookup, and download-library flows current.
@@ -241,28 +246,23 @@ Keep these scoped to Store's goals and data model. Share implementation patterns
   - Add a narrowly scoped maker/checker path only for manual money-affecting recovery operations that are not already automated or retry-safe, using existing admin sessions, role scopes, CSRF, and audit records rather than introducing a separate approval service.
   - Document any new journal, reconciliation records, and outbox behavior in [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [WORKFLOWS.md](WORKFLOWS.md), [SECURITY.md](SECURITY.md), [TESTING.md](TESTING.md), [EMAIL.md](EMAIL.md), and [../worker/README.md](../worker/README.md), including retention, PII, and operator runbooks.
 
-**Follow-up release note**
-
-The implementation below started from the published `v1.0.6` tag. That tag and GitHub release must not be moved or silently rewritten; merge and publish this follow-up as a later patch unless the existing release is deliberately withdrawn through an explicit release-management decision.
-
 - [ ] Cloudflare Workers Cache production evidence and rollout
   - Run `npm run cache:benchmark` against an authorized Cloudflare preview or production deployment with at least 30 samples for cache-enabled and cache-disabled cold, warm, repeated no-change, search-bypass, and post-purge cases. Record p50/p95/p99 latency, response bytes, `Cf-Cache-Status`, Worker CPU where available, and the emitted Workers/KV/R2/provider operation budgets.
   - Treat Cloudflare observability as the source for aggregate `HIT`/`MISS`/`UPDATING`/`BYPASS` ratios. Podman and in-process tests prove application behavior but must not be represented as proof of Cloudflare edge caching.
   - Require warm no-change Orders and Analytics hits to perform zero order-data KV list/get work after gateway authentication, improve p95 latency by at least 40 percent over uncached fallback, remain fresh after every covered mutation/purge, and save enough CPU/backend reads to justify the additional billed inner Workers request.
   - Keep Analytics, order-derived inventory, and download readiness disabled until each route passes its own evidence gate. Enable one route at a time in that order, monitor the production hit ratio and stale/fallback behavior, and leave low-value candidates uncached.
-  - Keep `cross_version_cache` off. Reconsider cross-version sharing only after rollback/version-tag purge tests, measured hit-ratio benefit, and an incident procedure are recorded.
+  - Reconsider the completed `cross_version_cache: false` default only after rollback/version-tag purge tests, measured hit-ratio benefit, and an incident procedure are recorded.
   - Add the sanitized benchmark and Cloudflare dashboard results to release evidence. Do not persist login tokens, cookies, response bodies, cache keys containing PII, or customer data.
   - Add formal Lighthouse/performance budgets only where they complement, rather than duplicate, the Worker route benchmark.
 
 - [ ] Backup, restore, and disaster recovery operations
   - Obtain business/operator approval for the provisional RPO/RTO and 7-daily/5-weekly/12-monthly retention policy. Decide whether four-hour encrypted snapshots during active sales are required after measuring actual snapshot duration and Cloudflare KV/R2 usage.
   - Perform a live encrypted sensitive snapshot with an operator-controlled age/GPG key outside the repository, verify decryption on an isolated device/location, capture all intended KV/admin/R2 classes including unattached R2 objects, and record only the sanitized receipt and measured usage.
-  - Rehearse a full captured snapshot in an isolated local/preview target. Extend the synthetic drill with representative physical, digital, ticket, RSVP, payment/idempotency, reminder, audit, R2, inventory, corrupt-checksum, wrong-target, malformed-value, missing-object, and quarantined-record cases before calling the recovery objective proven.
+  - Rehearse a full live captured snapshot in an isolated local/preview target. Extend the completed synthetic integrity/quarantine/malformed/missing-value coverage with representative physical, digital, ticket, RSVP, payment/idempotency, reminder, audit, R2, and inventory records before calling the recovery objective proven.
   - Implement and test a reviewed Durable Object inventory reconciliation operation; never import Durable Object storage directly. Add read-only Stripe comparison and second operator sign-off before any settled-order, replay-control, or money-affecting recovery.
   - Add retention pruning safeguards, at least one verified off-device copy outside the production Cloudflare account, and a scheduled non-mutating readiness check for inventory coverage, required secret names, snapshot age, rehearsal age, and provider/tool access. CI may retain sanitized evidence only.
   - Integrate sanitized `backup:plan`, inventory audit, provider evidence, and last rehearsal status into release smoke after their runtime and credentials are stable.
   - Run and record an isolated restore drill at least quarterly and before storage-schema, payment-state, inventory-coordinator, or provider migrations. Track duration against RTO, verified classes, skips, failures, owner, and corrective actions.
-  - Keep production restore operator-gated and incident-specific. Do not schedule or automatically execute production restore writes.
 
 - [ ] Tax calculator and compliance hardening
   - Start from Store's implemented baseline: Worker-owned `tax/quote`, checkout-total calculation, persisted order tax details, email/admin/export totals, `_config.yml` non-secret tax settings, Worker secrets for provider keys, New Mexico GRT defaults, and optional ZIP.TAX provider support.

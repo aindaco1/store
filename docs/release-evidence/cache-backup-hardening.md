@@ -3,7 +3,7 @@
 - Generated: `2026-07-10T01:44:15Z`
 - Branch: `release/1.0.6-cache-backup-hardening`
 - Base commit/tag: `42a5e902fa4fc7f479b6bf147736506caff4636d` / `v1.0.6`
-- Release status: unreleased follow-up; the published `v1.0.6` tag was not moved
+- Release status: documented as additional `v1.0.6` hardening; the published tag was not moved
 - Production deployment: not performed
 
 ## Automated Evidence
