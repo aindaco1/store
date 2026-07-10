@@ -156,3 +156,8 @@ jobs:
         env:
           CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
           CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Verify admin response security policy
+        run: npm run cloudflare:admin-response-rule -- --verify-public --require-current
+        env:
+          SITE_BASE: https://shop.dustwave.xyz

@@ -37,6 +37,7 @@
     "catalog:generate": "ruby ./scripts/generate-catalog-snapshot.rb",
     "secrets:dev": "./scripts/configure-dev-secrets.sh",
     "setup:deploy": "node ./scripts/setup-deploy.mjs",
+    "cloudflare:admin-response-rule": "node ./scripts/configure-cloudflare-admin-response-rule.mjs",
     "backup:plan": "node ./scripts/store-backup.mjs --dry-run",
     "backup:snapshot": "node ./scripts/store-backup.mjs",
     "backup:inventory:audit": "node ./scripts/audit-store-data-inventory.mjs",

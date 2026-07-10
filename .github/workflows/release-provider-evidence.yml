@@ -23,6 +23,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_ZONE }}
       CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      SITE_BASE: https://shop.dustwave.xyz
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -34,3 +35,6 @@ jobs:
 
       - name: Verify Cloudflare DNS release evidence
         run: npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars
+
+      - name: Verify admin response security rule
+        run: npm run cloudflare:admin-response-rule -- --verify-public --require-current
