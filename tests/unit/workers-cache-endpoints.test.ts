@@ -394,6 +394,31 @@ describe('Workers Cache admin endpoints', () => {
     expect(JSON.stringify(body)).not.toContain('evidence_secret');
   });
 
+  it('fails closed when the cached entrypoint rejects the scoped evidence read', async () => {
+    const env = buildEnv();
+    const cacheFetch = vi.fn(async () => new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'private, no-store'
+      }
+    }));
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/evidence`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer evidence_secret',
+        'Content-Type': 'application/json',
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ route: 'orders' })
+    }), env, buildCtx(cacheFetch));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Cache-Control')).toContain('private');
+    expect(await response.json()).toEqual({ error: 'Forbidden' });
+    expect(cacheFetch).toHaveBeenCalledTimes(1);
+  });
+
   it('routes Analytics, Inventory, and Downloads through the cohesive cached entrypoint', async () => {
     const env = buildEnv();
     const cacheFetch = vi.fn(async (request: Request, init: { props: Record<string, unknown> }) => {

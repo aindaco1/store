@@ -138,6 +138,13 @@ describe('Workers Cache policy helpers', () => {
     await fetchAdminStoreOrdersWorkersCache({ exports: { CachedAdminStoreReads: factory } }, request, props);
     expect(factory).toHaveBeenCalledWith({ props });
     expect(functionFetch).toHaveBeenCalledWith(request);
+
+    const hybridFetch = vi.fn().mockResolvedValue(new Response('{}'));
+    const hybridFactory = vi.fn().mockReturnValue({ fetch: functionFetch }) as any;
+    hybridFactory.fetch = hybridFetch;
+    await fetchAdminStoreOrdersWorkersCache({ exports: { CachedAdminStoreReads: hybridFactory } }, request, props);
+    expect(hybridFactory).toHaveBeenCalledWith({ props });
+    expect(hybridFetch).not.toHaveBeenCalled();
   });
 
   it('rejects malformed internal props before reading private data', () => {

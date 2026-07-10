@@ -437,14 +437,14 @@ function getAdminStoreReadWorkersCacheBinding(ctx = null, routeId = '') {
 function fetchAdminStoreReadWorkersCache(ctx = null, request, props = {}) {
   const binding = getAdminStoreReadWorkersCacheBinding(ctx, props.routeId);
   if (!binding) return null;
-  if (typeof binding.fetch === 'function') {
-    return binding.fetch(request, { props });
-  }
   if (typeof binding === 'function') {
     const scopedBinding = binding({ props });
     if (scopedBinding && typeof scopedBinding.fetch === 'function') {
       return scopedBinding.fetch(request);
     }
+  }
+  if (typeof binding.fetch === 'function') {
+    return binding.fetch(request, { props });
   }
   return null;
 }
@@ -1587,6 +1587,7 @@ async function collectWorkersCacheRouteEvidence(routeId, routeRequest, env, ctx,
       { routeId, startedAt: cached.startedAt || startedAt }
     );
   }
+  if (!response.ok) return { ok: false, response };
   const bytes = new Uint8Array(await response.clone().arrayBuffer());
   const payload = JSON.parse(new TextDecoder().decode(bytes));
   const workersCache = payload.workersCache || payload.page?.cache?.workers || cached.metadata || {};

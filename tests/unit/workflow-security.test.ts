@@ -17,6 +17,9 @@ describe('workflow security posture', () => {
     expect(deploy).toContain('CLOUDFLARE_CACHE_PURGE_TOKEN');
     expect(deploy).toContain('/admin/workers-cache/purge');
     expect(deploy).toContain('WORKERS_CACHE_PURGE_SECRET');
+    expect(deploy).toContain('for attempt in 1 2 3 4 5 6');
+    expect(deploy).toContain('waiting for Worker propagation');
+    expect(deploy).toContain('sleep "$((attempt * 5))"');
     expect(deploy).not.toContain('CLOUDFLARE_EMAIL:');
     expect(deploy).not.toContain('CLOUDFLARE_KEY:');
   });
