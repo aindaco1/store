@@ -341,7 +341,7 @@ Use `npm run backup:snapshot` for an operator-owned snapshot outside the reposit
 1. Merge catalog/settings/media changes.
 2. Run release smoke and backup planning before tagging.
 3. Dispatch the **Deploy Production** workflow manually when the operator is ready to deploy.
-4. The workflow generates the catalog snapshot, builds Jekyll, minifies generated `_site` assets, deploys the Worker to Cloudflare, purges known Workers Cache entries when `WORKERS_CACHE_PURGE_SECRET` is configured, deploys the static site to GitHub Pages, and optionally purges the Cloudflare zone cache when enabled.
+4. The workflow generates the catalog snapshot, builds Jekyll, minifies generated `_site` assets, idempotently maintains the path-scoped admin `no-transform`/`no-store` Cache Response Rule, deploys the Worker to Cloudflare, purges known Workers Cache entries when `WORKERS_CACHE_PURGE_SECRET` is configured, deploys the static site to GitHub Pages, and optionally purges the Cloudflare zone cache when enabled.
 5. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
 
 Before production deploys that touch Worker bindings or runtime config:

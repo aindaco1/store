@@ -190,7 +190,7 @@ Payment-specific setup, webhook, and reconciliation checks are documented in [PA
 
 `npm run launch:readiness` checks repo-visible production inputs. `npm run release:providers` can verify external account state when read-only provider credentials are present. Anything skipped by that probe still needs provider-console evidence in the release notes.
 
-For production Cloudflare DNS evidence, use the `Release Provider Evidence` GitHub Actions workflow. It runs the provider probe in Cloudflare DNS-only strict mode with production Cloudflare secrets that are intentionally not readable from a local checkout. Strict CI requires a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read` for the production zone, plus `CLOUDFLARE_ZONE_ID` when the token cannot look up zones by name. The deploy `CLOUDFLARE_API_TOKEN` remains separate and should not need DNS record access.
+For production Cloudflare DNS and admin response-rule evidence, use the `Release Provider Evidence` GitHub Actions workflow. It runs the DNS probe plus a read-only check of the Store-managed Cache Response Rule with production Cloudflare secrets that are intentionally not readable from a local checkout. Strict DNS CI requires a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read`; the admin rule requires `CLOUDFLARE_CACHE_RULES_API_TOKEN` with Cache Rules Edit and `CLOUDFLARE_ZONE_ID`. Keep the Worker deploy, DNS-read, cache-purge, and cache-rule credentials separate.
 
 ## Manual Store Smoke
 

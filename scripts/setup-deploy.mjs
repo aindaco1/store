@@ -96,7 +96,9 @@ const GITHUB_SECRETS = [
   { name: 'WORKERS_CACHE_PURGE_SECRET', label: 'Workers Cache deploy purge bearer secret (must match Worker secret)', required: false },
   { name: 'WORKERS_CACHE_EVIDENCE_SECRET', label: 'Workers Cache scheduled evidence bearer secret (must match Worker secret)', required: false },
   { name: 'CLOUDFLARE_ANALYTICS_API_TOKEN', label: 'Cloudflare Account Analytics Read token', required: false },
-  { name: 'CLOUDFLARE_CACHE_PURGE_TOKEN', label: 'Cloudflare cache purge token (defaults to deploy token if skipped)', required: false }
+  { name: 'CLOUDFLARE_CACHE_PURGE_TOKEN', label: 'Cloudflare cache purge token (defaults to deploy token if skipped)', required: false },
+  { name: 'CLOUDFLARE_CACHE_RULES_API_TOKEN', label: 'Cloudflare Cache Rules Edit token for Store admin response policy', required: false },
+  { name: 'CLOUDFLARE_ZONE_ID', label: 'Cloudflare production zone ID for scoped cache response rules', required: false }
 ];
 
 function printHelp() {

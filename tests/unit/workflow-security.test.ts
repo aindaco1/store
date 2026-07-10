@@ -20,6 +20,9 @@ describe('workflow security posture', () => {
     expect(deploy).toContain('for attempt in 1 2 3 4 5 6');
     expect(deploy).toContain('waiting for Worker propagation');
     expect(deploy).toContain('sleep "$((attempt * 5))"');
+    expect(deploy).toContain('npm run cloudflare:admin-response-rule -- --apply --require-current');
+    expect(deploy).toContain('CLOUDFLARE_CACHE_RULES_API_TOKEN');
+    expect(deploy).toContain('CLOUDFLARE_ZONE_ID');
     expect(deploy).not.toContain('CLOUDFLARE_EMAIL:');
     expect(deploy).not.toContain('CLOUDFLARE_KEY:');
   });
@@ -60,13 +63,16 @@ describe('workflow security posture', () => {
     expect(workflow).not.toMatch(/CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|STRIPE_LIVE_SECRET_KEY/);
   });
 
-  it('keeps release provider evidence read-only and DNS-scoped', () => {
+  it('keeps release provider evidence read-only and provider-scoped', () => {
     const workflow = readWorkflow('release-provider-evidence.yml');
 
     expect(workflow).toContain('permissions:\n  contents: read');
     expect(workflow).toContain('CLOUDFLARE_DNS_API_TOKEN');
     expect(workflow).toContain('CLOUDFLARE_ZONE_ID');
     expect(workflow).toContain('npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars');
+    expect(workflow).toContain('npm run cloudflare:admin-response-rule -- --require-current');
+    expect(workflow).toContain('CLOUDFLARE_CACHE_RULES_API_TOKEN');
+    expect(workflow).not.toContain('--apply');
     expect(workflow).not.toMatch(/wrangler deploy|deploy:worker|purge_cache|contents: write|pull-requests: write/);
   });
 

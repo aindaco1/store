@@ -46,6 +46,7 @@ Secret storage rules:
 - Production Worker secrets belong in Cloudflare Worker secrets via `wrangler secret put`.
 - GitHub repository secrets are for CI/deploy/operator workflows only; they are not runtime Worker secrets.
 - `WORKERS_CACHE_PURGE_SECRET` and `WORKERS_CACHE_EVIDENCE_SECRET` are narrow exceptions that must be present in both Worker and GitHub secrets with matching values. The purge secret authorizes reviewed tag targets after deploy; the evidence secret authorizes only the fixed read-only metrics probe.
+- `CLOUDFLARE_CACHE_RULES_API_TOKEN` is a dedicated GitHub-only Cache Rules Edit credential. Deploy uses it to maintain one path-scoped Cache Response Rule for `/admin/` and `/es/admin/`; the rule sets `private, no-store, no-transform, max-age=0, must-revalidate`, preventing Cloudflare JavaScript Detection and automatic Web Analytics injection without allowing inline scripts or replacing unrelated zone rules.
 - `_config.yml`, product markdown, and admin-published settings must never contain Stripe, Resend, USPS, ZIP.TAX, Cloudflare, GitHub, or admin session secrets.
 - The admin dashboard may show configured/missing status for credentials, but must not expose, edit, serialize, or publish secret values.
 

@@ -125,9 +125,9 @@ describe('Store SEO templates', () => {
     expect(adminLayout).toContain('social=false');
     expect(adminLayout).toContain('data-cfasync="false"');
     expect(adminLayout).toContain('/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}');
-    expect(adminCsp).toContain('https://static.cloudflareinsights.com');
-    expect(adminCsp).toContain('https://cloudflareinsights.com');
-    expect(adminCsp).toContain("'sha256-fmTc2S1qBUoxMlQ5hNbPPGRCgGvoWqX2volGkiDGt3I='");
+    expect(adminCsp).toContain('https://challenges.cloudflare.com');
+    expect(adminCsp).not.toContain('cloudflareinsights.com');
+    expect(adminCsp).not.toContain("'sha256-");
     expect(adminCsp).not.toContain("'unsafe-inline'");
     const qrVendor = readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js');
     expect(qrVendor).toContain('QR Code Generator for JavaScript');
