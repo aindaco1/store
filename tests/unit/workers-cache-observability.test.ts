@@ -99,8 +99,16 @@ describe('Workers Cache observability evidence', () => {
         containsCredentials: false,
         containsCustomerData: false,
         probe: { status: 'MISS', unchanged: false, writeBudget: { kvReadsExpected: 1, kvListExpected: 1 } },
+        warmup: { status: 'MISS', unchanged: true, writeBudget: { kvReadsExpected: 1, kvListExpected: 1 } },
         repeat: { status: 'HIT', unchanged: true, writeBudget: { kvReadsExpected: 0, kvListExpected: 0 } },
-        requestBudget: { probeReads: 2, rateLimitKvReadsExpected: 1, rateLimitKvWritesExpected: 1 }
+        requestBudget: {
+          probeReads: 3,
+          fullLookupReads: 1,
+          noChangeWarmupReads: 1,
+          noChangeRepeatReads: 1,
+          rateLimitKvReadsExpected: 1,
+          rateLimitKvWritesExpected: 1
+        }
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -126,6 +134,8 @@ describe('Workers Cache observability evidence', () => {
       acceptance: { passed: true },
       probeState: 'evaluated',
       probeChecks: expect.arrayContaining([
+        expect.objectContaining({ id: 'bounded-probe-reads', ok: true }),
+        expect.objectContaining({ id: 'warmup-unchanged', ok: true }),
         expect.objectContaining({ id: 'repeat-cache-status', ok: true }),
         expect.objectContaining({ id: 'repeat-zero-kv-reads', ok: true })
       ])

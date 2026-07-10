@@ -218,6 +218,8 @@ function probeGate(probe = null) {
   const repeatStatus = String(probe.repeat?.status || '').toUpperCase();
   const checks = [
     { id: 'sanitized', ok: probe.containsResponseBodies === false && probe.containsCredentials === false && probe.containsCustomerData === false },
+    { id: 'bounded-probe-reads', ok: numeric(probe.requestBudget?.probeReads) === 3 },
+    { id: 'warmup-unchanged', ok: probe.route !== 'orders' || probe.warmup?.unchanged === true },
     { id: 'repeat-cache-status', ok: HIT_STATUSES.has(repeatStatus) },
     { id: 'repeat-unchanged', ok: probe.route !== 'orders' || probe.repeat?.unchanged === true },
     { id: 'repeat-zero-kv-reads', ok: numeric(probe.repeat?.writeBudget?.kvReadsExpected) === 0 && numeric(probe.repeat?.writeBudget?.kvListExpected) === 0 }
@@ -280,6 +282,7 @@ export async function collectWorkersCacheObservability(options = {}) {
       route: probe.route,
       measuredAt: probe.measuredAt,
       probe: probe.probe,
+      warmup: probe.warmup,
       repeat: probe.repeat,
       requestBudget: probe.requestBudget
     } : null,
