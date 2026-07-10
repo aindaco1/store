@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
+import { gotoDomReady } from './helpers/navigation';
+import { applyTextScale } from './helpers/rendering';
 
 const WORKER_BASE = process.env.PLAYWRIGHT_WORKER_BASE_URL || 'http://127.0.0.1:8989';
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
@@ -10,22 +12,6 @@ const JSON_HEADERS = {
   'access-control-allow-credentials': 'true'
 };
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
-
-async function applyTextScale(page: any, percent = 200) {
-  const stylesheetPath = `/__store-text-scale-${percent}.css`;
-  await page.route(`**${stylesheetPath}`, async (route: any) => {
-    await route.fulfill({
-      contentType: 'text/css',
-      body: `:root { font-size: ${percent}% !important; }`
-    });
-  });
-  await page.addStyleTag({ url: stylesheetPath });
-  await page.evaluate(async () => {
-    await document.fonts?.ready;
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-  });
-}
 
 type AdminRole = 'super_admin' | 'limited_admin';
 
@@ -1742,7 +1728,7 @@ test.describe('Admin Dashboard', () => {
       await dialog.accept();
     });
 
-    await page.goto('/admin/');
+    await gotoDomReady(page, '/admin/');
     await expect(page.locator('#admin-auth-panel')).toBeVisible();
     await page.locator('#admin-email').fill(SUPER_ADMIN_EMAIL);
     await page.keyboard.press('Tab');
@@ -2825,7 +2811,7 @@ test.describe('Admin Dashboard', () => {
     await routeAdminWorker(page);
     await page.setViewportSize({ width: 1366, height: 768 });
 
-    await page.goto('/admin/?admin_login=admin-token-orders-desktop');
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-orders-desktop');
     await expect(page.locator('#admin-app')).toBeVisible();
 
     await selectAdminSection(page, 'Orders');
@@ -2854,7 +2840,7 @@ test.describe('Admin Dashboard', () => {
   test('loads the Spanish admin route and keeps limited admins in Store-only areas', async ({ page }) => {
     const calls = await routeAdminWorker(page, { role: 'limited_admin' });
 
-    await page.goto('/es/admin/?admin_login=creator-token');
+    await gotoDomReady(page, '/es/admin/?admin_login=creator-token');
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
     await expect(page.locator('#admin-app')).toBeVisible();
 	    await expect(page.locator('#admin-session-summary')).toContainText(LIMITED_ADMIN_EMAIL);
@@ -2873,15 +2859,17 @@ test.describe('Admin Dashboard', () => {
 
   test('restores the last admin tab and settings section after an authenticated reload', async ({ page }) => {
     await routeAdminWorker(page);
+    const reloadAdmin = async (path: string) => {
+      await gotoDomReady(page, path, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('#admin-app')).toBeVisible();
+    };
 
-    await page.goto('/admin/?admin_login=persist-token-orders');
-    await expect(page.locator('#admin-app')).toBeVisible();
+    await reloadAdmin('/admin/?admin_login=persist-token-orders');
     await selectAdminSection(page, 'Orders');
     await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('store-admin-dashboard-state:v1') || '{}').tab)).toBe('store-orders');
 
-    await page.goto('/admin/?admin_login=persist-token-orders-refresh');
-    await expect(page.locator('#admin-app')).toBeVisible();
+    await reloadAdmin('/admin/?admin_login=persist-token-orders-refresh');
     await expect(page.locator('#admin-tab-store-orders')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
 
@@ -2892,13 +2880,11 @@ test.describe('Admin Dashboard', () => {
       settingsSection: expect.any(Number)
     });
 
-    await page.goto('/admin/?admin_login=persist-token-settings-refresh');
-    await expect(page.locator('#admin-app')).toBeVisible();
+    await reloadAdmin('/admin/?admin_login=persist-token-settings-refresh');
     await expect(page.locator('#admin-tab-settings')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#admin-settings-section-tabs [data-settings-section-label="Shipping"]')).toHaveAttribute('aria-selected', 'true');
 
-    await page.goto('/admin/?admin_login=persist-token-products&tab=store-products');
-    await expect(page.locator('#admin-app')).toBeVisible();
+    await reloadAdmin('/admin/?admin_login=persist-token-products&tab=store-products');
     await expect(page.locator('#admin-tab-store-products')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#admin-panel-store-products')).toBeVisible();
   });
@@ -2907,7 +2893,7 @@ test.describe('Admin Dashboard', () => {
     const calls = await routeAdminWorker(page);
     await page.setViewportSize({ width: 912, height: 1368 });
 
-    await page.goto('/es/admin/?admin_login=admin-token-es-tablet');
+    await gotoDomReady(page, '/es/admin/?admin_login=admin-token-es-tablet');
     await expect(page.locator('#admin-app')).toBeVisible();
     expect(calls.summary).toHaveLength(0);
     await expect.poll(() => calls.settings.length).toBeGreaterThan(0);
@@ -2949,7 +2935,7 @@ test.describe('Admin Dashboard', () => {
     const calls = await routeAdminWorker(page);
     await page.setViewportSize({ width: 390, height: 844 });
 
-    await page.goto('/admin/?admin_login=admin-token-products-mobile');
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-products-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
     expect(calls.summary).toHaveLength(0);
 
@@ -3004,7 +2990,7 @@ test.describe('Admin Dashboard', () => {
     const calls = await routeAdminWorker(page);
     await page.setViewportSize({ width: 390, height: 844 });
 
-    await page.goto('/admin/?admin_login=admin-token-orders-mobile');
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-orders-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
     expect(calls.summary).toHaveLength(0);
 
@@ -3064,7 +3050,7 @@ test.describe('Admin Dashboard', () => {
       await dialog.accept();
     });
 
-    await page.goto('/admin/?admin_login=admin-token-downloads-mobile');
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-downloads-mobile');
     await expect(page.locator('#admin-app')).toBeVisible();
     expect(calls.summary).toHaveLength(0);
 
@@ -3137,7 +3123,7 @@ test.describe('Admin Dashboard', () => {
     const calls = await routeAdminWorker(page);
     await page.setViewportSize({ width: 1280, height: 900 });
 
-    await page.goto('/admin/?admin_login=admin-token-text-scale');
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-text-scale');
     await expect(page.locator('#admin-app')).toBeVisible();
     await applyTextScale(page);
     expect(calls.summary).toHaveLength(0);

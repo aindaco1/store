@@ -1,5 +1,6 @@
 import SalesTax from 'sales-tax';
 
+import { normalizeDestinationCountry, normalizeDestinationPostalCode } from './destination-validation.js';
 import { getSalesTaxRate, getShippingOriginCountry } from './provider-config.js';
 import { NM_GRT_STARTER_LOCATIONS } from './tax-data/nm-grt-starter.js';
 
@@ -109,28 +110,46 @@ export function normalizeTaxDestination(value) {
     };
   }
 
+  const rawCountry = String(value.country || value.countryCode || '').trim();
+  const rawPostalCode = String(value.postalCode || value.postal_code || '').trim();
+  const country = normalizeDestinationCountry(rawCountry);
+  const postalCode = normalizeDestinationPostalCode(rawPostalCode, country);
   const destination = {
-    country: String(value.country || value.countryCode || '').trim().toUpperCase(),
-    postalCode: String(value.postalCode || value.postal_code || '').trim(),
+    country,
+    postalCode,
     state: String(value.state || value.province || value.region || value.stateCode || '').trim().toUpperCase(),
     city: String(value.city || '').trim(),
     line1: String(value.line1 || value.address1 || value.street || '').trim(),
     line2: String(value.line2 || value.address2 || '').trim()
   };
 
-  if (!destination.country) {
+  if (!rawCountry) {
     return {
       valid: false,
       destination: null,
       error: 'Billing country is required'
     };
   }
+  if (!country) {
+    return {
+      valid: false,
+      destination: null,
+      error: 'Billing country must use a two-letter code'
+    };
+  }
 
-  if (!destination.postalCode) {
+  if (!rawPostalCode) {
     return {
       valid: false,
       destination: null,
       error: 'Billing postal code is required'
+    };
+  }
+  if (!postalCode) {
+    return {
+      valid: false,
+      destination: null,
+      error: 'Billing postal code is invalid'
     };
   }
 

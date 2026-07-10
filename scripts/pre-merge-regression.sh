@@ -465,6 +465,8 @@ if [[ "${USE_PODMAN_JEKYLL}" = "true" ]]; then
   fi
 fi
 
+run_phase "7b. Podman release resource check" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor
+
 if command -v lsof >/dev/null 2>&1; then
   EXISTING_WORKER_PIDS="$(lsof -ti tcp:8989 || true)"
   if [[ -n "${EXISTING_WORKER_PIDS}" ]]; then

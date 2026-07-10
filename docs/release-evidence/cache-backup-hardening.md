@@ -1,19 +1,19 @@
 # Cache And Recovery Hardening Evidence
 
-- Generated: `2026-07-10T04:04:07Z`; updated `2026-07-10T15:15:21Z`
-- Branch: `feature/cache-recovery-operations`
-- Base commit/tag: `1e30af2` / `v1.0.6`
-- Release status: additional `v1.0.6` hardening; the published tag was not moved
-- Production deployment at initial evidence capture: not performed; follow-up deployment and operational evidence are recorded below
+- Generated: `2026-07-10T04:04:07Z`; updated `2026-07-10T20:17:26Z`
+- Branches: `feature/cache-recovery-operations`, then `hotfix/1.0.6-order-index-bulk-read`
+- Release commit/tag before the hotfix: `85e24b5` / `v1.0.6`
+- Release status: the published `v1.0.6` tag and release point to the merged hardening commit; the same-release bulk-read hotfix passed the complete pre-merge release gate and awaits merge, tag retargeting, deployment, and production evidence
+- Production deployment: completed through the protected manual workflow; no production restore or recovery mutation was performed
 
 ## Automated Evidence
 
 | Result | Check | Evidence |
 | --- | --- | --- |
-| PASS | Definitive release smoke | `npm run release:smoke -- --podman-e2e --evidence-file /tmp/store-1.0.6-cache-recovery-operations-final-release-smoke.md`; all enabled phases passed. Logs: `/tmp/store-release-smoke-logs.vrJKMj`. |
-| PASS | Full unit suite | Vitest 4 ran 323 tests across 69 files, including cache policy, endpoint, telemetry, deployment observability, benchmark, backup, retention, preview verification/cleanup, captured reconciliation, maker/checker plus provider-gated recovery, and workflow safeguards. |
+| PASS | Definitive hotfix release smoke | `npm run release:smoke -- --podman-e2e --evidence-file /tmp/store-1.0.6-order-index-bulk-read-release-smoke-final.md`; all enabled phases passed against the final hotfix tree. Logs: `/tmp/store-release-smoke-logs.UKCZIG`. |
+| PASS | Full unit suite | Vitest 4 ran 325 tests across 69 files, including a 417-order, five-batch KV rebuild and non-bulk adapter fallback plus cache policy, endpoint, telemetry, deployment observability, benchmark, backup, retention, preview verification/cleanup, captured reconciliation, maker/checker plus provider-gated recovery, and workflow safeguards. |
 | PASS | Podman security | 22 tests passed against the production-like local stack, including evidence-secret authorization, admin boundaries, input limits, webhook signatures, rate limiting, CORS, and fail-closed behavior. |
-| PASS | Podman runtime/browser evidence | Worker smoke and both Podman headless E2E phases passed; the independent final Playwright run passed all 31 tests in 47.6 seconds. Automated accessibility, rendered English/Spanish and SEO, fulfillment, admin dashboard, responsive, and private-route behavior were exercised through the container stack. |
+| PASS | Podman runtime/browser evidence | Worker smoke and both independent Podman headless E2E phases in the final release smoke passed. Automated accessibility, rendered English/Spanish and SEO, fulfillment, admin dashboard, responsive, and private-route behavior were exercised through the production-like container stack. |
 | SKIP | Optional screen-reader transcript | This backend/admin operations slice did not require a new VoiceOver audio artifact. Axe, keyboard/status, high-zoom, responsive, and localized Playwright checks passed. |
 | PASS | Read-only provider/payment readiness | Cloudflare provider evidence and payment smoke passed without production writes. A direct Cloudflare Analytics Engine token query and Worker-wide invocation/error preflight also succeeded during implementation. |
 | PASS | Representative restore rehearsal | The Podman drill verified 19 integrity artifacts and 36 actions, restored 17 records and one R2 object across physical, digital, ticket, RSVP, failed-payment, idempotency, reminder, audit, and inventory-control classes, compared four fake Stripe-backed orders with zero mismatches/writes, excluded quarantine/derived state, and received `401` plus `private, no-store` from the Worker admin probe. |
@@ -31,6 +31,9 @@
 
 ## Post-Deployment Operations Evidence
 
+- [Deploy Production run 29113512713](https://github.com/aindaco1/store/actions/runs/29113512713) deployed merged commit `85e24b5` and passed the Worker deploy, Workers Cache purge, Pages deploy, Cloudflare zone purge, and public admin security-policy verification.
+- [Workers Cache Evidence run 29113627591](https://github.com/aindaco1/store/actions/runs/29113627591) ran from protected `main` under zero recent cache-read traffic. Because the deployment was 0.02 hours old, aggregate acceptance correctly returned `inconclusive` for the four-hour stability window. Its bounded probe recorded a full `MISS` in `53,109 ms` with 417 billed KV reads and one list, a no-change warmup `MISS` in `387 ms` with one KV index read, and an identical no-change repeat `HIT` in `4 ms` with zero order-data KV reads/lists.
+- The `53,109 ms` result exposed sequential `STORE_STATE.get` calls in the index rebuild after expiry or mutation invalidation. The v1.0.6 hotfix replaces them with five memory-bounded, 100-key bulk operations for the observed 417-order shape. Cloudflare billing still counts 417 key reads; the optimization targets wall time, simultaneous-connection queuing, and per-invocation external-operation headroom. Focused tests, all 325 unit tests, Wrangler production dry run, 22 Podman security tests, and the complete final release smoke pass before the production repeat.
 - [Deploy Production run 29070114312](https://github.com/aindaco1/store/actions/runs/29070114312) passed the Worker deploy, entrypoint-scoped Workers Cache purge, Pages deploy, and public Cloudflare purge.
 - [Workers Cache Evidence run 29070218894](https://github.com/aindaco1/store/actions/runs/29070218894) passed its low-traffic gate and uploaded sanitized evidence. The production probe recorded a full `EXPIRED` read in 51 ms, a no-change warmup `EXPIRED` read in 62 ms, and an identical no-change repeat `HIT` in 4 ms with zero order-data KV reads/lists. Both no-change reads returned `unchanged: true`; credential and customer-data flags were false. Aggregate hit-ratio evidence remained `insufficient_data` because only two eligible telemetry rows existed, so no rollout conclusion was inferred.
 - [Recovery Readiness run 29070260385](https://github.com/aindaco1/store/actions/runs/29070260385) passed provider evidence, the representative Podman rehearsal, and six readiness checks with zero failures. Its single warning correctly records the missing live encrypted snapshot receipt.

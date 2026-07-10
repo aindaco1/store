@@ -117,8 +117,8 @@ The browser cart is convenience state only. The Worker recalculates and validate
 
 - product identifiers, SKUs, variants, quantities, and unit prices from the generated Store catalog
 - coupon code validity, eligibility, status, date windows, and discount amount
-- tax category and NM GRT destination handling
-- shipping presets, USPS quote/fallback behavior, and non-shippable product handling
+- tax category and NM GRT destination handling, with shared two-letter country and bounded postal-code validation before provider access
+- shipping presets, USPS quote/fallback behavior, non-shippable product handling, and the same provider-bound country/postal allowlist
 - tip/platform fee policy
 - inventory availability and reservation ownership
 - free-order versus paid PaymentIntent behavior

@@ -63,6 +63,7 @@ Performance expectations:
 - every `ctx.exports.fetch()` is an additional billed Workers request, including a cache hit; the benefit is avoided inner CPU and backend reads, not a lower request count
 - order mutations invalidate Orders, Analytics, and order-derived inventory; inventory, download-library, and referral mutations invalidate their dependent policies
 - the materialized v2 order index uses a seven-day safety TTL because every order-changing path explicitly invalidates it; this avoids a measured periodic full-order rescan while retaining bounded recovery from a missed invalidation
+- a required index rebuild lists order keys once and reads values through memory-bounded [Workers KV bulk reads](https://developers.cloudflare.com/kv/api/read-key-value-pairs/) of at most 100 keys; the production 417-order shape therefore uses five external KV read operations instead of 417 sequential operations, while `kvReadsExpected` correctly remains 417 because Cloudflare bills a bulk read per key
 - purge failure does not fail a write and records only a bounded failure diagnostic; short TTLs cap stale exposure
 - download readiness lists R2 once and derives attached-file readiness from that listing, avoiding duplicate per-file `head` calls when the list is complete
 - response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters

@@ -8,7 +8,13 @@ import {
 class MockKVNamespace {
   store = new Map<string, string>();
 
-  get = vi.fn(async (key: string, options?: { type?: string }) => {
+  get = vi.fn(async (key: string | string[], options?: { type?: string }) => {
+    if (Array.isArray(key)) {
+      return new Map(key.map((keyName) => {
+        const value = this.store.get(keyName);
+        return [keyName, value === undefined ? null : (options?.type === 'json' ? JSON.parse(value) : value)];
+      }));
+    }
     if (!this.store.has(key)) return null;
     const value = this.store.get(key) as string;
     return options?.type === 'json' ? JSON.parse(value) : value;
@@ -510,6 +516,72 @@ describe('Workers Cache admin endpoints', () => {
     });
     expect(secondBody.orders).toBeUndefined();
     expect(secondBody.fulfillments).toBeUndefined();
+  });
+
+  it('rebuilds the 417-order index with bounded bulk reads while preserving billed read counts', async () => {
+    const env = buildEnv({ WORKERS_CACHE_ENABLED: 'false' });
+    for (let index = 0; index < 417; index += 1) {
+      const orderToken = `store-order-bulk-${String(index).padStart(3, '0')}`;
+      env.STORE_STATE.store.set(`orders:${orderToken}`, JSON.stringify({
+        orderToken,
+        status: 'confirmed',
+        createdAt: '2026-07-10T12:00:00.000Z',
+        updatedAt: '2026-07-10T12:01:00.000Z',
+        orderDraft: {
+          status: 'confirmed',
+          items: [{ id: `line-${index}`, sku: 'poster', quantity: 1, fulfillmentType: 'physical' }],
+          totals: { totalCents: 2500, currency: 'USD' }
+        }
+      }));
+    }
+    const ctx = buildCtx();
+    const session = await createAdminSession(env, ctx);
+
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/store/orders?status=all`, {
+      headers: { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() }
+    }), env, ctx);
+    const body = await response.json();
+    const bulkCalls = env.STORE_STATE.get.mock.calls.filter(([key]) => Array.isArray(key));
+    const individualOrderCalls = env.STORE_STATE.get.mock.calls.filter(([key]) => (
+      typeof key === 'string' && key.startsWith('orders:')
+    ));
+
+    expect(response.status).toBe(200);
+    expect(bulkCalls.map(([keys]) => keys.length)).toEqual([100, 100, 100, 100, 17]);
+    expect(individualOrderCalls).toEqual([]);
+    expect(body.page).toMatchObject({ scanned: 417, indexed: 417, truncated: false });
+    expect(body.writeBudget).toMatchObject({ kvReadsExpected: 417, kvListExpected: 1 });
+  });
+
+  it('falls back to individual order reads for local KV adapters without bulk support', async () => {
+    const env = buildEnv({ WORKERS_CACHE_ENABLED: 'false' });
+    for (let index = 0; index < 3; index += 1) {
+      const orderToken = `store-order-legacy-${index}`;
+      env.STORE_STATE.store.set(`orders:${orderToken}`, JSON.stringify({
+        orderToken,
+        status: 'confirmed',
+        orderDraft: { status: 'confirmed', items: [], totals: { totalCents: 0, currency: 'USD' } }
+      }));
+    }
+    const originalGet = env.STORE_STATE.get.getMockImplementation();
+    env.STORE_STATE.get = vi.fn(async (key: string | string[], options?: { type?: string }) => (
+      Array.isArray(key) ? null : originalGet?.(key, options)
+    ));
+    const ctx = buildCtx();
+    const session = await createAdminSession(env, ctx);
+
+    const response = await worker.fetch(new Request(`${WORKER_BASE}/admin/store/orders?status=all`, {
+      headers: { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() }
+    }), env, ctx);
+    const body = await response.json();
+    const individualOrderCalls = env.STORE_STATE.get.mock.calls.filter(([key]) => (
+      typeof key === 'string' && key.startsWith('orders:')
+    ));
+
+    expect(response.status).toBe(200);
+    expect(individualOrderCalls).toHaveLength(3);
+    expect(body.page).toMatchObject({ scanned: 3, indexed: 3 });
+    expect(body.writeBudget).toMatchObject({ kvReadsExpected: 3, kvListExpected: 1 });
   });
 
   it('falls back to KV order scanning when the Workers Cache entrypoint is unavailable', async () => {

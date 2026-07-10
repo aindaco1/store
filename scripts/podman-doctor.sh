@@ -63,6 +63,9 @@ pass() { printf '✅ %s\n' "$1"; }
 warn() { printf '⚠️  %s\n' "$1"; }
 fail() { printf '❌ %s\n' "$1"; exit 1; }
 
+PODMAN_RELEASE_MIN_MEMORY_MIB="${PODMAN_RELEASE_MIN_MEMORY_MIB:-6144}"
+PODMAN_REQUIRE_RELEASE_RESOURCES="${PODMAN_REQUIRE_RELEASE_RESOURCES:-false}"
+
 prefer_podman_path || true
 
 if ! command -v podman >/dev/null 2>&1; then
@@ -103,6 +106,18 @@ if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
   pass "Podman machine is running"
   configure_podman_connection
 
+  MACHINE_MEMORY_MIB="$(podman machine inspect --format '{{.Resources.Memory}}' podman-machine-default 2>/dev/null || true)"
+  if [[ "$MACHINE_MEMORY_MIB" =~ ^[0-9]+$ ]]; then
+    if [ "$MACHINE_MEMORY_MIB" -lt "$PODMAN_RELEASE_MIN_MEMORY_MIB" ]; then
+      if [ "$PODMAN_REQUIRE_RELEASE_RESOURCES" = "true" ]; then
+        fail "Podman machine memory is ${MACHINE_MEMORY_MIB} MiB; release/pre-merge suites require at least ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB. Stop the machine, run 'podman machine set --memory ${PODMAN_RELEASE_MIN_MEMORY_MIB}', then restart it."
+      fi
+      warn "Podman machine memory is ${MACHINE_MEMORY_MIB} MiB; use at least ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB for release/pre-merge suites."
+    else
+      pass "Podman machine memory: ${MACHINE_MEMORY_MIB} MiB"
+    fi
+  fi
+
   if [ "$OS_FAMILY" = "macos" ]; then
     MACHINE_VMTYPE="$(podman machine info 2>/dev/null | awk '/vmtype:/ {print $2}' | head -n 1 || true)"
     if [ "$MACHINE_VMTYPE" = "applehv" ]; then
@@ -134,7 +149,11 @@ fi
 pass "Podman engine is reachable"
 
 if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
-  for _ in 1 2 3; do
+  STABILITY_CHECKS=3
+  if [ "$PODMAN_REQUIRE_RELEASE_RESOURCES" = "true" ]; then
+    STABILITY_CHECKS=10
+  fi
+  for _ in $(seq 1 "$STABILITY_CHECKS"); do
     configure_podman_connection
     if ! podman info >/dev/null 2>&1; then
       LOG_PATH="$(podman_machine_log_path)"
