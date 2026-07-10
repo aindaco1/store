@@ -1,9 +1,9 @@
 # Cache And Recovery Hardening Evidence
 
-- Generated: `2026-07-10T04:04:07Z`; updated `2026-07-10T20:17:26Z`
-- Branches: `feature/cache-recovery-operations`, then `hotfix/1.0.6-order-index-bulk-read`
-- Release commit/tag before the hotfix: `85e24b5` / `v1.0.6`
-- Release status: the published `v1.0.6` tag and release point to the merged hardening commit; the same-release bulk-read hotfix passed the complete pre-merge release gate and awaits merge, tag retargeting, deployment, and production evidence
+- Generated: `2026-07-10T04:04:07Z`; updated `2026-07-10T20:29:43Z`
+- Branches: `feature/cache-recovery-operations`, `hotfix/1.0.6-order-index-bulk-read`, then `docs/1.0.6-production-evidence`
+- Production hotfix commit/tag: `f535abe` / `v1.0.6`
+- Release status: the same-release bulk-read hotfix passed the complete local and GitHub gates, was merged, tagged, deployed, and passed the bounded low-traffic production probe; the deployment-scoped aggregate remains correctly inconclusive during its four-hour stability window
 - Production deployment: completed through the protected manual workflow; no production restore or recovery mutation was performed
 
 ## Automated Evidence
@@ -31,9 +31,14 @@
 
 ## Post-Deployment Operations Evidence
 
+- [Deploy Production run 29121341684](https://github.com/aindaco1/store/actions/runs/29121341684) deployed hotfix commit `f535abe` and passed the Worker deploy, Workers Cache purge, Pages deploy, Cloudflare zone purge, and public admin security-policy verification.
+- [Quarterly Recovery Operations run 29121423704](https://github.com/aindaco1/store/actions/runs/29121423704) supplied the Worker-wide preflight before the controlled index test: 17 requests, one subrequest, and zero errors over 15 minutes against the 100-request/zero-error gate. The protected restore remained disabled and skipped.
+- After the preflight, the operator deleted only the derived `admin-store-orders:index:v2` production KV key. No authoritative order, customer, inventory, payment, fulfillment, or recovery source record was modified.
+- [Workers Cache Evidence run 29121486852](https://github.com/aindaco1/store/actions/runs/29121486852) passed under zero recent cache-read traffic and returned sanitized output only. Its deliberate cold rebuild completed in `1,658 ms` with 418 billed KV reads and one list, versus the pre-hotfix `53,109 ms` result, a 96.9 percent wall-time reduction. The immediately following no-change warmup completed in `917 ms` but repeated the rebuild because the newly written KV index was not yet visible to that request. The identical repeat was a `HIT` in `5 ms` with zero order-data KV reads/lists. All bounded-probe, unchanged-response, cache-status, zero-read, and data-sanitization checks passed.
+- Because the deployment was only 0.04 hours old, the same run correctly classified deployment-scoped aggregate acceptance as `inconclusive` until the four-hour stability window and minimum sample count are met.
 - [Deploy Production run 29113512713](https://github.com/aindaco1/store/actions/runs/29113512713) deployed merged commit `85e24b5` and passed the Worker deploy, Workers Cache purge, Pages deploy, Cloudflare zone purge, and public admin security-policy verification.
 - [Workers Cache Evidence run 29113627591](https://github.com/aindaco1/store/actions/runs/29113627591) ran from protected `main` under zero recent cache-read traffic. Because the deployment was 0.02 hours old, aggregate acceptance correctly returned `inconclusive` for the four-hour stability window. Its bounded probe recorded a full `MISS` in `53,109 ms` with 417 billed KV reads and one list, a no-change warmup `MISS` in `387 ms` with one KV index read, and an identical no-change repeat `HIT` in `4 ms` with zero order-data KV reads/lists.
-- The `53,109 ms` result exposed sequential `STORE_STATE.get` calls in the index rebuild after expiry or mutation invalidation. The v1.0.6 hotfix replaces them with five memory-bounded, 100-key bulk operations for the observed 417-order shape. Cloudflare billing still counts 417 key reads; the optimization targets wall time, simultaneous-connection queuing, and per-invocation external-operation headroom. Focused tests, all 325 unit tests, Wrangler production dry run, 22 Podman security tests, and the complete final release smoke pass before the production repeat.
+- The `53,109 ms` result exposed sequential `STORE_STATE.get` calls in the index rebuild after expiry or mutation invalidation. The v1.0.6 hotfix replaces them with five memory-bounded, 100-key bulk operations for the observed 417-order shape. Cloudflare billing still counts each key read; the optimization targets wall time, simultaneous-connection queuing, and per-invocation external-operation headroom. Focused tests, all 325 unit tests, Wrangler production dry run, 22 Podman security tests, the complete final release smoke, GitHub Merge Smoke, and the production repeat all passed.
 - [Deploy Production run 29070114312](https://github.com/aindaco1/store/actions/runs/29070114312) passed the Worker deploy, entrypoint-scoped Workers Cache purge, Pages deploy, and public Cloudflare purge.
 - [Workers Cache Evidence run 29070218894](https://github.com/aindaco1/store/actions/runs/29070218894) passed its low-traffic gate and uploaded sanitized evidence. The production probe recorded a full `EXPIRED` read in 51 ms, a no-change warmup `EXPIRED` read in 62 ms, and an identical no-change repeat `HIT` in 4 ms with zero order-data KV reads/lists. Both no-change reads returned `unchanged: true`; credential and customer-data flags were false. Aggregate hit-ratio evidence remained `insufficient_data` because only two eligible telemetry rows existed, so no rollout conclusion was inferred.
 - [Recovery Readiness run 29070260385](https://github.com/aindaco1/store/actions/runs/29070260385) passed provider evidence, the representative Podman rehearsal, and six readiness checks with zero failures. Its single warning correctly records the missing live encrypted snapshot receipt.
@@ -54,7 +59,7 @@
 
 Unit, integration, security, and Podman tests prove canonical key policy, role/scope partitioning, no-change responses, browser `private, no-store`, search bypass, mutation invalidation, purge failure behavior, operation budgets, evidence redaction, and dashboard refresh UX. Podman does not implement or prove Cloudflare's real edge cache behavior.
 
-The required 30-sample cache-disabled/cache-enabled `Cf-Cache-Status`, p50/p95/p99, operation-budget, and post-purge Cloudflare edge comparison remains open. It requires authorized short-lived super-admin login tokens and controlled sequential deployments. Normal-traffic deployment-scoped aggregate evidence also remains below a decision-quality sample count. Analytics, order-derived inventory, and download-readiness caching therefore remain disabled by default.
+The controlled production probe proves the cold-index implementation improvement and the steady-state no-change hit, but it is not the required 30-sample cache-disabled/cache-enabled `Cf-Cache-Status`, p50/p95/p99, operation-budget, and post-purge Cloudflare edge comparison. That comparison still requires authorized short-lived super-admin login tokens and controlled sequential deployments. Normal-traffic deployment-scoped aggregate evidence also remains below a decision-quality sample count. Analytics, order-derived inventory, and download-readiness caching therefore remain disabled by default. A future read-efficiency slice should prevent an immediate post-invalidation no-change request from repeating a rebuild while the new KV index propagates, without adding per-order writes or weakening mutation freshness.
 
 ## Recovery Evidence Boundary
 
