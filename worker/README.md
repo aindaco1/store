@@ -95,7 +95,7 @@ Mutation invalidation maps low-cardinality `orders`, `order-index`, `analytics`,
 
 Every cached inner fetch is an additional billed Workers request, including hits. `writeBudget` and the benchmark harness distinguish that request from avoided order KV list/get and R2 list/head work. Analytics Engine adds one asynchronous data-point write per eligible read but avoids per-hit KV counters. Use labeled disabled/enabled `npm run cache:benchmark` runs plus `npm run cache:compare` for metadata-only latency/status evidence; never persist response bodies, cookies, or tokens.
 
-`POST /admin/workers-cache/evidence` is the scheduled read-only probe. It accepts only `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs two fixed route reads, and returns cache status, timing, response-size, unchanged state, and operation budgets without Store rows. It cannot purge, change settings, or call checkout/fulfillment/provider mutations. `.github/workflows/workers-cache-evidence.yml` queries `store_workers_cache_metrics` nightly and calls this probe only under its configured cache-read traffic ceiling.
+`POST /admin/workers-cache/evidence` is the scheduled read-only probe. It accepts only `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs three fixed Orders reads (full, no-change warmup, and identical no-change repeat), and returns cache status, timing, response-size, unchanged state, and operation budgets without Store rows. It cannot purge, change settings, or call checkout/fulfillment/provider mutations. `.github/workflows/workers-cache-evidence.yml` queries `store_workers_cache_metrics` nightly and calls this probe only under its configured cache-read traffic ceiling.
 
 ## Secrets
 

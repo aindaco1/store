@@ -99,7 +99,7 @@ npm run cache:compare -- \
 
 The evidence files contain timings, byte counts, cache statuses, bypass reasons, and operation budgets, not response bodies or credentials. The comparator requires correctly labeled schema-v2 artifacts, at least 30 repeated samples, zero order-data KV list/get operations on warm/no-change hits, at least 40% p95 improvement, expected search bypasses, and a bounded post-purge refill. Mutation freshness and normal-traffic aggregate hit ratios remain separate production gates. Podman validates the application contract but cannot prove Cloudflare edge behavior.
 
-`.github/workflows/workers-cache-evidence.yml` runs at `03:17 America/Denver` on `main`. It queries the prior 24 hours from Analytics Engine and calls `POST /admin/workers-cache/evidence` only when recent cache-read traffic is below the configured threshold. That endpoint requires `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs two fixed read-only route probes, and returns metrics only. The scheduled workflow cannot purge or change configuration.
+`.github/workflows/workers-cache-evidence.yml` runs at `03:17 America/Denver` on `main`. It queries the prior 24 hours from Analytics Engine and calls `POST /admin/workers-cache/evidence` only when recent cache-read traffic is below the configured threshold. That endpoint requires `WORKERS_CACHE_EVIDENCE_SECRET`, is rate-limited, performs three fixed read-only Orders probes (full, no-change warmup, and identical no-change repeat), and returns metrics only. The scheduled workflow cannot purge or change configuration.
 
 Verify Worker Cache config before deploys that touch cached entrypoints:
 

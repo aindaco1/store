@@ -4,14 +4,14 @@
 - Branch: `release/1.0.6-cache-backup-hardening`
 - Base commit/tag: `42a5e902fa4fc7f479b6bf147736506caff4636d` / `v1.0.6`
 - Release status: additional `v1.0.6` hardening; the published tag was not moved
-- Production deployment at evidence capture: not performed
+- Production deployment at initial evidence capture: not performed; follow-up deployment and operational evidence are recorded below
 
 ## Automated Evidence
 
 | Result | Check | Evidence |
 | --- | --- | --- |
 | PASS | Definitive release smoke | `npm run release:smoke -- --podman-e2e --evidence-file /tmp/store-1.0.6-cache-recovery-operations-final-release-smoke.md`; all enabled phases passed. Logs: `/tmp/store-release-smoke-logs.yKiK7b`. |
-| PASS | Full unit suite | Vitest 4 ran 287 tests across 65 files, including cache policy, endpoint, telemetry, observability, benchmark, backup, retention, restore, recovery preflight, and workflow safeguards. |
+| PASS | Full unit suite | Vitest 4 ran 289 tests across 65 files, including cache policy, endpoint, telemetry, observability, benchmark, backup, retention, restore, recovery preflight, and workflow safeguards. |
 | PASS | Podman security | 22 tests passed against the production-like local stack, including evidence-secret authorization, admin boundaries, input limits, webhook signatures, rate limiting, CORS, and fail-closed behavior. |
 | PASS | Podman runtime/browser evidence | Worker smoke and both Podman headless E2E phases passed. Automated accessibility, rendered English/Spanish and SEO, fulfillment, admin dashboard, responsive, and private-route behavior were exercised through the container stack. |
 | SKIP | Optional screen-reader transcript | This backend/admin operations slice did not require a new VoiceOver audio artifact. Axe, keyboard/status, high-zoom, responsive, and localized Playwright checks passed. |
@@ -27,6 +27,13 @@
 - **Recovery Readiness** is scheduled for `03:43 America/Denver` each Sunday and uses synthetic data plus read-only provider metadata.
 - **Quarterly Recovery Operations** is scheduled for `04:17 America/Denver` on the first day of each quarter. Its captured-data job is disabled by default and protected by the `production-recovery` environment, a required reviewer, Worker-wide traffic/error evidence, and preview-only restore targets.
 - Deploy, cache evidence, and protected recovery share `production-operations` concurrency. Repository secret/variable names and environment protections were configured without storing values in this evidence file.
+
+## Post-Deployment Operations Evidence
+
+- [Deploy Production run 29070114312](https://github.com/aindaco1/store/actions/runs/29070114312) passed the Worker deploy, entrypoint-scoped Workers Cache purge, Pages deploy, and public Cloudflare purge.
+- [Workers Cache Evidence run 29070218894](https://github.com/aindaco1/store/actions/runs/29070218894) passed its low-traffic gate and uploaded sanitized evidence. The production probe recorded a full `EXPIRED` read in 51 ms, a no-change warmup `EXPIRED` read in 62 ms, and an identical no-change repeat `HIT` in 4 ms with zero order-data KV reads/lists. Both no-change reads returned `unchanged: true`; credential and customer-data flags were false. Aggregate hit-ratio evidence remained `insufficient_data` because only two eligible telemetry rows existed, so no rollout conclusion was inferred.
+- [Recovery Readiness run 29070260385](https://github.com/aindaco1/store/actions/runs/29070260385) passed provider evidence, the representative Podman rehearsal, and six readiness checks with zero failures. Its single warning correctly records the missing live encrypted snapshot receipt.
+- [Quarterly Recovery Operations run 29070592197](https://github.com/aindaco1/store/actions/runs/29070592197) passed the Worker-wide 15-minute preflight with 18 requests, 7 subrequests, and zero errors against a 100-request/zero-error ceiling. The artifact reported no credentials or customer data. The protected preview-restore job was correctly skipped because `RECOVERY_DRILL_ENABLED=false`.
 
 ## Cache Evidence Boundary
 
