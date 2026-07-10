@@ -36,7 +36,7 @@ Default posture:
 | Super-admin order CTA | Order notification email | Reuses the admin one-time login nonce with `tab=store-orders`; only generated for effective super admins, expires after 5 minutes, and creates a 30-minute admin session. |
 | Admin CSRF | `x-store-admin-csrf` | Required for dashboard writes. |
 | Admin roles/scopes | Admin APIs | `super_admin` plus Store access scopes for limited admins. |
-| Optional Turnstile | Admin sign-in | Local/test bypasses are accepted only in local/test mode. |
+| Optional Turnstile | Admin sign-in | Local/test bypasses are accepted only in local/test mode. The browser loads the challenge only after an existing admin session is rejected, while magic-link requests still require a valid challenge token. |
 | API/admin recovery secrets | Operator routes | Bearer/header secrets stay in Worker secrets or ignored local files. |
 | Cache evidence secret | `POST /admin/workers-cache/evidence` | Dedicated read-only bearer; returns bounded metrics only and cannot purge or expose Store rows. |
 
