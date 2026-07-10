@@ -129,6 +129,7 @@ describe('Store SEO templates', () => {
     expect(adminCsp).not.toContain('cloudflareinsights.com');
     expect(adminCsp).not.toContain("'sha256-");
     expect(adminCsp).not.toContain("'unsafe-inline'");
+    expect(adminCsp).not.toContain("'unsafe-eval'");
     const qrVendor = readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js');
     expect(qrVendor).toContain('QR Code Generator for JavaScript');
     expect(qrVendor).toContain('window.qrcode = qrcode');
@@ -163,6 +164,24 @@ describe('Store SEO templates', () => {
     expect(sitemapUrlInclude).toContain('xhtml:link rel="alternate"');
     expect(sitemapUrlInclude).toContain('hreflang="x-default"');
     expect(sitemapUrlInclude).toContain('localized-url.html lang=lang');
+  });
+
+  it('keeps first-party admin scripts free of dynamic string evaluation', () => {
+    const adminRuntime = [
+      ['assets', 'js', 'header-nav.js'],
+      ['assets', 'js', 'a11y-live.js'],
+      ['assets', 'js', 'store-config.js'],
+      ['assets', 'js', 'logger.js'],
+      ['assets', 'js', 'video-first-frame-poster.js'],
+      ['assets', 'js', 'form-control-identity.js'],
+      ['assets', 'js', 'vendor', 'qrcode-generator.js'],
+      ['assets', 'js', 'admin-dashboard.js']
+    ].map((segments) => readRepoFile(...segments)).join('\n');
+
+    expect(adminRuntime).not.toMatch(/\beval\s*\(/);
+    expect(adminRuntime).not.toMatch(/\bnew\s+Function\s*\(/);
+    expect(adminRuntime).not.toMatch(/\bFunction\s*\(\s*['"`]/);
+    expect(adminRuntime).not.toMatch(/\bset(?:Timeout|Interval)\s*\(\s*['"`]/);
   });
 
   it('keeps locale and navigation plumbing on canonical Store pages', () => {

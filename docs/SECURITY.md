@@ -162,11 +162,14 @@ Required protections:
 - strict media upload validation for type, size, destination, filename, and path traversal
 - no inline scripts in the static admin shell
 - restrictive admin CSP and no public social/structured metadata
+- no `unsafe-eval`, `eval`, string-built `Function`, or string-based timer execution in first-party admin scripts
 - runtime admin users stored in KV, not `_config.yml`
 - local dashboard navigation persistence limited to non-sensitive tab identifiers
 - Workers Cache use limited to authenticated, normalized, non-search read paths with private/no-store browser responses
 
 Limited admins should see only the Store surfaces allowed by their access scopes. Super admins retain settings and user-management access.
+
+Do not weaken the admin CSP to silence browser-extension diagnostics. Reproduce CSP findings in an extension-free browser, inspect the main document response for an actual `Content-Security-Policy-Report-Only` header, and identify the violating script origin first. Privacy and consent extensions may inject AutoConsent code that probes or attempts to bypass page CSPs; those extension-origin attempts should remain blocked.
 
 ## Product Content Safety
 

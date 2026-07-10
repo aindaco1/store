@@ -190,7 +190,9 @@ Payment-specific setup, webhook, and reconciliation checks are documented in [PA
 
 `npm run launch:readiness` checks repo-visible production inputs. `npm run release:providers` can verify external account state when read-only provider credentials are present. Anything skipped by that probe still needs provider-console evidence in the release notes.
 
-For production Cloudflare DNS and admin response-policy evidence, use the `Release Provider Evidence` GitHub Actions workflow. It runs the DNS probe with production credentials, then verifies the public English and Spanish admin responses contain the required `private`, `no-store`, `no-transform`, `max-age=0`, and `must-revalidate` directives and no Cloudflare JavaScript Detection/Web Analytics injection markers. Strict DNS CI requires a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read`; the public admin verification needs no credential.
+For production Cloudflare DNS and admin response-policy evidence, use the `Release Provider Evidence` GitHub Actions workflow. It runs the DNS probe with production credentials, then verifies the public English and Spanish admin responses contain the required `private`, `no-store`, `no-transform`, `max-age=0`, and `must-revalidate` directives, no Cloudflare JavaScript Detection/Web Analytics injection markers, and no unexpected `Content-Security-Policy-Report-Only` header. Strict DNS CI requires a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read`; the public admin verification needs no credential.
+
+When Chrome reports CSP issues that production verification cannot reproduce, clear the DevTools Issues and Console panels and reload in an extension-free profile. Check the violating script URL: extension-origin AutoConsent or privacy-tool code is not a first-party defect and must not be accommodated with `unsafe-eval`, `unsafe-inline`, or broader source allowlists.
 
 ## Manual Store Smoke
 

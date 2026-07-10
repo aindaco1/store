@@ -170,6 +170,7 @@ describe('Cloudflare admin response rule', () => {
       containsCustomerData: false
     });
     expect(result.routes).toHaveLength(2);
+    expect(result.routes.every((route) => route.reportOnlyCsp === false)).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
@@ -187,5 +188,15 @@ describe('Cloudflare admin response rule', () => {
     }));
     await expect(verifyAdminResponsePolicy({ siteBase: SITE_BASE, fetchImpl: injected }))
       .rejects.toThrow('edge injection present');
+
+    const reportOnly = vi.fn().mockResolvedValue(new Response('<!doctype html>', {
+      status: 200,
+      headers: {
+        'Cache-Control': 'max-age=0, private, must-revalidate, no-store, no-transform',
+        'Content-Security-Policy-Report-Only': "default-src 'none'"
+      }
+    }));
+    await expect(verifyAdminResponsePolicy({ siteBase: SITE_BASE, fetchImpl: reportOnly }))
+      .rejects.toThrow('report-only CSP present');
   });
 });
