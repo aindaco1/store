@@ -92,7 +92,7 @@ Sensitive responses should use `Cache-Control: private, no-store`. Tokenized ord
 Workers Cache rule:
 
 - The default Worker gateway entrypoint remains uncached so auth, CSRF, role/scope checks, rate limits, route dispatch, and mutations always run.
-- Only routes in the reviewed `CachedAdminStoreReads` policy registry may emit cacheable inner responses: Orders, Analytics, inventory, and download readiness. Orders is enabled by default; the three additional routes default off until real-edge evidence passes.
+- Only routes in the reviewed `CachedAdminStoreReads` policy registry may emit cacheable inner responses: Orders, Analytics, inventory, and download readiness. Every route defaults off; production evidence must justify the additional billed inner Worker request before a route is enabled.
 - The gateway authenticates the admin before calling the cached entrypoint and sends only props version, route, role, normalized scope key, and Store access scope. Do not key cached data on cookies, authorization/CSRF values, identity, search text, order tokens, or signed capabilities.
 - Browser-facing admin responses stay `private, no-store` even when the inner Workers Cache response is public-cacheable.
 - Free-text admin Orders searches bypass Workers Cache because `q` may contain customer PII or order tokens.
