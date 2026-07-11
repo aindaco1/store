@@ -1,0 +1,30 @@
+{%- assign products = site.products | sort: "order" -%}
+{%- assign lcp_product = nil -%}
+{%- assign show_all_products_locally = false -%}
+{%- if jekyll.environment != "production" -%}
+  {%- assign show_all_products_locally = true -%}
+{%- endif -%}
+{%- for product in products -%}
+  {%- assign product_status = product.status | default: "active" -%}
+  {%- assign product_public = true -%}
+  {%- if product.public == false -%}
+    {%- assign product_public = false -%}
+  {%- endif -%}
+  {%- unless product.type == "archive" -%}
+    {%- if show_all_products_locally or product_public -%}
+      {%- if show_all_products_locally or product_status == "active" or product_status == "sold_out" -%}
+        {%- assign lcp_product = product -%}
+        {%- break -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endunless -%}
+{%- endfor -%}
+{%- if lcp_product and lcp_product.image -%}
+  {%- assign lcp_sizes = "(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" -%}
+  {%- assign lcp_srcset = lcp_product.image | local_responsive_image_srcset: "320,480,640,960,1600" -%}
+  {%- if lcp_srcset != "" -%}
+    {%- assign lcp_fallback_entry = lcp_srcset | split: ", " | last -%}
+    {%- assign lcp_fallback = lcp_fallback_entry | split: " " | first -%}
+<link rel="preload" as="image" type="image/webp" href="{{ lcp_fallback | escape }}" imagesrcset="{{ lcp_srcset | escape }}" imagesizes="{{ lcp_sizes | escape }}" fetchpriority="high">
+  {%- endif -%}
+{%- endif -%}

@@ -1,6 +1,6 @@
 # Testing
 
-The current post-`v1.0.6` gate keeps Store release evidence for accessibility, i18n, Podman, SEO, provider readiness, payment contracts, signed-webhook settlement, fulfillment, and no-send order email rendering, and extends Workers Cache plus backup/restore coverage. The `v1.0.4` baseline added regression coverage for Store-owned customer/super-admin order email, durable digital download entitlements with admin revoke/refresh, ticket SVG long-name fitting, localized public order routes, authenticated order-notification link consumption, admin tab persistence, i18n completeness, SEO metadata, admin order action responsiveness, and live order attendance refresh.
+The `v1.0.7` gate adds centralized performance/cache policy budgets, Podman Lighthouse, fixed-key order-index deduplication, session review privacy/revocation, searchable audit exports, signed-download soft locks, production posture drift, localization review packets, off-device backup copies, and snapshot duration/read-usage evidence to the existing accessibility, i18n, Podman, SEO, provider, payment, fulfillment, Workers Cache, and recovery coverage.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -20,6 +20,19 @@ npm run test:e2e:headless
 ```
 
 Runtime-dependent defaults use the Podman stack so Worker and browser checks run against the production-like local environment. Use `npm run test:security:host`, `npm run test:e2e:host`, or `npm run test:e2e:headless:host` only for focused host-debugging sessions where the local Worker/site are already managed separately.
+
+Performance and operational policy checks:
+
+```bash
+npm run build
+npm run test:performance:budgets
+npm run test:performance:lighthouse
+npm run test:cache-policy
+npm run localization:review -- --output-dir=/tmp/store-localization-review
+npm run production:posture -- --secrets-file=/path/to/wrangler-secret-list.json
+```
+
+Lighthouse runs through `podman-stack-run.sh` by default. Production posture accepts Wrangler's secret-name JSON only and never reads secret values. Session/download/audit tests prove CSRF/role gates, data minimization, redaction, rate-limit thresholds, and audit behavior.
 
 Local services:
 

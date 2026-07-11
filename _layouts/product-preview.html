@@ -9,7 +9,7 @@ layout: default
   </div>
 
   <div class="storefront__product-detail">
-    {% include product-card.html product=page show_eyebrow=false show_summary=false image_loading="eager" image_fetchpriority="high" %}
+    {% include product-card.html product=page show_eyebrow=false show_summary=false image_loading="eager" image_fetchpriority="high" image_decoding="sync" %}
     <div class="storefront__product-copy">
       {% if page.long_content and page.long_content.size > 0 %}
         {% include long-content.html blocks=page.long_content %}

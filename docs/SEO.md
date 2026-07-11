@@ -2,6 +2,8 @@
 
 Store SEO focuses on public product, terms, and home pages. Admin pages are excluded from crawl-oriented metadata and audit coverage. Private order and fulfillment shells remain `noindex`.
 
+`npm run test:cache-policy` complements rendered SEO checks by verifying public cache lifetimes for product/catalog/add-on/social assets and private/no-store behavior for admin and tokenized Worker APIs. `npm run release:i18n-seo-evidence` continues to sample canonical, alternate, Open Graph, Twitter, Product/Offer/Breadcrumb/Organization, merchant return policy, sitemap, and robots output; real translated product-copy approval remains a future human QA gate.
+
 ## Current Coverage
 
 - Store-owned order emails and Order Success changes do not add indexable fulfillment URLs.

@@ -3,6 +3,14 @@
 
 {% include theme-vars.css %}
 
+@font-face {
+  font-display: swap;
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  src: url("/assets/fonts/inter-latin-variable.woff2") format("woff2");
+}
+
 // Import partials - foundation
 @import "partials/variables";
 @import "partials/mixins";
@@ -18,10 +26,10 @@
 
 // Import partials - page-specific
 @import "partials/storefront";
+@import "partials/admin-product-preview";
 
 // Import partials - content & utilities
 @import "partials/content-blocks";
-@import "partials/admin";
 @import "partials/utilities";
 @import "partials/accessibility";
 @import "partials/cart-ui";

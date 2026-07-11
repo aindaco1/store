@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "defaultLocale": "en",
+  "reviewLocales": ["es"],
+  "requiredReviewAreas": [
+    {
+      "id": "public-shells",
+      "label": "Public shells and navigation",
+      "paths": ["index.html", "es/index.html", "_includes/header.html", "_includes/site-footer.html"]
+    },
+    {
+      "id": "product-metadata",
+      "label": "Product metadata and merchandising copy",
+      "paths": ["_products", "_includes/product-card.html", "_includes/seo-meta.html", "_includes/seo-json-ld.html"]
+    },
+    {
+      "id": "checkout-orders",
+      "label": "Checkout, order lookup, and fulfillment flows",
+      "paths": ["assets/js/cart-provider.js", "assets/js/order-lookup.js", "assets/js/order-success.js", "_data/i18n/en.yml", "_data/i18n/es.yml"]
+    },
+    {
+      "id": "email",
+      "label": "Transactional and reminder email copy",
+      "paths": ["worker/src/email.js", "_data/i18n/en.yml", "_data/i18n/es.yml"]
+    },
+    {
+      "id": "terms",
+      "label": "Terms and policy copy",
+      "paths": ["terms.md", "es/terms.md"]
+    },
+    {
+      "id": "admin",
+      "label": "Admin controls, statuses, and help text",
+      "paths": ["_layouts/admin.html", "assets/js/admin-dashboard.js", "_data/i18n/en.yml", "_data/i18n/es.yml"]
+    }
+  ]
+}

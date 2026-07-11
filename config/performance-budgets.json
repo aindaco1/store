@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "assets": {
+    "siteDirectory": "_site",
+    "javascriptTotalBytes": 750000,
+    "cssTotalBytes": 200000,
+    "files": {
+      "assets/js/admin-dashboard.js": 320000,
+      "assets/js/cart-provider.js": 245000,
+      "assets/main.css": 100000,
+      "assets/admin.css": 115000
+    }
+  },
+  "lighthouse": {
+    "routes": ["/", "/products/fronteras-poster-big/", "/terms/"],
+    "categories": {
+      "performance": 0.8,
+      "accessibility": 0.95,
+      "best-practices": 0.9,
+      "seo": 0.95
+    },
+    "audits": {
+      "largest-contentful-paint": 4000,
+      "cumulative-layout-shift": 0.1,
+      "total-blocking-time": 300
+    },
+    "resourceBytes": {
+      "total": 1000000,
+      "image": 300000,
+      "stylesheet": 100000,
+      "third-party": 75000
+    }
+  },
+  "dashboard": {
+    "initialReadyMs": 3000,
+    "tabSwitchMs": 750,
+    "tableRenderMs": 1500
+  },
+  "workerRoutes": {
+    "ordersWarmP95Ms": 750,
+    "ordersNoChangeP95Ms": 250,
+    "cacheHitP95Ms": 100,
+    "minimumCacheP95ImprovementPercent": 40
+  },
+  "cachePolicy": [
+    { "id": "home", "base": "site", "path": "/", "status": 200, "type": "public", "minimumMaxAge": 600 },
+    { "id": "main-css", "base": "site", "path": "/assets/main.css", "status": 200, "type": "public", "minimumMaxAge": 14400 },
+    { "id": "cart-loader", "base": "site", "path": "/assets/js/cart-runtime-loader.js", "status": 200, "type": "public", "minimumMaxAge": 14400 },
+    { "id": "catalog-json", "base": "site", "path": "/api/products.json", "status": 200, "type": "public", "minimumMaxAge": 600 },
+    { "id": "add-ons-json", "base": "site", "path": "/api/add-ons.json", "status": 200, "type": "public", "minimumMaxAge": 600 },
+    { "id": "product-page", "base": "site", "path": "/products/fronteras-poster-big/", "status": 200, "type": "public", "minimumMaxAge": 600 },
+    { "id": "social-image", "base": "site", "path": "/assets/images/defaults/dust-wave-square.png", "status": 200, "type": "public", "minimumMaxAge": 14400 },
+    { "id": "order-lookup-shell", "base": "site", "path": "/orders/", "status": 200, "type": "public", "minimumMaxAge": 600 },
+    { "id": "order-success-shell", "base": "site", "path": "/order-success/", "status": 200, "type": "public", "minimumMaxAge": 600 },
+    { "id": "admin-html", "base": "site", "path": "/admin/", "status": 200, "type": "private" },
+    { "id": "admin-session", "base": "worker", "path": "/admin/session", "status": 401, "type": "private" },
+    { "id": "invalid-order-api", "base": "worker", "path": "/api/orders/invalid", "status": 400, "type": "private" }
+  ]
+}

@@ -165,6 +165,15 @@ For focused admin browser coverage:
 ./scripts/podman-playwright-run.sh npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium
 ```
 
+Performance gates also use the shared Podman Storefront/Worker stack by default:
+
+```bash
+npm run test:performance:lighthouse
+npm run test:cache-policy
+```
+
+The Lighthouse wrapper starts or reuses the production-like stack, then launches the repository's pinned Playwright Chromium from the host. Raw reports should go to ignored `test-results/` or `/tmp`; do not commit browser profiles or reports containing unexpected URL parameters. The public/admin stylesheet split and local Inter subset are exercised by the normal Podman build and browser suites.
+
 For host-side commands that need a temporary Podman-backed Storefront and Worker, use:
 
 ```bash

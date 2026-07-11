@@ -1,9 +1,19 @@
 export const ADMIN_STORE_READS_CACHE_ENTRYPOINT = 'CachedAdminStoreReads';
 export const ADMIN_STORE_READS_CACHE_LEGACY_ENTRYPOINT = 'CachedAdminStoreOrders';
+export const ADMIN_STORE_ORDER_INDEX_CACHE_ENTRYPOINT = 'CachedAdminStoreOrderIndex';
 export const ADMIN_STORE_READS_CACHE_SOURCE = 'store-admin-read-cache-gateway';
 export const ADMIN_STORE_READS_CACHE_PROPS_VERSION = 2;
 export const ADMIN_STORE_READS_CACHE_INTERNAL_ORIGIN = 'https://store-cache.internal';
 export const ADMIN_STORE_READS_CACHE_PURGE_PATH = '/__store-cache/admin-reads/purge';
+export const ADMIN_STORE_ORDER_INDEX_CACHE_PATH = '/__store-cache/admin-order-index';
+export const ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL = 'public, max-age=20, stale-if-error=0';
+export const ADMIN_STORE_ORDER_INDEX_CACHE_TAGS = Object.freeze([
+  'admin-store-reads',
+  'admin-store-reads-v2',
+  'admin-orders',
+  'orders',
+  'order-index'
+]);
 
 const COMMON_TAGS = ['admin-store-reads', 'admin-store-reads-v2'];
 
@@ -142,6 +152,14 @@ export function buildAdminStoreReadCacheRequest(request, routeId) {
     method: String(request.method || 'GET').toUpperCase() === 'HEAD' ? 'HEAD' : 'GET',
     headers: { Accept: 'application/json' },
     cf: { cacheControl: policy.cacheControl }
+  });
+}
+
+export function buildAdminStoreOrderIndexCacheRequest() {
+  return new Request(new URL(ADMIN_STORE_ORDER_INDEX_CACHE_PATH, ADMIN_STORE_READS_CACHE_INTERNAL_ORIGIN), {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cf: { cacheControl: ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL }
   });
 }
 

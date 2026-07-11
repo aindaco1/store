@@ -13,7 +13,10 @@
  *   GET  /abandoned-cart/resume  - Restore a signed Store checkout reminder snapshot
  *   POST /webhooks/stripe        - Handle Stripe webhooks
  *   GET  /admin/session          - Read current browser admin session
+ *   GET  /admin/sessions         - Review active and recent admin sessions
+ *   POST /admin/sessions/revoke  - Revoke an active admin session
  *   GET  /admin/dashboard/summary - Read Store admin summary
+ *   GET  /admin/audit            - Search recent redacted admin audit events
  *   GET  /admin/audit.csv        - Download recent admin mutation audit CSV
  *   GET  /admin/settings         - Read Store settings/config snapshot
  *   POST /admin/settings/preview - Validate admin settings changes
@@ -24,6 +27,7 @@
  *   GET  /admin/store/marketing/abandoned-checkout/health - Read checkout reminder health
  *   POST /admin/store/marketing/abandoned-checkout/suppression - Suppress checkout reminders
  *   GET  /admin/store/orders     - Read Store order fulfillment rows
+ *   GET  /admin/store/orders/download-abuse - Read aggregate signed-download abuse diagnostics
  *   GET  /admin/store/orders.csv - Download Store order fulfillment CSV
  *   GET  /admin/store/attendees.csv - Download Store ticket/RSVP attendee CSV
  *   GET  /admin/store/reconciliation.csv - Download Store order reconciliation CSV
@@ -86,6 +90,10 @@ import {
 } from './admin-store-read-model.js';
 import {
   ADMIN_STORE_READ_CACHE_POLICIES,
+  ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL,
+  ADMIN_STORE_ORDER_INDEX_CACHE_ENTRYPOINT,
+  ADMIN_STORE_ORDER_INDEX_CACHE_PATH,
+  ADMIN_STORE_ORDER_INDEX_CACHE_TAGS,
   ADMIN_STORE_READS_CACHE_ENTRYPOINT,
   ADMIN_STORE_READS_CACHE_INTERNAL_ORIGIN,
   ADMIN_STORE_READS_CACHE_LEGACY_ENTRYPOINT,
@@ -97,6 +105,7 @@ import {
   buildAdminStoreReadCacheProps,
   buildAdminStoreReadCachePurgeProps,
   buildAdminStoreReadCacheRequest,
+  buildAdminStoreOrderIndexCacheRequest,
   readAdminStoreReadCacheProps,
   storeReadCacheDomainsForMutation,
   workersCacheGloballyEnabled,
@@ -125,7 +134,9 @@ import {
   handleAdminAuthStart,
   handleAdminLogout,
   handleAdminSession,
+  listAdminSessionReview,
   requireAdminSession,
+  revokeAdminSessionById,
   saveStoredAdminUsers,
   verifyAdminAuthStartChallenge
 } from './admin-auth.js';
@@ -446,6 +457,10 @@ function getAdminStoreReadWorkersCacheBinding(ctx = null, routeId = '') {
   return binding || null;
 }
 
+function getAdminStoreOrderIndexWorkersCacheBinding(ctx = null) {
+  return ctx?.exports?.[ADMIN_STORE_ORDER_INDEX_CACHE_ENTRYPOINT] || null;
+}
+
 function fetchAdminStoreReadWorkersCache(ctx = null, request, props = {}) {
   const binding = getAdminStoreReadWorkersCacheBinding(ctx, props.routeId);
   if (!binding) return null;
@@ -458,6 +473,17 @@ function fetchAdminStoreReadWorkersCache(ctx = null, request, props = {}) {
   if (typeof binding.fetch === 'function') {
     return binding.fetch(request, { props });
   }
+  return null;
+}
+
+function fetchAdminStoreOrderIndexWorkersCache(ctx = null, request, props = {}) {
+  const binding = getAdminStoreOrderIndexWorkersCacheBinding(ctx);
+  if (!binding) return null;
+  if (typeof binding === 'function') {
+    const scopedBinding = binding({ props });
+    if (scopedBinding && typeof scopedBinding.fetch === 'function') return scopedBinding.fetch(request);
+  }
+  if (typeof binding.fetch === 'function') return binding.fetch(request, { props });
   return null;
 }
 
@@ -484,9 +510,12 @@ function adminStoreOrdersWorkersCacheMetadata(response = null, options = {}) {
 
 function attachAdminStoreReadGatewayUser(payload = {}, auth = {}, workersCache = null) {
   const servedFromCache = ['HIT', 'UPDATING'].includes(String(workersCache?.status || '').toUpperCase());
+  const nestedWorkersRequests = Math.max(0, Number(payload.writeBudget?.workersRequestsExpected || 0) || 0);
   const writeBudget = {
     ...(payload.writeBudget || adminReadBudget()),
-    workersRequestsExpected: workersCache?.enabled && !workersCache?.bypass ? 1 : 0
+    workersRequestsExpected: workersCache?.enabled && !workersCache?.bypass
+      ? (servedFromCache ? 1 : nestedWorkersRequests + 1)
+      : nestedWorkersRequests
   };
   if (servedFromCache) {
     for (const key of ['kvReadsExpected', 'kvListExpected', 'r2ReadsExpected', 'r2ListExpected', 'providerCallsExpected']) {
@@ -1212,6 +1241,22 @@ function updateDurationStats(target, durationMs) {
     ? safeDuration
     : Math.min(Number(target.minMs ?? safeDuration), safeDuration);
   target.lastMs = safeDuration;
+  const bucket = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
+    .find((maximum) => safeDuration <= maximum);
+  target.histogram = target.histogram || {};
+  const bucketKey = bucket ? String(bucket) : 'inf';
+  target.histogram[bucketKey] = Number(target.histogram[bucketKey] || 0) + 1;
+}
+
+function durationPercentile(histogram = {}, count = 0, percentile = 0.5, fallback = 0) {
+  if (!count || !histogram || typeof histogram !== 'object') return fallback;
+  const rank = Math.max(1, Math.ceil(count * percentile));
+  let seen = 0;
+  for (const boundary of ['10', '25', '50', '100', '250', '500', '1000', '2500', '5000', '10000', 'inf']) {
+    seen += Number(histogram[boundary] || 0);
+    if (seen >= rank) return boundary === 'inf' ? fallback : Number(boundary);
+  }
+  return fallback;
 }
 
 function finalizeDurationStats(target = {}) {
@@ -1223,7 +1268,10 @@ function finalizeDurationStats(target = {}) {
     avgMs: count > 0 ? Number((totalMs / count).toFixed(2)) : 0,
     minMs: count > 0 ? Number(target.minMs || 0) : 0,
     maxMs: Number(target.maxMs || 0),
-    lastMs: Number(target.lastMs || 0)
+    lastMs: Number(target.lastMs || 0),
+    p50Ms: durationPercentile(target.histogram, count, 0.5, Number(target.maxMs || 0)),
+    p95Ms: durationPercentile(target.histogram, count, 0.95, Number(target.maxMs || 0)),
+    p99Ms: durationPercentile(target.histogram, count, 0.99, Number(target.maxMs || 0))
   };
 }
 
@@ -2492,12 +2540,14 @@ function buildAdminStoreInventoryReadPayload(snapshot = {}) {
       latestKnownUpdatedAt: snapshot.latestKnownUpdatedAt || '',
       watermark: snapshot.watermark || ''
     },
-    writeBudget: adminReadBudget({
-      kvListExpected: snapshot.cache?.hit ? 0 : (snapshot.listCalls ?? 1),
-      kvReadsExpected: snapshot.cache?.hit
-        ? (snapshot.cache?.source === 'kv_index' ? 1 : 0)
-        : snapshot.scanned
-    })
+    writeBudget: snapshot.writeBudget && typeof snapshot.writeBudget === 'object'
+      ? adminReadBudget(snapshot.writeBudget)
+      : adminReadBudget({
+        kvListExpected: snapshot.cache?.hit ? 0 : (snapshot.listCalls ?? 1),
+        kvReadsExpected: snapshot.cache?.hit
+          ? (snapshot.cache?.source === 'kv_index' ? 1 : 0)
+          : snapshot.scanned
+      })
   };
 }
 
@@ -2523,13 +2573,66 @@ function buildAdminStoreDownloadsReadPayload(snapshot = {}) {
   };
 }
 
+async function readAdminStoreOrderScanThroughWorkersCache(env, ctx, auth) {
+  const props = buildAdminStoreReadCacheProps(auth, 'orders');
+  const cacheRequest = buildAdminStoreOrderIndexCacheRequest();
+  const responsePromise = props
+    ? fetchAdminStoreOrderIndexWorkersCache(ctx, cacheRequest, props)
+    : null;
+  if (!responsePromise) return readAdminStoreOrderScan(env, { ctx });
+
+  try {
+    const response = await responsePromise;
+    if (!response.ok) return readAdminStoreOrderScan(env, { ctx });
+    const payload = await response.json();
+    const index = normalizeAdminStoreOrderIndex(payload?.index, {
+      maxAgeMs: ADMIN_STORE_ORDER_INDEX_MAX_AGE_MS
+    });
+    if (!index) return readAdminStoreOrderScan(env, { ctx });
+    const status = String(response.headers.get('Cf-Cache-Status') || 'MISS').toUpperCase();
+    const hit = ['HIT', 'UPDATING', 'STALE', 'REVALIDATED'].includes(status);
+    const sourceBudget = payload?.writeBudget && typeof payload.writeBudget === 'object'
+      ? payload.writeBudget
+      : adminReadBudget();
+    return {
+      ok: true,
+      ...index,
+      writeBudget: adminReadBudget({
+        ...sourceBudget,
+        workersRequestsExpected: 1,
+        ...(hit ? {
+          kvReadsExpected: 0,
+          kvListExpected: 0,
+          r2ReadsExpected: 0,
+          r2ListExpected: 0,
+          providerCallsExpected: 0
+        } : {})
+      }),
+      cache: {
+        hit,
+        source: hit ? 'workers_cache_index' : 'workers_cache_index_fill',
+        status,
+        ageMs: index.ageMs,
+        ttlMs: 20 * 1000
+      }
+    };
+  } catch (error) {
+    console.warn('Admin Store order index Workers Cache bypassed:', error?.message || String(error));
+    return readAdminStoreOrderScan(env, { ctx });
+  }
+}
+
 async function buildAdminStoreCachedReadPayload(routeId, request, env, options = {}) {
   const auth = options.auth;
+  const orderSnapshot = ['orders', 'analytics', 'inventory'].includes(routeId)
+    ? await readAdminStoreOrderScanThroughWorkersCache(env, options.ctx || null, auth)
+    : null;
   if (routeId === 'orders') {
     return buildAdminStoreOrdersPayload(request, env, {
       ctx: options.ctx || null,
       auth,
-      includeUser: false
+      includeUser: false,
+      orderSnapshot
     });
   }
   if (routeId === 'analytics') {
@@ -2537,7 +2640,8 @@ async function buildAdminStoreCachedReadPayload(routeId, request, env, options =
       paginate: false,
       ctx: options.ctx || null,
       auth,
-      includeUser: false
+      includeUser: false,
+      orderSnapshot
     });
     if (!built.ok) return built;
     const payload = buildAdminStoreAnalyticsPayload(built.payload);
@@ -2549,7 +2653,10 @@ async function buildAdminStoreCachedReadPayload(routeId, request, env, options =
     return { ok: true, payload };
   }
   if (routeId === 'inventory') {
-    const snapshot = await buildAdminStoreInventorySnapshot(env, { ctx: options.ctx || null });
+    const snapshot = await buildAdminStoreInventorySnapshot(env, {
+      ctx: options.ctx || null,
+      orderSnapshot
+    });
     if (!snapshot.ok) {
       return { ok: false, response: privateJsonResponse({ error: snapshot.error }, snapshot.status || 503, env) };
     }
@@ -2613,6 +2720,37 @@ async function tryAdminStoreReadWorkersCache(request, env, ctx, auth, routeId) {
     })
   };
 }
+
+export const CachedAdminStoreOrderIndex = {
+  async fetch(request, env, ctx) {
+    configureWorkerLogging(env);
+    const url = new URL(request.url);
+    const props = readAdminStoreReadCacheProps(ctx);
+    if (
+      request.method !== 'GET' ||
+      url.pathname !== ADMIN_STORE_ORDER_INDEX_CACHE_PATH ||
+      url.search ||
+      !props ||
+      props.routeId !== 'orders' ||
+      props.accessScope !== STORE_ADMIN_SCOPE
+    ) {
+      return noStoreAdminStoreReadCacheResponse({ error: 'Forbidden' }, 403, env);
+    }
+
+    const scanned = await readAdminStoreOrderScan(env, { ctx });
+    if (!scanned.ok) {
+      return noStoreAdminStoreReadCacheResponse({ error: scanned.error }, scanned.status || 503, env);
+    }
+    const index = buildAdminStoreOrderIndexSnapshot(scanned);
+    return jsonResponse({
+      index,
+      writeBudget: adminStoreOrderScanReadBudget(scanned)
+    }, 200, env, false, {
+      'Cache-Control': ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL,
+      'Cache-Tag': ADMIN_STORE_ORDER_INDEX_CACHE_TAGS.join(',')
+    });
+  }
+};
 
 export const CachedAdminStoreReads = {
   async fetch(request, env, ctx) {
@@ -2724,6 +2862,19 @@ export default {
         return handleAdminSession(request, env);
       }
 
+      if (path === '/admin/sessions' && method === 'GET') {
+        return handleAdminSessions(request, env);
+      }
+
+      if (path === '/admin/sessions/revoke' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        return handleAdminSessionRevoke(request, env, parsedBody.body || {});
+      }
+
       if (path === '/admin/logout' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
         if (!bodyLimit.ok) return bodyLimit.response;
@@ -2736,6 +2887,10 @@ export default {
 
       if (path === '/admin/audit.csv' && method === 'GET') {
         return handleAdminAuditCsv(request, env);
+      }
+
+      if (path === '/admin/audit' && method === 'GET') {
+        return handleAdminAudit(request, env);
       }
 
       if (path === '/admin/store/health' && method === 'GET') {
@@ -2814,6 +2969,10 @@ export default {
 
       if (path === '/admin/store/orders' && method === 'GET') {
         return handleAdminStoreOrders(request, env, ctx);
+      }
+
+      if (path === '/admin/store/orders/download-abuse' && method === 'GET') {
+        return handleAdminStoreDownloadAbuse(request, env);
       }
 
       if (path === '/admin/store/orders.csv' && method === 'GET') {
@@ -3502,6 +3661,10 @@ const STORE_ORDER_LOOKUP_TOKEN_PREFIX = 'store-order-lookup:';
 const STORE_ORDER_LOOKUP_TOKEN_TTL_SECONDS = 15 * 60;
 const STORE_ORDER_LOOKUP_SCOPE = 'store_order_lookup';
 const STORE_FULFILLMENT_TOKEN_TTL_SECONDS = 72 * 60 * 60;
+const STORE_DOWNLOAD_FAILURE_LIMIT = 10;
+const STORE_DOWNLOAD_FAILURE_WINDOW_SECONDS = 15 * 60;
+const STORE_DOWNLOAD_SOFT_LOCK_SECONDS = 30 * 60;
+const STORE_DOWNLOAD_ABUSE_SUMMARY_TTL_SECONDS = 30 * 24 * 60 * 60;
 const STORE_EVENT_ADDRESS_LOOKUP_CACHE_PREFIX = 'store-event-address-lookup:';
 const STORE_EVENT_ADDRESS_LOOKUP_CACHE_TTL_SECONDS = 24 * 60 * 60;
 
@@ -5302,6 +5465,86 @@ async function verifyStoreFulfillmentToken(env, token, expected = {}) {
   return { ok: true, payload };
 }
 
+async function storeDownloadAbuseKey(request, env, orderToken = '') {
+  const address = String(
+    request.headers.get('CF-Connecting-IP') ||
+    request.headers.get('X-Forwarded-For')?.split(',')[0] ||
+    'unknown'
+  ).trim();
+  const secret = getStoreFulfillmentSecret(env);
+  const fingerprint = secret
+    ? base64urlEncodeBytes(await hmacSha256Bytes(secret, `download-abuse:${address}`)).slice(0, 20)
+    : 'unconfigured';
+  return `download-abuse:${String(orderToken || '').trim()}:${fingerprint}`;
+}
+
+function storeDownloadAbuseResponse(env, record = {}) {
+  const now = Math.floor(Date.now() / 1000);
+  const retryAfter = Math.max(1, Number(record.lockedUntil || 0) - now);
+  return privateJsonResponse({
+    error: 'Download access is temporarily locked after repeated failed attempts.',
+    retryAfter
+  }, 429, env, {
+    'Retry-After': String(retryAfter)
+  });
+}
+
+async function checkStoreDownloadAbuseLock(request, env, orderToken = '') {
+  if (!env.RATELIMIT) return { allowed: false, response: privateJsonResponse({ error: RATELIMIT_REQUIRED_ERROR }, 503, env) };
+  const key = await storeDownloadAbuseKey(request, env, orderToken);
+  const record = await env.RATELIMIT.get(key, { type: 'json' }) || {};
+  if (Number(record.lockedUntil || 0) > Math.floor(Date.now() / 1000)) {
+    return { allowed: false, response: storeDownloadAbuseResponse(env, record), key };
+  }
+  return { allowed: true, key, record };
+}
+
+async function updateStoreDownloadAbuseSummary(env, orderToken = '', record = {}) {
+  if (!env.STORE_STATE || !STORE_ORDER_TOKEN_PATTERN.test(String(orderToken || ''))) return;
+  const key = `download-abuse-summary:${orderToken}`;
+  const summary = await env.STORE_STATE.get(key, { type: 'json' }) || {
+    failedAttempts: 0,
+    softLocks: 0
+  };
+  summary.failedAttempts = Number(summary.failedAttempts || 0) + 1;
+  if (record.locked === true) summary.softLocks = Number(summary.softLocks || 0) + 1;
+  summary.lastFailedAt = new Date().toISOString();
+  summary.lastLockedUntil = record.locked === true ? new Date(Number(record.lockedUntil || 0) * 1000).toISOString() : String(summary.lastLockedUntil || '');
+  await env.STORE_STATE.put(key, JSON.stringify(summary), { expirationTtl: STORE_DOWNLOAD_ABUSE_SUMMARY_TTL_SECONDS });
+}
+
+async function recordStoreDownloadFailure(request, env, orderToken = '', existing = null) {
+  const key = existing?.key || await storeDownloadAbuseKey(request, env, orderToken);
+  return withRateLimitKeyLock(key, async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const record = await env.RATELIMIT.get(key, { type: 'json' }) || {};
+    if (!Number(record.windowReset || 0) || now >= Number(record.windowReset || 0)) {
+      record.count = 0;
+      record.windowReset = now + STORE_DOWNLOAD_FAILURE_WINDOW_SECONDS;
+    }
+    record.count = Number(record.count || 0) + 1;
+    record.lastFailedAt = now;
+    const newlyLocked = record.count >= STORE_DOWNLOAD_FAILURE_LIMIT && Number(record.lockedUntil || 0) <= now;
+    if (newlyLocked) record.lockedUntil = now + STORE_DOWNLOAD_SOFT_LOCK_SECONDS;
+    await env.RATELIMIT.put(key, JSON.stringify(record), {
+      expirationTtl: Math.max(STORE_DOWNLOAD_FAILURE_WINDOW_SECONDS, STORE_DOWNLOAD_SOFT_LOCK_SECONDS) + 60
+    });
+    await updateStoreDownloadAbuseSummary(env, orderToken, {
+      locked: newlyLocked,
+      lockedUntil: record.lockedUntil
+    });
+    return {
+      locked: Number(record.lockedUntil || 0) > now,
+      response: Number(record.lockedUntil || 0) > now ? storeDownloadAbuseResponse(env, record) : null
+    };
+  });
+}
+
+async function clearStoreDownloadFailureWindow(request, env, orderToken = '') {
+  if (!env.RATELIMIT || typeof env.RATELIMIT.delete !== 'function') return;
+  await env.RATELIMIT.delete(await storeDownloadAbuseKey(request, env, orderToken));
+}
+
 async function hmacSha256Bytes(secret, data) {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -5534,7 +5777,12 @@ function getStoreDownloadAccessState(storedOrder = {}, itemId = '', item = {}, n
     updatedBy: String(record.updatedBy || ''),
     reissuedAt: String(record.reissuedAt || ''),
     revokedAt,
-    expiredAt: revokedAt
+    expiredAt: revokedAt,
+    history: (Array.isArray(record.history) ? record.history : []).slice(-10).map((entry) => ({
+      action: String(entry?.action || ''),
+      at: String(entry?.at || ''),
+      by: String(entry?.by || '')
+    }))
   };
 }
 
@@ -5757,6 +6005,11 @@ async function handleStoreOrderRoute(request, env, route) {
   const trustedOrigin = requireTrustedSiteOrigin(request, env);
   if (!trustedOrigin.ok) return trustedOrigin.response;
 
+  const abuse = route.kind === 'download'
+    ? await checkStoreDownloadAbuseLock(request, env, route.orderToken)
+    : { allowed: true };
+  if (!abuse.allowed) return abuse.response;
+
   const loaded = await loadStoreOrderForRead(env, route.orderToken);
   if (!loaded.ok) {
     return privateJsonResponse({ error: loaded.error }, loaded.status || 404, env);
@@ -5781,14 +6034,21 @@ async function handleStoreOrderRoute(request, env, route) {
     action: route.kind
   });
   if (!tokenCheck.ok) {
+    if (route.kind === 'download') {
+      const failure = await recordStoreDownloadFailure(request, env, route.orderToken, abuse);
+      if (failure.locked) return failure.response;
+    }
     return privateJsonResponse({ error: tokenCheck.error }, tokenCheck.status || 403, env);
   }
 
   if (route.kind === 'download') {
     const access = getStoreDownloadAccessState(loaded.storedOrder, match.itemId, match.item);
     if (!access.available) {
+      const failure = await recordStoreDownloadFailure(request, env, route.orderToken, abuse);
+      if (failure.locked) return failure.response;
       return privateJsonResponse({ error: 'Store download access revoked' }, 410, env);
     }
+    await clearStoreDownloadFailureWindow(request, env, route.orderToken);
     return handleStoreDownload(request, env, loaded.storedOrder, match.item, match.itemId);
   }
   if (route.kind === 'ticket') {
@@ -7361,7 +7621,9 @@ async function readAdminStoreOrderScan(env, options = {}) {
 }
 
 async function buildStoreInventorySoldCounts(env, options = {}) {
-  const scanned = await readAdminStoreOrderScan(env, { ctx: options.ctx || null });
+  const scanned = options.orderSnapshot?.ok
+    ? options.orderSnapshot
+    : await readAdminStoreOrderScan(env, { ctx: options.ctx || null });
   if (!scanned.ok) return scanned;
   const counts = buildStoreInventorySoldCountsFromOrders(scanned.orders);
   return {
@@ -7375,6 +7637,7 @@ async function buildStoreInventorySoldCounts(env, options = {}) {
     generatedAt: scanned.generatedAt || '',
     latestKnownUpdatedAt: scanned.latestKnownUpdatedAt || '',
     watermark: scanned.watermark || '',
+    writeBudget: scanned.writeBudget || null,
     orders: scanned.orders || []
   };
 }
@@ -9940,7 +10203,10 @@ async function buildAdminStoreInventorySnapshot(env, options = {}) {
   const effectiveSnapshot = applyStoreInventoryOverridesToSnapshot(baseSnapshot, overrides);
   const baseCatalog = normalizeStoreCatalogSnapshot(baseSnapshot);
   const effectiveCatalog = normalizeStoreCatalogSnapshot(effectiveSnapshot);
-  const sold = await buildStoreInventorySoldCounts(env, { ctx: options.ctx || null });
+  const sold = await buildStoreInventorySoldCounts(env, {
+    ctx: options.ctx || null,
+    orderSnapshot: options.orderSnapshot || null
+  });
   if (!sold.ok) return sold;
 
   const rows = [];
@@ -9985,7 +10251,8 @@ async function buildAdminStoreInventorySnapshot(env, options = {}) {
     cache: sold.cache || null,
     ordersGeneratedAt: sold.generatedAt || '',
     latestKnownUpdatedAt: sold.latestKnownUpdatedAt || '',
-    watermark: sold.watermark || ''
+    watermark: sold.watermark || '',
+    writeBudget: sold.writeBudget || null
   };
 }
 
@@ -10385,16 +10652,31 @@ function storeAdminOrderFiltersFromUrl(url) {
   };
 }
 
+function adminStoreOrderScanReadBudget(scannedOrders = {}) {
+  if (scannedOrders.writeBudget && typeof scannedOrders.writeBudget === 'object') {
+    return adminReadBudget(scannedOrders.writeBudget);
+  }
+  const scanCache = scannedOrders.cache || null;
+  return adminReadBudget({
+    kvListExpected: scanCache?.hit ? 0 : (scannedOrders.listCalls || 1),
+    kvReadsExpected: scanCache?.hit
+      ? (scanCache.source === 'kv_index' ? 1 : 0)
+      : scannedOrders.scanned
+  });
+}
+
 async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   const auth = options.auth?.ok
     ? options.auth
     : await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return { ok: false, response: auth.response };
 
-  const scannedOrders = await readAdminStoreOrderScan(env, {
-    force: options.forceScan === true,
-    ctx: options.ctx || null
-  });
+  const scannedOrders = options.orderSnapshot?.ok
+    ? options.orderSnapshot
+    : await readAdminStoreOrderScan(env, {
+      force: options.forceScan === true,
+      ctx: options.ctx || null
+    });
   if (!scannedOrders.ok) {
     return { ok: false, response: privateJsonResponse({ error: scannedOrders.error }, scannedOrders.status || 503, env) };
   }
@@ -10433,12 +10715,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
           watermark: scannedOrders.watermark || ''
         },
         filters,
-        writeBudget: adminReadBudget({
-          kvListExpected: scanCache?.hit ? 0 : (scannedOrders.listCalls || 1),
-          kvReadsExpected: scanCache?.hit
-            ? (scanCache.source === 'kv_index' ? 1 : 0)
-            : scannedOrders.scanned
-        }),
+        writeBudget: adminStoreOrderScanReadBudget(scannedOrders),
         generatedAt: new Date().toISOString()
       }
     };
@@ -10503,12 +10780,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
         watermark: scannedOrders.watermark || ''
       },
       filters,
-      writeBudget: adminReadBudget({
-        kvListExpected: scanCache?.hit ? 0 : (scannedOrders.listCalls || 1),
-        kvReadsExpected: scanCache?.hit
-          ? (scanCache.source === 'kv_index' ? 1 : 0)
-          : scannedOrders.scanned
-      }),
+      writeBudget: adminStoreOrderScanReadBudget(scannedOrders),
       generatedAt: new Date().toISOString()
     }
   };
@@ -11750,6 +12022,181 @@ async function buildAdminAuditExportRows(request, env) {
   return { ok: true, rows, page: { listed: listed.keys.length, returned: rows.length, listCalls: listed.listCalls, truncated: listed.truncated } };
 }
 
+async function buildAdminAuditSearchRows(request, env) {
+  const listed = await listAdminAuditEventKeys(env, adminAuditExportPrefix(request));
+  if (!listed.ok) return listed;
+
+  const rows = [];
+  let valueReads = 0;
+  for (const key of listed.keys) {
+    const keyName = String(key?.name || '').trim();
+    if (!keyName) continue;
+    const metadata = key?.metadata;
+    if (metadata && typeof metadata === 'object' && metadata.createdAt && metadata.action) {
+      rows.push({ ...metadata, key: keyName });
+      continue;
+    }
+    const event = await env.STORE_STATE.get(keyName, { type: 'json' });
+    valueReads += 1;
+    if (!event || typeof event !== 'object') continue;
+    rows.push(publicAdminAuditRow({ key: keyName, ...event }));
+  }
+
+  rows.sort((a, b) => {
+    const byDate = String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    return byDate || String(b.key || '').localeCompare(String(a.key || ''));
+  });
+
+  return {
+    ok: true,
+    rows,
+    page: {
+      listed: listed.keys.length,
+      returned: rows.length,
+      listCalls: listed.listCalls,
+      valueReads,
+      truncated: listed.truncated
+    }
+  };
+}
+
+function adminAuditSearchValue(row = {}) {
+  return [
+    row.action,
+    row.adminEmail,
+    row.adminRole,
+    row.productId,
+    adminAuditStringList(row.productIds),
+    row.variantId,
+    row.sku,
+    row.orderToken,
+    row.itemId,
+    row.fileKey,
+    row.githubPath,
+    row.commitSha,
+    row.mutation
+  ].map((value) => String(value || '').toLowerCase()).join(' ');
+}
+
+function publicAdminAuditRow(row = {}) {
+  return {
+    key: String(row.key || ''),
+    createdAt: String(row.createdAt || ''),
+    action: String(row.action || ''),
+    adminEmail: String(row.adminEmail || ''),
+    adminRole: String(row.adminRole || ''),
+    productId: String(row.productId || ''),
+    orderToken: String(row.orderToken || ''),
+    itemId: String(row.itemId || ''),
+    fileKey: String(row.fileKey || ''),
+    mutation: String(row.mutation || ''),
+    changedFields: Array.isArray(row.changedFields) ? row.changedFields.map(String).slice(0, 50) : []
+  };
+}
+
+function adminAuditFiltersFromRequest(request) {
+  const url = new URL(request.url);
+  return {
+    action: String(url.searchParams.get('action') || '').trim().toLowerCase().slice(0, 120),
+    email: String(url.searchParams.get('email') || '').trim().toLowerCase().slice(0, 254),
+    query: String(url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120)
+  };
+}
+
+function filterAdminAuditRows(rows = [], filters = {}) {
+  return rows.filter((row) => {
+    if (filters.action && !String(row.action || '').toLowerCase().includes(filters.action)) return false;
+    if (filters.email && String(row.adminEmail || '').toLowerCase() !== filters.email) return false;
+    if (filters.query && !adminAuditSearchValue(row).includes(filters.query)) return false;
+    return true;
+  });
+}
+
+async function handleAdminAudit(request, env) {
+  const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  const built = await buildAdminAuditSearchRows(request, env);
+  if (!built.ok) {
+    return privateJsonResponse({ error: built.error || 'Audit search unavailable' }, built.status || 503, env);
+  }
+  const url = new URL(request.url);
+  const filters = adminAuditFiltersFromRequest(request);
+  const requestedLimit = Number.parseInt(String(url.searchParams.get('limit') || '100'), 10);
+  const limit = Math.max(1, Math.min(250, Number.isFinite(requestedLimit) ? requestedLimit : 100));
+  const filtered = filterAdminAuditRows(built.rows, filters);
+  return privateJsonResponse({
+    rows: filtered.slice(0, limit).map(publicAdminAuditRow),
+    page: {
+      ...built.page,
+      matched: filtered.length,
+      returned: Math.min(filtered.length, limit),
+      limit
+    },
+    filters,
+    writeBudget: adminReadBudget({ kvListExpected: built.page.listCalls, kvReadsExpected: built.page.valueReads }),
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+async function handleAdminSessions(request, env) {
+  const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  const sessions = await listAdminSessionReview(env);
+  return privateJsonResponse({
+    ...sessions,
+    active: sessions.active.map((session) => ({
+      ...session,
+      current: session.id === auth.sessionId
+    })),
+    privacy: {
+      storesFullIp: false,
+      storesFullUserAgent: false,
+      storesPreciseLocation: false,
+      networkIdentifier: 'keyed fingerprint'
+    },
+    generatedAt: new Date().toISOString()
+  }, 200, env);
+}
+
+async function handleAdminSessionRevoke(request, env, body = {}) {
+  const auth = await requireAdminSession(request, env, 'settings:publish', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Forbidden' }, 403, env);
+  }
+  const revoked = await revokeAdminSessionById(env, body.id);
+  if (!revoked.ok) {
+    return privateJsonResponse({ error: revoked.error }, revoked.status || 400, env);
+  }
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'admin_session:revoke',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    revokedAdminEmail: revoked.session.email,
+    revokedSessionId: revoked.session.id.slice(0, 12),
+    revokedSessionCreatedAt: revoked.session.createdAt
+  });
+  return privateJsonResponse({
+    success: true,
+    revoked: {
+      email: revoked.session.email,
+      id: revoked.session.id,
+      createdAt: revoked.session.createdAt
+    },
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 1 : 0 })
+  }, 200, env);
+}
+
 async function handleAdminAuditCsv(request, env) {
   const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return auth.response;
@@ -11763,7 +12210,8 @@ async function handleAdminAuditCsv(request, env) {
   }
 
   const dateKey = getPlatformDateKey(env, new Date());
-  return csvResponse(adminAuditRowsCsv(built.rows), `admin-audit-${dateKey}.csv`, env);
+  const rows = filterAdminAuditRows(built.rows, adminAuditFiltersFromRequest(request));
+  return csvResponse(adminAuditRowsCsv(rows), `admin-audit-${dateKey}.csv`, env);
 }
 
 function normalizeAdminStoreCheckInIntent(body = {}, item = {}) {
@@ -11793,6 +12241,34 @@ function normalizeAdminStoreDownloadAccessIntent(body = {}, _item = {}) {
     ok: true,
     action
   };
+}
+
+async function handleAdminStoreDownloadAbuse(request, env) {
+  const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+  const orderToken = String(new URL(request.url).searchParams.get('orderToken') || '').trim();
+  if (!STORE_ORDER_TOKEN_PATTERN.test(orderToken)) {
+    return privateJsonResponse({ error: 'Invalid Store order token' }, 400, env);
+  }
+  const summary = await env.STORE_STATE?.get(`download-abuse-summary:${orderToken}`, { type: 'json' }) || {};
+  return privateJsonResponse({
+    orderToken,
+    failedAttempts: Math.max(0, Number(summary.failedAttempts || 0)),
+    softLocks: Math.max(0, Number(summary.softLocks || 0)),
+    lastFailedAt: String(summary.lastFailedAt || ''),
+    lastLockedUntil: String(summary.lastLockedUntil || ''),
+    policy: {
+      failedAttemptLimit: STORE_DOWNLOAD_FAILURE_LIMIT,
+      windowMinutes: STORE_DOWNLOAD_FAILURE_WINDOW_SECONDS / 60,
+      softLockMinutes: STORE_DOWNLOAD_SOFT_LOCK_SECONDS / 60
+    },
+    privacy: {
+      storesSignedUrls: false,
+      storesRawIp: false,
+      aggregateOnly: true
+    },
+    writeBudget: adminReadBudget({ kvReadsExpected: 1 })
+  }, 200, env);
 }
 
 async function handleAdminStoreOrderDownloadAccess(request, env, body = {}, ctx = null) {
@@ -13013,7 +13489,7 @@ async function handleCronStatus(request, env) {
   const lastRun = await env.STORE_STATE?.get('cron:lastRun');
   const lastError = await env.STORE_STATE?.get('cron:lastError', { type: 'json' });
 
-  return jsonResponse({
+  return privateJsonResponse({
     lastRun,
     lastError,
     now: new Date().toISOString()
@@ -13029,30 +13505,37 @@ async function handleWebhookObservability(request, env) {
   const summaries = await listObservabilitySummaries(env, 'webhook', days);
   const recent = await getObservabilityRecentEvents(env, 'webhook');
 
-  return jsonResponse({
+  return privateJsonResponse({
     success: true,
     days,
     now: new Date().toISOString(),
     summaries,
     recent
-  });
+  }, 200, env);
 }
 
 async function handlePerformanceObservability(request, env) {
-  const auth = requireAdmin(request, env);
+  let auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) auth = requireAdmin(request, env);
   if (!auth.ok) return auth.response;
 
   const url = new URL(request.url);
   const days = clampObservabilityDays(url.searchParams.get('days'));
   const summaries = await listObservabilitySummaries(env, 'performance', days);
+  const slowRoutes = summaries.flatMap((summary) => Object.entries(summary.operations || {}).map(([operation, metrics]) => ({
+    date: summary.date,
+    operation,
+    ...metrics
+  }))).sort((a, b) => Number(b.p95Ms || b.maxMs || 0) - Number(a.p95Ms || a.maxMs || 0)).slice(0, 20);
 
-  return jsonResponse({
+  return privateJsonResponse({
     success: true,
     days,
     sampleRate: getObservabilitySampleRate(env),
     now: new Date().toISOString(),
-    summaries
-  });
+    summaries,
+    slowRoutes
+  }, 200, env);
 }
 
 
@@ -13313,6 +13796,39 @@ function buildSecretHealthChecks(env) {
   ));
 }
 
+function configuredHttpsOrigin(value = '') {
+  try {
+    const url = new URL(String(value || '').trim());
+    return url.protocol === 'https:' && url.origin === url.href.replace(/\/$/, '');
+  } catch {
+    return false;
+  }
+}
+
+function buildRuntimeSecurityHealthChecks(env, adminUsers = []) {
+  const live = getAppMode(env) === 'live';
+  const corsOrigin = String(env.CORS_ALLOWED_ORIGIN || '').trim();
+  const siteBase = String(env.CANONICAL_SITE_BASE || env.SITE_BASE || '').trim().replace(/\/$/, '');
+  const superAdmins = adminUsers.filter((user) => user?.role === 'super_admin');
+  const turnstileConfigured = Boolean(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY);
+  const turnstileRequired = isTruthyWorkerEnv(env.ADMIN_TURNSTILE_REQUIRED);
+  const orderLookupConfigured = Boolean(env.STORE_ORDER_LOOKUP_SECRET || env.MAGIC_LINK_SECRET || env.CHECKOUT_INTENT_SECRET);
+  const fulfillmentConfigured = Boolean(getStoreFulfillmentSecret(env));
+  return [
+    storeHealthCheck('runtime-production-mode', 'Production mode', live ? 'ok' : 'warning', live ? 'Worker APP_MODE is live.' : 'Worker APP_MODE is test.'),
+    storeHealthCheck('runtime-cors-origin', 'Allowed browser origin', configuredHttpsOrigin(corsOrigin) && corsOrigin.replace(/\/$/, '') === siteBase ? 'ok' : 'action', configuredHttpsOrigin(corsOrigin) ? corsOrigin : 'CORS_ALLOWED_ORIGIN must be one explicit HTTPS origin.'),
+    storeHealthCheck('runtime-rate-limit-binding', 'Rate-limit posture', env.RATELIMIT ? 'ok' : 'action', env.RATELIMIT ? 'RATELIMIT storage is configured and required fail-closed.' : RATELIMIT_REQUIRED_ERROR),
+    storeHealthCheck('runtime-state-binding', 'Store state binding', env.STORE_STATE ? 'ok' : 'action', env.STORE_STATE ? 'STORE_STATE is configured.' : 'STORE_STATE is missing.'),
+    storeHealthCheck('runtime-admin-users', 'Admin user posture', superAdmins.length > 0 ? 'ok' : 'action', `${adminUsers.length} admin user${adminUsers.length === 1 ? '' : 's'} configured; ${superAdmins.length} super-admin${superAdmins.length === 1 ? '' : 's'}.`),
+    storeHealthCheck('runtime-turnstile', 'Admin Turnstile', turnstileConfigured && (!live || turnstileRequired) ? 'ok' : live ? 'warning' : 'info', turnstileConfigured ? (turnstileRequired ? 'Configured and required.' : 'Configured but not explicitly required.') : 'Not configured.'),
+    storeHealthCheck('runtime-order-lookup', 'Order lookup tokens', orderLookupConfigured ? 'ok' : 'action', orderLookupConfigured ? 'Dedicated or approved shared signing secret is available.' : 'Order lookup token signing is unavailable.'),
+    storeHealthCheck('runtime-signed-downloads', 'Signed downloads', fulfillmentConfigured && env.RATELIMIT ? 'ok' : 'action', fulfillmentConfigured ? 'Fulfillment signing and failed-attempt soft locks are configured.' : 'Fulfillment signing is unavailable.'),
+    storeHealthCheck('runtime-coupons', 'Coupon storage', env.STORE_STATE ? 'ok' : 'action', env.STORE_STATE ? 'Coupons use the canonical Store state binding.' : 'Coupon persistence is unavailable.'),
+    storeHealthCheck('runtime-reminders', 'Reminder delivery', env.RESEND_API_KEY && getAbandonedCartTokenSecret(env) ? 'ok' : 'warning', env.RESEND_API_KEY ? 'Reminder delivery and signed resume/unsubscribe links are configured.' : 'Reminder email delivery is not configured.'),
+    storeHealthCheck('runtime-admin-csp', 'Admin CSP', 'ok', 'The admin shell uses the versioned first-party CSP template; deploy smoke verifies the rendered policy.')
+  ];
+}
+
 async function handleAdminStoreHealth(request, env) {
   const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
   if (!auth.ok) return auth.response;
@@ -13324,7 +13840,8 @@ async function handleAdminStoreHealth(request, env) {
     webhookSummariesResult,
     webhookRecentResult,
     cronLastRunResult,
-    cronLastErrorResult
+    cronLastErrorResult,
+    adminUsersResult
   ] = await Promise.allSettled([
     buildAdminStoreProductsSnapshot(env),
     buildAdminStoreDownloadsSnapshot(env),
@@ -13332,7 +13849,8 @@ async function handleAdminStoreHealth(request, env) {
     listObservabilitySummaries(env, 'webhook', 2),
     getObservabilityRecentEvents(env, 'webhook'),
     env.STORE_STATE?.get('cron:lastRun') || Promise.resolve(''),
-    env.STORE_STATE?.get('cron:lastError', { type: 'json' }) || Promise.resolve(null)
+    env.STORE_STATE?.get('cron:lastError', { type: 'json' }) || Promise.resolve(null),
+    getEffectiveAdminUsers(env)
   ]);
 
   const products = productsResult.status === 'fulfilled' && productsResult.value?.ok ? productsResult.value : null;
@@ -13346,6 +13864,7 @@ async function handleAdminStoreHealth(request, env) {
     : [];
   const lastRun = cronLastRunResult.status === 'fulfilled' ? String(cronLastRunResult.value || '') : '';
   const lastError = cronLastErrorResult.status === 'fulfilled' ? cronLastErrorResult.value : null;
+  const adminUsers = adminUsersResult.status === 'fulfilled' && Array.isArray(adminUsersResult.value) ? adminUsersResult.value : [];
 
   const checks = [
     summarizeCatalogHealth(products),
@@ -13355,6 +13874,7 @@ async function handleAdminStoreHealth(request, env) {
     summarizeCronHealth(lastRun, lastError)
   ];
   if (auth.user.role === 'super_admin') {
+    checks.push(...buildRuntimeSecurityHealthChecks(env, adminUsers));
     checks.push(...buildSecretHealthChecks(env));
   }
   const totals = storeHealthTotals(checks);
@@ -14600,6 +15120,18 @@ async function handleAdminSettings(request, env) {
           currentUserEmail: auth.user.email
         }]
       ]),
+      adminSettingsSection('Admin sessions', [
+        ['Admin sessions', '', {
+          input: 'admin-session-review',
+          hideLabel: true
+        }]
+      ]),
+      adminSettingsSection('Audit log', [
+        ['Audit log', '', {
+          input: 'admin-audit-review',
+          hideLabel: true
+        }]
+      ]),
       adminSettingsSection('Store readiness', [
         ['Store readiness', '', {
           input: 'store-readiness',
@@ -14639,6 +15171,10 @@ async function handleAdminSettings(request, env) {
           workersCacheEnabledForAdminStoreRead(env, policy.routeId) ? 'enabled' : 'disabled',
           readOnlyAdminSettingHelp(`${policy.path} can use ${ADMIN_STORE_READS_CACHE_ENTRYPOINT} with ${policy.cacheControl}.`)
         ]),
+        ['Performance observations', '', {
+          input: 'performance-observability',
+          hideLabel: true
+        }],
         ['Workers Cache controls', '', {
           input: 'workers-cache-controls',
           hideLabel: true
@@ -16253,11 +16789,15 @@ async function recordAdminAuditEvent(env, event = {}) {
   const now = new Date();
   const action = String(event.action || 'admin_event').trim() || 'admin_event';
   const key = getAdminAuditEventKey(action, now);
-  await env.STORE_STATE.put(key, JSON.stringify({
+  const record = {
     ...event,
     action,
     createdAt: now.toISOString()
-  }), { expirationTtl: ADMIN_AUDIT_EVENT_TTL_SECONDS });
+  };
+  await env.STORE_STATE.put(key, JSON.stringify(record), {
+    expirationTtl: ADMIN_AUDIT_EVENT_TTL_SECONDS,
+    metadata: publicAdminAuditRow({ key, ...record })
+  });
   return key;
 }
 

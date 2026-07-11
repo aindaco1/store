@@ -132,4 +132,40 @@ describe('Store digital download access', () => {
       revokedAt: '2026-06-03T12:05:00.000Z'
     });
   });
+
+  it('soft-locks repeated failed signed-download attempts per order and network fingerprint', async () => {
+    const storeState = new MockKVNamespace();
+    const ratelimit = new MockKVNamespace();
+    await storeState.put('orders:store-order-download123', JSON.stringify(buildDigitalOrder({ status: 'active' })));
+    const env = {
+      ...buildEnv(storeState),
+      RATELIMIT: ratelimit
+    };
+    const request = () => worker.fetch(new Request(
+      'http://127.0.0.1:8989/api/orders/store-order-download123/downloads/download-1?token=invalid',
+      {
+        headers: {
+          Origin: 'http://127.0.0.1:4002',
+          'CF-Connecting-IP': '203.0.113.42'
+        }
+      }
+    ), env);
+
+    for (let attempt = 1; attempt < 10; attempt += 1) {
+      expect((await request()).status).toBe(403);
+    }
+    const locked = await request();
+    expect(locked.status).toBe(429);
+    expect(locked.headers.get('Retry-After')).toBeTruthy();
+    expect(await locked.json()).toMatchObject({ retryAfter: expect.any(Number) });
+    expect((await request()).status).toBe(429);
+
+    const abuseKeys = Array.from(ratelimit.store.keys()).filter((key) => key.startsWith('download-abuse:'));
+    expect(abuseKeys).toHaveLength(1);
+    expect(abuseKeys[0]).not.toContain('203.0.113.42');
+    expect(await storeState.get('download-abuse-summary:store-order-download123', { type: 'json' })).toMatchObject({
+      failedAttempts: 10,
+      softLocks: 1
+    });
+  });
 });

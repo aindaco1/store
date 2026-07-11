@@ -1522,14 +1522,21 @@
     label.textContent = row.label || row.path || 'Setting';
     header.appendChild(label);
     var body = createElement('div', 'admin-settings__row-body');
-    if (row.input === 'plan-usage' || row.input === 'store-readiness' || row.input === 'workers-cache-controls') {
+    if (row.input === 'plan-usage' || row.input === 'store-readiness' || row.input === 'workers-cache-controls' || row.input === 'admin-session-review' || row.input === 'admin-audit-review' || row.input === 'performance-observability') {
       wrapper.classList.add('admin-settings__row--custom');
       if (row.hideLabel) wrapper.classList.add('admin-settings__row--hide-label');
-      body.appendChild(row.input === 'plan-usage'
+      var customControl = row.input === 'plan-usage'
         ? createPlanUsageTracker()
         : row.input === 'store-readiness'
           ? createStoreReadinessTracker()
-          : createWorkersCacheControls());
+          : row.input === 'admin-session-review'
+            ? createAdminSessionReview()
+            : row.input === 'admin-audit-review'
+              ? createAdminAuditReview()
+              : row.input === 'performance-observability'
+                ? createPerformanceObservability()
+                : createWorkersCacheControls();
+      body.appendChild(customControl);
       if (!row.hideLabel) wrapper.appendChild(header);
       wrapper.appendChild(body);
       return wrapper;
@@ -2353,6 +2360,299 @@
     return root;
   }
 
+  function adminSessionClientLabel(session) {
+    var client = session && session.client ? session.client : {};
+    return [client.browser, client.operatingSystem, client.device].filter(Boolean).join(' / ') || 'Unavailable';
+  }
+
+  function renderAdminSessions(root, data) {
+    var results = $('[data-admin-session-results]', root);
+    if (!results) return;
+    clear(results);
+    var active = Array.isArray(data.active) ? data.active : [];
+    var recent = Array.isArray(data.recent) ? data.recent : [];
+    results.appendChild(createElement('p', 'admin-app__muted', active.length + ' active session' + (active.length === 1 ? '' : 's') + '. Login metadata is retained for ' + String(data.retentionDays || 30) + ' days without full IP addresses, full user agents, or precise location.'));
+
+    var activeHeading = createElement('h3', 'admin-card-heading', 'Active sessions');
+    results.appendChild(activeHeading);
+    if (!active.length) {
+      results.appendChild(createElement('p', 'admin-app__muted', 'No active sessions.'));
+    } else {
+      var activeTable = createElement('table', 'admin-store-readiness__table');
+      var activeHead = document.createElement('thead');
+      var activeHeadRow = document.createElement('tr');
+      ['Admin', 'Client', 'Started', 'Expires', 'Action'].forEach(function(label) {
+        activeHeadRow.appendChild(createElement('th', '', label));
+      });
+      activeHead.appendChild(activeHeadRow);
+      activeTable.appendChild(activeHead);
+      var activeBody = document.createElement('tbody');
+      active.forEach(function(session) {
+        var row = document.createElement('tr');
+        row.appendChild(createElement('td', '', session.email || 'Unknown'));
+        row.appendChild(createElement('td', '', adminSessionClientLabel(session)));
+        row.appendChild(createElement('td', '', formatDate(session.createdAt)));
+        row.appendChild(createElement('td', '', formatDate(session.expiresAt)));
+        var actionCell = document.createElement('td');
+        if (session.current) {
+          actionCell.appendChild(createElement('span', 'admin-app__muted', 'Current session'));
+          row.appendChild(actionCell);
+          activeBody.appendChild(row);
+          return;
+        }
+        var revoke = createElement('button', 'btn btn--secondary btn--small', 'Revoke');
+        revoke.type = 'button';
+        revoke.addEventListener('click', function() {
+          revoke.disabled = true;
+          setStatus($('[data-admin-session-status]', root), 'Revoking session...');
+          requestJson('/admin/sessions/revoke', { method: 'POST', body: { id: session.id } }).then(function() {
+            setStatus($('[data-admin-session-status]', root), 'Session revoked.');
+            return loadAdminSessionReview(root, { force: true });
+          }).catch(function(error) {
+            setStatus($('[data-admin-session-status]', root), formatError(error), true);
+            revoke.disabled = false;
+          });
+        });
+        actionCell.appendChild(revoke);
+        row.appendChild(actionCell);
+        activeBody.appendChild(row);
+      });
+      activeTable.appendChild(activeBody);
+      results.appendChild(activeTable);
+    }
+
+    var recentHeading = createElement('h3', 'admin-card-heading', 'Recent logins');
+    results.appendChild(recentHeading);
+    var recentTable = createElement('table', 'admin-store-readiness__table');
+    var recentHead = document.createElement('thead');
+    var recentHeadRow = document.createElement('tr');
+    ['Admin', 'Client', 'Network ID', 'Started', 'State'].forEach(function(label) {
+      recentHeadRow.appendChild(createElement('th', '', label));
+    });
+    recentHead.appendChild(recentHeadRow);
+    recentTable.appendChild(recentHead);
+    var recentBody = document.createElement('tbody');
+    recent.slice(0, 100).forEach(function(session) {
+      var row = document.createElement('tr');
+      row.appendChild(createElement('td', '', session.email || 'Unknown'));
+      row.appendChild(createElement('td', '', adminSessionClientLabel(session)));
+      row.appendChild(createElement('td', '', session.networkId || 'Unavailable'));
+      row.appendChild(createElement('td', '', formatDate(session.createdAt)));
+      row.appendChild(createElement('td', '', session.active ? 'Active' : 'Inactive'));
+      recentBody.appendChild(row);
+    });
+    recentTable.appendChild(recentBody);
+    results.appendChild(recentTable);
+  }
+
+  function loadAdminSessionReview(root, options) {
+    if (!(root instanceof HTMLElement)) return;
+    var force = options && options.force === true;
+    if (!force && (root.dataset.adminSessionState === 'loading' || root.dataset.adminSessionState === 'loaded')) return;
+    var status = $('[data-admin-session-status]', root);
+    root.dataset.adminSessionState = 'loading';
+    setStatus(status, 'Loading admin sessions...');
+    return requestJson('/admin/sessions').then(function(data) {
+      root.dataset.adminSessionState = 'loaded';
+      renderAdminSessions(root, data);
+      setStatus(status, '');
+    }).catch(function(error) {
+      root.dataset.adminSessionState = 'failed';
+      setStatus(status, formatError(error), true);
+    });
+  }
+
+  function createAdminSessionReview() {
+    var root = createElement('div', 'admin-session-review');
+    root.dataset.adminSessionReview = 'true';
+    var actions = createElement('div', 'admin-store-readiness__actions');
+    var refresh = createElement('button', 'btn btn--secondary', 'Refresh sessions');
+    refresh.type = 'button';
+    refresh.addEventListener('click', function() { loadAdminSessionReview(root, { force: true }); });
+    actions.appendChild(refresh);
+    var status = createElement('p', 'admin-dashboard__status');
+    status.dataset.adminSessionStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    var results = createElement('div', 'admin-session-review__results');
+    results.dataset.adminSessionResults = 'true';
+    root.appendChild(actions);
+    root.appendChild(status);
+    root.appendChild(results);
+    return root;
+  }
+
+  function adminAuditQuery(root) {
+    var params = new URLSearchParams();
+    ['date', 'action', 'email', 'q'].forEach(function(name) {
+      var control = $('[name="' + name + '"]', root);
+      var value = control ? String(control.value || '').trim() : '';
+      if (value) params.set(name, value);
+    });
+    return params.toString();
+  }
+
+  function renderAdminAuditRows(root, data) {
+    var results = $('[data-admin-audit-results]', root);
+    if (!results) return;
+    clear(results);
+    var rows = Array.isArray(data.rows) ? data.rows : [];
+    results.appendChild(createElement('p', 'admin-app__muted', String(data.page && data.page.matched || rows.length) + ' matching event' + ((data.page && data.page.matched || rows.length) === 1 ? '' : 's') + '. Sensitive event payloads are excluded.'));
+    if (!rows.length) return;
+    var table = createElement('table', 'admin-store-readiness__table');
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['Time', 'Action', 'Admin', 'Target', 'Mutation'].forEach(function(label) {
+      headRow.appendChild(createElement('th', '', label));
+    });
+    head.appendChild(headRow);
+    table.appendChild(head);
+    var body = document.createElement('tbody');
+    rows.forEach(function(event) {
+      var row = document.createElement('tr');
+      row.appendChild(createElement('td', '', formatDate(event.createdAt)));
+      row.appendChild(createElement('td', '', event.action || 'Unknown'));
+      row.appendChild(createElement('td', '', event.adminEmail || 'System'));
+      row.appendChild(createElement('td', '', event.productId || event.orderToken || event.fileKey || event.itemId || ''));
+      row.appendChild(createElement('td', '', event.mutation || (Array.isArray(event.changedFields) ? event.changedFields.join(', ') : '')));
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    results.appendChild(table);
+  }
+
+  function loadAdminAuditReview(root) {
+    if (!(root instanceof HTMLElement)) return;
+    var status = $('[data-admin-audit-status]', root);
+    setStatus(status, 'Loading audit events...');
+    var query = adminAuditQuery(root);
+    return requestJson('/admin/audit' + (query ? '?' + query : '')).then(function(data) {
+      renderAdminAuditRows(root, data);
+      setStatus(status, '');
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+    });
+  }
+
+  function createAdminAuditReview() {
+    var root = createElement('div', 'admin-audit-review');
+    root.dataset.adminAuditReview = 'true';
+    var form = createElement('form', 'admin-store-orders__filters');
+    [['date', 'Date', 'date'], ['action', 'Action', 'search'], ['email', 'Admin email', 'email'], ['q', 'Search', 'search']].forEach(function(field) {
+      var wrapper = createElement('div', 'admin-store-orders__field');
+      var id = 'admin-audit-' + field[0];
+      var label = createElement('label', '', field[1]);
+      label.setAttribute('for', id);
+      var input = document.createElement('input');
+      input.id = id;
+      input.name = field[0];
+      input.type = field[2];
+      input.className = 'admin-settings__input';
+      input.autocomplete = 'off';
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      form.appendChild(wrapper);
+    });
+    var apply = createElement('button', 'btn btn--secondary', 'Apply filters');
+    apply.type = 'submit';
+    form.appendChild(apply);
+    form.addEventListener('submit', function(event) {
+      event.preventDefault();
+      loadAdminAuditReview(root);
+    });
+    var actions = createElement('div', 'admin-store-readiness__actions');
+    var exportButton = createElement('button', 'btn btn--secondary', 'Export filtered CSV');
+    exportButton.type = 'button';
+    exportButton.addEventListener('click', function() {
+      var query = adminAuditQuery(root);
+      downloadAdminCsv({
+        path: '/admin/audit.csv' + (query ? '?' + query : ''),
+        status: $('[data-admin-audit-status]', root),
+        fallbackFilename: 'admin-audit.csv',
+        loadingMessage: 'Preparing audit CSV...',
+        completeMessage: 'Audit CSV download started.'
+      });
+    });
+    actions.appendChild(exportButton);
+    var status = createElement('p', 'admin-dashboard__status');
+    status.dataset.adminAuditStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    var results = createElement('div', 'admin-audit-review__results');
+    results.dataset.adminAuditResults = 'true';
+    root.appendChild(form);
+    root.appendChild(actions);
+    root.appendChild(status);
+    root.appendChild(results);
+    return root;
+  }
+
+  function renderPerformanceObservability(root, data) {
+    var results = $('[data-performance-observability-results]', root);
+    if (!results) return;
+    clear(results);
+    var routes = Array.isArray(data.slowRoutes) ? data.slowRoutes : [];
+    results.appendChild(createElement('p', 'admin-app__muted', 'Sample rate ' + Math.round(Number(data.sampleRate || 0) * 100) + '%. Percentiles are bounded histogram estimates and do not include request or customer data.'));
+    if (!routes.length) {
+      results.appendChild(createElement('p', 'admin-app__muted', 'No sampled Worker route timing is available for this period.'));
+      return;
+    }
+    var table = createElement('table', 'admin-store-readiness__table');
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['Route', 'Date', 'Samples', 'p50', 'p95', 'p99', 'Max'].forEach(function(label) {
+      headRow.appendChild(createElement('th', '', label));
+    });
+    head.appendChild(headRow);
+    table.appendChild(head);
+    var body = document.createElement('tbody');
+    routes.forEach(function(route) {
+      var row = document.createElement('tr');
+      row.appendChild(createElement('td', '', route.operation || 'unknown'));
+      row.appendChild(createElement('td', '', route.date || ''));
+      row.appendChild(createElement('td', '', String(route.count || 0)));
+      row.appendChild(createElement('td', '', String(route.p50Ms || 0) + ' ms'));
+      row.appendChild(createElement('td', '', String(route.p95Ms || 0) + ' ms'));
+      row.appendChild(createElement('td', '', String(route.p99Ms || 0) + ' ms'));
+      row.appendChild(createElement('td', '', String(route.maxMs || 0) + ' ms'));
+      body.appendChild(row);
+    });
+    table.appendChild(body);
+    results.appendChild(table);
+  }
+
+  function loadPerformanceObservability(root) {
+    if (!(root instanceof HTMLElement)) return;
+    var status = $('[data-performance-observability-status]', root);
+    setStatus(status, 'Loading Worker timing...');
+    return requestJson('/admin/observability/performance?days=7').then(function(data) {
+      renderPerformanceObservability(root, data);
+      setStatus(status, '');
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+    });
+  }
+
+  function createPerformanceObservability() {
+    var root = createElement('div', 'admin-performance-observability');
+    root.dataset.performanceObservability = 'true';
+    var actions = createElement('div', 'admin-store-readiness__actions');
+    var refresh = createElement('button', 'btn btn--secondary', 'Refresh timing');
+    refresh.type = 'button';
+    refresh.addEventListener('click', function() { loadPerformanceObservability(root); });
+    actions.appendChild(refresh);
+    var status = createElement('p', 'admin-dashboard__status');
+    status.dataset.performanceObservabilityStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    var results = createElement('div', 'admin-performance-observability__results');
+    results.dataset.performanceObservabilityResults = 'true';
+    root.appendChild(actions);
+    root.appendChild(status);
+    root.appendChild(results);
+    return root;
+  }
+
   function createWorkersCacheControls() {
     var root = createElement('div', 'admin-workers-cache-controls');
     root.dataset.workersCacheControls = 'true';
@@ -2395,6 +2695,15 @@
     $all('[data-plan-usage-tracker]', root).forEach(loadPlanUsageTracker);
     $all('[data-store-readiness-tracker]', root).forEach(function(tracker) {
       loadStoreReadinessTracker(tracker);
+    });
+    $all('[data-admin-session-review]', root).forEach(function(tracker) {
+      loadAdminSessionReview(tracker);
+    });
+    $all('[data-admin-audit-review]', root).forEach(function(tracker) {
+      loadAdminAuditReview(tracker);
+    });
+    $all('[data-performance-observability]', root).forEach(function(tracker) {
+      loadPerformanceObservability(tracker);
     });
   }
 
@@ -3379,6 +3688,18 @@
     var wrapper = createElement('div', 'admin-store-orders__download-access');
     var note = createElement('span', 'admin-store-orders__action-note', formatStoreDownloadAccessNote(row));
     wrapper.appendChild(note);
+    var history = Array.isArray(access.history) ? access.history : [];
+    if (history.length) {
+      var details = document.createElement('details');
+      var summary = createElement('summary', 'admin-store-orders__action-note', 'Access history (' + String(history.length) + ')');
+      details.appendChild(summary);
+      var list = document.createElement('ul');
+      history.slice().reverse().forEach(function(entry) {
+        list.appendChild(createElement('li', 'admin-store-orders__action-note', [entry.action || 'updated', formatDate(entry.at), entry.by || 'system'].filter(Boolean).join(' / ')));
+      });
+      details.appendChild(list);
+      wrapper.appendChild(details);
+    }
     parent.appendChild(wrapper);
     if (!row.downloadAccessManageable) return;
 
@@ -3404,6 +3725,24 @@
       revoke.setAttribute('aria-label', 'Revoke download access for ' + itemLabel);
       control.appendChild(revoke);
     }
+    var diagnostics = createElement('button', 'btn btn--secondary', 'Abuse diagnostics');
+    diagnostics.type = 'button';
+    diagnostics.addEventListener('click', function() {
+      diagnostics.disabled = true;
+      requestJson('/admin/store/orders/download-abuse?orderToken=' + encodeURIComponent(row.orderToken || '')).then(function(data) {
+        note.textContent = [
+          formatStoreDownloadAccessNote(row),
+          String(data.failedAttempts || 0) + ' failed attempts',
+          String(data.softLocks || 0) + ' soft locks',
+          data.lastFailedAt ? 'last ' + formatDate(data.lastFailedAt) : ''
+        ].filter(Boolean).join(' / ');
+      }).catch(function(error) {
+        note.textContent = formatError(error);
+      }).finally(function() {
+        diagnostics.disabled = false;
+      });
+    });
+    control.appendChild(diagnostics);
     wrapper.appendChild(control);
   }
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.7 - Unreleased
+
+- Approved and versioned the Store recovery objectives, four-hour active-sales snapshot interval, and 7-daily/5-weekly/12-monthly plus release-snapshot retention policy in the canonical data inventory.
+- Added aggregate snapshot duration/Cloudflare read-usage evidence, a checksum-verified append-only off-device filesystem copy and second-device decryption path, and provider-neutral S3-compatible protected archive configuration without requiring AWS.
+- Added `CachedAdminStoreOrderIndex`, a fixed-key cache entrypoint that deduplicates immediate post-invalidation order-index rebuilds across Orders watermark and route variants while preserving authenticated private/no-store gateway responses and explicit operation budgets.
+- Added centralized generated-asset, Lighthouse/Web Vital/resource, Worker-route, dashboard-timing, and public/private cache-policy budgets; split admin-only CSS from the public bundle, self-hosted a licensed Inter subset, deferred Adobe CSS, optimized a missing product image derivative set, and limited eager/synchronous image work plus responsive head preloading to the actual catalog-derived LCP candidate.
+- Added super-admin active-session review/revocation with 30-day minimized login metadata, keyed network fingerprints, parsed client summaries, and no full IP, full user agent, or precise location retention.
+- Added searchable redacted admin audit filters plus filtered CSV export, using KV list metadata to avoid per-event value reads for new interactive searches while preserving complete CSV and legacy-row fallback; added aggregate signed-download abuse diagnostics, access history, and a 10-failures/15-minute per-order+network soft lock lasting 30 minutes without storing signed URLs or raw IPs.
+- Expanded Store readiness to cover production mode, explicit origins, state/rate-limit bindings, admin posture, Turnstile, lookup/download signing, coupons, reminders, providers, R2, and CSP release verification; added bounded Worker timing histograms with p50/p95/p99 slow-route diagnostics.
+- Added scheduled Production Posture and Localization Review workflows. Posture drift creates or updates a sanitized GitHub issue without runtime mutation; localization generates source-hashed human-review packets without claiming professional translation.
+- Expanded Workers Cache, recovery/off-device, session privacy, download abuse, performance/cache-policy, localization, posture, workflow-security, and production-like Podman browser test coverage.
+
 ## v1.0.6 - 2026-07-09
 
 - Added a Cloudflare Workers Cache integration for authenticated admin Orders list reads using a cached named Worker entrypoint while keeping the default gateway and browser-facing admin responses private/no-store.

@@ -161,6 +161,7 @@
 
     if (document.fonts?.ready) {
       document.fonts.ready.then(scheduleProductTitleFit).catch(function() {});
+      document.fonts.addEventListener?.('loadingdone', scheduleProductTitleFit);
     }
 
     if ('ResizeObserver' in window) {

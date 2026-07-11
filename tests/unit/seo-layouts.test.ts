@@ -24,6 +24,8 @@ describe('Store SEO templates', () => {
     const cartRuntimeFoot = readRepoFile('_includes', 'cart-runtime-foot.html');
     const pagePrefetch = readRepoFile('_includes', 'page-prefetch.html');
     const responsiveImage = readRepoFile('_includes', 'responsive-image.html');
+    const storefrontLcpPreload = readRepoFile('_includes', 'storefront-lcp-preload.html');
+    const imageFilters = readRepoFile('_plugins', 'image_dimensions.rb');
     const homePage = readRepoFile('index.html');
     const storefrontHome = readRepoFile('_includes', 'storefront-home.html');
     const localizedProductPages = readRepoFile('_plugins', 'localized_product_pages.rb');
@@ -41,7 +43,8 @@ describe('Store SEO templates', () => {
     expect(productLayout).toContain('store-product-options.js');
     expect(homePage).toContain('{% include storefront-home.html');
     expect(storefrontHome).toContain('site.products | sort: "order"');
-    expect(storefrontHome).toContain('visible_product_index < 3');
+    expect(storefrontHome).toContain('visible_product_index == 0');
+    expect(storefrontHome).toContain('product_image_decoding = "sync"');
     expect(storefrontHome).toContain('image_loading=product_image_loading');
     expect(storefrontHome).toContain('store-product-options.js');
     expect(localizedProductPages).toContain("Jekyll::PageWithoutAFile");
@@ -59,9 +62,16 @@ describe('Store SEO templates', () => {
     expect(header).toContain('<script data-cfasync="false" src="/assets/js/a11y-live.js" defer></script>');
     expect(footer).toContain('responsive-image.html src=footer_logo_path');
     expect(responsiveImage).toContain('local_image_dimensions');
+    expect(responsiveImage).toContain('local_responsive_image_srcset');
     expect(responsiveImage).toContain('<source type="image/webp" srcset="{{ responsive_srcset | escape }}"');
-    expect(cartRuntimeHead).toContain('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+    expect(defaultLayout).toContain('storefront-lcp-preload.html');
+    expect(storefrontLcpPreload).toContain('local_responsive_image_srcset');
+    expect(storefrontLcpPreload).toContain('imagesrcset="{{ lcp_srcset | escape }}"');
+    expect(imageFilters).toContain('def local_responsive_image_srcset');
     expect(cartRuntimeHead).toContain('<link rel="preconnect" href="https://use.typekit.net" crossorigin>');
+    expect(cartRuntimeHead).toContain('data-deferred-stylesheet="true"');
+    expect(cartRuntimeHead).toContain('/assets/js/deferred-stylesheets.js');
+    expect(cartRuntimeHead).not.toContain('fonts.googleapis.com');
     expect(cartRuntimeFoot).toContain('/assets/js/store-config.js?v={{ asset_version }}');
     expect(cartRuntimeFoot).toContain('/assets/js/form-control-identity.js?v={{ asset_version }}');
     expect(cartRuntimeFoot).toContain('/assets/js/cart-runtime-loader.js?v={{ asset_version }}');

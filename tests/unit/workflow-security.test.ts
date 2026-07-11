@@ -136,7 +136,10 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('STRIPE_RECOVERY_READ_KEY');
     expect(workflow).toContain('sudo apt-get install -y age awscli');
     expect(drill).toContain('RESTORE_RESULT="${WORK_DIR}/restore-result.json"');
-    expect(drill).toContain('aws s3 cp');
+    expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID');
+    expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_S3_ENDPOINT');
+    expect(drill).toContain('aws "${archive_cli_args[@]}" s3 cp');
+    expect(drill).toContain('--endpoint-url "$ARCHIVE_ENDPOINT"');
     expect(drill).toContain('cmp -s');
     expect(drill).toContain('offAccountArchiveVerified');
     expect(drill).not.toContain('${EVIDENCE_DIR}/restore-result.json');

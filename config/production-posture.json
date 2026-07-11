@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "requiredSecrets": [
+    "ADMIN_SECRET",
+    "ADMIN_SESSION_SECRET",
+    "MAGIC_LINK_SECRET",
+    "CHECKOUT_INTENT_SECRET",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "RESEND_API_KEY",
+    "USPS_CLIENT_SECRET"
+  ],
+  "recommendedSecrets": [
+    "STORE_FULFILLMENT_SECRET",
+    "TURNSTILE_SECRET_KEY",
+    "WORKERS_CACHE_PURGE_SECRET",
+    "WORKERS_CACHE_EVIDENCE_SECRET"
+  ],
+  "requiredKvBindings": ["STORE_STATE", "RATELIMIT"],
+  "requiredR2Bindings": ["STORE_DOWNLOADS"],
+  "requiredDurableObjectBindings": ["STORE_INVENTORY_COORDINATOR"],
+  "expectedStripeWebhookPath": "/webhooks/stripe"
+}

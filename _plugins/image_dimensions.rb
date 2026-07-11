@@ -18,6 +18,29 @@ module Jekyll
       DIMENSION_CACHE[image_path] ||= read_image_dimensions(image_path)
     end
 
+    def local_responsive_image_srcset(src, widths = '320,480,640,960,1600')
+      site = @context.registers[:site]
+      source = site&.source
+      src_path = src.to_s.split('?').first
+      extension = File.extname(src_path).downcase
+      return '' if source.nil? || src_path.empty? || !src_path.start_with?('/')
+      return '' unless %w[.gif .jpg .jpeg .png].include?(extension)
+
+      absolute_source = File.expand_path(source)
+      stem = src_path.delete_suffix(extension)
+      widths.to_s.split(',').filter_map do |raw_width|
+        width = raw_width.strip
+        next unless width.match?(/\A\d+\z/)
+
+        candidate = "#{stem}-#{width}.webp"
+        candidate_path = File.expand_path(candidate.sub(%r{\A/+}, ''), absolute_source)
+        next unless candidate_path.start_with?(absolute_source + File::SEPARATOR)
+        next unless File.file?(candidate_path)
+
+        "#{candidate} #{width}w"
+      end.join(', ')
+    end
+
     private
 
     def read_image_dimensions(image_path)

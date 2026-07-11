@@ -57,7 +57,9 @@ Current Settings sections:
 - Advanced performance: intent prefetch, live inventory cache controls, the global Workers Cache switch, and per-route Orders, Analytics, inventory, and download-readiness switches.
 - Debug: console logging flags.
 - Secrets & credentials: read-only status checks for required and optional runtime secrets.
-- Runtime diagnostics: current site base, Worker base, CORS allowed origin, the uncached Workers Cache gateway state, each cached admin read policy state, and a super-admin Workers Cache clear action.
+- Runtime diagnostics: current site base, Worker base, CORS allowed origin, the uncached Workers Cache gateway state, each cached admin read policy state, sampled Worker p50/p95/p99 slow-route timing, and a super-admin Workers Cache clear action.
+- Admin sessions: active-session review/revocation plus 30-day minimized login history with parsed client labels and keyed network IDs.
+- Audit log: date/action/admin/text filters, redacted result rows, and filtered CSV export.
 
 Settings media fields use upload controls and image previews rather than manual path-only editing where supported.
 
@@ -195,6 +197,9 @@ Performance/cache behavior:
 - The v2 order snapshot provides a deterministic non-PII watermark. A matching first-page request returns `unchanged: true` without order/customer rows; payloads and watermarks remain in memory and are not written to browser storage.
 - Free-text search requests bypass Workers Cache because query text can contain customer data or order tokens.
 - The response payload includes `page.cache.workers` metadata, and the response headers include `X-Store-Workers-Cache` and `X-Store-Workers-Cache-Entry` when the cached entrypoint is used.
+- Route misses share `CachedAdminStoreOrderIndex`, so immediate Orders/Analytics/inventory variants do not repeat a cold bounded index rebuild while KV propagation catches up.
+
+Digital order controls show the last ten access revoke/refresh events and can load aggregate failed-attempt/soft-lock diagnostics. Diagnostics never include a signed URL or raw IP address.
 - Order mutations purge Orders, Analytics, and order-derived inventory tags through the centralized dependency map. Purge failure does not fail the mutation; short TTLs and the manual refresh control bound stale exposure.
 - Analytics, inventory, and download-readiness cache policies are visible in Settings but default off until each passes a real Cloudflare edge benchmark.
 - Settings also exposes the global cache and sanitized telemetry switches. Publishing either switch requires the normal reviewed configuration/deployment path; the dashboard never receives Analytics Engine credentials or raw telemetry rows.
