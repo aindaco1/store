@@ -101,6 +101,17 @@ describe('workflow security posture', () => {
     expect(workflow).not.toMatch(/backup:snapshot|--kv-values|--r2-objects|wrangler deploy|contents: write|pull-requests: write/);
   });
 
+  it('pins the localization review runtime and keeps the workflow read-only', () => {
+    const workflow = readWorkflow('localization-review.yml');
+
+    expect(workflow).toContain("ruby-version: '3.2'");
+    expect(workflow).toContain('npm run test:i18n');
+    expect(workflow).toContain('npm run release:i18n-seo-evidence');
+    expect(workflow).toContain('npm run localization:review');
+    expect(workflow).toContain('permissions:\n  contents: read');
+    expect(workflow).not.toMatch(/contents: write|pull-requests: write|wrangler deploy|deploy:worker/);
+  });
+
   it('keeps quarterly captured-data recovery approval-gated and preview-only', () => {
     const workflow = readWorkflow('recovery-operations.yml');
     const drill = fs.readFileSync(path.join(repoRoot, 'scripts', 'protected-recovery-drill.sh'), 'utf8');

@@ -10,6 +10,7 @@
 - Added searchable redacted admin audit filters plus filtered CSV export, using KV list metadata to avoid per-event value reads for new interactive searches while preserving complete CSV and legacy-row fallback; added aggregate signed-download abuse diagnostics, access history, and a 10-failures/15-minute per-order+network soft lock lasting 30 minutes without storing signed URLs or raw IPs.
 - Expanded Store readiness to cover production mode, explicit origins, state/rate-limit bindings, admin posture, Turnstile, lookup/download signing, coupons, reminders, providers, R2, and CSP release verification; added bounded Worker timing histograms with p50/p95/p99 slow-route diagnostics.
 - Added scheduled Production Posture and Localization Review workflows. Posture drift creates or updates a sanitized GitHub issue without runtime mutation; localization generates source-hashed human-review packets without claiming professional translation.
+- Fixed the Localization Review workflow to pin its Ruby runtime and added workflow regression coverage so scheduled review packets can build on clean GitHub-hosted runners.
 - Expanded Workers Cache, recovery/off-device, session privacy, download abuse, performance/cache-policy, localization, posture, workflow-security, and production-like Podman browser test coverage.
 
 ## v1.0.6 - 2026-07-09
