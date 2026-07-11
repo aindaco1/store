@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import worker, { buildAdminStoreOrdersWorkersCachePurgeProps } from '../../worker/src/index.js';
+import worker, {
+  CachedAdminStoreOrderIndex,
+  CachedAdminStoreReads,
+  buildAdminStoreOrdersWorkersCachePurgeProps
+} from '../../worker/src/index.js';
 import {
   adminStoreReadCacheTagsForDomains
 } from '../../worker/src/workers-cache-policy.js';
 
 class MockKVNamespace {
   store = new Map<string, string>();
+  metadata = new Map<string, unknown>();
 
   get = vi.fn(async (key: string | string[], options?: { type?: string }) => {
     if (Array.isArray(key)) {
@@ -20,12 +25,14 @@ class MockKVNamespace {
     return options?.type === 'json' ? JSON.parse(value) : value;
   });
 
-  put = vi.fn(async (key: string, value: string, _options?: unknown) => {
+  put = vi.fn(async (key: string, value: string, options?: { metadata?: unknown }) => {
     this.store.set(key, value);
+    if (options?.metadata !== undefined) this.metadata.set(key, options.metadata);
   });
 
   delete = vi.fn(async (key: string) => {
     this.store.delete(key);
+    this.metadata.delete(key);
   });
 
   list = vi.fn(async ({ prefix = '', cursor }: { prefix?: string; cursor?: string } = {}) => {
@@ -33,7 +40,7 @@ class MockKVNamespace {
     return {
       keys: Array.from(this.store.keys())
         .filter((key) => key.startsWith(prefix))
-        .map((name) => ({ name })),
+        .map((name) => ({ name, metadata: this.metadata.get(name) })),
       list_complete: true,
       cursor: undefined
     };
@@ -518,6 +525,88 @@ describe('Workers Cache admin endpoints', () => {
     expect(secondBody.fulfillments).toBeUndefined();
   });
 
+  it('reuses one shared cached index across immediate Orders query variants', async () => {
+    const env = buildEnv();
+    for (let index = 0; index < 417; index += 1) {
+      const orderToken = `store-order-shared-${String(index).padStart(3, '0')}`;
+      env.STORE_STATE.store.set(`orders:${orderToken}`, JSON.stringify({
+        orderToken,
+        status: 'confirmed',
+        createdAt: '2026-07-10T12:00:00.000Z',
+        updatedAt: '2026-07-10T12:01:00.000Z',
+        orderDraft: {
+          status: 'confirmed',
+          items: [{ id: `line-${index}`, sku: 'poster', quantity: 1, fulfillmentType: 'physical' }],
+          totals: { totalCents: 2500, currency: 'USD' }
+        }
+      }));
+    }
+    const ctx = buildCtx();
+    let cachedIndexResponse: Response | null = null;
+    const indexHandler = vi.fn(async (request: Request, props: Record<string, unknown>) => {
+      const generated = await CachedAdminStoreOrderIndex.fetch(request, env, { ...ctx, props });
+      const headers = new Headers(generated.headers);
+      headers.set('Cf-Cache-Status', 'MISS');
+      const response = new Response(await generated.arrayBuffer(), { status: generated.status, headers });
+      cachedIndexResponse = response.clone();
+      return response;
+    });
+    const indexFactory = vi.fn(({ props }: { props: Record<string, unknown> }) => ({
+      fetch: async (request: Request) => {
+        if (!cachedIndexResponse) return indexHandler(request, props);
+        const headers = new Headers(cachedIndexResponse.headers);
+        headers.set('Cf-Cache-Status', 'HIT');
+        return new Response(await cachedIndexResponse.clone().arrayBuffer(), {
+          status: cachedIndexResponse.status,
+          headers
+        });
+      }
+    }));
+    const readsFactory = vi.fn(({ props }: { props: Record<string, unknown> }) => ({
+      fetch: async (request: Request) => {
+        const generated = await CachedAdminStoreReads.fetch(request, env, {
+          ...ctx,
+          props,
+          exports: { CachedAdminStoreOrderIndex: indexFactory }
+        });
+        const headers = new Headers(generated.headers);
+        headers.set('Cf-Cache-Status', 'MISS');
+        return new Response(await generated.arrayBuffer(), { status: generated.status, headers });
+      }
+    }));
+    ctx.exports.CachedAdminStoreReads = readsFactory;
+    const session = await createAdminSession(env, ctx);
+    const headers = { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() };
+
+    const first = await worker.fetch(new Request(`${WORKER_BASE}/admin/store/orders?status=all`, { headers }), env, ctx);
+    const firstBody = await first.json();
+    const second = await worker.fetch(new Request(
+      `${WORKER_BASE}/admin/store/orders?status=all&watermark=${encodeURIComponent(firstBody.watermark)}`,
+      { headers: { ...headers, 'CF-Connecting-IP': requestIp() } }
+    ), env, ctx);
+    const secondBody = await second.json();
+    const bulkCalls = env.STORE_STATE.get.mock.calls.filter(([key]) => Array.isArray(key));
+
+    expect(first.status).toBe(200);
+    expect(firstBody.writeBudget).toMatchObject({
+      workersRequestsExpected: 2,
+      kvReadsExpected: 417,
+      kvListExpected: 1
+    });
+    expect(second.status).toBe(200);
+    expect(secondBody).toMatchObject({
+      unchanged: true,
+      writeBudget: {
+        workersRequestsExpected: 2,
+        kvReadsExpected: 0,
+        kvListExpected: 0
+      }
+    });
+    expect(indexFactory).toHaveBeenCalledTimes(2);
+    expect(indexHandler).toHaveBeenCalledOnce();
+    expect(bulkCalls.map(([keys]) => keys.length)).toEqual([100, 100, 100, 100, 17]);
+  });
+
   it('rebuilds the 417-order index with bounded bulk reads while preserving billed read counts', async () => {
     const env = buildEnv({ WORKERS_CACHE_ENABLED: 'false' });
     for (let index = 0; index < 417; index += 1) {
@@ -733,6 +822,52 @@ describe('Workers Cache admin endpoints', () => {
       target: 'admin_orders',
       purgeSource: 'dashboard-button'
     });
+  });
+
+  it('searches new audit events from redacted KV metadata without per-event value reads', async () => {
+    const env = buildEnv();
+    const cacheFetch = vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      purgedAt: '2026-07-09T00:00:00.000Z'
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const ctx = buildCtx(cacheFetch);
+    const session = await createAdminSession(env, ctx);
+
+    const purgeResponse = await worker.fetch(new Request(`${WORKER_BASE}/admin/workers-cache/purge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: session.cookie,
+        Origin: SITE_BASE,
+        'x-store-admin-csrf': session.csrfToken,
+        'CF-Connecting-IP': requestIp()
+      },
+      body: JSON.stringify({ target: 'admin_orders', source: 'audit metadata test' })
+    }), env, ctx);
+    expect(purgeResponse.status).toBe(200);
+
+    const [auditKey] = Array.from(env.STORE_STATE.store.keys()).filter((key) => key.startsWith('admin-audit:'));
+    expect(env.STORE_STATE.metadata.get(auditKey)).toEqual(expect.objectContaining({
+      action: 'workers_cache:purge',
+      adminEmail: 'admin@example.com'
+    }));
+    expect(env.STORE_STATE.metadata.get(auditKey)).not.toHaveProperty('purgeSource');
+    env.STORE_STATE.get.mockClear();
+
+    const auditResponse = await worker.fetch(new Request(`${WORKER_BASE}/admin/audit?action=workers_cache`, {
+      headers: {
+        Cookie: session.cookie,
+        Origin: SITE_BASE,
+        'CF-Connecting-IP': requestIp()
+      }
+    }), env, ctx);
+    expect(auditResponse.status).toBe(200);
+    expect(await auditResponse.json()).toMatchObject({
+      rows: [expect.objectContaining({ action: 'workers_cache:purge' })],
+      page: { valueReads: 0 },
+      writeBudget: { kvReadsExpected: 0, kvListExpected: 1 }
+    });
+    expect(env.STORE_STATE.get.mock.calls.some(([key]) => String(key).startsWith('admin-audit:'))).toBe(false);
   });
 
   it('allows deploy-secret cache purges without storing the secret in audit data', async () => {

@@ -13,6 +13,7 @@
   <link rel="icon" type="image/png" href="{{ site.platform.favicon_path | default: '/assets/images/defaults/favicon.png' }}">
   {% include first-party-admin-csp.html %}
   {% include cart-head.html %}
+  <link rel="stylesheet" href="/assets/admin.css?v={{ asset_version }}">
   {% capture admin_title %}{% include t.html key="admin.page_title" lang=current_lang %}{% endcapture %}
   {% include seo-meta.html lang=current_lang title=admin_title indexable=false social=false translation_key=page.translation_key %}
 </head>

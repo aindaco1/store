@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createAdminLoginUrl, handleAdminAuthExchange, handleAdminAuthStart } from '../../worker/src/admin-auth.js';
+import { createAdminLoginUrl, handleAdminAuthExchange, handleAdminAuthStart, listAdminSessionReview, revokeAdminSessionById } from '../../worker/src/admin-auth.js';
 
 class MockKVNamespace {
   store = new Map<string, string>();
@@ -15,6 +15,14 @@ class MockKVNamespace {
   delete = vi.fn(async (key: string) => {
     this.store.delete(key);
   });
+  list = vi.fn(async (options?: { prefix?: string; limit?: number }) => ({
+    keys: Array.from(this.store.keys())
+      .filter((key) => key.startsWith(options?.prefix || ''))
+      .sort()
+      .slice(0, options?.limit || 1000)
+      .map((name) => ({ name })),
+    list_complete: true
+  }));
 }
 
 describe('admin auth links', () => {
@@ -129,5 +137,44 @@ describe('admin auth links', () => {
       { token }
     );
     expect(secondResponse.status).toBe(401);
+  });
+
+  it('retains redacted login metadata and supports explicit session revocation', async () => {
+    const storeState = new MockKVNamespace();
+    const env = {
+      SITE_BASE: 'https://shop.dustwave.xyz',
+      CORS_ALLOWED_ORIGIN: 'https://shop.dustwave.xyz',
+      ADMIN_BOOTSTRAP_EMAILS: 'admin@example.com',
+      ADMIN_SESSION_SECRET: 'test_admin_session_secret',
+      STORE_STATE: storeState
+    };
+    const loginUrl = await createAdminLoginUrl(env, { email: 'admin@example.com' });
+    const token = new URL(loginUrl).searchParams.get('admin_login') || '';
+    const rawUserAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36';
+    const rawIp = '203.0.113.42';
+    const response = await handleAdminAuthExchange(new Request('https://shop.dustwave.xyz/admin/auth/exchange', {
+      method: 'POST',
+      headers: {
+        'User-Agent': rawUserAgent,
+        'CF-Connecting-IP': rawIp
+      }
+    }), env, { token });
+
+    expect(response.status).toBe(200);
+    const review = await listAdminSessionReview(env);
+    expect(review.retentionDays).toBe(30);
+    expect(review.active).toHaveLength(1);
+    expect(review.active[0]).toMatchObject({
+      email: 'admin@example.com',
+      client: { browser: 'Chrome', operatingSystem: 'macOS', device: 'Desktop' }
+    });
+    expect(review.active[0].networkId).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    expect(review.recent[0]).toMatchObject({ email: 'admin@example.com', active: true });
+    expect(Array.from(storeState.store.values()).join('\n')).not.toContain(rawUserAgent);
+    expect(Array.from(storeState.store.values()).join('\n')).not.toContain(rawIp);
+
+    const revoked = await revokeAdminSessionById(env, review.active[0].id);
+    expect(revoked.ok).toBe(true);
+    expect((await listAdminSessionReview(env)).active).toHaveLength(0);
   });
 });

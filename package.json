@@ -1,6 +1,6 @@
 {
   "name": "store",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
   "main": "index.js",
   "directories": {
@@ -15,8 +15,14 @@
     "test:unit:coverage": "vitest run --coverage",
     "test:content-security": "node ./scripts/audit-product-content.mjs",
     "test:seo": "node ./scripts/audit-seo.mjs",
+    "test:performance:budgets": "node ./scripts/audit-performance-budgets.mjs",
+    "test:performance:lighthouse": "./scripts/podman-stack-run.sh node ./scripts/performance-lighthouse.mjs",
+    "test:performance:lighthouse:host": "node ./scripts/performance-lighthouse.mjs",
+    "test:cache-policy": "node ./scripts/audit-cache-policy.mjs",
     "test:secrets": "node ./scripts/audit-secrets.mjs",
     "test:i18n": "ruby ./scripts/check-i18n-completeness.rb",
+    "localization:review": "node ./scripts/localization-review.mjs",
+    "production:posture": "node ./scripts/audit-production-posture.mjs",
     "launch:readiness": "ruby ./scripts/check-launch-readiness.rb",
     "test:premerge": "./scripts/pre-merge-regression.sh",
     "release:smoke": "./scripts/release-smoke.sh",
@@ -43,6 +49,7 @@
     "backup:inventory:audit": "node ./scripts/audit-store-data-inventory.mjs",
     "backup:readiness": "node ./scripts/backup-readiness.mjs",
     "backup:retention": "node ./scripts/backup-retention.mjs",
+    "backup:offsite": "node ./scripts/backup-offsite-copy.mjs",
     "restore:plan": "node ./scripts/store-restore.mjs",
     "restore:rehearse": "./scripts/podman-stack-run.sh node ./scripts/rehearse-store-restore.mjs",
     "recovery:traffic-preflight": "node ./scripts/recovery-traffic-preflight.mjs",
@@ -73,6 +80,7 @@
     "axe-core": "^4.11.2",
     "esbuild": "^0.28.1",
     "jsdom": "^24.0.0",
+    "lighthouse": "^12.6.1",
     "smol-toml": "^1.7.0",
     "vitest": "^4.1.10"
   }

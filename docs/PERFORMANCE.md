@@ -12,7 +12,10 @@ Store performance depends on static public pages, lazy cart loading, generated m
 - Spanish public shells share the English page includes and runtime message payloads; they do not duplicate product rendering or add locale-specific bundles.
 - Admin dashboard tab restoration reads and writes one small sanitized `localStorage` object only when an admin tab or Settings section changes; it does not add network calls or polling.
 - Generated assets are verified with `npm run assets:minify:check` after build.
-- Formal route-level budgets and Lighthouse automation remain future work in [ROADMAP.md](ROADMAP.md).
+- `config/performance-budgets.json` now owns generated JS/CSS, Lighthouse category/Web Vital/resource, dashboard timing, Worker-route, and cache-policy budgets.
+- The local mobile Lighthouse hard gate requires at least 0.80 performance, 0.95 accessibility/SEO, 0.90 best practices, no more than 4,000 ms LCP, 0.10 CLS, 300 ms TBT, 1 MB total transfer, 300 KB images, 100 KB stylesheets, and 75 KB third-party transfer. This is a regression ceiling, not a claim that 4-second LCP is the desired production percentile; the external Adobe project should use [`font-display: optional` or `fallback`](https://helpx.adobe.com/fonts/using/font-display-settings.html) when the operator can update that licensed kit.
+- Public `main.css` excludes the roughly 5,000-line admin stylesheet; `/admin/` loads `admin.css` separately. Inter is a licensed local WOFF2 subset, while Adobe display CSS loads without blocking first render.
+- Home pages preload the responsive candidate set for the first visible catalog product. The preload and rendered image share `local_responsive_image_srcset`, so product reordering and media customization cannot silently leave a hard-coded LCP resource behind.
 
 ## Public Site
 
@@ -28,6 +31,9 @@ npm run build
 npm run test:seo
 npm run media:optimize:check
 npm run assets:minify:check
+npm run test:performance:budgets
+npm run test:performance:lighthouse
+npm run test:cache-policy
 ```
 
 ## Worker
@@ -65,13 +71,15 @@ Performance expectations:
 - the materialized v2 order index uses a seven-day safety TTL because every order-changing path explicitly invalidates it; this avoids a measured periodic full-order rescan while retaining bounded recovery from a missed invalidation
 - a required index rebuild lists order keys once and reads values through memory-bounded [Workers KV bulk reads](https://developers.cloudflare.com/kv/api/read-key-value-pairs/) of at most 100 keys; the production 417-order shape therefore uses five external KV read operations instead of 417 sequential operations, while `kvReadsExpected` remains per-key because Cloudflare bills a bulk read per key
 - a controlled production invalidation reduced the cold Orders rebuild from `53,109 ms` to `1,658 ms` (96.9 percent); the steady-state no-change repeat was a `5 ms` `HIT` with zero order-data KV reads/lists
-- the immediate no-change warmup after that deliberate invalidation repeated the bounded rebuild in `917 ms` because the new KV index had not propagated to that request; avoiding that transitional duplicate without weakening freshness remains future hardening rather than a reason to add per-order writes
+- the fixed-key `CachedAdminStoreOrderIndex` entrypoint gives all route/filter/watermark variants the same 20-second rebuild key, so an immediate no-change request reuses the first bounded rebuild while the seven-day KV index propagates; a 417-order regression fixture proves the second variant performs zero order-data KV list/get work
 - purge failure does not fail a write and records only a bounded failure diagnostic; short TTLs cap stale exposure
 - download readiness lists R2 once and derives attached-file readiness from that listing, avoiding duplicate per-file `head` calls when the list is complete
 - response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters
 - the authenticated gateway writes one asynchronous `STORE_CACHE_METRICS` Analytics Engine point per eligible admin read when `WORKERS_CACHE_TELEMETRY_ENABLED=true`; fields are limited to route, cache status/bypass, duration, response bytes, and expected operation counts
 - Analytics Engine telemetry adds one data-point write per eligible read and the nightly collector adds one SQL query plus, only below its recent cache-read threshold, a three-read full/no-change-warmup/no-change-repeat evidence probe with one rate-limit KV read/write; it never adds order-store KV counters
 - super-admin and deploy-secret purges clear all known cache domains; deploy/version isolation remains enabled because `cross_version_cache` is off
+
+Sampled Worker observations retain bounded latency histograms and expose approximate p50/p95/p99, max, status counts, and slow routes in Admin -> Runtime diagnostics. The data remains aggregate-only and reuses the existing observability store.
 
 Capture the disabled baseline and enabled candidate separately with a fresh one-time super-admin token supplied only through the environment. Disabled runs do not purge; enabled runs use two bounded purges rather than purging once per sample because every purge writes an audit KV row:
 

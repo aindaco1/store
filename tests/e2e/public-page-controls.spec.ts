@@ -96,7 +96,7 @@ test.describe('Store Public Page Controls', () => {
     await expect(page.locator('.store-product-card__eyebrow').first()).toBeVisible();
     await expect.poll(async () => {
       const images = await productCardImageMetrics(page, 3);
-      return images.length === 3 && images.every((image) => image.loading === 'eager' && image.complete && image.naturalWidth > 0 && image.objectFit === 'contain');
+      return images.length === 3 && images[0].loading === 'eager' && images.slice(1).every((image) => image.loading === 'lazy') && images.every((image) => image.complete && image.naturalWidth > 0 && image.objectFit === 'contain');
     }).toBe(true);
 
     await expect.poll(async () => (await storefrontLayoutMetrics(page)).firstRowCount).toBe(3);

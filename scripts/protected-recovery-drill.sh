@@ -14,9 +14,6 @@ required_names=(
   STRIPE_SECRET_KEY
   STORE_RECOVERY_PREVIEW_R2_BUCKET
   STORE_RECOVERY_ARCHIVE_S3_URI
-  AWS_ACCESS_KEY_ID
-  AWS_SECRET_ACCESS_KEY
-  AWS_REGION
   WORKER_BASE
 )
 
@@ -26,6 +23,18 @@ for name in "${required_names[@]}"; do
     exit 1
   fi
 done
+
+ARCHIVE_ACCESS_KEY_ID="${STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
+ARCHIVE_SECRET_ACCESS_KEY="${STORE_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+ARCHIVE_REGION="${STORE_RECOVERY_ARCHIVE_REGION:-${AWS_REGION:-us-east-1}}"
+ARCHIVE_ENDPOINT="${STORE_RECOVERY_ARCHIVE_S3_ENDPOINT:-${AWS_ENDPOINT_URL:-}}"
+if [ -z "$ARCHIVE_ACCESS_KEY_ID" ] || [ -z "$ARCHIVE_SECRET_ACCESS_KEY" ]; then
+  echo "Protected recovery requires restricted S3-compatible archive credentials." >&2
+  exit 1
+fi
+export AWS_ACCESS_KEY_ID="$ARCHIVE_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$ARCHIVE_SECRET_ACCESS_KEY"
+export AWS_REGION="$ARCHIVE_REGION"
 
 if [ -z "${STORE_RECOVERY_TRAFFIC_EVIDENCE:-}" ] || [ ! -f "$STORE_RECOVERY_TRAFFIC_EVIDENCE" ]; then
   echo "Protected recovery drill requires a current traffic preflight artifact." >&2
@@ -45,7 +54,7 @@ if ! command -v age >/dev/null 2>&1; then
   exit 1
 fi
 if ! command -v aws >/dev/null 2>&1; then
-  echo "AWS CLI is required for the durable off-account recovery archive." >&2
+  echo "The S3-compatible AWS CLI client is required for the durable off-account recovery archive." >&2
   exit 1
 fi
 
@@ -55,6 +64,18 @@ node -e '
     throw new Error("STORE_RECOVERY_ARCHIVE_S3_URI must be a bounded S3 bucket/prefix URI.");
   }
 ' "$STORE_RECOVERY_ARCHIVE_S3_URI"
+
+archive_cli_args=()
+if [ -n "$ARCHIVE_ENDPOINT" ]; then
+  node -e '
+    const value = String(process.argv[1] || "").trim();
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+      throw new Error("STORE_RECOVERY_ARCHIVE_S3_ENDPOINT must be a credential-free HTTPS origin.");
+    }
+  ' "$ARCHIVE_ENDPOINT"
+  archive_cli_args+=(--endpoint-url "$ARCHIVE_ENDPOINT")
+fi
 
 WORK_DIR="$(mktemp -d "${RUNNER_TEMP:-/tmp}/store-protected-recovery.XXXXXX")"
 IDENTITY_FILE="${WORK_DIR}/age-identity.txt"
@@ -111,21 +132,21 @@ node ./scripts/store-backup.mjs \
 
 archive_run_key="${GITHUB_RUN_ID:-manual}-${started_at//[:]/-}"
 archive_uri="${STORE_RECOVERY_ARCHIVE_S3_URI%/}/${archive_run_key}"
-aws s3 cp \
+aws "${archive_cli_args[@]}" s3 cp \
   "${ENCRYPTED_DIR}/store-backup.tar.gz.age" \
   "${archive_uri}/store-backup.tar.gz.age" \
   --only-show-errors
-aws s3 cp \
+aws "${archive_cli_args[@]}" s3 cp \
   "${ENCRYPTED_DIR}/manifest.json" \
   "${archive_uri}/manifest.json" \
   --only-show-errors
-aws s3 ls "${archive_uri}/store-backup.tar.gz.age" >/dev/null
-aws s3 ls "${archive_uri}/manifest.json" >/dev/null
-aws s3 cp \
+aws "${archive_cli_args[@]}" s3 ls "${archive_uri}/store-backup.tar.gz.age" >/dev/null
+aws "${archive_cli_args[@]}" s3 ls "${archive_uri}/manifest.json" >/dev/null
+aws "${archive_cli_args[@]}" s3 cp \
   "${archive_uri}/store-backup.tar.gz.age" \
   "$OFF_ACCOUNT_ARCHIVE_COPY" \
   --only-show-errors
-aws s3 cp \
+aws "${archive_cli_args[@]}" s3 cp \
   "${archive_uri}/manifest.json" \
   "$OFF_ACCOUNT_RECEIPT_COPY" \
   --only-show-errors
@@ -202,7 +223,7 @@ node -e '
     previewCleanupVerified: cleanup.cleanup?.ok === true,
     previewResidualKvRecords: cleanup.cleanup?.residualKvRecords || 0,
     previewResidualR2Objects: cleanup.cleanup?.residualR2Objects || 0,
-    offAccountArchiveProvider: "s3",
+    offAccountArchiveProvider: process.env.STORE_RECOVERY_ARCHIVE_PROVIDER || "s3-compatible",
     offAccountArchiveVerified: process.argv[8] === "true",
     emailOperations: 0,
     sourceArchiveSha256: receipt.archiveSha256 || "",

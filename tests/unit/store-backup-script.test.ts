@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildBackupUsageSummary,
   KV_BACKUP_PREFIXES,
   KV_QUARANTINE_PREFIXES,
   KV_VALUE_BACKUP_PREFIXES,
@@ -120,6 +121,28 @@ preview_bucket_name = "store-downloads-preview"
     expect(chunkKvBackupKeys(keys).map((chunk) => chunk.length)).toEqual([100, 100, 5]);
     expect(chunkKvBackupKeys([])).toEqual([]);
     expect(chunkKvBackupKeys(keys, 500).map((chunk) => chunk.length)).toEqual([100, 100, 5]);
+  });
+
+  it('reports aggregate snapshot duration and provider read usage without identifiers', () => {
+    const usage = buildBackupUsageSummary({
+      kvListOperations: 4,
+      kvValueBulkOperations: 5,
+      kvValueCapture: [{ prefix: 'orders:', keys: 417 }],
+      r2: { inventoryRequests: 1, objectsDownloadedCount: 2, objectBytesDownloaded: 4096 },
+      adminExports: [{ filename: 'orders.csv' }, { filename: 'audit.csv' }]
+    });
+
+    expect(usage).toEqual({
+      kvListOperations: 4,
+      kvBulkReadOperations: 5,
+      kvKeysRead: 417,
+      r2InventoryRequests: 1,
+      r2ObjectReads: 2,
+      r2BytesRead: 4096,
+      adminExportReads: 2
+    });
+    expect(JSON.stringify(usage)).not.toContain('orders:');
+    expect(JSON.stringify(usage)).not.toContain('orders.csv');
   });
 
   it('reduces encrypted receipt warnings to non-sensitive categories', () => {

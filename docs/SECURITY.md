@@ -36,9 +36,11 @@ Default posture:
 | Super-admin order CTA | Order notification email | Reuses the admin one-time login nonce with `tab=store-orders`; only generated for effective super admins, expires after 5 minutes, and creates a 30-minute admin session. |
 | Admin CSRF | `x-store-admin-csrf` | Required for dashboard writes. |
 | Admin roles/scopes | Admin APIs | `super_admin` plus Store access scopes for limited admins. |
+| Admin session review | `/admin/sessions*` | Super-admin-only review/revoke; 30-day metadata excludes full IP, full user agent, and precise location. |
 | Optional Turnstile | Admin sign-in | Local/test bypasses are accepted only in local/test mode. The browser loads the challenge only after an existing admin session is rejected, while magic-link requests still require a valid challenge token. |
 | API/admin recovery secrets | Operator routes | Bearer/header secrets stay in Worker secrets or ignored local files. |
 | Cache evidence secret | `POST /admin/workers-cache/evidence` | Dedicated read-only bearer; returns bounded metrics only and cannot purge or expose Store rows. |
+| Download abuse lock | Signed download routes | Ten failures per order plus keyed network fingerprint in 15 minutes cause a 30-minute soft lock. |
 
 Secret storage rules:
 
@@ -148,6 +150,7 @@ Digital products use private R2 objects and signed fulfillment actions.
 - Order Success exposes download actions only for confirmed orders and token-scoped fulfillment items.
 - Per-order download access state enforces explicit admin revocation server-side, so revoked access blocks previously issued links.
 - Admin download revoke/refresh mutations require an authenticated Store admin session plus CSRF and write an audit event.
+- Download failure records use a keyed network fingerprint in `RATELIMIT`, not a raw address. Aggregate per-order diagnostics contain counts and timestamps only; signed URLs and token values are never recorded.
 - Order lookup requests return a generic response, email short-lived one-time tokens only when matching orders exist, and consume each token before returning order links.
 - Signed links should be short-lived and private/no-store, while confirmed digital entitlements remain permanent unless revoked.
 - Production operation requires real `STORE_DOWNLOADS` objects for all active digital products, or an approved Worker-only fallback URL for externally hosted media.
@@ -155,6 +158,8 @@ Digital products use private R2 objects and signed fulfillment actions.
 ## Admin Dashboard
 
 Admin writes use a single server-side normalization boundary before touching GitHub-backed files or KV.
+
+Super-admin session revocation requires an authenticated session, trusted origin, CSRF token, exact non-secret session hash, and audit event. Searchable audit JSON and filtered CSV expose an explicit redacted field set rather than arbitrary event payloads. The scheduled Production Posture workflow reads secret names/config/provider evidence only and may create a sanitized GitHub issue; it never writes Worker settings, secrets, customer data, or provider state.
 
 Required protections:
 

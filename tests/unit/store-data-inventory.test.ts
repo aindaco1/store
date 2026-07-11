@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   auditStoreDataInventory,
-  discoverWorkerStoragePrefixes
+  discoverWorkerStoragePrefixes,
+  validateRecoveryPolicyApproval
 } from '../../scripts/audit-store-data-inventory.mjs';
 import { loadStoreDataInventory } from '../../scripts/lib/store-data-inventory.mjs';
 
@@ -26,6 +27,22 @@ describe('Store data inventory coverage', () => {
     expect(auditStoreDataInventory({ inventory, discovered })).toMatchObject({
       ok: false,
       missing: ['store-new-family:']
+    });
+  });
+
+  it('requires a complete approval matching the configured active-sales RPO', () => {
+    const inventory = loadStoreDataInventory();
+    expect(validateRecoveryPolicyApproval(inventory)).toEqual({ ok: true, errors: [] });
+
+    expect(validateRecoveryPolicyApproval({
+      ...inventory,
+      recoveryPolicyApproval: {
+        ...inventory.recoveryPolicyApproval,
+        activeSalesSnapshotIntervalHours: 8
+      }
+    })).toMatchObject({
+      ok: false,
+      errors: ['approved active-sales snapshot interval does not match the configured order RPO']
     });
   });
 });

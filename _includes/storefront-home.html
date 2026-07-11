@@ -44,13 +44,13 @@
           {%- if show_all_products_locally or product_status == "active" or product_status == "sold_out" -%}
             {%- assign product_image_loading = "lazy" -%}
             {%- assign product_image_fetchpriority = "" -%}
-            {%- if visible_product_index < 3 -%}
+            {%- assign product_image_decoding = "async" -%}
+            {%- if visible_product_index == 0 -%}
               {%- assign product_image_loading = "eager" -%}
-              {%- if visible_product_index == 0 -%}
-                {%- assign product_image_fetchpriority = "high" -%}
-              {%- endif -%}
+              {%- assign product_image_fetchpriority = "high" -%}
+              {%- assign product_image_decoding = "sync" -%}
             {%- endif -%}
-            {% include product-card.html product=product image_loading=product_image_loading image_fetchpriority=product_image_fetchpriority %}
+            {% include product-card.html product=product image_loading=product_image_loading image_fetchpriority=product_image_fetchpriority image_decoding=product_image_decoding %}
             {%- assign visible_product_index = visible_product_index | plus: 1 -%}
           {%- endif -%}
         {%- endif -%}

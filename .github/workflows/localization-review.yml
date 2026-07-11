@@ -1,0 +1,54 @@
+name: Localization Review
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '29 3 1 * *'
+      timezone: 'America/Denver'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: localization-review-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  review-packet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate localization catalogs
+        run: npm run test:i18n
+
+      - name: Build rendered localization and SEO evidence
+        run: npm run release:i18n-seo-evidence
+
+      - name: Generate review packet
+        run: npm run localization:review -- --output-dir=localization-review
+
+      - name: Upload localization review evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: localization-review-${{ github.run_id }}
+          path: localization-review
+          if-no-files-found: error
+          retention-days: 90

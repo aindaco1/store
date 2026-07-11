@@ -17,6 +17,12 @@ type = "worker"
   [exports.CachedAdminStoreReads.cache]
   enabled = true
 
+[exports.CachedAdminStoreOrderIndex]
+type = "worker"
+
+  [exports.CachedAdminStoreOrderIndex.cache]
+  enabled = true
+
 [[analytics_engine_datasets]]
 binding = "STORE_CACHE_METRICS"
 dataset = "store_workers_cache_metrics"

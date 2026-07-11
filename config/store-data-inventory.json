@@ -15,6 +15,15 @@
     "offAccountCopiesMinimum": 1,
     "encryptionRequiredForSensitiveValues": true
   },
+  "recoveryPolicyApproval": {
+    "schemaVersion": 1,
+    "status": "approved",
+    "approvedBy": "Store owner/operator",
+    "approvedAt": "2026-07-10",
+    "activeSalesSnapshotIntervalHours": 4,
+    "objectivesAndRetentionAccepted": true,
+    "reviewOnMaterialDataOrProviderChange": true
+  },
   "families": [
     { "id": "orders", "binding": "STORE_STATE", "type": "kv", "prefix": "orders:", "sourceOfTruth": "Store Worker order records", "sensitivity": "restricted-pii-payment-metadata", "backupFrequency": "4h-active-sales", "retention": "business-record-policy", "restorePhase": 3, "validation": "valid JSON; orderToken matches key; status and orderDraft present", "owner": "Store operations", "classification": "authoritative", "backupValues": true, "restoreDefault": "restore" },
     { "id": "inventory-overrides", "binding": "STORE_STATE", "type": "kv", "prefix": "store-inventory-overrides:v1", "sourceOfTruth": "admin inventory overrides", "sensitivity": "internal", "backupFrequency": "4h-active-sales-and-pre-change", "retention": "snapshot-retention", "restorePhase": 4, "validation": "versioned JSON with non-negative inventory values", "owner": "Store operations", "classification": "authoritative", "backupValues": true, "restoreDefault": "restore" },

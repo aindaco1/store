@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  CachedAdminStoreOrderIndex,
   CachedAdminStoreReads,
   adminStoreOrdersWorkersCacheBypassReason,
   buildAdminStoreOrdersCacheRequest,
@@ -14,12 +15,16 @@ import {
   workersCacheEnabledForAdminStoreOrders
 } from '../../worker/src/index.js';
 import {
+  ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL,
+  ADMIN_STORE_ORDER_INDEX_CACHE_ENTRYPOINT,
+  ADMIN_STORE_ORDER_INDEX_CACHE_TAGS,
   ADMIN_STORE_READ_CACHE_POLICIES,
   adminStoreReadCacheBypassReason,
   adminStoreReadCachePoliciesForDomains,
   adminStoreReadCacheTagsForDomains,
   buildAdminStoreReadCacheProps,
   buildAdminStoreReadCacheRequest,
+  buildAdminStoreOrderIndexCacheRequest,
   readAdminStoreReadCacheProps,
   STORE_READ_CACHE_MUTATION_DOMAINS,
   workersCacheEnabledForAdminStoreRead
@@ -124,6 +129,25 @@ describe('Workers Cache policy helpers', () => {
     expect(response.headers.get('Cache-Control')).toBe(ADMIN_STORE_READ_CACHE_POLICIES.orders.cacheControl);
     expect(response.headers.get('Cache-Tag')).toBe(ADMIN_STORE_READ_CACHE_POLICIES.orders.tags.join(','));
     expect(response.headers.has('Set-Cookie')).toBe(false);
+  });
+
+  it('uses one fixed trusted cache key for the shared order index', async () => {
+    const request = buildAdminStoreOrderIndexCacheRequest();
+    expect(ADMIN_STORE_ORDER_INDEX_CACHE_ENTRYPOINT).toBe('CachedAdminStoreOrderIndex');
+    expect(request.url).toBe('https://store-cache.internal/__store-cache/admin-order-index');
+    expect(request.headers.has('Authorization')).toBe(false);
+    expect(ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL).toBe('public, max-age=20, stale-if-error=0');
+    expect(ADMIN_STORE_ORDER_INDEX_CACHE_TAGS).toEqual(expect.arrayContaining(['orders', 'order-index']));
+
+    const rejected = await CachedAdminStoreOrderIndex.fetch(request, {}, { props: {} });
+    expect(rejected.status).toBe(403);
+    const props = buildAdminStoreOrdersWorkersCacheProps({ user: { role: 'super_admin' } });
+    const queryRejected = await CachedAdminStoreOrderIndex.fetch(
+      new Request(`${request.url}?unexpected=1`),
+      {},
+      { props }
+    );
+    expect(queryRejected.status).toBe(403);
   });
 
   it('supports object and function-style ctx.exports bindings', async () => {

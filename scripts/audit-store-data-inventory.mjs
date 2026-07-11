@@ -41,6 +41,25 @@ export function discoverWorkerStoragePrefixes(sourceDir = WORKER_SOURCE_DIR) {
   return Array.from(prefixes).sort();
 }
 
+export function validateRecoveryPolicyApproval(inventory = {}) {
+  const approval = inventory.recoveryPolicyApproval || {};
+  const errors = [];
+  if (approval.status !== 'approved') errors.push('recovery policy is not approved');
+  if (!String(approval.approvedBy || '').trim()) errors.push('recovery policy approver is missing');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(approval.approvedAt || ''))) {
+    errors.push('recovery policy approval date is invalid');
+  }
+  if (approval.objectivesAndRetentionAccepted !== true) {
+    errors.push('recovery objectives and retention were not accepted');
+  }
+  const approvedInterval = Number(approval.activeSalesSnapshotIntervalHours);
+  const configuredInterval = Number(inventory.recoveryObjectives?.ordersAndAdminState?.rpoHours);
+  if (!Number.isFinite(approvedInterval) || approvedInterval <= 0 || approvedInterval !== configuredInterval) {
+    errors.push('approved active-sales snapshot interval does not match the configured order RPO');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 export function auditStoreDataInventory(options = {}) {
   const inventory = options.inventory || loadStoreDataInventory();
   const documented = new Set(inventory.families
@@ -48,17 +67,27 @@ export function auditStoreDataInventory(options = {}) {
     .map((family) => family.prefix));
   const discovered = options.discovered || discoverWorkerStoragePrefixes(options.sourceDir);
   const missing = discovered.filter((prefix) => !documented.has(prefix));
-  return { ok: missing.length === 0, discovered, documented: Array.from(documented).sort(), missing };
+  const policyApproval = validateRecoveryPolicyApproval(inventory);
+  return {
+    ok: missing.length === 0 && policyApproval.ok,
+    discovered,
+    documented: Array.from(documented).sort(),
+    missing,
+    policyApproval
+  };
 }
 
 function main() {
   const result = auditStoreDataInventory();
   if (!result.ok) {
-    console.error(`Store data inventory is missing: ${result.missing.join(', ')}`);
+    if (result.missing.length > 0) {
+      console.error(`Store data inventory is missing: ${result.missing.join(', ')}`);
+    }
+    for (const error of result.policyApproval.errors) console.error(`Recovery policy approval: ${error}`);
     process.exitCode = 1;
     return;
   }
-  console.log(`Store data inventory covers ${result.discovered.length} Worker storage families.`);
+  console.log(`Store data inventory covers ${result.discovered.length} Worker storage families with an approved recovery policy.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

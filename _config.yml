@@ -41,8 +41,8 @@ exclude:
   - Containerfile.playwright.dev
 platform:
   name: Shop
-  version: 1.0.6
-  release_label: v1.0.6
+  version: 1.0.7
+  release_label: v1.0.7
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>

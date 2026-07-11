@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 import { gotoDomReady } from './helpers/navigation';
@@ -12,6 +13,7 @@ const JSON_HEADERS = {
   'access-control-allow-credentials': 'true'
 };
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
+const performanceBudgets = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'config', 'performance-budgets.json'), 'utf8')).dashboard;
 
 type AdminRole = 'super_admin' | 'limited_admin';
 
@@ -76,6 +78,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
   const calls: Record<string, any[]> = {
     authStart: [],
     authExchange: [],
+    adminSessions: [],
+    adminSessionRevokes: [],
     summary: [],
     settings: [],
     settingsPreview: [],
@@ -93,6 +97,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeMarketingAbandonedSuppression: [],
     storeMarketingDrafts: [],
     auditCsv: [],
+    auditSearch: [],
+    performanceObservability: [],
     storeReconciliationCsv: [],
     storeOrders: [],
     storeOrderCsv: [],
@@ -100,6 +106,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeSnipcartImports: [],
     storeOrderCheckIns: [],
     storeOrderDownloadAccesses: [],
+    storeDownloadAbuse: [],
     storeProducts: [],
     storeCoupons: [],
     storeProductMedia: [],
@@ -119,6 +126,16 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     accessScopes: role === 'super_admin' ? [] : ['store']
   };
   const checkIns: Record<string, any> = {};
+  let activeSessions = [{
+    id: 'a'.repeat(64),
+    email: OTHER_ADMIN_EMAIL,
+    role: 'super_admin',
+    source: 'magic_link',
+    createdAt: '2026-06-11T11:00:00.000Z',
+    expiresAt: '2026-06-11T19:00:00.000Z',
+    client: { browser: 'Safari', operatingSystem: 'macOS', device: 'Desktop' },
+    networkId: 'network123456789'
+  }];
 
   await page.route(/^http:\/\/127\.0\.0\.1:(8989|8787)\/admin\//, async (route: any) => {
     const request = route.request();
@@ -133,6 +150,20 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
 
     if (url.pathname === '/admin/session') {
       return fulfillJson({ error: 'Unauthorized' }, 401);
+    }
+    if (url.pathname === '/admin/sessions' && method === 'GET') {
+      calls.adminSessions.push({ method });
+      return fulfillJson({
+        active: activeSessions,
+        recent: activeSessions.map((session) => ({ ...session, active: true })),
+        retentionDays: 30,
+        privacy: { storesFullIp: false, storesFullUserAgent: false, storesPreciseLocation: false }
+      });
+    }
+    if (url.pathname === '/admin/sessions/revoke' && method === 'POST') {
+      calls.adminSessionRevokes.push(body);
+      activeSessions = activeSessions.filter((session) => session.id !== body.id);
+      return fulfillJson({ success: true, revoked: { id: body.id, email: OTHER_ADMIN_EMAIL } });
     }
     if (url.pathname === '/admin/auth/start') {
       calls.authStart.push(body);
@@ -169,6 +200,13 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     if (url.pathname === '/admin/plan-usage' && method === 'GET') {
       calls.planUsage.push({ method });
       return fulfillJson(planUsagePayload());
+    }
+    if (url.pathname === '/admin/observability/performance' && method === 'GET') {
+      calls.performanceObservability.push(Object.fromEntries(url.searchParams.entries()));
+      return fulfillJson({
+        sampleRate: 0.1,
+        slowRoutes: [{ date: '2026-06-11', operation: 'store_order_fulfillment', count: 20, p50Ms: 50, p95Ms: 250, p99Ms: 500, maxMs: 412 }]
+      });
     }
     if (url.pathname === '/admin/store/analytics' && method === 'GET') {
       calls.storeAnalytics.push(Object.fromEntries(url.searchParams.entries()));
@@ -309,6 +347,23 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         body: `key,created_at,action,admin_email\nadmin-audit:2026-06-11:store_order:check_in:test,2026-06-11T12:00:00.000Z,store_order:check_in,${SUPER_ADMIN_EMAIL}\n`
       });
     }
+    if (url.pathname === '/admin/audit' && method === 'GET') {
+      calls.auditSearch.push(Object.fromEntries(url.searchParams.entries()));
+      return fulfillJson({
+        rows: [{
+          key: 'admin-audit:2026-06-11:store_order:check_in:test',
+          createdAt: '2026-06-11T12:00:00.000Z',
+          action: 'store_order:check_in',
+          adminEmail: SUPER_ADMIN_EMAIL,
+          adminRole: 'super_admin',
+          orderToken: TICKET_ORDER_TOKEN,
+          itemId: TICKET_ITEM_ID,
+          mutation: 'check_in',
+          changedFields: []
+        }],
+        page: { matched: 1, returned: 1, limit: 100 }
+      });
+    }
     if (url.pathname === '/admin/store/reconciliation.csv' && method === 'GET') {
       calls.storeReconciliationCsv.push(Object.fromEntries(url.searchParams.entries()));
       return route.fulfill({
@@ -401,6 +456,17 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
       const params = Object.fromEntries(url.searchParams.entries());
       calls.storeOrders.push(params);
       return fulfillJson(storeOrdersPayload(params, checkIns));
+    }
+    if (url.pathname === '/admin/store/orders/download-abuse' && method === 'GET') {
+      calls.storeDownloadAbuse.push(Object.fromEntries(url.searchParams.entries()));
+      return fulfillJson({
+        orderToken: url.searchParams.get('orderToken'),
+        failedAttempts: 3,
+        softLocks: 1,
+        lastFailedAt: '2026-06-11T12:30:00.000Z',
+        lastLockedUntil: '2026-06-11T13:00:00.000Z',
+        policy: { failedAttemptLimit: 10, windowMinutes: 15, softLockMinutes: 30 }
+      });
     }
     if (url.pathname === '/admin/store/orders.csv' && method === 'GET') {
       calls.storeOrderCsv.push(Object.fromEntries(url.searchParams.entries()));
@@ -816,6 +882,12 @@ function storeSettingsSections(lang = 'en') {
       })
     ]
   }, {
+    title: 'Admin sessions',
+    rows: [settingsRow({ label: 'Admin sessions', value: '', rawValue: '', input: 'admin-session-review', hideLabel: true })]
+  }, {
+    title: 'Audit log',
+    rows: [settingsRow({ label: 'Audit log', value: '', rawValue: '', input: 'admin-audit-review', hideLabel: true })]
+  }, {
     title: 'Advanced performance',
     rows: [
       settingsRow({ label: 'Intent prefetch enabled', value: 'true', rawValue: 'true', editable: true, path: 'performance.intent_prefetch_enabled', type: 'boolean', input: 'boolean' }),
@@ -846,6 +918,7 @@ function storeSettingsSections(lang = 'en') {
       settingsRow({ label: 'Workers Cache admin Analytics', value: 'disabled' }),
       settingsRow({ label: 'Workers Cache admin Inventory', value: 'disabled' }),
       settingsRow({ label: 'Workers Cache admin Download readiness', value: 'disabled' }),
+      settingsRow({ label: 'Performance observations', value: '', rawValue: '', input: 'performance-observability', hideLabel: true }),
       settingsRow({ label: 'Workers Cache controls', value: '', rawValue: '', input: 'workers-cache-controls', hideLabel: true })
     ]
   }];
@@ -1063,7 +1136,8 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
         issuedAt: '2026-06-11T12:05:00.000Z',
         expiresAt: '',
         expiresInSeconds: 0,
-        expiresHours: 0
+        expiresHours: 0,
+        history: [{ action: 'reissue', at: '2026-06-11T12:06:00.000Z', by: SUPER_ADMIN_EMAIL }]
       }
     }];
   const allFulfillments = rawFulfillments.map((row) => {
@@ -1739,10 +1813,12 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-auth-status')).toContainText('Local login link ready.');
     await expect(page.locator('#admin-auth-status a')).toHaveAttribute('href', `${SITE_BASE}/admin/?admin_login=test-token`);
 
-    await page.locator('#admin-auth-status a').click();
+	    const initialReadyStartedAt = Date.now();
+	    await page.locator('#admin-auth-status a').click();
     await expect.poll(() => calls.authExchange.length).toBe(1);
     await expect(page.locator('#admin-app')).toBeVisible();
-    await expect(page.getByText(`Signed in as ${SUPER_ADMIN_EMAIL}`)).toBeVisible();
+	    await expect(page.getByText(`Signed in as ${SUPER_ADMIN_EMAIL}`)).toBeVisible();
+	    expect(Date.now() - initialReadyStartedAt).toBeLessThanOrEqual(performanceBudgets.initialReadyMs);
 	    await expect(page.locator('[data-admin-tabs] > .admin-tabs__list').getByRole('tab')).toHaveText([
 	      'Settings',
 	      'Products',
@@ -1825,6 +1901,9 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-panel-settings .admin-settings__header')).toHaveJSProperty('offsetHeight', Math.round(settingsHeaderHeight));
     await expect(page.locator('#admin-settings-results')).toContainText('Current site base');
 	    await expect(page.locator('#admin-settings-results')).toContainText(SITE_BASE);
+	    await expect.poll(() => calls.performanceObservability.length).toBe(1);
+	    await expect(page.locator('[data-performance-observability-results]')).toContainText('store_order_fulfillment');
+	    await expect(page.locator('[data-performance-observability-results]')).toContainText('250 ms');
     await page.getByRole('button', { name: 'Clear Workers cache' }).click();
     await expect.poll(() => calls.workersCachePurges.length).toBe(1);
     expect(calls.workersCachePurges[0]).toMatchObject({ target: 'all_known', source: 'dashboard' });
@@ -1845,7 +1924,26 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-store-readiness-status]')).toContainText('Audit CSV download started.');
     await page.getByRole('button', { name: 'Export reconciliation' }).click();
     await expect.poll(() => calls.storeReconciliationCsv.length).toBe(1);
-    await expect(page.locator('[data-store-readiness-status]')).toContainText('Reconciliation CSV download started.');
+	    await expect(page.locator('[data-store-readiness-status]')).toContainText('Reconciliation CSV download started.');
+
+	    await selectSettingsSection(page, 'Admin sessions');
+	    await expect.poll(() => calls.adminSessions.length).toBe(1);
+	    await expect(page.locator('[data-admin-session-results]')).toContainText(OTHER_ADMIN_EMAIL);
+	    await expect(page.locator('[data-admin-session-results]')).toContainText('Safari / macOS / Desktop');
+	    await page.getByRole('button', { name: 'Revoke' }).click();
+	    await expect.poll(() => calls.adminSessionRevokes.length).toBe(1);
+	    await expect(page.locator('[data-admin-session-results]')).toContainText('No active sessions.');
+
+	    await selectSettingsSection(page, 'Audit log');
+	    await expect.poll(() => calls.auditSearch.length).toBe(1);
+	    await expect(page.locator('[data-admin-audit-results]')).toContainText('store_order:check_in');
+	    await page.locator('#admin-audit-action').fill('store_order');
+	    await page.getByRole('button', { name: 'Apply filters' }).click();
+	    await expect.poll(() => calls.auditSearch.length).toBe(2);
+	    expect(calls.auditSearch[1]).toMatchObject({ action: 'store_order' });
+	    await page.getByRole('button', { name: 'Export filtered CSV' }).click();
+	    await expect.poll(() => calls.auditCsv.length).toBe(2);
+	    expect(calls.auditCsv[1]).toMatchObject({ action: 'store_order' });
 
 	    await selectSettingsSection(page, 'Plan usage');
 	    await expect(page.locator('[data-settings-section-panel="Plan usage"] .admin-settings__section-title')).toHaveCount(0);
@@ -1859,14 +1957,17 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-plan-usage-results]')).toContainText('Monthly emails');
     await expect(page.locator('[data-plan-usage-results]')).toContainText('Manage plan');
 
-    await selectAdminSection(page, 'Analytics');
+	    const analyticsStartedAt = Date.now();
+	    await selectAdminSection(page, 'Analytics');
+	    expect(Date.now() - analyticsStartedAt).toBeLessThanOrEqual(performanceBudgets.tabSwitchMs);
     await expect(page.locator('#admin-store-analytics-load')).toHaveCount(0);
     await expect.poll(() => calls.storeAnalytics.length).toBe(1);
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Revenue');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('$17');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Fronteras Screening');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Referral codes');
-    await expect(page.locator('#admin-store-analytics-results')).toContainText('Flyer Crew (flyer-crew)');
+	    await expect(page.locator('#admin-store-analytics-results')).toContainText('Flyer Crew (flyer-crew)');
+	    expect(Date.now() - analyticsStartedAt).toBeLessThanOrEqual(performanceBudgets.tableRenderMs);
     await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Top products' })).toBeVisible();
     const topProductsHeadingStyle = await page.locator('.admin-store-analytics__table-actions .admin-report-heading').filter({ hasText: 'Top products' }).first().evaluate((element: HTMLElement) => {
@@ -2092,9 +2193,15 @@ test.describe('Admin Dashboard', () => {
     await expect(attendanceRow).toContainText('100%');
     const digitalRow = page.locator('#admin-store-orders-results tbody tr').filter({ hasText: 'Fronteras Download' });
     await expect(digitalRow).toContainText('Active entitlement');
+	    await expect(digitalRow).toContainText('Access history (1)');
     await expect(digitalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
     await expect(digitalRow.getByRole('button', { name: 'Refresh download access for Fronteras Download' })).toBeVisible();
     await expect(digitalRow.getByRole('button', { name: 'Revoke download access for Fronteras Download' })).toBeVisible();
+	    await digitalRow.getByRole('button', { name: 'Abuse diagnostics' }).click();
+	    await expect.poll(() => calls.storeDownloadAbuse.length).toBe(1);
+	    expect(calls.storeDownloadAbuse[0]).toMatchObject({ orderToken: DIGITAL_ORDER_TOKEN });
+	    await expect(digitalRow).toContainText('3 failed attempts');
+	    await expect(digitalRow).toContainText('1 soft locks');
     await digitalRow.getByRole('button', { name: 'Refresh download access for Fronteras Download' }).click();
     await expect.poll(() => calls.storeOrderDownloadAccesses.length).toBe(1);
     expect(calls.storeOrderDownloadAccesses[0]).toMatchObject({

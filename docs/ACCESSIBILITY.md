@@ -34,7 +34,7 @@ npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium --worke
 
 The admin E2E injects axe-core for the signed-in dashboard. Public-page E2E covers home, product detail, Terms, order lookup, Order Success, mobile overflow, keyboard add-to-cart, cart quantity updates, storefront filters, localized public/product routes, and expected product-control behavior. Admin coverage includes product editing, download creation, large/long content fixtures, mobile rows, and compact tablet tabs.
 
-The release E2E path also covers 200% text scaling for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces. This does not replace manual assistive-technology testing, but it catches high-zoom layout regressions in the automated gate.
+The release E2E path also covers 200% text scaling for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces, including long product/variant/file/coupon/referral fixtures and tablet/mobile rows. The mounted checkout/payment surface remains in automated axe coverage. This does not replace manual assistive-technology testing, but it catches high-zoom layout regressions in the automated gate.
 
 ## Admin Smoke Checklist
 

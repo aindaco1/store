@@ -1,5 +1,7 @@
 # Backup, Restore, And Disaster Recovery
 
+The Store owner/operator approved the documented RPO/RTO, four-hour active-sales snapshot interval, and 7-daily/5-weekly/12-monthly plus release retention policy on 2026-07-10. Snapshot receipts record aggregate duration and Cloudflare KV/R2/admin-export read usage so that interval can be revisited with evidence.
+
 This runbook covers Store Git/config/build artifacts, Cloudflare KV, private R2 downloads, provider evidence, and guarded recovery. Do not commit snapshots, exports, decrypted archives, or customer data.
 
 ## Recovery Objectives
@@ -17,7 +19,7 @@ Initial objectives:
 
 Recommended retention is 7 daily, 5 weekly, and 12 monthly encrypted snapshots plus release snapshots. Keep at least one verified copy outside the production Cloudflare account and off the primary operator device.
 
-These objectives and retention counts remain provisional until the business/operator owner records approval. Automation enforces the checked-in values but does not manufacture that approval.
+The Store owner/operator approved these objectives, the four-hour active-sales snapshot interval, and the retention counts on `2026-07-10`. `config/store-data-inventory.json` is the machine-readable approval record. Re-review the policy after a material data-class, provider, checkout-volume, or recovery-architecture change; automation validates the record but does not silently change or renew approval.
 
 ## Data Classes
 
@@ -203,9 +205,12 @@ The planner revalidates encrypted receipt/archive checksums and never selects th
 
 - **Recovery Readiness** runs weekly at `03:43 America/Denver`. It performs read-only Cloudflare provider evidence, the representative Podman rehearsal, and backup readiness, then uploads sanitized evidence only.
 - **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of January, April, July, and October. The captured-data job remains disabled unless `RECOVERY_DRILL_ENABLED=true`.
-- The captured-data job shares production concurrency with deploy/cache operations and requires approval through the `production-recovery` environment. It requires a dedicated age recipient/identity, a fresh one-time super-admin token, a restricted live Stripe read key, an explicit preview R2 bucket, and off-account S3 archive credentials/destination. It captures encrypted KV/admin/R2 data, verifies the S3 copy, reconciles captured orders read-only, restores only to preview, verifies every restored value/object, removes snapshot-owned preview data, derives artifacts from sanitized counts/status, and removes detailed restore output and plaintext material before artifact upload.
+- The captured-data job shares production concurrency with deploy/cache operations and requires approval through the `production-recovery` environment. It requires a dedicated age recipient/identity, a fresh one-time super-admin token, a restricted live Stripe read key, an explicit preview R2 bucket, and off-account S3-compatible archive credentials/destination. An optional endpoint keeps the workflow provider-neutral. It captures encrypted KV/admin/R2 data, verifies the remote copy, reconciles captured orders read-only, restores only to preview, verifies every restored value/object, removes snapshot-owned preview data, derives artifacts from sanitized counts/status, and removes detailed restore output and plaintext material before artifact upload.
 - Store the dedicated recovery identity as a protected environment secret only after review; do not reuse an operator's personal/master key. A fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN` must be supplied immediately before approval because it is short-lived and one-time.
-- GitHub's 90-day encrypted drill artifact is secondary drill evidence, not the approved long-term 7-daily/5-weekly/12-monthly destination and not proof of decryption on a second isolated device. The protected path additionally requires verified S3 upload, but operators must still approve that account/provider and retention policy.
+- GitHub's 90-day encrypted drill artifact is secondary drill evidence, not the approved long-term 7-daily/5-weekly/12-monthly destination and not proof of decryption on a second isolated device. The protected path additionally requires a verified S3-compatible upload. `npm run backup:offsite -- --snapshot=... --destination=...` provides a plan-first copy to a mounted external or private remote filesystem; execution requires `--execute --acknowledge=STORE_BACKUP_OFF_DEVICE_COPY`, a different filesystem device, checksum readback, and an append-only target. Run `--verify-only --verify-decrypt` on the separately located recovery machine to produce second-device evidence.
+
+A separately located, operator-controlled recovery device is the preferred local-friendly second-location target. Mount its encrypted destination through a private LAN/VPN share or rotate an encrypted removable disk; do not expose public SSH/SMB. The recovery device must receive only the encrypted archive and receipt, preserve append-only snapshots, verify checksums, and run the age decrypt-to-`/dev/null` proof locally before the second-device gate is marked complete. An S3-compatible provider remains optional and AWS is not required.
+
 - No scheduled or protected workflow contains a production restore acknowledgement or production target. A production restore remains a separate manual incident procedure governed by the gates below.
 
 ## Production Restore Gates

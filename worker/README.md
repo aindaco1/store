@@ -62,10 +62,10 @@ The Film summary adapter uses the shared admin order read model and `admin-store
 
 Browser admin mutations use the `store_admin_session` cookie plus `x-store-admin-csrf`.
 
-- Auth/session: `POST /admin/auth/start`, `POST /admin/auth/exchange`, `GET /admin/session`, `POST /admin/logout`.
+- Auth/session: `POST /admin/auth/start`, `POST /admin/auth/exchange`, `GET /admin/session`, `GET /admin/sessions`, `POST /admin/sessions/revoke`, `POST /admin/logout`.
 - Settings/media/users: `GET /admin/settings`, `POST /admin/settings/preview`, `POST /admin/settings/publish`, `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, `POST /admin/settings/audio-upload`, `POST /admin/settings/video-upload`, `POST /admin/users`.
-- Readiness/diagnostics: `GET /admin/dashboard/summary`, `GET /admin/store/health`, `GET /admin/plan-usage`, `GET /admin/audit.csv`, `GET /admin/cron/status`, `GET /admin/observability/webhooks`, `GET /admin/observability/performance`.
-- Orders: `GET /admin/store/orders`, `GET /admin/store/orders.csv`, `GET /admin/store/attendees.csv`, `GET /admin/store/reconciliation.csv`, `POST /admin/store/orders/import-snipcart`, `POST /admin/store/orders/download-access`, `POST /admin/store/orders/check-in`.
+- Readiness/diagnostics: `GET /admin/dashboard/summary`, `GET /admin/store/health`, `GET /admin/plan-usage`, `GET /admin/audit`, `GET /admin/audit.csv`, `GET /admin/cron/status`, `GET /admin/observability/webhooks`, `GET /admin/observability/performance`.
+- Orders: `GET /admin/store/orders`, `GET /admin/store/orders/download-abuse`, `GET /admin/store/orders.csv`, `GET /admin/store/attendees.csv`, `GET /admin/store/reconciliation.csv`, `POST /admin/store/orders/import-snipcart`, `POST /admin/store/orders/download-access`, `POST /admin/store/orders/check-in`.
 - Products/media: `GET /admin/store/products`, `GET /admin/store/products/media`, `GET /admin/store/products/address-lookup`, `POST /admin/store/products/preview`, `POST /admin/store/products/publish`, `POST /admin/store/products/bulk-publish`, `POST /admin/store/products/order`.
 - Coupons: `GET /admin/store/coupons`, `POST /admin/store/coupons`, `POST /admin/store/coupons/delete`.
 - Downloads: `GET /admin/store/downloads`, `POST /admin/store/downloads/create`, `POST /admin/store/downloads/upload`, `POST /admin/store/downloads/delete`.
@@ -77,7 +77,7 @@ Some maintenance/observability routes also accept the configured admin recovery 
 
 ## Workers Cache
 
-Wrangler config keeps the default Worker gateway uncached and enables cache only for `CachedAdminStoreReads`. This requires Wrangler `4.107+` and `compatibility_date = "2026-07-09"`.
+Wrangler config keeps the default Worker gateway uncached and enables cache only for `CachedAdminStoreReads` plus the fixed internal `CachedAdminStoreOrderIndex` entrypoint. This requires Wrangler `4.107+` and `compatibility_date = "2026-07-09"`.
 
 Authenticated cache flow:
 
@@ -86,6 +86,10 @@ Authenticated cache flow:
 3. Eligible reads call `ctx.exports.CachedAdminStoreReads` with a canonical internal request and minimal route/role/scope props.
 4. The inner response uses the route policy: Orders `max-age=15` without stale serving; Analytics `max-age=60, stale-while-revalidate=120`; inventory `max-age=15`; downloads `max-age=30`.
 5. The gateway returns a browser-facing `private, no-store` response with the authenticated user restored.
+
+On a route cache miss, order-derived readers call the fixed `/__store-cache/admin-order-index` entrypoint. Its 20-second internal key is independent of browser filters and watermark variants, so requests arriving while a newly written KV index propagates share one bounded rebuild instead of repeating the order scan. It accepts no browser credentials, queries, or untrusted props.
+
+Admin sessions retain active records only for their normal session TTL. A separate 30-day login history stores email/role/source, parsed browser/OS/device, and a keyed network fingerprint; it excludes full IP addresses, full user agents, and location. Signed-download failures use a different keyed order/network rate-limit record: 10 failures in 15 minutes create a 30-minute soft lock, while admin diagnostics expose aggregate counts only.
 
 Orders accepts validated `since` and `watermark` values. A matching first-page non-search refresh returns `unchanged: true` without order/customer rows, and the browser retains its existing in-memory payload. Order payloads are never persisted to browser storage. Free-text `q` searches bypass Workers Cache.
 
@@ -132,7 +136,7 @@ Operationally important optional secrets:
 - `CLOUDFLARE_USAGE_API_TOKEN` or `CLOUDFLARE_ANALYTICS_API_TOKEN`: read-only Cloudflare GraphQL/Analytics Engine access for plan usage, cache evidence, and recovery traffic preflight. Keep it separate from the deploy token where possible.
 - `STORE_BACKUP_ENCRYPTION_RECIPIENT`, `STORE_BACKUP_AGE_IDENTITY`, and a fresh `STORE_BACKUP_ADMIN_LOGIN_TOKEN`: approval-gated quarterly captured-data drill inputs. Use a dedicated recovery identity and never treat the one-time admin token as a reusable scheduled credential.
 - `STRIPE_RECOVERY_READ_KEY`: restricted live-mode read-only Stripe key used only for captured-order PaymentIntent comparison; test-mode or write-capable keys must not be substituted.
-- `STORE_RECOVERY_ARCHIVE_S3_URI`, `STORE_RECOVERY_ARCHIVE_AWS_ACCESS_KEY_ID`, and `STORE_RECOVERY_ARCHIVE_AWS_SECRET_ACCESS_KEY`: protected off-account encrypted archive destination and credentials. The workflow verifies both archive and receipt after upload before decrypting locally for preview rehearsal.
+- `STORE_RECOVERY_ARCHIVE_S3_URI`, `STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID`, and `STORE_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY`: protected off-account encrypted archive destination and restricted credentials. `STORE_RECOVERY_ARCHIVE_S3_ENDPOINT` and `STORE_RECOVERY_ARCHIVE_REGION` select a non-AWS S3-compatible provider. The workflow verifies both archive and receipt after upload before decrypting locally for preview rehearsal. `npm run backup:offsite` separately supports a mounted external or private remote filesystem for a local off-device copy and second-machine verification.
 - `ADMIN_LOCAL_REPO_TOKEN`: optional local sidecar bearer token; falls back to `ADMIN_SECRET` in local dev.
 
 Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in Cloudflare Worker secrets or GitHub repository secrets for deploy-only credentials.
