@@ -12,6 +12,7 @@
 - Added scheduled Production Posture and Localization Review workflows. Posture drift creates or updates a sanitized GitHub issue without runtime mutation; localization generates source-hashed human-review packets without claiming professional translation.
 - Fixed the Localization Review workflow to pin its Ruby runtime and added workflow regression coverage so scheduled review packets can build on clean GitHub-hosted runners.
 - Expanded Workers Cache, recovery/off-device, session privacy, download abuse, performance/cache-policy, localization, posture, workflow-security, and production-like Podman browser test coverage.
+- Completed the authorized 30-sample production Orders comparison. Cache correctness, search bypass, purge refill, and zero-warm-KV gates passed, but warm p95 improved only 14.41 percent and no-change p95 regressed 28.36 percent against the required 40 percent improvement, so all route switches now default off rather than retaining an unjustified billed inner Worker request.
 
 ## v1.0.6 - 2026-07-09
 

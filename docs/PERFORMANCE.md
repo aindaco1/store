@@ -53,7 +53,7 @@ The `CachedAdminStoreReads` policy registry owns canonical paths/query fields, n
 
 | Route | TTL | Default | Backend work avoided on hit |
 | --- | --- | --- | --- |
-| `/admin/store/orders` | `max-age=15`, no stale serving | enabled | order-index KV read or cold order list/get scan |
+| `/admin/store/orders` | `max-age=15`, no stale serving | disabled after failed benefit gate | order-index KV read or cold order list/get scan |
 | `/admin/store/analytics` | `max-age=60, stale-while-revalidate=120` | disabled | order snapshot and referral-label KV reads |
 | `/admin/store/inventory` | `max-age=15`, no stale serving | disabled | order snapshot/list/get work |
 | `/admin/store/downloads` | `max-age=30`, no stale serving | disabled | R2 list/readiness work |

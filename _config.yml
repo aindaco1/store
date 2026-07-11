@@ -167,7 +167,7 @@ cache:
   live_inventory_ttl_seconds: 300
   workers_enabled: true
   workers_telemetry_enabled: true
-  workers_admin_orders_enabled: true
+  workers_admin_orders_enabled: false
   workers_admin_analytics_enabled: false
   workers_admin_inventory_enabled: false
   workers_admin_downloads_enabled: false
