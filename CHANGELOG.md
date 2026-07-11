@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.7 - Unreleased
+## v1.0.7 - 2026-07-11
 
 - Approved and versioned the Store recovery objectives, four-hour active-sales snapshot interval, and 7-daily/5-weekly/12-monthly plus release-snapshot retention policy in the canonical data inventory.
 - Added aggregate snapshot duration/Cloudflare read-usage evidence, a checksum-verified append-only off-device filesystem copy and second-device decryption path, and provider-neutral S3-compatible protected archive configuration without requiring AWS.
