@@ -16,6 +16,6 @@
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
     "qrcode": "^1.5.4",
-    "sales-tax": "^2.21.0"
+    "sales-tax": "^2.23.0"
   }
 }
