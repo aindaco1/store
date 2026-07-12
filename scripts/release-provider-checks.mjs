@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
+import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -238,13 +239,14 @@ async function listStripeWebhooksWithApi(key) {
   return { ok: true, status: webhooks.status, data: webhooks.body?.data || [] };
 }
 
-function listStripeWebhooksWithCli({ live = false } = {}) {
-  if (!commandAvailable('stripe')) return { ok: false, reason: 'stripe CLI not found', data: [] };
+function listStripeWebhooksWithCli({ live = false, authState } = {}) {
+  const auth = authState || stripeCliAuthState({ cwd: ROOT });
+  if (!auth.authenticated) return { ok: false, reason: auth.reason, data: [] };
   const args = ['webhook_endpoints', 'list', '--limit', '100'];
   if (live) args.push('--live');
   const result = run('stripe', args, { cwd: ROOT });
   if (result.status !== 0) {
-    return { ok: false, reason: String(result.stderr || result.stdout || 'stripe CLI failed').trim(), data: [] };
+    return { ok: false, reason: 'authenticated stripe CLI request failed', data: [] };
   }
   const parsed = parseJsonOutput(result.stdout);
   if (!parsed) return { ok: false, reason: 'stripe CLI returned non-JSON output', data: [] };
@@ -530,7 +532,8 @@ async function main() {
     return;
   }
 
-  const stripeLiveCli = listStripeWebhooksWithCli({ live: true });
+  const stripeCliAuth = stripeCliAuthState({ cwd: ROOT });
+  const stripeLiveCli = listStripeWebhooksWithCli({ live: true, authState: stripeCliAuth });
   if (stripeLiveCli.ok) {
     const liveEndpoint = findRequiredStripeWebhook(stripeLiveCli.data, workerBase, { livemode: true });
     if (liveEndpoint) add('PASS', 'Stripe production webhook endpoint', `live endpoint targets ${workerBase}/webhooks/stripe with required events`);
@@ -553,7 +556,7 @@ async function main() {
     }
   }
 
-  const stripeTestCli = listStripeWebhooksWithCli({ live: false });
+  const stripeTestCli = listStripeWebhooksWithCli({ live: false, authState: stripeCliAuth });
   if (stripeTestCli.ok) {
     const testEndpoint = findRequiredStripeWebhook(stripeTestCli.data, workerBase, { livemode: false });
     if (testEndpoint) {

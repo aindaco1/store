@@ -6,6 +6,7 @@ import process from 'node:process';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
+import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORKER_DIR = path.join(ROOT, 'worker');
@@ -582,7 +583,16 @@ async function runReadinessChecks() {
   const kvNamespaces = listCloudflareKvNamespaces();
   readinessStatus('Cloudflare KV namespace discovery', kvNamespaces.length > 0, kvNamespaces.length ? `${kvNamespaces.length} namespace(s) visible` : 'no namespaces visible yet or listing failed');
 
-  if (commandAvailable('stripe')) {
+  const stripeAuth = stripeCliAuthState({
+    cwd: ROOT,
+    commandAvailableFn: commandAvailable,
+    runCommandFn: (command, commandArgs, commandOptions) => run(command, commandArgs, {
+      ...commandOptions,
+      allowFailure: true,
+      dryRunExec: true
+    })
+  });
+  if (stripeAuth.authenticated) {
     const stripeWebhooks = run('stripe', ['webhook_endpoints', 'list', '--limit', '10'], {
       cwd: ROOT,
       allowFailure: true,
@@ -590,7 +600,7 @@ async function runReadinessChecks() {
     });
     readinessStatus('Stripe webhook endpoint access', stripeWebhooks.status === 0, stripeWebhooks.status === 0 ? 'webhook endpoints are readable' : 'run stripe login or configure webhook manually');
   } else {
-    readinessStatus('Stripe CLI webhook check', false, 'stripe CLI not installed; verify webhook endpoint manually');
+    readinessStatus('Stripe CLI webhook check', false, `${stripeAuth.reason}; verify webhook endpoint manually`);
   }
 
   const resendKey = readinessEnv('RESEND_API_KEY');

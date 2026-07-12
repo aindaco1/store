@@ -4,7 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Release target: `v1.0.6`.
+- Current release line: `v1.0.7`. Its published tag remains immutable, while subsequent `1.0.7` hotfixes and lockdown work are recorded explicitly as post-release hardening without moving the tag.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -17,6 +17,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
 - Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, and an explicitly invalidated seven-day materialized index. Orders, Analytics, inventory, and download readiness support the reviewed `CachedAdminStoreReads` Workers Cache entrypoint but default off after the production Orders comparison failed its latency-benefit gate. Deployment-scoped weighted telemetry, disabled/enabled comparison gates, a scoped nightly probe, kill switches, and the incident runbook support measured rollout.
 - Backup and disaster recovery use a canonical Store data inventory, checksum-verified snapshot v2 manifests, complete/chunked encrypted KV/R2 capture, guarded restore planning, read-only Store/Stripe reconciliation, maker/checker Durable Object inventory recovery, preview readback/cleanup, retention/readiness planning, weekly representative Podman drills, and a disabled-by-default protected quarterly workflow with off-account archive gates.
+- Provider readiness and remote backup inventory are noninteractive: Stripe CLI endpoint reads run only after a captured `stripe whoami` succeeds, and authentication/pairing output is never written to release evidence or backup manifests.
 - Production hardening includes centralized asset/Lighthouse/cache budgets, sampled Worker p50/p95/p99 diagnostics, full readiness posture, super-admin session review/revocation, searchable redacted audit records, signed-download soft locks, scheduled configuration drift issues, and source-hashed localization review packets.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
@@ -45,6 +46,7 @@ bundle exec jekyll build --quiet
 npm run test:seo
 npm run test:content-security
 npm run test:unit
+npm run test:unit:coverage
 npm run test:security
 npm run test:e2e:headless
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman

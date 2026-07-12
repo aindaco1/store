@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release target: `v1.0.6`.
+Current release line: `v1.0.7`. Its published tag remains immutable; subsequent fixes are documented as `1.0.7` post-release hardening without rewriting the tag.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 
@@ -23,9 +23,9 @@ The current repository is production-ready from a code-path perspective: public 
 
 At this sweep the source catalog contains:
 
-- 49 product records in `_products/`
-- 27 active products and 22 archived products
-- 25 physical products, 22 ticket products, 1 digital product, and 1 free RSVP product
+- 50 product records in `_products/`
+- 26 active products and 24 archived products
+- 25 physical products, 23 ticket products, 1 digital product, and 1 free RSVP product
 - launch-test fixtures for controlled direct-link checkout/download/check-in smoke tests
 
 Current product front matter still uses `category: dustwave` and `category: fronteras` as collection-compatible legacy values. `_includes/product-taxonomy.html` maps those values to Store collections and derives merchandising categories from fulfillment/type/shipping metadata.

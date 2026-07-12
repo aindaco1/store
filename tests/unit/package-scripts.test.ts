@@ -6,6 +6,13 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = process.cwd();
 
 describe('package test scripts', () => {
+  it('keeps the coverage command reproducible from declared dependencies', () => {
+    const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+
+    expect(packageJson.scripts['test:unit:coverage']).toBe('vitest run --coverage');
+    expect(packageJson.devDependencies['@vitest/coverage-v8']).toBeTruthy();
+  });
+
   it('keeps runtime-dependent default tests on the Podman stack', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     const scripts = packageJson.scripts || {};

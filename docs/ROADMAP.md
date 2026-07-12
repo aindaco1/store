@@ -8,7 +8,8 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 
 - Store is live at `https://shop.dustwave.xyz` with the Cloudflare Worker at `https://checkout.dustwave.xyz`.
 - The primary implementation scope for checkout, fulfillment, admin operations, i18n, accessibility, SEO, Podman, and release evidence is complete.
-- `v1.0.6` added Workers Cache performance/read-efficiency hardening, versioned backup/restore/disaster-recovery automation, and Podman-backed default runtime tests.
+- `v1.0.6` added Workers Cache performance/read-efficiency hardening, versioned backup/restore/disaster-recovery automation, and Podman-backed default runtime tests. `v1.0.7` added production quality budgets, fixed-key order-index rebuild deduplication, admin session/audit/download-abuse hardening, scheduled posture/localization review, and approved recovery objectives/retention controls.
+- Published tags are immutable. Localization, cache-evidence, workflow supply-chain, least-privilege, coverage, and provider-probe fixes after the `v1.0.7` tag are tracked as `1.0.7` post-release hardening without rewriting the tag.
 - Production Cloudflare DNS API evidence is covered by the non-deploying `Release Provider Evidence` GitHub Actions workflow on `main`; ongoing external evidence remains an operations gate, not a Store code gap.
 
 ## Completed
@@ -137,6 +138,8 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
   - The Worker is authoritative for cart validation, checkout totals, tax, shipping, inventory reservations, order state, fulfillment actions, admin mutations, and email dispatch.
   - Stripe webhook signatures, signed order/download/check-in/lookup links, CSRF-protected admin mutations, role/scope checks, rate limits, and request-size caps protect the runtime boundary.
   - Secrets stay in Cloudflare Worker secrets, GitHub repository secrets, or ignored `worker/.dev.vars`; repo config and product markdown never hold provider secret values.
+  - GitHub workflows declare explicit least-privilege token permissions and pin every external Action to an immutable commit SHA. Dependabot maintains reviewed Action and root/Worker npm updates; pull-request tests use synthetic credentials and read-only repository access.
+  - Release, setup, and backup provider tooling preflights Stripe CLI authentication with captured `stripe whoami`, skips endpoint commands when signed out, and exposes fixed redacted failure categories instead of identity, pairing, URL, or raw authentication output.
 - [x] Private data and fulfillment safety
   - Tokenized order/download/admin routes use private/no-store response handling and stay out of public sitemap and social metadata.
   - Customer order lookup avoids existence leaks by returning generic request responses.
@@ -162,6 +165,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
   - A live operator-controlled age snapshot captured 444 production KV records across 14 authoritative/control families plus the one object in a completely enumerated R2 bucket. The checksum-valid archive was decrypted in an isolated local directory, planned with 70 integrity artifacts and no invalid/missing families, restored to empty preview KV/R2 resources with seven commands, read back across all 444 records and the R2 checksum, and removed from preview with zero residual snapshot-owned data.
   - `npm run recovery:reconcile` produces aggregate-only Store inventory and read-only Stripe comparison evidence, rejects live/test credential-mode mismatch before provider access, and never emits customer, order, provider, or credential identifiers. A super-admin inventory recovery endpoint reuses the same bounded provider comparator and fingerprints its result with Store/Durable Object state; distinct maker/checker approval, short-lived quarantined approval state, maintenance/Stripe/reservation interlocks, exact acknowledgement, audit records, and cache invalidation gate execution instead of importing Durable Object storage.
   - The protected quarterly path now requires complete R2 discovery, a restricted live Stripe read credential, verified S3 off-account upload, preview readback, and exact-snapshot preview cleanup. Cleanup runs explicitly after success and best-effort after partial failure; raw restore/verification output remains temporary.
+  - A dedicated restricted live-mode Stripe key with Payment Intents read access only has been provisioned in the protected recovery environment. Provisioning is complete; the aggregate captured-order comparison remains an unexecuted operator evidence gate.
   - Unit tests cover inventory completeness, snapshot safety, transport/path containment, manifest tampering/completeness, restore gates, missing-value blocks, quarantine, representative classes, retention safeguards, readiness ages, preview bucket isolation, repair planning, and fail-fast command generation.
   - Rollback guidance covers storefront deploys, Worker deploys, bad order state, stuck inventory reservations, and token rotation boundaries.
 - [x] Production operations posture
@@ -190,11 +194,13 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 - [x] Merge gate and focused tests
   - `npm run test:premerge` covers secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site artifact checks, SEO audit, Worker security tests, host Worker smoke, Podman Worker smoke, asset minification checks, and headless Playwright.
   - Unit, Playwright, security, SEO, content-safety, worker-smoke, USPS, and seeded-order paths cover Store-specific checkout, admin, fulfillment, reminders, downloads, tax, shipping, and i18n behavior.
+  - `npm run test:unit:coverage` is reproducible from the declared Vitest v8 provider and reports text/HTML diagnostics; release confidence remains risk-based across focused unit, Podman security, Worker smoke, and browser gates rather than a misleading aggregate percentage alone.
 - [x] Release evidence automation
   - `npm run release:smoke` wraps the merge gate, launch readiness, Podman E2E, accessibility evidence, optional VoiceOver/Whisper transcript evidence, rendered i18n/SEO evidence, Worker fulfillment evidence, provider readiness, and payment readiness.
   - Focused release commands exist for accessibility, screen-reader transcript capture, rendered i18n/SEO, Worker fulfillment, provider readiness, and payment smoke.
   - Direct local signed-webhook payment evidence covers paid digital, paid physical, paid ticket, free RSVP, failed-payment suppression, and no-send customer/admin email rendering.
   - `.github/workflows/podman-e2e.yml` provides scheduled non-deploying Podman E2E drift detection, and `.github/workflows/release-provider-evidence.yml` provides production Cloudflare DNS API evidence through GitHub Actions secrets.
+  - Stripe CLI readiness regression coverage proves signed-out environments do not invoke endpoint commands or surface interactive authentication output.
 - [x] Cross-repo parity and docs-as-code
   - [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md), [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [TESTING.md](TESTING.md), and [release-evidence/](release-evidence/) document the Store release discipline.
   - Store/Pool parity rules treat shared work as transferable primitives while preserving Store-specific nouns, storage boundaries, checkout, fulfillment, admin, inventory, and SEO behavior.
@@ -270,7 +276,7 @@ Keep these scoped to Store's goals and data model. Share implementation patterns
 - [ ] Backup, restore, and disaster recovery operations
   - Collect repeated production snapshot duration and aggregate Cloudflare operation evidence to confirm that the approved four-hour active-sales interval remains proportionate as order and download volume grows.
   - Repeat the captured-data drill with a fresh one-time super-admin token so encrypted admin CSV/readiness/download exports are included, and verify decryption from a second isolated device/location rather than only the originating operator machine.
-  - Provision a dedicated restricted **live-mode read-only** Stripe key and complete the aggregate PaymentIntent comparison. Store/Pool local development currently has only a test-mode key, and the recovery CLI correctly refuses to compare it to production data.
+  - Use the provisioned restricted **live-mode Payment Intents read-only** Stripe key to complete the aggregate captured-order comparison. Local development intentionally retains test-mode credentials, and the recovery CLI correctly refuses to compare them to production data.
   - Use the completed retention planner, then verify at least one durable off-device copy outside the production Cloudflare account. A separately located, operator-controlled recovery device or encrypted removable destination is the local-friendly option once append-only storage is mounted and second-device decryption is evidenced; an optional S3-compatible provider remains supported but AWS is not required.
   - Enable and run the protected quarterly workflow only after the fresh admin token, restricted live Stripe key, S3 destination, required reviewer, and retention/RPO/RTO decisions are approved. The dedicated age identity, protected environment, preview KV namespace, and preview R2 bucket are configured. Record duration against RTO, verified classes, skips, failures, owner, and corrective actions before calling the recurring drill objective proven.
 

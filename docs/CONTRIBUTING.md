@@ -78,6 +78,7 @@ bundle exec jekyll build --quiet
 npm run test:seo
 npm run test:content-security
 npm run test:unit
+npm run test:unit:coverage
 npm run test:e2e:headless
 ```
 
@@ -114,6 +115,7 @@ Default browser coverage is Store-only. Add new Playwright coverage to the Store
 - [ ] Coupon, lookup, reminder, or marketing changes include Worker tests or focused admin/browser coverage.
 - [ ] Ethical risk review is recorded for triggered changes, or marked `N/A` with a reason.
 - [ ] No secrets, tokens, customer data, or production export files are committed.
+- [ ] External GitHub Actions remain pinned to full commit SHAs; version bumps arrive through reviewed Dependabot pull requests.
 - [ ] Docs are updated when workflow or operator behavior changes.
 - [ ] `npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md` passes for release-impacting changes, or each skipped external evidence item has owner/date/reason.
 
