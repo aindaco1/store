@@ -175,8 +175,11 @@ Keep the Worker posture conservative:
 
 Worker-backed release evidence is split by risk:
 
+- GitHub workflows declare least-privilege token permissions and pin external actions to immutable commit SHAs. Dependabot covers GitHub Actions and the root/Worker npm lockfiles so updates remain reviewable.
+- `npm audit`, `npm audit --prefix worker`, `npm run test:unit:coverage`, and the Podman-backed `npm run test:security` are the dependency, coverage, and runtime security baseline for Worker-affecting releases.
+
 - `npm run release:fulfillment-evidence` runs the Worker in process with mock KV/R2 data to verify signed downloads, revoke/refresh behavior, ticket/RSVP check-in, and admin CSV exports without external providers.
-- `npm run release:providers` is read-only and can use shell credentials, authenticated `gh`/`wrangler`/`stripe` CLIs, or `worker/.dev.vars` defaults unless `--no-dev-vars` is passed.
+- `npm run release:providers` is read-only and can use shell credentials, authenticated `gh`/`wrangler`/`stripe` CLIs, or `worker/.dev.vars` defaults unless `--no-dev-vars` is passed. Stripe endpoint reads require a successful captured `stripe whoami`; signed-out CLI state never starts interactive login or enters logs/manifests.
 - `npm run release:payment-smoke` runs payment contract checks. With `PAYMENT_SMOKE_ALLOW_MUTATION=1 -- --direct-webhook`, it targets only a local/non-production Worker, signs local Stripe webhook events, and verifies Store settlement.
 - `npm run backup:plan` dry-runs the backup/restore snapshot plan without writing artifacts or calling provider CLIs.
 - `npm run backup:snapshot` writes a checksum-verified v2 manifest, canonical classification, isolated build evidence, and restore plan. Sensitive `--kv-values`, `--r2-objects`, or `--admin-exports` capture requires explicit acknowledgement and an age/GPG recipient outside the repository.

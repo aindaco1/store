@@ -31,10 +31,10 @@ jobs:
       RECOVERY_MAX_RECENT_WORKER_REQUESTS: ${{ vars.RECOVERY_MAX_RECENT_WORKER_REQUESTS || '100' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
           cache: npm
@@ -55,7 +55,7 @@ jobs:
         run: node -e 'const e=require("./recovery-traffic-preflight.json"); if(e.traffic.lowTraffic!==true) process.exit(1)'
 
       - name: Upload traffic preflight
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: recovery-traffic-preflight-${{ github.run_id }}
           path: recovery-traffic-preflight.json
@@ -85,10 +85,10 @@ jobs:
       WORKER_BASE: ${{ vars.WORKER_BASE || 'https://checkout.dustwave.xyz' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
           cache: npm
@@ -101,7 +101,7 @@ jobs:
           sudo apt-get install -y age awscli
 
       - name: Download traffic preflight
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: recovery-traffic-preflight-${{ github.run_id }}
           path: ${{ runner.temp }}/recovery-preflight
@@ -115,7 +115,7 @@ jobs:
 
       - name: Upload sanitized drill evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: quarterly-recovery-evidence-${{ github.run_id }}
           path: ${{ runner.temp }}/store-quarterly-evidence
@@ -124,7 +124,7 @@ jobs:
 
       - name: Upload encrypted off-account snapshot
         if: success()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: quarterly-encrypted-snapshot-${{ github.run_id }}
           path: ${{ runner.temp }}/store-quarterly-encrypted

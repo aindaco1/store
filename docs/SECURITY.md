@@ -51,6 +51,14 @@ Secret storage rules:
 - A path-scoped Cloudflare Cache Response Rule for `/admin/` and `/es/admin/` sets `private, no-store, no-transform, max-age=0, must-revalidate`, preventing Cloudflare JavaScript Detection and automatic Web Analytics injection without allowing inline scripts. Deploy and provider evidence verify the effective public headers and absence of injected script markers without privileged credentials; the optional API reconciliation command requires a separate Cache Rules Edit token and never replaces unrelated zone rules.
 - `_config.yml`, product markdown, and admin-published settings must never contain Stripe, Resend, USPS, ZIP.TAX, Cloudflare, GitHub, or admin session secrets.
 - The admin dashboard may show configured/missing status for credentials, but must not expose, edit, serialize, or publish secret values.
+- One-time admin login tokens used by recovery automation must be created immediately before an approved run and removed from GitHub after use or expiry. A configured secret name is not proof that the short-lived token is still valid.
+
+GitHub Actions supply-chain rules:
+
+- Declare `GITHUB_TOKEN` permissions explicitly in every workflow. Read-only workflows use `contents: read`; write, Pages, issue, pull-request, and OIDC permissions belong only to the job that requires them.
+- Pin every external action to a full 40-character commit SHA. Keep the human-readable release in a trailing comment and let Dependabot propose reviewed SHA updates.
+- Do not use `pull_request_target` for build/test execution, and do not expose production secrets to pull-request jobs. Merge Smoke uses synthetic credentials and read-only repository access.
+- Keep production mutation workflows manual or protected by reviewed environments, narrow concurrency, explicit secrets, and fail-closed preflight checks.
 
 ## Data Storage
 
@@ -86,6 +94,8 @@ Operator backup/cache clients accept one-time admin tokens only through environm
 Durable Object inventory recovery is restricted to browser-authenticated super admins with CSRF. Its short-lived plan fingerprints confirmed-order inventory, current coordinator state/reservations, and a fresh bounded read-only Stripe comparison; a different super admin must approve, the requester must execute, and incomplete/mismatched provider evidence blocks replacement. Audit/response evidence is aggregate-only, and the operation has no Stripe write path.
 
 Recovery workflows separate trust levels. Weekly CI handles synthetic data and sanitized provider metadata only. The quarterly captured-data path is disabled by default, requires a Worker-wide low-traffic/error preflight, shares deployment concurrency, waits on the protected `production-recovery` environment, uses a dedicated recovery age identity plus a fresh one-time super-admin token, requires a restricted live Stripe read key and verified off-account S3 copy, and hard-codes preview restore. It reads every restored KV value/R2 checksum back, then deletes only snapshot-owned preview data and verifies zero residuals; a failure trap retries cleanup after partial restore. Plaintext snapshot/decryption files and detailed restore/verification output stay in private temporary storage and are removed on exit; only aggregate reconciliation/drill evidence, the sanitized receipt, and the encrypted archive may become GitHub artifacts. No workflow can invoke the production restore acknowledgement.
+
+Provider probes are noninteractive. Stripe CLI fallback reads require a successful captured `stripe whoami` preflight; signed-out CLIs are skipped without invoking an endpoint command. Readiness, setup, and backup code expose only fixed failure categories and must never copy CLI identity, pairing codes, authentication URLs, or raw authentication output into console logs, manifests, receipts, or artifacts.
 
 Sensitive responses should use `Cache-Control: private, no-store`. Tokenized order/download/admin routes must not be indexed or placed in the sitemap.
 
@@ -216,6 +226,9 @@ Core local checks:
 ```bash
 npm run test:secrets
 npm run test:content-security
+npm audit
+npm audit --prefix worker
+npm run test:unit:coverage
 npm run test:security
 SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh
 PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1

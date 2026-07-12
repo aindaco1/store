@@ -6,6 +6,7 @@ import path from 'node:path';
 const repoRoot = path.resolve(__dirname, '..', '..');
 const sourceSetupScript = path.join(repoRoot, 'scripts', 'setup-deploy.mjs');
 const sourceCommandRunner = path.join(repoRoot, 'scripts', 'lib', 'command-runner.mjs');
+const sourceStripeCliAuth = path.join(repoRoot, 'scripts', 'lib', 'stripe-cli-auth.mjs');
 
 function writeExecutable(filePath: string, body: string) {
   fs.writeFileSync(filePath, body, 'utf8');
@@ -35,6 +36,7 @@ function createTempSetupRepo() {
   fs.mkdirSync(binDir, { recursive: true });
   fs.copyFileSync(sourceSetupScript, path.join(scriptsDir, 'setup-deploy.mjs'));
   fs.copyFileSync(sourceCommandRunner, path.join(scriptsLibDir, 'command-runner.mjs'));
+  fs.copyFileSync(sourceStripeCliAuth, path.join(scriptsLibDir, 'stripe-cli-auth.mjs'));
   fs.writeFileSync(path.join(scriptsDir, 'sync-worker-config.rb'), 'puts "synced"\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, '.dev.vars.example'), '# local dev secrets\n', 'utf8');
   fs.writeFileSync(path.join(workerDir, 'wrangler.toml'), `name = "store-worker"
@@ -266,7 +268,36 @@ describe('setup-deploy script', () => {
     expect(log).toContain('gh repo view --json nameWithOwner,url');
     expect(log).toContain('gh secret list');
     expect(log).toContain('npx wrangler whoami');
+    expect(log).toContain('stripe whoami');
+    expect(log).toContain('stripe webhook_endpoints list --limit 10');
     expect(log).not.toContain('secret set');
     expect(log).not.toContain('secret put');
+  });
+
+  it('does not invoke Stripe endpoints when the CLI is unauthenticated', () => {
+    const temp = createTempSetupRepo();
+    writeFakeCli(temp.binDir, 'stripe', `
+if [ "\${1:-}" = "--version" ]; then echo "stripe version 1.0.0"; exit 0; fi
+if [ "\${1:-}" = "whoami" ]; then echo "signed out"; exit 1; fi
+if [ "\${1:-}" = "webhook_endpoints" ]; then echo "unexpected interactive login"; exit 1; fi
+exit 1
+`);
+
+    const result = runSetup(temp, [
+      '--mode=production',
+      '--dry-run',
+      '--non-interactive',
+      '--skip-auth',
+      '--skip-kv',
+      '--skip-secrets'
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('stripe CLI is not authenticated');
+    const log = commandLog(temp);
+    expect(log).toContain('stripe whoami');
+    expect(log).not.toContain('stripe webhook_endpoints');
+    expect(result.stdout).not.toContain('unexpected interactive login');
+    expect(result.stderr).not.toContain('unexpected interactive login');
   });
 });

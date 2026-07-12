@@ -6,6 +6,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fetchAdminExport, exchangeAdminLoginToken } from './lib/admin-export-client.mjs';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
+import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 import { buildChecksumManifest, enforcePrivatePermissions, sha256File } from './lib/file-integrity.mjs';
 import { transformKvBackupValuesToPutRecords } from './lib/kv-backup-records.mjs';
 import {
@@ -320,7 +321,8 @@ function captureCommand(manifest, label, command, args, options = {}) {
   const result = run(command, args, options);
   planned.status = result.status;
   if (result.status !== 0) {
-    manifest.warnings.push(`${label} failed: ${result.stderr.trim() || result.error || `exit ${result.status}`}`);
+    const failureDetail = options.failureDetail || result.stderr.trim() || result.error || `exit ${result.status}`;
+    manifest.warnings.push(`${label} failed: ${failureDetail}`);
   }
   if (options.stdoutFile && result.status === 0) writeText(options.stdoutFile, result.stdout, options);
   if (options.stderrFile && result.stderr) writeText(options.stderrFile, result.stderr, options);
@@ -438,14 +440,16 @@ function captureProviderInventory(manifest, outputDir, options, wranglerInventor
     manifest.warnings.push('gh not available; GitHub provider inventory skipped.');
   }
 
-  if (commandAvailable('stripe')) {
+  const stripeAuth = stripeCliAuthState({ cwd: ROOT });
+  if (stripeAuth.authenticated) {
     captureCommand(manifest, 'stripe webhook_endpoints list', 'stripe', ['webhook_endpoints', 'list', '--limit', '100'], {
       ...options,
       cwd: ROOT,
-      stdoutFile: path.join(providerDir, 'stripe-webhook-endpoints.txt')
+      stdoutFile: path.join(providerDir, 'stripe-webhook-endpoints.txt'),
+      failureDetail: 'authenticated Stripe CLI inventory request failed'
     });
   } else {
-    manifest.warnings.push('stripe CLI not available; Stripe webhook endpoint inventory skipped.');
+    manifest.warnings.push(`${stripeAuth.reason}; Stripe webhook endpoint inventory skipped.`);
   }
 }
 

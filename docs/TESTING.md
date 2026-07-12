@@ -57,7 +57,10 @@ E2E navigation uses the shared `gotoDomReady` helper, then asserts the page-spec
 
 ```bash
 npm run test:unit
+npm run test:unit:coverage
 ```
+
+The coverage command uses the declared `@vitest/coverage-v8` provider and writes text plus local HTML reports. Coverage is diagnostic rather than a release percentage claim: risk-based route, security, Podman, and browser gates remain authoritative, and changes should add focused assertions for touched behavior instead of inflating totals with low-value execution.
 
 Focused Store runs:
 
@@ -155,7 +158,7 @@ VOICEOVER_AUDIO_DEVICE=":0" VOICEOVER_CONTROL=ensure-on VOICEOVER_OPEN_APP=Safar
 
 Use an existing recording instead with `--screen-reader-audio-file <recording>`. For reliable VoiceOver capture, prefer a system-audio loopback device; microphone capture can prove the pipeline but depends on room audio and macOS microphone permissions.
 
-`npm run release:providers` is read-only. It checks public DNS and, when credentials or authenticated CLIs are present, GitHub deploy secret names, Cloudflare API/KV/R2/DNS records, Stripe webhook endpoints, Resend domains, and USPS quote fixtures. The probe uses `gh`, `wrangler`, and `stripe` CLI auth as fallback evidence without printing secrets. `npm run release:payment-smoke` always runs payment contract checks; the release-grade mutation path is the direct local signed-webhook matrix with `PAYMENT_SMOKE_ALLOW_MUTATION=1`.
+`npm run release:providers` is read-only. It checks public DNS and, when credentials or authenticated CLIs are present, GitHub deploy secret names, Cloudflare API/KV/R2/DNS records, Stripe webhook endpoints, Resend domains, and USPS quote fixtures. The probe uses `gh`, `wrangler`, and `stripe` CLI auth as fallback evidence without printing secrets. Stripe endpoint reads require a successful captured `stripe whoami`; a signed-out CLI is skipped without starting interactive login, and raw auth output is never included in evidence. `npm run release:payment-smoke` always runs payment contract checks; the release-grade mutation path is the direct local signed-webhook matrix with `PAYMENT_SMOKE_ALLOW_MUTATION=1`.
 
 Release provider and payment probes read `worker/.dev.vars` by default, with shell environment values taking precedence. Use `--no-dev-vars` only for clean-shell CI probes. The direct local webhook path is:
 

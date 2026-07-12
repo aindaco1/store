@@ -1,6 +1,21 @@
 # Changelog
 
+## Unreleased
+
+No changes yet.
+
 ## v1.0.7 - 2026-07-11
+
+### Post-release hardening
+
+- Pinned every GitHub Actions dependency to an immutable commit SHA, added monthly Dependabot updates for Actions plus both npm lockfiles, and made Merge Smoke's read-only token permission explicit.
+- Reduced the Deploy Production build job to `contents: read`; Pages write and OIDC permissions now exist only on the deploy job that requires them.
+- Added the missing Vitest v8 coverage provider so `npm run test:unit:coverage` runs non-interactively from a clean install, with regression coverage for the declared dependency.
+- Prevented release, setup, and backup probes from starting Stripe CLI interactive login: they now require a successful captured `stripe whoami` check before endpoint reads and use fixed redacted failure reasons so pairing details and authentication URLs cannot enter logs or manifests.
+- Fixed the post-release Localization Review workflow by pinning Ruby 3.2 and added workflow regression coverage for clean GitHub-hosted runners.
+- Recorded the post-release 30-sample production Orders decision: correctness and zero-warm-KV gates passed, but the latency-benefit gate failed, so all optional admin read-cache route switches remain off.
+
+### Initial release scope
 
 - Approved and versioned the Store recovery objectives, four-hour active-sales snapshot interval, and 7-daily/5-weekly/12-monthly plus release-snapshot retention policy in the canonical data inventory.
 - Added aggregate snapshot duration/Cloudflare read-usage evidence, a checksum-verified append-only off-device filesystem copy and second-device decryption path, and provider-neutral S3-compatible protected archive configuration without requiring AWS.
@@ -10,9 +25,7 @@
 - Added searchable redacted admin audit filters plus filtered CSV export, using KV list metadata to avoid per-event value reads for new interactive searches while preserving complete CSV and legacy-row fallback; added aggregate signed-download abuse diagnostics, access history, and a 10-failures/15-minute per-order+network soft lock lasting 30 minutes without storing signed URLs or raw IPs.
 - Expanded Store readiness to cover production mode, explicit origins, state/rate-limit bindings, admin posture, Turnstile, lookup/download signing, coupons, reminders, providers, R2, and CSP release verification; added bounded Worker timing histograms with p50/p95/p99 slow-route diagnostics.
 - Added scheduled Production Posture and Localization Review workflows. Posture drift creates or updates a sanitized GitHub issue without runtime mutation; localization generates source-hashed human-review packets without claiming professional translation.
-- Fixed the Localization Review workflow to pin its Ruby runtime and added workflow regression coverage so scheduled review packets can build on clean GitHub-hosted runners.
 - Expanded Workers Cache, recovery/off-device, session privacy, download abuse, performance/cache-policy, localization, posture, workflow-security, and production-like Podman browser test coverage.
-- Completed the authorized 30-sample production Orders comparison. Cache correctness, search bypass, purge refill, and zero-warm-KV gates passed, but warm p95 improved only 14.41 percent and no-change p95 regressed 28.36 percent against the required 40 percent improvement, so all route switches now default off rather than retaining an unjustified billed inner Worker request.
 
 ## v1.0.6 - 2026-07-09
 

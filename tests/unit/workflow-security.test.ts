@@ -8,7 +8,34 @@ function readWorkflow(name: string) {
   return fs.readFileSync(path.join(repoRoot, '.github', 'workflows', name), 'utf8');
 }
 
+function workflowFiles() {
+  const workflowDir = path.join(repoRoot, '.github', 'workflows');
+  return fs.readdirSync(workflowDir)
+    .filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'))
+    .map((name) => ({ name, content: readWorkflow(name) }));
+}
+
 describe('workflow security posture', () => {
+  it('keeps immutable action and npm dependency updates automated', () => {
+    const dependabot = fs.readFileSync(path.join(repoRoot, '.github', 'dependabot.yml'), 'utf8');
+
+    expect(dependabot).toContain('package-ecosystem: github-actions');
+    expect(dependabot).toContain('package-ecosystem: npm');
+    expect(dependabot).toContain('directory: /worker');
+  });
+
+  it('pins every external action to an immutable commit and declares token permissions', () => {
+    for (const { name, content } of workflowFiles()) {
+      expect(content, `${name} must declare least-privilege token permissions`).toMatch(/^permissions:\n/m);
+      for (const line of content.split(/\r?\n/)) {
+        const action = line.match(/^\s*uses:\s*([^\s#]+)/)?.[1] || '';
+        if (!action || action.startsWith('./')) continue;
+        const ref = action.split('@').pop() || '';
+        expect(ref, `${name} has a mutable action reference: ${action}`).toMatch(/^[0-9a-f]{40}$/);
+      }
+    }
+  });
+
   it('pins cache purging to the Cloudflare API instead of an unpinned third-party action', () => {
     const deploy = readWorkflow('deploy.yml');
 
@@ -28,13 +55,19 @@ describe('workflow security posture', () => {
 
   it('keeps production deploy manual-only so release merges do not deploy', () => {
     const deploy = readWorkflow('deploy.yml');
+    const workflowHeader = deploy.split('\njobs:')[0];
+    const deployJob = deploy.split('  deploy:')[1];
 
     expect(deploy).toContain('workflow_dispatch:');
     expect(deploy).not.toMatch(/\n\s+push:\s*\n/);
     expect(deploy).not.toContain("github.event_name == 'push'");
     expect(deploy).toContain('npx wrangler deploy -c wrangler.toml --env=""');
-    expect(deploy).toContain('actions/deploy-pages@v5');
+    expect(deploy).toContain('actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5');
     expect(deploy).toContain('group: "production-operations"');
+    expect(workflowHeader).toContain('permissions:\n  contents: read');
+    expect(workflowHeader).not.toContain('pages: write');
+    expect(workflowHeader).not.toContain('id-token: write');
+    expect(deployJob).toContain('permissions:\n      contents: read\n      pages: write\n      id-token: write');
   });
 
   it('sends media optimization changes through a pull request', () => {
