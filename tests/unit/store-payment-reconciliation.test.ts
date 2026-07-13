@@ -4,6 +4,7 @@ import { reconciliationKey } from '../../worker/src/payment-integrity.js';
 import {
   compareStoreOrderToPaymentIntent,
   reconcileIndexedStorePayments,
+  STORE_PAYMENT_RECONCILIATION_ALGORITHM_VERSION,
   STORE_PAYMENT_RECONCILIATION_STATE_KEY
 } from '../../worker/src/store-payment-reconciliation.js';
 
@@ -28,6 +29,7 @@ function paidOrder() {
     totals: { totalCents: 1200, currency: 'USD' },
     payment: {
       required: true,
+      provider: 'stripe',
       status: 'succeeded',
       paymentIntentId: 'pi_one',
       amountCents: 1200,
@@ -41,6 +43,7 @@ describe('bounded Store payment reconciliation', () => {
     expect(compareStoreOrderToPaymentIntent(paidOrder(), {
       id: 'pi_one', amount: 1100, currency: 'eur', status: 'requires_payment_method'
     })).toEqual({
+      applicable: true,
       severity: 'critical',
       reasons: expect.arrayContaining([
         'amount_mismatch',
@@ -91,5 +94,64 @@ describe('bounded Store payment reconciliation', () => {
       status: 'idle', cursor: 0
     });
     expect((kv as Record<string, unknown>).list).toBeUndefined();
+  });
+
+  it('treats historical non-Stripe orders as non-applicable and resolves stale Stripe breaks', async () => {
+    const order = {
+      ...paidOrder(),
+      payment: {
+        required: true,
+        provider: 'snipcart',
+        status: 'succeeded',
+        amountCents: 1200,
+        currency: 'USD'
+      }
+    };
+    expect(compareStoreOrderToPaymentIntent(order)).toEqual({
+      reasons: [],
+      severity: 'info',
+      applicable: false,
+      disposition: 'non_stripe_order'
+    });
+
+    const kv = memoryKv({
+      [ADMIN_STORE_ORDER_INDEX_KEY]: {
+        version: 2,
+        watermark: 'orders-v2-historical',
+        orders: [order]
+      },
+      'orders:store-order-one': order,
+      [reconciliationKey('store-order-one')]: {
+        status: 'open',
+        severity: 'critical',
+        occurrenceCount: 1,
+        reasons: ['payment_intent_missing']
+      },
+      [STORE_PAYMENT_RECONCILIATION_STATE_KEY]: {
+        version: 1,
+        algorithmVersion: 1,
+        watermark: 'orders-v2-historical',
+        cursor: 0,
+        lastCycleCompletedAt: '2026-07-13T01:30:00.000Z'
+      }
+    });
+    const retrieve = vi.fn();
+
+    const result = await reconcileIndexedStorePayments({ STORE_STATE: kv }, {
+      source: 'test',
+      stripe: { paymentIntents: { retrieve } },
+      now: new Date('2026-07-13T02:00:00.000Z')
+    });
+
+    expect(result).toMatchObject({ attempted: true, processed: 1, open: 0, resolved: 1 });
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(JSON.parse(kv.values.get(reconciliationKey('store-order-one')) || '{}')).toMatchObject({
+      status: 'resolved', occurrenceCount: 1
+    });
+    expect(JSON.parse(kv.values.get(STORE_PAYMENT_RECONCILIATION_STATE_KEY) || '{}')).toMatchObject({
+      status: 'idle',
+      algorithmVersion: STORE_PAYMENT_RECONCILIATION_ALGORITHM_VERSION,
+      cursor: 0
+    });
   });
 });

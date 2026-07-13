@@ -488,7 +488,7 @@ New payment/order state distinguishes:
 
 Stripe webhook markers retain 35 days. A 10-minute processing lease lets concurrent delivery return a retryable conflict while a live handler is working, permits stale work to resume, and releases a failed lease. Replays remain idempotent and cannot re-confirm inventory or resend durable email work.
 
-The scheduler runs one bounded reconciliation cycle per day when `PAYMENT_RECONCILIATION_ENABLED=true`. Each invocation reads the fixed `admin-store-orders:index:v2` model and compares at most 20 orders by default with Stripe PaymentIntent reads; it never lists `orders:`. Differences become 400-day `reconciliation-break:v1:*` records with open/resolved status, severity, object IDs, reasons, timestamps, occurrence count, source, and bounded notes.
+The scheduler runs one bounded reconciliation cycle per day when `PAYMENT_RECONCILIATION_ENABLED=true`. Each invocation reads the fixed `admin-store-orders:index:v2` model and compares at most 20 Stripe-backed orders by default with Stripe PaymentIntent reads; it never lists `orders:`. Historical orders owned by another payment provider are non-applicable and make no Stripe request. An algorithm-version change rechecks the fixed index once so stale provider-mismatch breaks are resolved without waiting for the normal daily interval. Actual Stripe differences become 400-day `reconciliation-break:v1:*` records with open/resolved status, severity, object IDs, reasons, timestamps, occurrence count, source, and bounded notes.
 
 A super admin may start the same read-only bounded operation with session, CSRF, and Store scope:
 

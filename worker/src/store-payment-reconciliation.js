@@ -6,6 +6,7 @@ export const STORE_PAYMENT_RECONCILIATION_STATE_TTL_SECONDS = 400 * 24 * 60 * 60
 export const STORE_PAYMENT_RECONCILIATION_DEFAULT_BATCH_SIZE = 20;
 export const STORE_PAYMENT_RECONCILIATION_LEASE_MS = 10 * 60 * 1000;
 export const STORE_PAYMENT_RECONCILIATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const STORE_PAYMENT_RECONCILIATION_ALGORITHM_VERSION = 2;
 
 function boundedInteger(value, fallback, min, max) {
   const parsed = Math.trunc(Number(value));
@@ -27,6 +28,10 @@ function paymentIntentId(order = {}) {
 export function compareStoreOrderToPaymentIntent(order = {}, paymentIntent = null) {
   const reasons = [];
   const payment = order.payment || {};
+  const provider = String(payment.provider || '').trim().toLowerCase();
+  if (provider && provider !== 'stripe') {
+    return { reasons, severity: 'info', applicable: false, disposition: 'non_stripe_order' };
+  }
   const expectedAmount = Math.trunc(Number(payment.amountCents ?? order.totals?.totalCents ?? order.orderDraft?.totals?.totalCents ?? 0) || 0);
   const expectedCurrency = upper(payment.currency || order.totals?.currency || order.orderDraft?.currency);
   const required = payment.required === true;
@@ -36,17 +41,17 @@ export function compareStoreOrderToPaymentIntent(order = {}, paymentIntent = nul
   if (!required) {
     if (expectedAmount > 0) reasons.push('free_order_has_total');
     if (storedPaymentStatus && storedPaymentStatus !== 'not_required') reasons.push('free_order_payment_status_unexpected');
-    return { reasons, severity: reasons.length ? 'warning' : 'info' };
+    return { reasons, severity: reasons.length ? 'warning' : 'info', applicable: true };
   }
 
   const expectedId = paymentIntentId(order);
   if (!expectedId) {
     reasons.push('payment_intent_missing');
-    return { reasons, severity: 'critical' };
+    return { reasons, severity: 'critical', applicable: true };
   }
   if (!paymentIntent) {
     reasons.push('processor_object_unavailable');
-    return { reasons, severity: 'warning' };
+    return { reasons, severity: 'warning', applicable: true };
   }
 
   const actualId = String(paymentIntent.id || '').trim();
@@ -70,7 +75,7 @@ export function compareStoreOrderToPaymentIntent(order = {}, paymentIntent = nul
     'stored_succeeded_status_mismatch',
     'failed_order_has_succeeded_processor_payment'
   ].includes(reason));
-  return { reasons: Array.from(new Set(reasons)), severity: critical ? 'critical' : (reasons.length ? 'warning' : 'info') };
+  return { reasons: Array.from(new Set(reasons)), severity: critical ? 'critical' : (reasons.length ? 'warning' : 'info'), applicable: true };
 }
 
 async function readJson(storage, key) {
@@ -110,10 +115,11 @@ export async function reconcileIndexedStorePayments(env = {}, options = {}) {
   }
 
   const watermark = String(index.watermark || index.generatedAt || '');
-  const sameCycle = String(previousState.watermark || '') === watermark;
+  const currentAlgorithm = Number(previousState.algorithmVersion) === STORE_PAYMENT_RECONCILIATION_ALGORITHM_VERSION;
+  const sameCycle = currentAlgorithm && String(previousState.watermark || '') === watermark;
   const priorCursor = sameCycle ? boundedInteger(previousState.cursor, 0, 0, indexedOrders.length) : 0;
   const lastCompletedMs = Date.parse(String(previousState.lastCycleCompletedAt || ''));
-  if (!force && priorCursor === 0 && Number.isFinite(lastCompletedMs) && nowMs - lastCompletedMs < STORE_PAYMENT_RECONCILIATION_INTERVAL_MS) {
+  if (!force && currentAlgorithm && priorCursor === 0 && Number.isFinite(lastCompletedMs) && nowMs - lastCompletedMs < STORE_PAYMENT_RECONCILIATION_INTERVAL_MS) {
     return { attempted: false, skipped: 'interval_not_due', nextAt: new Date(lastCompletedMs + STORE_PAYMENT_RECONCILIATION_INTERVAL_MS).toISOString() };
   }
 
@@ -123,6 +129,7 @@ export async function reconcileIndexedStorePayments(env = {}, options = {}) {
   await writeState(env.STORE_STATE, {
     ...previousState,
     version: 1,
+    algorithmVersion: STORE_PAYMENT_RECONCILIATION_ALGORITHM_VERSION,
     status: 'processing',
     leaseId,
     source,
@@ -203,6 +210,7 @@ export async function reconcileIndexedStorePayments(env = {}, options = {}) {
     const cycleComplete = nextCursorValue >= indexedOrders.length;
     const nextState = {
       version: 1,
+      algorithmVersion: STORE_PAYMENT_RECONCILIATION_ALGORITHM_VERSION,
       status: 'idle',
       source,
       watermark,
