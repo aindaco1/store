@@ -100,7 +100,8 @@ jobs:
           npm ci
           npm ci --prefix worker
           sudo apt-get update
-          sudo apt-get install -y age awscli
+          sudo apt-get install -y age
+          aws --version
 
       - name: Download traffic preflight
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
