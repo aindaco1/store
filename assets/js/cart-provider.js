@@ -2590,7 +2590,13 @@
     const fulfillmentType = String(product.fulfillment_type || product.category || getCartItemFieldValue(item, '_product_type') || 'physical').trim();
     const isNonShippable = ['digital', 'ticket', 'rsvp', 'service'].includes(fulfillmentType.toLowerCase());
     const catalogShipping = product.shipping && typeof product.shipping === 'object' ? product.shipping : null;
-    const price = Number(variant?.price ?? product.price ?? item?.price ?? 0);
+    const price = typeof addOnUtils.resolveUnitPrice === 'function'
+      ? addOnUtils.resolveUnitPrice(product, variant)
+      : Number(
+        variant?.price !== undefined && variant?.price !== null && String(variant.price).trim() !== ''
+          ? variant.price
+          : (product.price ?? item?.price ?? 0)
+      );
     const normalizedId = preserveAddOnId
       ? String(item?.id || '')
       : (variantId ? `${productId}__${variantId}` : productId);

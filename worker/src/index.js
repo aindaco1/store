@@ -12,6 +12,7 @@
  *   GET  /abandoned-cart/unsubscribe - Suppress Store checkout reminder emails
  *   GET  /abandoned-cart/resume  - Restore a signed Store checkout reminder snapshot
  *   POST /webhooks/stripe        - Handle Stripe webhooks
+ *   POST /webhooks/resend        - Handle signed Resend delivery events
  *   GET  /admin/session          - Read current browser admin session
  *   GET  /admin/sessions         - Review active and recent admin sessions
  *   POST /admin/sessions/revoke  - Revoke an active admin session
@@ -31,11 +32,13 @@
  *   GET  /admin/store/orders.csv - Download Store order fulfillment CSV
  *   GET  /admin/store/attendees.csv - Download Store ticket/RSVP attendee CSV
  *   GET  /admin/store/reconciliation.csv - Download Store order reconciliation CSV
+ *   POST /admin/store/reconciliation/run - Run bounded read-only Stripe reconciliation
  *   POST /admin/store/orders/import-snipcart - Import legacy Snipcart orders into production
  *   POST /admin/store/orders/download-access - Revoke or refresh Store digital download access
  *   POST /admin/store/orders/check-in - Mark Store ticket/RSVP check-in state
  *   GET  /admin/store/products   - Read Store catalog products and variants
- *   GET  /admin/store/products/media - Read reusable Store product media references
+ *   GET  /admin/store/products/media - Browse repository-backed Store product/default/add-on media
+ *   POST /admin/store/products/media/optimize - Dispatch changed/all repository media repair
  *   GET  /admin/store/products/address-lookup - Look up a public event address
  *   POST /admin/store/products/preview - Render a Store product editor preview
  *   POST /admin/store/products/publish - Publish Store product catalog edits
@@ -58,14 +61,18 @@
  */
 
 import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventReminderEmail, sendStoreOrderAdminNotificationEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
-import { verifyStripeSignature, createStripeClient } from './stripe.js';
+import { emailOutboxEnabled, enqueueEmailOutbox, processEmailOutbox, processResendWebhook, verifyResendWebhook } from './email-outbox.js';
+import { verifyStripeSignature, DEFAULT_STRIPE_API_VERSION } from './stripe.js';
+import { createStoreStripeClient, recordStripeProcessorEvent, storeReconciliationBreak } from './payment-integrity.js';
+import { reconcileIndexedStorePayments, STORE_PAYMENT_RECONCILIATION_STATE_KEY } from './store-payment-reconciliation.js';
 import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
 import { applyStoreCouponCode, getValidationTaxableSubtotalCents, loadStoreCoupons, saveStoreCoupons, upsertStoreCoupon } from './coupons.js';
 import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
-import { getGitHubTextFile, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
+import { getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
+import { MEDIA_MANIFEST_PATH, classifyMediaPath, mediaPathLabel, mediaPlacementBudget, normalizeMediaManifest } from './media-catalog.js';
 import { getScopedConsole } from './logger.js';
-import { isValidSlug, isValidEmail, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
+import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { verifyTurnstile } from './turnstile.js';
 import {
   DEFAULT_SITE_BASE,
@@ -227,13 +234,21 @@ async function readAdminRepoTextFile(env, filePath) {
   return getGitHubTextFile(env, filePath);
 }
 
+async function listAdminRepoDirectory(env, directoryPath, options = {}) {
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    return callLocalAdminRepoService(env, '/list', { path: directoryPath });
+  }
+  return listGitHubDirectory(env, directoryPath, options);
+}
+
 async function putAdminRepoTextFile(env, filePath, content, message, sha, options = {}) {
   if (isLocalAdminRepoWritesEnabled(env)) {
     return callLocalAdminRepoService(env, '/write', {
       path: filePath,
       content,
       message,
-      overwrite: options.overwrite === true || Boolean(sha)
+      overwrite: options.overwrite === true || Boolean(sha),
+      expectedSha: sha || ''
     });
   }
   return putGitHubTextFile(env, filePath, content, message, sha);
@@ -291,7 +306,8 @@ async function putAdminRepoBase64File(env, filePath, base64Content, message, sha
       path: filePath,
       content: base64Content,
       message,
-      overwrite: options.overwrite === true || Boolean(sha)
+      overwrite: options.overwrite === true || Boolean(sha),
+      expectedSha: sha || ''
     });
   }
   return putGitHubBase64File(env, filePath, base64Content, message, sha);
@@ -315,7 +331,7 @@ function adminRepoDeployNotice(env, githubNotice, localNotice) {
   return isLocalAdminRepoWritesEnabled(env) ? localNotice : githubNotice;
 }
 
-const STRIPE_CUSTOM_UI_MODE_API_VERSION = '2026-02-25.clover';
+const STRIPE_CUSTOM_UI_MODE_API_VERSION = DEFAULT_STRIPE_API_VERSION;
 const PRIVATE_NO_STORE_CACHE_CONTROL = 'private, no-store, max-age=0';
 const DEFAULT_I18N_LANG = 'en';
 const STORE_ADMIN_SCOPE = 'store';
@@ -380,6 +396,8 @@ const MAX_ADMIN_STORE_DOWNLOAD_UPLOAD_BODY_BYTES = 140 * 1024 * 1024;
 const MAX_ADMIN_STORE_DOWNLOAD_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_ADMIN_SNIPCART_IMPORT_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_STRIPE_WEBHOOK_BODY_BYTES = 256 * 1024;
+const STRIPE_EVENT_MARKER_TTL_SECONDS = 35 * 24 * 60 * 60;
+const STRIPE_EVENT_PROCESSING_LEASE_MS = 10 * 60 * 1000;
 const MAX_FILM_STRIPE_SUMMARY_BODY_BYTES = 16 * 1024;
 const FILM_STRIPE_SUMMARY_MAX_REFS = 100;
 const RATELIMIT_REQUIRED_ERROR = 'Rate limit storage not configured';
@@ -1950,6 +1968,7 @@ function extractStripePaymentIntentFinancials(paymentIntent = {}) {
     };
   }
 
+  const availableOn = Math.trunc(Number(balanceTransaction.available_on || 0) || 0);
   return {
     source: 'actual',
     paymentIntentId,
@@ -1960,7 +1979,8 @@ function extractStripePaymentIntentFinancials(paymentIntent = {}) {
     netAmount: Math.trunc(Number(balanceTransaction.net || 0) || 0),
     currency: String(balanceTransaction.currency || paymentIntent?.currency || '').toLowerCase() || 'usd',
     status: String(balanceTransaction.status || ''),
-    availableOn: balanceTransaction.available_on || null,
+    availableOn: availableOn || null,
+    availableAt: availableOn > 0 ? new Date(availableOn * 1000).toISOString() : null,
     reportingCategory: balanceTransaction.reporting_category || null
   };
 }
@@ -1994,7 +2014,10 @@ async function enrichStripePaymentIntentForSettlement(paymentIntent = {}, env = 
   if (!stripeSecretKey) return paymentIntent;
 
   try {
-    const enriched = await retrieveStripePaymentIntentForSettlement(createStripeClient(stripeSecretKey), paymentIntentId);
+    const enriched = await retrieveStripePaymentIntentForSettlement(createStoreStripeClient(env, stripeSecretKey, {
+      operation: 'payment_intent_enrichment',
+      intent: 'read'
+    }), paymentIntentId);
     return enriched || paymentIntent;
   } catch (error) {
     console.error('Stripe Store PaymentIntent enrichment failed:', stripeErrorLogContext(error));
@@ -2999,6 +3022,18 @@ export default {
         return handleAdminStoreReconciliationCsv(request, env);
       }
 
+      if (path === '/admin/store/reconciliation/run' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStorePaymentReconciliation(request, env, parsedBody.body || {});
+      }
+
       if (path === '/admin/store/analytics' && method === 'GET') {
         return handleAdminStoreAnalytics(request, env, ctx);
       }
@@ -3101,6 +3136,10 @@ export default {
 
       if (path === '/admin/store/products/media' && method === 'GET') {
         return handleAdminStoreProductMedia(request, env);
+      }
+
+      if (path === '/admin/store/products/media/optimize' && method === 'POST') {
+        return handleAdminStoreProductMediaOptimize(request, env);
       }
 
       if (path === '/admin/store/products/address-lookup' && method === 'GET') {
@@ -3308,6 +3347,12 @@ export default {
         return handleStripeWebhook(request, env, ctx);
       }
 
+      if (path === '/webhooks/resend' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+        if (!bodyLimit.ok) return bodyLimit.response;
+        return handleResendWebhook(request, env);
+      }
+
       if (path === '/admin/rebuild' && method === 'POST') {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES);
         if (!bodyLimit.ok) return bodyLimit.response;
@@ -3390,6 +3435,43 @@ export default {
         }), { expirationTtl: 604800 });
       }
     }
+
+    if (emailOutboxEnabled(env)) {
+      try {
+        const outboxResults = await processEmailOutbox(env, { now });
+        console.log('Store email outbox cron complete:', outboxResults);
+      } catch (err) {
+        console.error('Store email outbox cron failed:', err);
+        if (env.STORE_STATE) {
+          await env.STORE_STATE.put('cron:lastError', JSON.stringify({
+            at: new Date().toISOString(),
+            error: err?.message || String(err)
+          }), { expirationTtl: 604800 });
+        }
+      }
+    }
+
+    const paymentReconciliationEnabled = env.PAYMENT_RECONCILIATION_ENABLED === undefined
+      ? getAppMode(env) === 'live'
+      : String(env.PAYMENT_RECONCILIATION_ENABLED).trim().toLowerCase() === 'true';
+    if (paymentReconciliationEnabled && getStripeKey(env)) {
+      try {
+        const reconciliation = await reconcileIndexedStorePayments(env, {
+          now,
+          source: 'scheduled',
+          stripeSecretKey: getStripeKey(env)
+        });
+        console.log('Store payment reconciliation cron complete:', reconciliation);
+      } catch (err) {
+        console.error('Store payment reconciliation cron failed:', err);
+        if (env.STORE_STATE) {
+          await env.STORE_STATE.put('cron:lastError', JSON.stringify({
+            at: new Date().toISOString(),
+            error: err?.message || String(err)
+          }), { expirationTtl: 604800 });
+        }
+      }
+    }
   }
 };
 
@@ -3449,24 +3531,33 @@ async function attemptStoreOrderEmailDelivery(env, storedOrder = {}) {
   }
 
   try {
-    const result = await sendStoreOrderEmail(env, payload);
+    const result = emailOutboxEnabled(env)
+      ? await enqueueEmailOutbox(env, {
+          kind: 'store_order',
+          payload,
+          dedupeKey: orderToken,
+          orderToken
+        })
+      : await sendStoreOrderEmail(env, payload);
     if (result?.sent === false) {
       throw new Error(result.reason || 'Store order email was not sent');
     }
 
     const sentAt = new Date().toISOString();
-    if (env.STORE_STATE) {
+    if (env.STORE_STATE && !result?.queued) {
       await env.STORE_STATE.put(sentKey, 'sent', { expirationTtl: 30 * 24 * 60 * 60 });
     }
     await updateStoreOrderEmailDeliveryState(env, orderToken, {
-      emailSent: true,
+      emailQueued: result?.queued === true,
+      emailSent: result?.queued === true ? false : true,
+      emailOutboxJobId: result?.jobId || null,
       emailDryRun: result?.dryRun === true,
       emailError: null,
-      emailSentAt: sentAt,
+      ...(result?.queued ? { emailQueuedAt: sentAt } : { emailSentAt: sentAt }),
       updatedAt: sentAt
     });
 
-    return { ok: true };
+    return { ok: true, queued: result?.queued === true, jobId: result?.jobId || '' };
   } catch (err) {
     const failedAt = new Date().toISOString();
     const message = err?.message || 'Unknown Store order email error';
@@ -4101,7 +4192,7 @@ async function processStoreEventReminders(env, now = new Date()) {
 
     try {
       const attachments = await buildStoreEventEmailAttachments(env, storedOrder, item, match.itemId, { calendarMethod: 'REQUEST' });
-      const result = await sendStoreEventReminderEmail(env, {
+      const reminderPayload = {
         email: record.email,
         orderToken: record.orderToken,
         orderUrl: buildStoreOrderSuccessUrl(env, record.orderToken),
@@ -4112,7 +4203,16 @@ async function processStoreEventReminders(env, now = new Date()) {
         reminderLabel: record.offsetLabel || '',
         preferredLang: record.preferredLang || DEFAULT_I18N_LANG,
         attachments
-      });
+      };
+      const result = emailOutboxEnabled(env)
+        ? await enqueueEmailOutbox(env, {
+            kind: 'store_event_reminder',
+            payload: reminderPayload,
+            dedupeKey: `${record.orderToken}:${record.itemId}:${record.offsetKey}`,
+            orderToken: record.orderToken,
+            expiresAt: event?.startsAt || record.startsAt || ''
+          })
+        : await sendStoreEventReminderEmail(env, reminderPayload);
 
       if (!result?.sent) throw new Error(result?.reason || 'Event reminder email was not sent');
 
@@ -4625,14 +4725,23 @@ async function processAbandonedCartFollowups(env, now = new Date()) {
       continue;
     }
 
-    const result = await sendStoreAbandonedCartEmail(env, {
+    const abandonedPayload = {
       email: record.email,
       resumeUrl: getAbandonedCartResumeUrl(env, resumeToken),
       amountCents: Number(record.amountCents || 0) || 0,
       itemCount: Number(record.itemCount || 0) || 0,
       unsubscribeUrl: getAbandonedCartUnsubscribeUrl(env, unsubscribeToken),
       preferredLang: record.preferredLang || DEFAULT_I18N_LANG
-    });
+    };
+    const result = emailOutboxEnabled(env)
+      ? await enqueueEmailOutbox(env, {
+          kind: 'store_abandoned_cart',
+          payload: abandonedPayload,
+          dedupeKey: `${record.emailHash}:${record.cartHash}`,
+          orderToken: record.orderToken,
+          expiresAt: new Date(now.getTime() + ABANDONED_CART_TTL_SECONDS * 1000).toISOString()
+        })
+      : await sendStoreAbandonedCartEmail(env, abandonedPayload);
 
     if (!result?.sent) {
       const attempts = Number(record.attempts || 0) + 1;
@@ -4809,7 +4918,11 @@ async function backfillStoreOrderCustomerFromStripe(env, storedOrder = {}, expec
   if (!paymentIntentId || !stripeSecretKey) return null;
 
   try {
-    const stripe = createStripeClient(stripeSecretKey);
+    const stripe = createStoreStripeClient(env, stripeSecretKey, {
+      operation: 'order_customer_backfill',
+      orderToken: storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '',
+      intent: 'read'
+    });
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
       expand: ['latest_charge']
     });
@@ -7822,11 +7935,16 @@ function adminStoreEventDetailsSummary(source = {}) {
 function buildAdminStoreEditableVariant(variant = {}, overrides = {}, productId = '') {
   const variantId = String(variant?.id || '').trim();
   const download = adminStoreDownloadSummary(variant);
+  const hasPriceOverride = variant?.price_override === true || (
+    variant?.price_override === undefined &&
+    (variant?.price_cents !== undefined || variant?.price !== undefined)
+  );
   return {
     id: variantId,
     label: String(variant?.label || variantId).trim(),
     sku: String(variant?.sku || '').trim(),
-    priceCents: adminStoreProductPriceCents(variant),
+    priceCents: hasPriceOverride ? adminStoreProductPriceCents(variant) : null,
+    priceInherited: !hasPriceOverride,
     inventory: getConfiguredStoreInventory(variant?.inventory),
     overrideInventory: getStoreInventoryOverrideValue(overrides, productId, variantId),
     status: String(variant?.status || '').trim(),
@@ -7964,16 +8082,17 @@ function normalizeAdminStoreIntegerField(value, label) {
 function normalizeAdminStorePriceField(value, label) {
   const text = String(value ?? '').replace(/[$,]/g, '').trim();
   const number = Number(text);
-  if (!Number.isFinite(number) || number < 0 || text === '') {
-    return { ok: false, error: `${label} must be 0 or greater.` };
+  const cents = Math.round(number * 100);
+  if (!Number.isFinite(number) || !isValidAmount(cents) || text === '') {
+    return { ok: false, error: `${label} must be between $0 and $1,000,000.` };
   }
-  return { ok: true, value: Math.round(number * 100) };
+  return { ok: true, value: cents };
 }
 
 function normalizeAdminStorePriceCentsField(value, label) {
   const number = Number.parseInt(String(value ?? '').trim(), 10);
-  if (!Number.isFinite(number) || number < 0 || String(value ?? '').trim() === '') {
-    return { ok: false, error: `${label} must be 0 or greater.` };
+  if (!isValidAmount(number) || String(value ?? '').trim() === '') {
+    return { ok: false, error: `${label} must be between $0 and $1,000,000.` };
   }
   return { ok: true, value: number };
 }
@@ -8033,7 +8152,8 @@ function serializeAdminStoreContentBlockToYaml(block = {}) {
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
   } else if (block.type === 'image') {
     lines.push(`    src: ${yamlQuoteAdminString(block.src || '')}`);
-    lines.push(`    alt: ${yamlQuoteAdminString(block.alt || '')}`);
+    lines.push(`    alt: ${yamlQuoteAdminString(block.decorative === true ? '' : block.alt || '')}`);
+    if (block.decorative === true) lines.push('    decorative: true');
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
   } else if (block.type === 'gallery') {
     const layout = normalizeAdminStoreContentGalleryLayout(block.layout);
@@ -8043,7 +8163,8 @@ function serializeAdminStoreContentBlockToYaml(block = {}) {
     lines.push('    images:');
     for (const image of block.images || []) {
       lines.push(`      - src: ${yamlQuoteAdminString(image.src || '')}`);
-      lines.push(`        alt: ${yamlQuoteAdminString(image.alt || '')}`);
+      lines.push(`        alt: ${yamlQuoteAdminString(image.decorative === true ? '' : image.alt || '')}`);
+      if (image.decorative === true) lines.push('        decorative: true');
       yamlAdminOptionalScalar(lines, 'caption', image.caption, '        ');
     }
     yamlAdminOptionalScalar(lines, 'caption', block.caption, '    ');
@@ -8075,7 +8196,9 @@ function serializeAdminStoreProductVariantsYaml(variants = []) {
     lines.push(`- id: ${yamlAdminValue(variant.id || '', 'string')}`);
     yamlAdminMaybeLine(lines, 'label', variant.label || '', '  ');
     yamlAdminMaybeLine(lines, 'sku', variant.sku || '', '  ');
-    lines.push(`  price: ${formatAdminStorePriceYaml(variant.priceCents)}`);
+    if (variant.priceCents !== null && variant.priceCents !== undefined) {
+      lines.push(`  price: ${formatAdminStorePriceYaml(variant.priceCents)}`);
+    }
     yamlAdminMaybeLine(lines, 'inventory', variant.inventory, '  ');
     yamlAdminMaybeLine(lines, 'status', variant.status || '', '  ');
     if (variant.downloadFileKey) {
@@ -8153,13 +8276,19 @@ function normalizeAdminStoreSubmittedVariant(baseVariant = {}, submitted = {}, e
     else errors.push(normalized.error);
   }
   if (hasAdminStoreProductPatchField(submitted, 'priceCents')) {
-    const normalized = normalizeAdminStorePriceCentsField(submitted.priceCents, `${labelPrefix} price`);
-    if (normalized.ok) variant.priceCents = normalized.value;
-    else errors.push(normalized.error);
+    if (String(submitted.priceCents ?? '').trim() === '') variant.priceCents = null;
+    else {
+      const normalized = normalizeAdminStorePriceCentsField(submitted.priceCents, `${labelPrefix} price`);
+      if (normalized.ok) variant.priceCents = normalized.value;
+      else errors.push(normalized.error);
+    }
   } else if (hasAdminStoreProductPatchField(submitted, 'price')) {
-    const normalized = normalizeAdminStorePriceField(submitted.price, `${labelPrefix} price`);
-    if (normalized.ok) variant.priceCents = normalized.value;
-    else errors.push(normalized.error);
+    if (String(submitted.price ?? '').trim() === '') variant.priceCents = null;
+    else {
+      const normalized = normalizeAdminStorePriceField(submitted.price, `${labelPrefix} price`);
+      if (normalized.ok) variant.priceCents = normalized.value;
+      else errors.push(normalized.error);
+    }
   }
   if (hasAdminStoreProductPatchField(submitted, 'inventory')) {
     const normalized = normalizeAdminStoreIntegerField(submitted.inventory, `${labelPrefix} inventory`);
@@ -9105,9 +9234,13 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
         status: String(variant?.status || 'active').trim() || 'active'
       };
       if (hasAdminStoreProductPatchField(variant, 'priceCents')) {
-        next.price_cents = normalizeAdminStorePriceCentsField(variant.priceCents, 'Variant price').value;
+        if (String(variant.priceCents ?? '').trim() !== '') {
+          next.price_cents = normalizeAdminStorePriceCentsField(variant.priceCents, 'Variant price').value;
+        }
       } else if (hasAdminStoreProductPatchField(variant, 'price')) {
-        next.price_cents = normalizeAdminStorePriceField(variant.price, 'Variant price').value;
+        if (String(variant.price ?? '').trim() !== '') {
+          next.price_cents = normalizeAdminStorePriceField(variant.price, 'Variant price').value;
+        }
       }
       return next;
     }).filter((variant) => variant.id);
@@ -9764,15 +9897,173 @@ async function handleAdminStoreProductMedia(request, env) {
 
   const url = new URL(request.url);
   const productId = String(url.searchParams.get('productId') || '').trim();
-  const media = collectAdminStoreProductMedia(env, productId);
+  const requestedType = String(url.searchParams.get('type') || 'all').trim().toLowerCase();
+  const requestedScope = String(url.searchParams.get('scope') || 'all').trim().toLowerCase();
+  if (!['all', 'image', 'video', 'audio'].includes(requestedType)) {
+    return privateJsonResponse({ error: 'Media type must be all, image, video, or audio.' }, 400, env);
+  }
+  if (!['all', 'product', 'default', 'add_on'].includes(requestedScope)) {
+    return privateJsonResponse({ error: 'Media scope must be all, product, default, or add_on.' }, 400, env);
+  }
+  const search = String(url.searchParams.get('search') || '').trim().toLowerCase().slice(0, 100);
+  const sort = String(url.searchParams.get('sort') || 'recent').trim().toLowerCase() === 'name' ? 'name' : 'recent';
+  const placement = String(url.searchParams.get('placement') || 'product_detail').trim().toLowerCase();
+  const placementBudget = mediaPlacementBudget(placement);
+  const manifestFile = await readAdminRepoTextFile(env, MEDIA_MANIFEST_PATH);
+  const manifest = (() => {
+    if (!manifestFile.ok) return normalizeMediaManifest({});
+    try { return normalizeMediaManifest(JSON.parse(manifestFile.content || '{}')); } catch { return normalizeMediaManifest({}); }
+  })();
+  const directories = [
+    'assets/images', 'assets/images/products', 'assets/images/add-ons', 'assets/images/defaults',
+    'assets/videos', 'assets/videos/products', 'assets/videos/add-ons', 'assets/videos/defaults',
+    'assets/audio', 'assets/audio/products', 'assets/audio/add-ons', 'assets/audio/defaults'
+  ];
+  const listings = await Promise.all(directories.map((directory) => listAdminRepoDirectory(env, directory, { quiet: true })));
+  const listedFiles = new Map();
+  for (const listing of listings) {
+    if (!listing.ok) continue;
+    for (const entry of listing.entries || []) {
+      if (entry.type !== 'file') continue;
+      listedFiles.set(String(entry.path || '').replace(/^\/+/, ''), String(entry.sha || ''));
+    }
+  }
+  const manifestAssets = new Map((manifest.assets || []).map((asset) => [String(asset.path || ''), asset]));
+  const knownPaths = new Set([
+    ...listedFiles.keys(),
+    ...manifestAssets.keys(),
+    ...(manifest.assets || []).flatMap((asset) => (asset.derivatives || []).map((item) => String(item.path || '')))
+  ].filter(Boolean));
+  const referencedMedia = collectAdminStoreProductMedia(env, productId);
+  const referencedByPath = new Map(referencedMedia.map((item) => [String(item.path || '').replace(/^\/+/, ''), item]));
+  const sourcePaths = new Set([
+    ...manifestAssets.keys(),
+    ...Array.from(listedFiles.keys()).filter((pathValue) => classifyMediaPath(pathValue, knownPaths)?.role === 'source')
+  ]);
+  let media = Array.from(sourcePaths).map((githubPath) => {
+    const classified = classifyMediaPath(githubPath, knownPaths);
+    if (!classified || classified.role !== 'source') return null;
+    const metadata = manifestAssets.get(githubPath) || {};
+    const reference = referencedByPath.get(githubPath) || {};
+    const warnings = Array.isArray(metadata.warnings) ? [...metadata.warnings] : [];
+    if (classified.type === 'image' && Number(metadata.bytes || 0) > placementBudget.maxBytes) {
+      warnings.push('placement_over_budget');
+    }
+    return {
+      name: String(metadata.name || githubPath.split('/').pop() || ''),
+      label: String(reference.label || metadata.label || mediaPathLabel(githubPath)),
+      path: `/${githubPath}`,
+      githubPath,
+      contentSha: listedFiles.get(githubPath) || '',
+      scope: classified.scope,
+      type: classified.type,
+      role: 'source',
+      productId: String(reference.productId || ''),
+      currentProduct: reference.currentProduct === true,
+      bytes: Number(metadata.bytes || 0) || null,
+      width: Number(metadata.width || 0) || null,
+      height: Number(metadata.height || 0) || null,
+      durationMs: Number(metadata.durationMs || 0) || null,
+      optimizationStatus: String(metadata.optimizationStatus || 'pending_manifest'),
+      derivatives: Array.isArray(metadata.derivatives) ? metadata.derivatives : [],
+      missingDerivatives: Array.isArray(metadata.missingDerivatives) ? metadata.missingDerivatives : [],
+      skippedDerivatives: Array.isArray(metadata.skippedDerivatives) ? metadata.skippedDerivatives : [],
+      warnings: Array.from(new Set(warnings)),
+      references: Array.isArray(metadata.references) ? metadata.references : [],
+      recentKey: String(githubPath).match(/-(\d{8}-\d{6})\.[a-z0-9]+$/i)?.[1] || ''
+    };
+  }).filter(Boolean);
+  if (!media.length) {
+    media = referencedMedia.map((item) => ({
+      ...item,
+      githubPath: String(item.path || '').replace(/^\/+/, ''),
+      type: 'image',
+      scope: 'product',
+      role: 'source',
+      optimizationStatus: 'manifest_unavailable',
+      derivatives: [],
+      missingDerivatives: [],
+      warnings: [],
+      references: []
+    }));
+  }
+  media = media.filter((item) => (
+    (requestedType === 'all' || item.type === requestedType) &&
+    (requestedScope === 'all' || item.scope === requestedScope) &&
+    (!search || `${item.label} ${item.name} ${item.githubPath}`.toLowerCase().includes(search))
+  ));
+  media.sort((a, b) => {
+    if (a.currentProduct !== b.currentProduct) return a.currentProduct ? -1 : 1;
+    if (sort === 'name') return a.label.localeCompare(b.label) || a.githubPath.localeCompare(b.githubPath);
+    return String(b.recentKey || '').localeCompare(String(a.recentKey || '')) || a.label.localeCompare(b.label);
+  });
+  const brokenReferences = [
+    ...(manifest.brokenReferences || []).map((item) => ({
+      path: String(item.publicPath || `/${item.path || ''}`),
+      githubPath: String(item.path || '').replace(/^\/+/, ''),
+      reason: 'missing_file',
+      references: Array.isArray(item.references) ? item.references : []
+    })),
+    ...referencedMedia
+    .map((item) => String(item.path || '').replace(/^\/+/, ''))
+    .filter((githubPath) => !knownPaths.has(githubPath))
+    .map((githubPath) => ({ path: `/${githubPath}`, githubPath, reason: 'missing_file', references: [] }))
+  ].filter((item, index, rows) => item.githubPath && rows.findIndex((candidate) => candidate.githubPath === item.githubPath) === index);
   return privateJsonResponse({
     scope: STORE_ADMIN_SCOPE,
     productId,
     media,
-    images: media,
-    totals: { media: media.length },
+    images: media.filter((item) => item.type === 'image'),
+    filters: { type: requestedType, scope: requestedScope, search, sort, placement },
+    placementBudget,
+    manifest: { version: manifest.version, available: (manifest.assets || []).length > 0 },
+    brokenReferences,
+    totals: {
+      media: media.length,
+      images: media.filter((item) => item.type === 'image').length,
+      videos: media.filter((item) => item.type === 'video').length,
+      audio: media.filter((item) => item.type === 'audio').length,
+      brokenReferences: brokenReferences.length
+    },
     writeBudget: adminReadBudget({ kvListExpected: 0 })
   }, 200, env);
+}
+
+async function handleAdminStoreProductMediaOptimize(request, env) {
+  const parsedBody = await parseJsonRequestBody(request, env, {
+    maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+    privateResponse: true,
+    emptyValue: {}
+  });
+  if (!parsedBody.ok) return parsedBody.response;
+  const scope = String(parsedBody.body?.scope || 'changed').trim().toLowerCase();
+  if (!['changed', 'all'].includes(scope)) {
+    return privateJsonResponse({ error: 'Optimization scope must be changed or all.' }, 400, env);
+  }
+  const auth = await requireAdminSession(request, env, scope === 'all' ? 'settings:publish' : 'fulfillment:manage', {
+    requireCsrf: true,
+    ...(scope === 'changed' ? { accessScope: STORE_ADMIN_SCOPE } : {})
+  });
+  if (!auth.ok) return auth.response;
+  if (scope === 'all' && auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Only super admins can request a full media optimization run.' }, 403, env);
+  }
+  const optimization = await triggerAdminMediaOptimization(env, { scope });
+  if (!optimization.triggered && adminRepoMode(env) !== 'local') {
+    return privateJsonResponse({ error: optimization.reason || 'Unable to dispatch media optimization.', optimization }, 502, env);
+  }
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_media:optimize',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    scope
+  });
+  return privateJsonResponse({
+    success: true,
+    optimization,
+    auditKey,
+    writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: auditKey ? 1 : 0 })
+  }, 202, env);
 }
 
 async function handleAdminStoreProductPreview(request, env) {
@@ -11868,6 +12159,46 @@ async function handleAdminStoreReconciliationCsv(request, env) {
   return csvResponse(storeOrderReconciliationRowsCsv(built.payload.orders), `store-reconciliation-${dateKey}.csv`, env);
 }
 
+async function handleAdminStorePaymentReconciliation(request, env, body = {}) {
+  const auth = await requireAdminSession(request, env, 'store:read', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf: true
+  });
+  if (!auth.ok) return auth.response;
+  if (auth.user.role !== 'super_admin') {
+    return privateJsonResponse({ error: 'Super-admin access required' }, 403, env);
+  }
+  const stripeSecretKey = getStripeKey(env);
+  if (!stripeSecretKey) {
+    return privateJsonResponse({ error: 'Stripe reconciliation is not configured' }, 503, env);
+  }
+  const batchSize = Math.max(1, Math.min(100, Math.trunc(Number(body.batchSize || 20) || 20)));
+  const result = await reconcileIndexedStorePayments(env, {
+    source: 'super_admin',
+    force: true,
+    batchSize,
+    stripeSecretKey
+  });
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_payment_reconciliation:run',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    scope: STORE_ADMIN_SCOPE,
+    changedFields: [
+      `processed:${Number(result.processed || 0)}`,
+      `open:${Number(result.open || 0)}`,
+      `resolved:${Number(result.resolved || 0)}`
+    ]
+  });
+  return privateJsonResponse({
+    success: result.attempted === true,
+    result,
+    stateKey: STORE_PAYMENT_RECONCILIATION_STATE_KEY,
+    auditKey,
+    readOnlyProcessorOperation: true
+  }, result.skipped === 'processing_in_progress' ? 409 : 200, env);
+}
+
 function normalizeAdminAuditDate(value = '') {
   const text = String(value || '').trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
@@ -12737,7 +13068,9 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       payment: {
         required: false,
         provider: null,
-        status: 'not_required'
+        status: 'not_required',
+        valueTime: confirmedOrderDraft.valueTime || confirmedOrderDraft.createdAt,
+        bookedAt: confirmedAt
       }
     };
 
@@ -12800,7 +13133,9 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       provider: 'stripe',
       status: 'not_created',
       amountCents: orderDraft.totals.totalCents,
-      currency: orderDraft.currency
+      currency: orderDraft.currency,
+      valueTime: orderDraft.valueTime || orderDraft.createdAt,
+      bookedAt: new Date().toISOString()
     }
   };
 
@@ -12810,7 +13145,12 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     { expirationTtl: STORE_ORDER_DRAFT_TTL_SECONDS }
   );
 
-  const stripe = createStripeClient(stripeSecretKey);
+  const stripe = createStoreStripeClient(env, stripeSecretKey, {
+    operation: 'checkout_payment_intent',
+    orderToken,
+    intent: 'create',
+    valueTime: pendingOrderDraft.valueTime || pendingOrderDraft.createdAt
+  });
   const paymentIntentParams = {
     amount: pendingOrderDraft.totals.totalCents,
     currency: pendingOrderDraft.currency.toLowerCase(),
@@ -12872,7 +13212,12 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       status: String(paymentIntent.status || 'requires_payment_method'),
       paymentIntentId: paymentIntent.id,
       amountCents: pendingOrderDraft.totals.totalCents,
-      currency: pendingOrderDraft.currency
+      currency: pendingOrderDraft.currency,
+      valueTime: stripeTimestampIso(paymentIntent.created, pendingOrderDraft.valueTime || pendingOrderDraft.createdAt),
+      bookedAt: new Date().toISOString(),
+      ...(Number(paymentIntent.created) > 0
+        ? { processorCreatedAt: stripeTimestampIso(paymentIntent.created) }
+        : {})
     }
   };
 
@@ -13032,9 +13377,16 @@ function validateStorePaymentIntentForOrder(paymentIntent = {}, storedOrder = {}
   return { ok: true };
 }
 
+function stripeTimestampIso(value, fallback = '') {
+  const epochSeconds = Math.trunc(Number(value || 0) || 0);
+  return epochSeconds > 0 ? new Date(epochSeconds * 1000).toISOString() : fallback;
+}
+
 function buildStorePaymentSnapshot(storedOrder = {}, paymentIntent = {}, status, settledAt) {
   const financials = extractStripePaymentIntentFinancials(paymentIntent);
   const cardChecks = extractStripePaymentIntentCardChecks(paymentIntent);
+  const processorCreatedAt = stripeTimestampIso(paymentIntent?.created, storedOrder.payment?.processorCreatedAt || '');
+  const valueTime = processorCreatedAt || storedOrder.payment?.valueTime || storedOrder.orderDraft?.valueTime || storedOrder.createdAt || settledAt;
   const payment = {
     ...(storedOrder.payment || {}),
     required: true,
@@ -13042,7 +13394,11 @@ function buildStorePaymentSnapshot(storedOrder = {}, paymentIntent = {}, status,
     status,
     paymentIntentId: stripeObjectId(paymentIntent),
     amountCents: storePaymentIntentAmountCents(paymentIntent),
-    currency: storePaymentIntentCurrency(paymentIntent) || storedOrder.payment?.currency || storedOrder.orderDraft?.currency || 'USD'
+    currency: storePaymentIntentCurrency(paymentIntent) || storedOrder.payment?.currency || storedOrder.orderDraft?.currency || 'USD',
+    valueTime,
+    bookedAt: settledAt,
+    webhookSettledAt: settledAt,
+    ...(processorCreatedAt ? { processorCreatedAt } : {})
   };
 
   if (status === 'succeeded') {
@@ -13059,6 +13415,7 @@ function buildStorePaymentSnapshot(storedOrder = {}, paymentIntent = {}, status,
     payment.stripeFinancials = financials;
     if (financials.chargeId) payment.chargeId = financials.chargeId;
     if (financials.balanceTransactionId) payment.balanceTransactionId = financials.balanceTransactionId;
+    if (financials.availableAt) payment.processorAvailabilityAt = financials.availableAt;
   }
   if (cardChecks) {
     payment.cardChecks = cardChecks;
@@ -13353,6 +13710,24 @@ async function handleTaxQuote(request, env) {
   }
 }
 
+async function handleResendWebhook(request, env) {
+  const secret = String(env.RESEND_WEBHOOK_SECRET || '').trim();
+  if (!secret) return jsonResponse({ error: 'Resend webhook is not configured' }, 503);
+  const bodyRead = await readRequestTextWithinLimit(request, env, MAX_STRIPE_WEBHOOK_BODY_BYTES);
+  if (!bodyRead.ok) return bodyRead.response;
+  const headers = {
+    id: request.headers.get('svix-id'),
+    timestamp: request.headers.get('svix-timestamp'),
+    signature: request.headers.get('svix-signature')
+  };
+  const verified = await verifyResendWebhook(bodyRead.text, headers, secret);
+  if (!verified.valid) return jsonResponse({ error: 'Invalid signature' }, 401);
+  let event;
+  try { event = JSON.parse(bodyRead.text); } catch { return jsonResponse({ error: 'Invalid payload' }, 400); }
+  const result = await processResendWebhook(env, event, verified.id);
+  return jsonResponse({ received: true, duplicate: result.duplicate === true });
+}
+
 async function handleStripeWebhook(request, env, ctx) {
   console.log('📨 Stripe webhook received');
   const startedAt = Date.now();
@@ -13361,6 +13736,17 @@ async function handleStripeWebhook(request, env, ctx) {
   let observedEventId = '';
   let observedEventType = 'unknown';
   let observedOrderId = '';
+  let eventKey = '';
+  let eventLeaseId = '';
+  const releaseStripeEventLease = async () => {
+    if (!env.STORE_STATE || !eventKey || !eventLeaseId) return;
+    const markerRaw = await env.STORE_STATE.get(eventKey);
+    let marker = markerRaw;
+    try { marker = markerRaw ? JSON.parse(markerRaw) : null; } catch {}
+    if (marker?.status === 'processing' && marker?.leaseId === eventLeaseId) {
+      await env.STORE_STATE.delete(eventKey);
+    }
+  };
   const finishWebhook = (response, outcome, extra = {}) => {
     queueBackgroundTask(
       ctx,
@@ -13374,41 +13760,38 @@ async function handleStripeWebhook(request, env, ctx) {
       }),
       `webhook observation (${outcome})`
     );
+    const journalEventId = extra.eventId ?? observedEventId;
+    if (journalEventId) {
+      queueBackgroundTask(
+        ctx,
+        recordStripeProcessorEvent(env, {
+          method: 'POST',
+          path: '/webhooks/stripe',
+          status: response?.status || 0,
+          success: (response?.status || 0) < 400,
+          eventId: journalEventId,
+          eventType: extra.eventType ?? observedEventType,
+          valueTime: extra.valueTime || null,
+          objectId: extra.objectId || '',
+          objectType: extra.eventType ?? observedEventType
+        }, {
+          kind: 'webhook',
+          operation: 'stripe_webhook',
+          intent: outcome,
+          orderToken: extra.orderId ?? observedOrderId,
+          mode: getAppMode(env)
+        }),
+        `processor journal (${outcome})`
+      );
+    }
+    if (response?.status >= 400 && outcome !== 'processing_in_progress') {
+      queueBackgroundTask(ctx, releaseStripeEventLease(), `release webhook lease (${outcome})`);
+    }
     return response;
   };
 
-  // SEC-002: Early mode detection from raw payload to avoid signature mismatch
-  // When prod worker (live mode) receives test events, the signature won't verify
-  // because test events are signed with a different secret. Parse livemode early
-  // and acknowledge if it doesn't match our environment.
-  try {
-    const parsed = JSON.parse(body);
-    const isLiveEvent = parsed.livemode === true;
-    const isLiveMode = getAppMode(env) === 'live';
-    if (isLiveEvent !== isLiveMode) {
-      console.log('📨 Skipping event (mode mismatch, pre-verification):', { 
-        eventId: parsed.id, 
-        eventType: parsed.type,
-        isLiveEvent, 
-        isLiveMode 
-      });
-      return finishWebhook(
-        jsonResponse({ received: true, skipped: 'mode mismatch' }, 200),
-        'mode_mismatch',
-        {
-          eventId: parsed.id,
-          eventType: parsed.type
-        }
-      );
-    }
-  } catch (parseErr) {
-    console.error('📨 Failed to parse webhook body for mode check:', parseErr.message);
-    // Continue to signature verification which will fail properly
-  }
-
-  // SEC-002: Webhooks must fail closed when signing secrets are missing.
-  // Mode mismatches are acknowledged above; everything else needs a configured
-  // secret so forged payloads cannot be treated as successfully received.
+  // SEC-002: Webhooks must fail closed when signing secrets are missing. The
+  // event mode is untrusted until after this signature verification succeeds.
   const webhookSecret = getStripeWebhookSecret(env);
   if (!webhookSecret) {
     console.error('Stripe webhook secret not configured for this mode; rejecting webhook');
@@ -13424,25 +13807,72 @@ async function handleStripeWebhook(request, env, ctx) {
     return finishWebhook(jsonResponse({ error: 'Invalid signature' }, 401), 'invalid_signature');
   }
 
-  const event = JSON.parse(body);
+  let event;
+  try {
+    event = JSON.parse(body);
+  } catch {
+    return finishWebhook(jsonResponse({ error: 'Invalid payload' }, 400), 'invalid_payload');
+  }
   observedEventId = String(event?.id || '').trim();
   observedEventType = String(event?.type || 'unknown').trim() || 'unknown';
+  const eventValueTime = stripeTimestampIso(event?.created);
   console.log('📨 Event type:', event.type);
 
-  const eventKey = env.STORE_STATE ? `stripe-event:${event.id}` : null;
+  const isLiveEvent = event.livemode === true;
+  const isLiveMode = getAppMode(env) === 'live';
+  if (isLiveEvent !== isLiveMode) {
+    console.log('📨 Skipping signed event (mode mismatch):', {
+      eventId: observedEventId,
+      eventType: observedEventType,
+      isLiveEvent,
+      isLiveMode
+    });
+    return finishWebhook(
+      jsonResponse({ received: true, skipped: 'mode mismatch' }, 200),
+      'mode_mismatch',
+      { eventId: observedEventId, eventType: observedEventType, valueTime: eventValueTime }
+    );
+  }
+
+  eventKey = env.STORE_STATE ? `stripe-event:${event.id}` : '';
+  eventLeaseId = crypto.randomUUID();
   const markStripeEventProcessed = async () => {
     if (env.STORE_STATE && eventKey) {
-      await env.STORE_STATE.put(eventKey, 'processed', { expirationTtl: 86400 });
+      const markerRaw = await env.STORE_STATE.get(eventKey);
+      let marker = markerRaw;
+      try { marker = markerRaw ? JSON.parse(markerRaw) : null; } catch {}
+      if (marker?.status === 'processing' && marker?.leaseId !== eventLeaseId) return false;
+      await env.STORE_STATE.put(eventKey, JSON.stringify({
+        status: 'processed',
+        eventId: event.id,
+        eventType: event.type,
+        processedAt: new Date().toISOString()
+      }), { expirationTtl: STRIPE_EVENT_MARKER_TTL_SECONDS });
+      return true;
     }
+    return false;
   };
 
   // Idempotency: skip if we've already processed this event
   if (env.STORE_STATE && eventKey) {
-    const alreadyProcessed = await env.STORE_STATE.get(eventKey);
-    if (alreadyProcessed) {
+    const markerRaw = await env.STORE_STATE.get(eventKey);
+    let marker = markerRaw;
+    try { marker = markerRaw ? JSON.parse(markerRaw) : null; } catch {}
+    if (marker === 'processed' || marker?.status === 'processed') {
       console.log('📨 Skipping duplicate event:', event.id);
       return finishWebhook(jsonResponse({ received: true }), 'duplicate_event');
     }
+    const leaseAgeMs = marker?.startedAt ? Date.now() - Date.parse(marker.startedAt) : Number.POSITIVE_INFINITY;
+    if (marker?.status === 'processing' && Number.isFinite(leaseAgeMs) && leaseAgeMs < STRIPE_EVENT_PROCESSING_LEASE_MS) {
+      return finishWebhook(jsonResponse({ error: 'Webhook event is already processing' }, 409), 'processing_in_progress');
+    }
+    await env.STORE_STATE.put(eventKey, JSON.stringify({
+      status: 'processing',
+      eventId: event.id,
+      eventType: event.type,
+      leaseId: eventLeaseId,
+      startedAt: new Date().toISOString()
+    }), { expirationTtl: STRIPE_EVENT_MARKER_TTL_SECONDS });
   }
 
   if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
@@ -13464,7 +13894,12 @@ async function handleStripeWebhook(request, env, ctx) {
         return finishWebhook(
           jsonResponse({ error: result.error }, result.status || 409),
           result.outcome || 'store_order_rejected',
-          { orderId: result.orderToken || metadata.orderToken }
+          {
+            orderId: result.orderToken || metadata.orderToken,
+            objectId: stripeObjectId(paymentIntent),
+            eventType: event.type,
+            valueTime: eventValueTime
+          }
         );
       }
 
@@ -13472,13 +13907,22 @@ async function handleStripeWebhook(request, env, ctx) {
       return finishWebhook(
         jsonResponse(result.response || { received: true }),
         result.outcome,
-        { orderId: result.orderToken || metadata.orderToken }
+        {
+          orderId: result.orderToken || metadata.orderToken,
+          objectId: stripeObjectId(paymentIntent),
+          eventType: event.type,
+          valueTime: eventValueTime
+        }
       );
     }
   }
 
   await markStripeEventProcessed();
-  return finishWebhook(jsonResponse({ received: true, skipped: 'unsupported_event' }), 'ignored_event_type');
+  return finishWebhook(jsonResponse({ received: true, skipped: 'unsupported_event' }), 'ignored_event_type', {
+    eventType: event.type,
+    objectId: stripeObjectId(event.data?.object),
+    valueTime: eventValueTime
+  });
 }
 
 
@@ -13814,6 +14258,12 @@ function buildRuntimeSecurityHealthChecks(env, adminUsers = []) {
   const turnstileRequired = isTruthyWorkerEnv(env.ADMIN_TURNSTILE_REQUIRED);
   const orderLookupConfigured = Boolean(env.STORE_ORDER_LOOKUP_SECRET || env.MAGIC_LINK_SECRET || env.CHECKOUT_INTENT_SECRET);
   const fulfillmentConfigured = Boolean(getStoreFulfillmentSecret(env));
+  const outboxConfigured = emailOutboxEnabled(env) && Boolean(env.RESEND_API_KEY);
+  const resendWebhookConfigured = Boolean(env.RESEND_WEBHOOK_SECRET);
+  const reconciliationEnabled = env.PAYMENT_RECONCILIATION_ENABLED === undefined
+    ? live
+    : String(env.PAYMENT_RECONCILIATION_ENABLED).trim().toLowerCase() === 'true';
+  const reconciliationConfigured = reconciliationEnabled && Boolean(env.STORE_STATE) && Boolean(getStripeKey(env));
   return [
     storeHealthCheck('runtime-production-mode', 'Production mode', live ? 'ok' : 'warning', live ? 'Worker APP_MODE is live.' : 'Worker APP_MODE is test.'),
     storeHealthCheck('runtime-cors-origin', 'Allowed browser origin', configuredHttpsOrigin(corsOrigin) && corsOrigin.replace(/\/$/, '') === siteBase ? 'ok' : 'action', configuredHttpsOrigin(corsOrigin) ? corsOrigin : 'CORS_ALLOWED_ORIGIN must be one explicit HTTPS origin.'),
@@ -13824,7 +14274,9 @@ function buildRuntimeSecurityHealthChecks(env, adminUsers = []) {
     storeHealthCheck('runtime-order-lookup', 'Order lookup tokens', orderLookupConfigured ? 'ok' : 'action', orderLookupConfigured ? 'Dedicated or approved shared signing secret is available.' : 'Order lookup token signing is unavailable.'),
     storeHealthCheck('runtime-signed-downloads', 'Signed downloads', fulfillmentConfigured && env.RATELIMIT ? 'ok' : 'action', fulfillmentConfigured ? 'Fulfillment signing and failed-attempt soft locks are configured.' : 'Fulfillment signing is unavailable.'),
     storeHealthCheck('runtime-coupons', 'Coupon storage', env.STORE_STATE ? 'ok' : 'action', env.STORE_STATE ? 'Coupons use the canonical Store state binding.' : 'Coupon persistence is unavailable.'),
+    storeHealthCheck('runtime-email-outbox', 'Durable email delivery', outboxConfigured ? (resendWebhookConfigured ? 'ok' : 'warning') : (live ? 'action' : 'info'), outboxConfigured ? (resendWebhookConfigured ? 'Email outbox and signed delivery webhook evidence are configured.' : 'Email outbox is configured; add RESEND_WEBHOOK_SECRET for signed delivery, bounce, complaint, and suppression evidence.') : 'Enable EMAIL_OUTBOX_ENABLED and configure RESEND_API_KEY before production email delivery.'),
     storeHealthCheck('runtime-reminders', 'Reminder delivery', env.RESEND_API_KEY && getAbandonedCartTokenSecret(env) ? 'ok' : 'warning', env.RESEND_API_KEY ? 'Reminder delivery and signed resume/unsubscribe links are configured.' : 'Reminder email delivery is not configured.'),
+    storeHealthCheck('runtime-payment-reconciliation', 'Payment reconciliation', reconciliationConfigured ? 'ok' : (live ? 'action' : 'info'), reconciliationConfigured ? 'Bounded read-only Stripe reconciliation is enabled against the canonical order index.' : 'Enable PAYMENT_RECONCILIATION_ENABLED with STORE_STATE and the active Stripe secret before production reconciliation.'),
     storeHealthCheck('runtime-admin-csp', 'Admin CSP', 'ok', 'The admin shell uses the versioned first-party CSP template; deploy smoke verifies the rendered policy.')
   ];
 }
@@ -14356,6 +14808,7 @@ function adminSecretStatusRows(env) {
     ['Workers Cache evidence secret', status(env.WORKERS_CACHE_EVIDENCE_SECRET, false), secretStatusHelp('Optional dedicated bearer used only by the rate-limited read-only cache metrics probe. Never reuse the purge or admin recovery secret.')],
     ['Admin Turnstile secret', status(env.TURNSTILE_SECRET_KEY || env.ADMIN_TURNSTILE_SECRET_KEY, turnstileRequired), secretStatusHelp('Cloudflare Turnstile secret used to verify admin email sign-in challenges. Required when the admin Turnstile widget is enabled.')],
     ['Resend API key', status(env.RESEND_API_KEY), secretStatusHelp('Email provider API key used for admin magic links and Store order emails. Never store it in _config.yml.')],
+    ['Resend webhook secret', status(env.RESEND_WEBHOOK_SECRET, false), secretStatusHelp('Optional Resend/Svix signing secret for delivery, bounce, complaint, and suppression evidence. Production should configure it after creating /webhooks/resend.')],
     ['USPS client secret', status(env.USPS_CLIENT_SECRET, uspsRequired), secretStatusHelp('USPS OAuth client secret for live shipping quotes. Required only when USPS is enabled; the client ID remains non-secret config.')],
     ['ZIP.TAX API key', status(env.ZIP_TAX_API_KEY || env.TAX_API_KEY, zipTaxRequired), secretStatusHelp('ZIP.TAX API key for jurisdiction-level tax lookup. Required only when the ZIP.TAX provider is selected.')],
     ['Cloudflare usage analytics token', status(env.CLOUDFLARE_USAGE_API_TOKEN || env.CLOUDFLARE_ANALYTICS_API_TOKEN, false), secretStatusHelp('Optional read-only Cloudflare GraphQL Analytics token for the admin plan usage tracker. Keep deploy tokens separate from usage tokens.')],
@@ -15535,12 +15988,14 @@ function validateAdminStoreContentBlock(block, index, errors, warnings) {
 
   if (type === 'image') {
     const src = normalizeAdminStoreContentAsset(block.src || '', `${path}.src`, errors, { required: true });
-    const alt = normalizeAdminStoreContentPlainText(block.alt || '', `${path}.alt`, errors, { maxLength: 300 });
-    if (!alt.trim()) warnings.push(`${path}.alt should describe the image.`);
+    const decorative = block.decorative === true || String(block.decorative || '').trim().toLowerCase() === 'true';
+    const alt = decorative ? '' : normalizeAdminStoreContentPlainText(block.alt || '', `${path}.alt`, errors, { maxLength: 300 });
+    if (!decorative && !alt.trim()) errors.push(`${path}.alt is required unless the image is explicitly decorative.`);
     return {
       type,
       src,
       alt,
+      ...(decorative ? { decorative: true } : {}),
       caption: normalizeAdminStoreContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminStoreContentAlignment(block.align)
     };
@@ -15556,11 +16011,17 @@ function validateAdminStoreContentBlock(block, index, errors, warnings) {
       type,
       layout: normalizeAdminStoreContentGalleryLayout(block.layout),
       caption_style: normalizeAdminStoreContentGalleryCaptionStyle(block.caption_style),
-      images: images.map((image, imageIndex) => ({
-        src: normalizeAdminStoreContentAsset(image?.src || '', `${path}.images[${imageIndex}].src`, errors, { required: true }),
-        alt: normalizeAdminStoreContentPlainText(image?.alt || '', `${path}.images[${imageIndex}].alt`, errors, { maxLength: 300 }),
-        caption: normalizeAdminStoreContentRichText(image?.caption || '', `${path}.images[${imageIndex}].caption`, errors, { maxLength: 1000 })
-      })),
+      images: images.map((image, imageIndex) => {
+        const decorative = image?.decorative === true || String(image?.decorative || '').trim().toLowerCase() === 'true';
+        const alt = decorative ? '' : normalizeAdminStoreContentPlainText(image?.alt || '', `${path}.images[${imageIndex}].alt`, errors, { maxLength: 300 });
+        if (!decorative && !alt.trim()) errors.push(`${path}.images[${imageIndex}].alt is required unless the image is explicitly decorative.`);
+        return {
+          src: normalizeAdminStoreContentAsset(image?.src || '', `${path}.images[${imageIndex}].src`, errors, { required: true }),
+          alt,
+          ...(decorative ? { decorative: true } : {}),
+          caption: normalizeAdminStoreContentRichText(image?.caption || '', `${path}.images[${imageIndex}].caption`, errors, { maxLength: 1000 })
+        };
+      }),
       caption: normalizeAdminStoreContentRichText(block.caption || '', `${path}.caption`, errors, { maxLength: 1000 }),
       align: normalizeAdminStoreContentAlignment(block.align)
     };
@@ -16186,6 +16647,9 @@ function serializeAdminAddOnProductsYaml(products = [], indent = '  ') {
       lines.push(`${indent}    variants:`);
       for (const variant of product.variants) {
         const entry = { id: variant.id, label: variant.label };
+        if (variant.price !== undefined && variant.price !== null && String(variant.price).trim() !== '') {
+          entry.price = Number(variant.price);
+        }
         if (variant.inventory !== undefined) entry.inventory = Number(variant.inventory);
         lines.push(`${indent}      - ${yamlAdminInlineObject(entry)}`);
       }
@@ -16331,9 +16795,13 @@ function adminUploadDirectory(body = {}, options = {}) {
   const kind = String(body.kind || '').trim().toLowerCase();
   const contentType = String(body.contentType || '').trim().toLowerCase();
   if (contentType.startsWith('video/')) {
+    if (kind === 'store-product') return 'assets/videos/products';
+    if (kind === 'add-on') return 'assets/videos/add-ons';
     return 'assets/videos/defaults';
   }
   if (contentType.startsWith('audio/')) {
+    if (kind === 'store-product') return 'assets/audio/products';
+    if (kind === 'add-on') return 'assets/audio/add-ons';
     return 'assets/audio/defaults';
   }
   if (kind === 'add-on') {
@@ -16416,7 +16884,25 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
     : { ...body, filename };
   const safeBase = adminUploadSlug(adminUploadBaseName(uploadBaseBody, extension), options.defaultFilename || 'upload');
   const directory = adminUploadDirectory({ ...body, contentType }, options);
-  const filePath = `${directory}/${safeBase}-${adminUploadTimestamp()}.${extension}`;
+  const requestedReplacement = String(body.replaceGithubPath || '').trim().replace(/^\/+/, '');
+  const replaceSha = String(body.replaceSha || '').trim();
+  let filePath = `${directory}/${safeBase}-${adminUploadTimestamp()}.${extension}`;
+  if (requestedReplacement) {
+    const normalizedReplacement = requestedReplacement.replace(/\\/g, '/').replace(/\/{2,}/g, '/');
+    if (
+      normalizedReplacement.split('/').some((part) => part === '..') ||
+      !normalizedReplacement.startsWith(`${directory}/`)
+    ) {
+      return { ok: false, error: `${label} replacement must be an existing file in the selected Store media scope.` };
+    }
+    if (normalizedReplacement.split('.').pop()?.toLowerCase() !== extension) {
+      return { ok: false, error: `${label} replacement must keep the existing file type.` };
+    }
+    if (!/^[a-f0-9]{40,64}$/i.test(replaceSha)) {
+      return { ok: false, error: `${label} replacement requires the current repository revision.` };
+    }
+    filePath = normalizedReplacement;
+  }
   return {
     ok: true,
     base64,
@@ -16424,7 +16910,8 @@ function normalizeAdminMediaUpload(body = {}, options = {}) {
     publicPath: `/${filePath}`,
     estimatedBytes,
     contentType,
-    processing: adminUploadProcessingSummary(contentType, extension)
+    processing: adminUploadProcessingSummary(contentType, extension),
+    replaceSha: requestedReplacement ? replaceSha : undefined
   };
 }
 
@@ -16467,7 +16954,8 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     env,
     normalized.filePath,
     normalized.base64,
-    `Upload ${options.commitLabel || 'admin media'} ${normalized.filePath}`
+    `${normalized.replaceSha ? 'Replace' : 'Upload'} ${options.commitLabel || 'admin media'} ${normalized.filePath}`,
+    normalized.replaceSha
   );
   if (!uploaded.ok) {
     return privateJsonResponse({
@@ -16484,6 +16972,7 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     success: true,
     path: normalized.publicPath,
     githubPath: normalized.filePath,
+    contentSha: uploaded.contentSha || '',
     commitSha: uploaded.commitSha,
     commitUrl: uploaded.commitUrl,
     repositoryMode: adminRepoMode(env),

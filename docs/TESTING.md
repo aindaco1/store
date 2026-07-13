@@ -1,6 +1,6 @@
 # Testing
 
-The `v1.0.7` gate adds centralized performance/cache policy budgets, Podman Lighthouse, fixed-key order-index deduplication, session review privacy/revocation, searchable audit exports, signed-download soft locks, production posture drift, localization review packets, off-device backup copies, and snapshot duration/read-usage evidence to the existing accessibility, i18n, Podman, SEO, provider, payment, fulfillment, Workers Cache, and recovery coverage.
+The `v1.0.7` gate added centralized performance/cache policy budgets, Podman Lighthouse, fixed-key order-index deduplication, session review privacy/revocation, searchable audit exports, signed-download soft locks, production posture drift, localization review packets, off-device backup copies, and snapshot duration/read-usage evidence. The `v1.0.8` gate adds deterministic repository media evidence, DRY add-on pricing, resumable Stripe processing and reconciliation, durable email delivery evidence, and explicit release-closure checks for cache and protected recovery operations.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -84,6 +84,22 @@ npx vitest run \
   tests/unit/page-prefetch.test.ts
 ```
 
+Pool-adaptation coverage can be rerun directly with:
+
+```bash
+npx vitest run \
+  tests/unit/add-on-utils.test.ts \
+  tests/unit/store-catalog.test.ts \
+  tests/unit/media-optimization-script.test.ts \
+  tests/unit/email-outbox.test.ts \
+  tests/unit/stripe-client.test.ts \
+  tests/unit/payment-integrity.test.ts \
+  tests/unit/store-payment-reconciliation.test.ts \
+  tests/unit/stripe-webhook-resume.test.ts
+npm run media:optimize:check
+npm run backup:inventory:audit
+```
+
 ## Security
 
 ```bash
@@ -96,7 +112,7 @@ The default security suite starts or reuses the Podman Storefront and Worker sta
 
 Podman-backed security, Worker smoke, and headless E2E wrappers reset local Wrangler state for their isolated stack before running. This avoids stale Miniflare SQLite state from turning `RATELIMIT` reads into false `503` failures while leaving normal manual `./scripts/dev.sh --podman` state intact.
 
-Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`, `tests/unit/workers-cache-endpoints.test.ts`, `tests/unit/workers-cache-benchmark.test.ts`, `tests/unit/workers-cache-telemetry.test.ts`, `tests/unit/workers-cache-observability.test.ts`, and `tests/unit/admin-store-read-model.test.ts`. It checks canonical request normalization, watermark validation and no-change/full responses, credential stripping, role/scope isolation, global/route/telemetry switches, search and unsafe-route bypasses, TTL/header/tag policy, mutation dependencies, scoped evidence authorization, Analytics Engine field minimization, deployment-scoped weighted quantiles/outlier budgets, stable-deployment and low-sample classification, entrypoint/purge failure fallback, operation budgets, benchmark comparison gates, and evidence redaction.
+Workers Cache coverage lives in `tests/unit/workers-cache-policy.test.ts`, `tests/unit/workers-cache-endpoints.test.ts`, `tests/unit/workers-cache-benchmark.test.ts`, `tests/unit/workers-cache-telemetry.test.ts`, `tests/unit/workers-cache-observability.test.ts`, and `tests/unit/admin-store-read-model.test.ts`. It checks canonical request normalization, watermark validation and no-change/full responses, credential stripping, role/scope isolation, global/route/telemetry switches, search and unsafe-route bypasses, TTL/header/tag policy, mutation dependencies, scoped evidence authorization, Analytics Engine field minimization, deployment-scoped weighted quantiles/outlier budgets, stable-deployment and low-sample classification, conclusive disabled/no-candidate evidence, fail-closed probe sanitization/budget/route checks, entrypoint/purge failure fallback, operation budgets, benchmark comparison gates, and evidence redaction.
 
 Backup and restore coverage lives in `tests/unit/store-backup-script.test.ts`, `tests/unit/store-restore-script.test.ts`, `tests/unit/store-data-inventory.test.ts`, `tests/unit/restore-rehearsal.test.ts`, `tests/unit/backup-readiness.test.ts`, `tests/unit/backup-retention.test.ts`, `tests/unit/recovery-traffic-preflight.test.ts`, `tests/unit/recovery-reconciliation-script.test.ts`, `tests/unit/store-recovery-reconciliation.test.ts`, and `tests/unit/store-recovery-endpoint.test.ts`. It checks canonical storage-family coverage, Wrangler v4 100-key/raw-value behavior, private permissions, complete R2 pagination/download gates, sanitized encrypted receipts, checksum manifests, encryption/acknowledgement gates, aggregate-only live/test Stripe reconciliation, maker/checker Durable Object recovery, quarantine exclusions, production interlocks, preview value/object readback, exact-snapshot cleanup and failure cleanup wiring, derived repair planning, retention safeguards, evidence ages, Worker-wide traffic/error gates, temporary detailed output, and dry-run behavior. `npm run restore:rehearse` adds the representative Podman-backed restore/Worker probe without touching production resources.
 
@@ -247,6 +263,8 @@ Provider and runtime checks:
 - Production runtime config uses `SITE_BASE=https://shop.dustwave.xyz`, `WORKER_BASE=https://checkout.dustwave.xyz`, `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`, `TAX_PROVIDER=nm_grt`, `SHIPPING_ORIGIN_ZIP=87120`, `SHIPPING_ORIGIN_COUNTRY=US`, and `USPS_ENABLED=true` unless intentionally changed.
 - Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes at least to `payment_intent.succeeded` and `payment_intent.payment_failed`.
 - Resend sender domains and `ORDERS_EMAIL_FROM` / `UPDATES_EMAIL_FROM` are verified.
+- Resend delivery webhook targets `https://checkout.dustwave.xyz/webhooks/resend`, subscribes to delivered/bounced/complained/failed/suppressed events, and its signing secret is stored as `RESEND_WEBHOOK_SECRET`.
+- `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` are present in the deployed production binding summary; the admin readiness checks report their dependencies as ready.
 - USPS live credentials and New Mexico GRT behavior are verified from the production origin address.
 - Real `STORE_DOWNLOADS` objects or approved Worker-only fallback URLs exist for active digital products.
 - Finite-stock products have true inventory baselines or `inventory_baseline_source` / `inventory_verified_at`; unlimited or made-to-order products use `inventory_tracking: false`.

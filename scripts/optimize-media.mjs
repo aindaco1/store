@@ -1,29 +1,39 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import {
+  MEDIA_MANIFEST_PATH,
+  MEDIA_MANIFEST_VERSION,
+  MEDIA_RESPONSIVE_WIDTHS,
+  classifyMediaPath,
+  expectedMediaDerivativePaths,
+  mediaPublicPath,
+  normalizeMediaRepoPath
+} from '../worker/src/media-catalog.js';
 
 const execFileAsync = promisify(execFile);
 
 const IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
 const RESPONSIVE_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
 const VIDEO_EXTENSIONS = new Set(['.mov', '.mp4', '.m4v']);
-const RESPONSIVE_WEBP_WIDTHS = [320, 480, 640, 960, 1600];
+const RESPONSIVE_WEBP_WIDTHS = MEDIA_RESPONSIVE_WIDTHS;
 const RESPONSIVE_WEBP_QUALITY = '86';
-const MEDIA_ROOTS = ['assets/images', 'assets/videos'];
-const REFERENCE_ROOTS = ['_products', '_data'];
+const MEDIA_ROOTS = ['assets/images', 'assets/videos', 'assets/audio'];
+const REFERENCE_ROOTS = ['_products', '_data', '_includes', '_layouts'];
 const REFERENCE_FILES = ['_config.yml'];
 
 export function normalizeRepoPath(repoPath) {
-  return String(repoPath || '').replace(/\\/g, '/').replace(/^\.\/+/, '');
+  return normalizeMediaRepoPath(repoPath);
 }
 
 export function publicAssetPathForRepoPath(repoPath) {
-  const normalized = normalizeRepoPath(repoPath);
-  return normalized.startsWith('assets/') ? `/${normalized}` : '';
+  return mediaPublicPath(repoPath);
 }
 
 export function webmDerivativePathForVideo(repoPath) {
@@ -75,12 +85,14 @@ function parseArgs(argv = []) {
     write: false,
     check: false,
     changed: false,
+    manifestOnly: false,
     files: []
   };
   for (const arg of argv) {
     if (arg === '--write') args.write = true;
     else if (arg === '--check') args.check = true;
     else if (arg === '--changed') args.changed = true;
+    else if (arg === '--manifest-only') args.manifestOnly = true;
     else args.files.push(arg);
   }
   return args;
@@ -180,10 +192,16 @@ function isVideoSourceFile(repoPath) {
   return VIDEO_EXTENSIONS.has(path.posix.extname(normalizeRepoPath(repoPath)).toLowerCase());
 }
 
+function isAudioFile(repoPath) {
+  return new Set(['.aac', '.m4a', '.mp3', '.ogg', '.wav', '.webm'])
+    .has(path.posix.extname(normalizeRepoPath(repoPath)).toLowerCase()) &&
+    normalizeRepoPath(repoPath).startsWith('assets/audio/');
+}
+
 function isDashboardMediaFile(repoPath) {
   const normalized = normalizeRepoPath(repoPath);
   return MEDIA_ROOTS.some((root) => normalized.startsWith(`${root}/`)) &&
-    (isImageFile(normalized) || isVideoSourceFile(normalized));
+    (isImageFile(normalized) || isVideoSourceFile(normalized) || isAudioFile(normalized));
 }
 
 async function resolveMediaFiles(args) {
@@ -420,7 +438,10 @@ async function referenceFiles() {
   for (const file of REFERENCE_FILES) {
     if (await fileExists(file)) files.push(file);
   }
-  return files.filter((file) => /\.(md|ya?ml|json)$/i.test(file));
+  return files.filter((file) => (
+    /\.(md|ya?ml|json)$/i.test(file) &&
+    normalizeRepoPath(file) !== MEDIA_MANIFEST_PATH
+  ));
 }
 
 async function rewriteRepositoryReferences(replacements, write) {
@@ -434,6 +455,208 @@ async function rewriteRepositoryReferences(replacements, write) {
     if (write) await fs.writeFile(filePath, rewritten);
   }
   return changed;
+}
+
+async function sha256File(filePath) {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  return hash.digest('hex');
+}
+
+async function probeMediaMetadata(repoPath, tools) {
+  if (!tools.ffprobe) return {};
+  try {
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error',
+      '-show_entries', 'stream=codec_type,width,height:format=duration',
+      '-of', 'json',
+      path.resolve(repoPath)
+    ]);
+    const parsed = JSON.parse(stdout || '{}');
+    const visual = (parsed.streams || []).find((stream) => stream.codec_type === 'video') || {};
+    const duration = Number(parsed.format?.duration || 0);
+    return {
+      ...(Number(visual.width) > 0 ? { width: Number(visual.width) } : {}),
+      ...(Number(visual.height) > 0 ? { height: Number(visual.height) } : {}),
+      ...(Number.isFinite(duration) && duration > 0 ? { durationMs: Math.round(duration * 1000) } : {})
+    };
+  } catch {
+    return {};
+  }
+}
+
+function countLiteralOccurrences(source, value) {
+  if (!value) return 0;
+  let count = 0;
+  let offset = 0;
+  while ((offset = source.indexOf(value, offset)) >= 0) {
+    count += 1;
+    offset += value.length;
+  }
+  return count;
+}
+
+async function buildMediaReferenceIndex(paths = []) {
+  const index = new Map(paths.map((repoPath) => [repoPath, []]));
+  const publicPaths = new Map(paths.map((repoPath) => [repoPath, publicAssetPathForRepoPath(repoPath)]));
+  const brokenByPath = new Map();
+  const literalMediaPattern = /(?:^|[\s"'(:=])(\/?assets\/(?:images|videos|audio)\/[A-Za-z0-9_./%+ -]+\.(?:png|jpe?g|gif|webp|avif|mp4|m4v|mov|webm|mp3|m4a|aac|ogg|wav))(?=$|[\s"')},?#])/gim;
+  for (const filePath of await referenceFiles()) {
+    const source = await fs.readFile(filePath, 'utf8').catch(() => '');
+    if (!source) continue;
+    const referencePath = normalizeRepoPath(filePath);
+    for (const repoPath of paths) {
+      const publicPath = publicPaths.get(repoPath);
+      const publicCount = countLiteralOccurrences(source, publicPath);
+      const count = publicCount || countLiteralOccurrences(source, repoPath);
+      if (count > 0) index.get(repoPath).push({ path: normalizeRepoPath(filePath), count });
+    }
+    for (const match of source.matchAll(literalMediaPattern)) {
+      const repoPath = String(match[1] || '').replace(/^\/+/, '').trim();
+      if (!repoPath || repoPath.includes('{{') || paths.includes(repoPath)) continue;
+      const existing = brokenByPath.get(repoPath) || { path: repoPath, publicPath: `/${repoPath}`, references: [] };
+      const found = existing.references.find((reference) => reference.path === referencePath);
+      if (found) found.count += 1;
+      else existing.references.push({ path: referencePath, count: 1 });
+      brokenByPath.set(repoPath, existing);
+    }
+  }
+  return {
+    index,
+    brokenReferences: Array.from(brokenByPath.values()).sort((a, b) => a.path.localeCompare(b.path))
+  };
+}
+
+function manifestWarningForSource(classified, bytes) {
+  const limits = { image: 8 * 1024 * 1024, video: 100 * 1024 * 1024, audio: 25 * 1024 * 1024 };
+  if (bytes > (limits[classified.type] || Number.POSITIVE_INFINITY)) {
+    return `${classified.type}_source_oversized`;
+  }
+  return '';
+}
+
+function mergeMediaReferences(references = []) {
+  const byPath = new Map();
+  for (const reference of references) {
+    byPath.set(reference.path, (byPath.get(reference.path) || 0) + Number(reference.count || 0));
+  }
+  return Array.from(byPath, ([pathValue, count]) => ({ path: pathValue, count }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
+export async function buildMediaOptimizationManifest(tools = {}, { previousManifest = {}, optimizerResults = [] } = {}) {
+  const roots = await Promise.all(MEDIA_ROOTS.map((root) => walkFiles(root)));
+  const repoPaths = roots.flat()
+    .map((filePath) => normalizeRepoPath(path.relative(process.cwd(), filePath)))
+    .filter(isDashboardMediaFile)
+    .sort();
+  const knownPaths = new Set(repoPaths);
+  const sourceRows = repoPaths
+    .map((repoPath) => classifyMediaPath(repoPath, knownPaths))
+    .filter((asset) => asset?.role === 'source');
+  const referenceScan = await buildMediaReferenceIndex(repoPaths);
+  const referenceIndex = referenceScan.index;
+  const previousAssets = new Map((previousManifest.assets || []).map((asset) => [asset.path, asset]));
+  const optimizerExceptions = new Map();
+  for (const result of optimizerResults) {
+    if (result?.skipped !== 'candidate not smaller than source' || !result.derivativeRepoPath) continue;
+    const rows = optimizerExceptions.get(result.repoPath) || [];
+    rows.push(result.derivativeRepoPath);
+    optimizerExceptions.set(result.repoPath, rows);
+  }
+  const assets = [];
+
+  for (const source of sourceRows) {
+    const sourceStat = await fs.stat(source.path);
+    const probedMetadata = await probeMediaMetadata(source.path, tools);
+    const metadata = source.type === 'image'
+      ? { ...(probedMetadata.width ? { width: probedMetadata.width } : {}), ...(probedMetadata.height ? { height: probedMetadata.height } : {}) }
+      : source.type === 'audio'
+        ? { ...(probedMetadata.durationMs ? { durationMs: probedMetadata.durationMs } : {}) }
+        : probedMetadata;
+    const sourceSha256 = await sha256File(source.path);
+    const expected = expectedMediaDerivativePaths(source.path, metadata);
+    const derivatives = [];
+    for (const derivativePath of expected) {
+      if (!knownPaths.has(derivativePath)) continue;
+      const derivativeStat = await fs.stat(derivativePath);
+      const derivative = classifyMediaPath(derivativePath, knownPaths);
+      derivatives.push({
+        path: derivativePath,
+        publicPath: publicAssetPathForRepoPath(derivativePath),
+        bytes: derivativeStat.size,
+        sha256: await sha256File(derivativePath),
+        sourceSha256,
+        ...(derivative?.derivativeWidth ? { width: derivative.derivativeWidth } : {})
+      });
+    }
+    const previous = previousAssets.get(source.path) || {};
+    const preservedExceptions = previous.sha256 === sourceSha256 && Array.isArray(previous.skippedDerivatives)
+      ? previous.skippedDerivatives
+      : [];
+    const skippedDerivatives = Array.from(new Set([
+      ...preservedExceptions,
+      ...(optimizerExceptions.get(source.path) || [])
+    ])).filter((candidate) => expected.includes(candidate) && !knownPaths.has(candidate)).sort();
+    const skippedSet = new Set(skippedDerivatives);
+    const missingDerivatives = expected.filter((candidate) => !knownPaths.has(candidate) && !skippedSet.has(candidate));
+    const referencedPaths = [source.path, ...derivatives.map((item) => item.path)];
+    const references = referencedPaths.flatMap((repoPath) => referenceIndex.get(repoPath) || []);
+    const warning = manifestWarningForSource(source, sourceStat.size);
+    assets.push({
+      path: source.path,
+      publicPath: source.publicPath,
+      name: source.name,
+      label: source.label,
+      type: source.type,
+      scope: source.scope,
+      productSlug: source.productSlug,
+      bytes: sourceStat.size,
+      sha256: sourceSha256,
+      ...metadata,
+      optimizationStatus: missingDerivatives.length ? 'missing_derivatives' : (expected.length ? 'ready' : 'not_applicable'),
+      expectedDerivatives: expected,
+      missingDerivatives,
+      skippedDerivatives,
+      derivatives,
+      warnings: warning ? [warning] : [],
+      references: mergeMediaReferences(references)
+    });
+  }
+
+  return {
+    version: MEDIA_MANIFEST_VERSION,
+    policy: {
+      sourceOfTruth: 'repository',
+      manifest: 'rebuildable',
+      responsiveImageWidths: MEDIA_RESPONSIVE_WIDTHS,
+      videoDerivative: 'webm'
+    },
+    brokenReferences: referenceScan.brokenReferences,
+    assets
+  };
+}
+
+async function syncMediaOptimizationManifest(tools, { write, check, optimizerResults = [] }) {
+  const previous = await fs.readFile(MEDIA_MANIFEST_PATH, 'utf8').catch(() => '');
+  const previousManifest = (() => {
+    try { return JSON.parse(previous); } catch { return {}; }
+  })();
+  const manifest = await buildMediaOptimizationManifest(tools, { previousManifest, optimizerResults });
+  const serialized = `${JSON.stringify(manifest, null, 2)}\n`;
+  const changed = previous !== serialized;
+  if (write && changed) {
+    await fs.mkdir(path.dirname(MEDIA_MANIFEST_PATH), { recursive: true });
+    await fs.writeFile(MEDIA_MANIFEST_PATH, serialized);
+  }
+  return {
+    path: MEDIA_MANIFEST_PATH,
+    changed,
+    assets: manifest.assets.length,
+    missingDerivatives: manifest.assets.reduce((total, asset) => total + asset.missingDerivatives.length, 0),
+    brokenReferences: manifest.brokenReferences.length,
+    checkFailed: Boolean(check && changed)
+  };
 }
 
 async function main() {
@@ -452,7 +675,7 @@ async function main() {
   const replacements = new Map();
   const results = [];
 
-  for (const repoPath of mediaFiles) {
+  for (const repoPath of args.manifestOnly ? [] : mediaFiles) {
     if (isImageFile(repoPath)) {
       results.push(await optimizeImage(repoPath, { ...args, write }, tools));
       results.push(...await generateResponsiveWebpDerivatives(repoPath, { ...args, write }, tools));
@@ -466,12 +689,14 @@ async function main() {
   }
 
   const referenceChanges = write ? await rewriteRepositoryReferences(replacements, true) : [];
-  const changedCount = results.filter((result) => result.changed).length + referenceChanges.length;
+  const manifest = await syncMediaOptimizationManifest(tools, { write, check: args.check, optimizerResults: results });
+  const changedCount = results.filter((result) => result.changed).length + referenceChanges.length + (manifest.changed ? 1 : 0);
   console.log(JSON.stringify({
     mode: write ? 'write' : 'check',
     filesChecked: mediaFiles.length,
     changedCount,
     referenceChanges,
+    manifest,
     tools,
     results
   }, null, 2));

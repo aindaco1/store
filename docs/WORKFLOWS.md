@@ -304,6 +304,25 @@ Public document prefetch is intentionally narrow:
 
 ## Local Development Workflow
 
+### Media optimization workflow
+
+Repository sources under `assets/images/`, `assets/videos/`, and `assets/audio/` remain authoritative. `scripts/optimize-media.mjs` deterministically rebuilds `_data/media-optimization-manifest.json`, compresses/generates applicable derivatives, records intentionally skipped larger output, and fails checks on stale metadata or broken references.
+
+```bash
+npm run media:manifest
+npm run media:optimize:check
+```
+
+Admin uploads dispatch **Optimize dashboard media** with `scope=changed`; a reviewed super-admin repair may use `scope=all`. The workflow operates in Git and produces reviewable media changes. The Worker does not transcode files or maintain a media database.
+
+### Durable email workflow
+
+With `EMAIL_OUTBOX_ENABLED=true`, confirmed order email and due event/abandoned-cart reminders enqueue deterministic `email-outbox:v1:*` work. The minute scheduler consults `email-outbox-queue:v1`, acquires per-job leases, freezes the Resend payload, sends with stable provider idempotency, and records acceptance/delivery independently of order truth. Signed `POST /webhooks/resend` events update minimized delivery/suppression evidence. Security-sensitive one-time-link and explicit test messages remain immediate.
+
+### Payment reconciliation workflow
+
+With `PAYMENT_RECONCILIATION_ENABLED=true`, scheduled work advances a daily cursor over the canonical admin order index in bounded batches and performs read-only Stripe PaymentIntent retrieval. It writes open/resolved discrepancy evidence, never scans the order namespace, and never mutates processor money. Super admins can invoke the same bounded operation through `POST /admin/store/reconciliation/run` with CSRF.
+
 Start local services:
 
 ```bash
@@ -360,9 +379,9 @@ Before production deploys that touch Worker bindings or runtime config:
 - confirm the cron trigger remains enabled for background maintenance
 - use `npm run deploy:worker` only for an explicit Worker-only manual deploy outside the production workflow
 
-Deploy, nightly cache evidence, and protected recovery use the shared `production-operations` concurrency group. **Workers Cache Evidence** runs at `03:17 America/Denver`, reads Analytics Engine, and performs only a bounded metrics probe below its cache-read threshold. **Recovery Readiness** runs at `03:43 America/Denver` each Sunday with synthetic data and read-only provider metadata. **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of each quarter.
+Deploy, nightly cache evidence, and protected recovery use the shared `production-operations` concurrency group. **Workers Cache Evidence** runs at `03:17 America/Denver`, reads Analytics Engine, and performs only a bounded metrics probe below its cache-read threshold. `WORKERS_CACHE_EVIDENCE_ROUTE` selects that one route. A consistently disabled, sanitized, correctly bounded probe is a successful `not_applicable`/`no_enabled_candidates` result only when Analytics Engine has no enabled candidate; during an experiment the variable must name the enabled candidate. **Recovery Readiness** runs at `03:43 America/Denver` each Sunday with synthetic data and read-only provider metadata. **Quarterly Recovery Operations** runs a Worker-wide Cloudflare invocation/error preflight at `04:17 America/Denver` on the first day of each quarter.
 
-The quarterly captured-data job is disabled unless `RECOVERY_DRILL_ENABLED=true` and requires approval through `production-recovery`. Before enabling it, configure a dedicated age recipient/private identity, a fresh one-time `STORE_BACKUP_ADMIN_LOGIN_TOKEN`, a restricted `STRIPE_RECOVERY_READ_KEY` for live read-only comparison, an explicit preview R2 bucket, and `STORE_RECOVERY_ARCHIVE_S3_URI` plus restricted S3-compatible credentials. Supply the one-time admin token immediately before approval and delete the environment secret after use or expiry. Non-AWS providers use `STORE_RECOVERY_ARCHIVE_S3_ENDPOINT`, `STORE_RECOVERY_ARCHIVE_REGION`, and a provider label. The job verifies the off-account upload, can write only preview KV/R2 through `scripts/protected-recovery-drill.sh`, reads every restored value/object back, and removes snapshot-owned preview data after success or partial failure. Detailed restore output remains temporary, the script has no production restore target or acknowledgement, and the encrypted GitHub artifact remains secondary evidence rather than long-term retention. A separately located operator machine or mounted encrypted drive can hold a second verified copy through `npm run backup:offsite`; the command requires a distinct filesystem device, exact acknowledgement, checksum readback, and optional age decryption verification.
+The quarterly captured-data job is disabled unless `RECOVERY_DRILL_ENABLED=true` and requires approval through `production-recovery`. Before enabling it, configure a dedicated age recipient/private identity, a fresh one-time `STORE_BACKUP_ADMIN_LOGIN_TOKEN`, a restricted `STRIPE_RECOVERY_READ_KEY` for live read-only comparison, an explicit preview R2 bucket, and the separate-account Cloudflare R2 archive contract: `STORE_RECOVERY_ARCHIVE_ACCOUNT_ID`, a `s3://<bucket>/store/...` secret URI, bucket-scoped Object Read & Write credentials, the matching credential-free R2 endpoint, region `auto`, provider `cloudflare-r2`, and a 400-day lock. Supply the one-time admin token immediately before approval and delete the environment secret after use or expiry. The job fails before customer-data capture unless a non-sensitive canary uploads, reads back byte-identically, rejects deletion, and remains readable. It verifies the encrypted off-account upload, can write only preview KV/R2 through `scripts/protected-recovery-drill.sh`, reads every restored value/object back, and removes snapshot-owned preview data after success or partial failure. Detailed restore output remains temporary, the script has no production restore target or acknowledgement, and the encrypted GitHub artifact remains secondary evidence rather than long-term retention. A separately located operator machine or mounted encrypted drive can hold a second verified copy through `npm run backup:offsite`; the command requires a distinct filesystem device, exact acknowledgement, checksum readback, and optional age decryption verification.
 
 Production non-secret config should match the intended public domains and providers unless an operator intentionally changes them:
 

@@ -1,0 +1,2876 @@
+{
+  "version": 1,
+  "policy": {
+    "sourceOfTruth": "repository",
+    "manifest": "rebuildable",
+    "responsiveImageWidths": [
+      320,
+      480,
+      640,
+      960,
+      1600
+    ],
+    "videoDerivative": "webm"
+  },
+  "brokenReferences": [],
+  "assets": [
+    {
+      "path": "assets/images/airplane-guild.jpg",
+      "publicPath": "/assets/images/airplane-guild.jpg",
+      "name": "airplane-guild.jpg",
+      "label": "airplane guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 176028,
+      "sha256": "39e42e8bf6e18683a4f8b128056a4e174f9a0809800ec5ab3d1bd9fd2a3fb37c",
+      "width": 1536,
+      "height": 2031,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/airplane-guild-320.webp",
+        "assets/images/airplane-guild-480.webp",
+        "assets/images/airplane-guild-640.webp",
+        "assets/images/airplane-guild-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/airplane-guild-320.webp",
+          "publicPath": "/assets/images/airplane-guild-320.webp",
+          "bytes": 18832,
+          "sha256": "f3f07b801d2de5dd5437965634c72860f9082c921e30be61ff840a6d2fb811c9",
+          "sourceSha256": "39e42e8bf6e18683a4f8b128056a4e174f9a0809800ec5ab3d1bd9fd2a3fb37c",
+          "width": 320
+        },
+        {
+          "path": "assets/images/airplane-guild-480.webp",
+          "publicPath": "/assets/images/airplane-guild-480.webp",
+          "bytes": 31232,
+          "sha256": "78345950a908eed84838389b6ca31baecfdec0417461d75d381f79aa214c1dfc",
+          "sourceSha256": "39e42e8bf6e18683a4f8b128056a4e174f9a0809800ec5ab3d1bd9fd2a3fb37c",
+          "width": 480
+        },
+        {
+          "path": "assets/images/airplane-guild-640.webp",
+          "publicPath": "/assets/images/airplane-guild-640.webp",
+          "bytes": 44672,
+          "sha256": "f4c99bfedd652fafadf1e139b7200a5b8e00027094e79400fcfe91f993a3e5a3",
+          "sourceSha256": "39e42e8bf6e18683a4f8b128056a4e174f9a0809800ec5ab3d1bd9fd2a3fb37c",
+          "width": 640
+        },
+        {
+          "path": "assets/images/airplane-guild-960.webp",
+          "publicPath": "/assets/images/airplane-guild-960.webp",
+          "bytes": 77994,
+          "sha256": "360043138d66355b961a94a6210e83fcca7f74a0fa7afb66021edd9f1538ac44",
+          "sourceSha256": "39e42e8bf6e18683a4f8b128056a4e174f9a0809800ec5ab3d1bd9fd2a3fb37c",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-airplane-guild.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/al1ce.png",
+      "publicPath": "/assets/images/al1ce.png",
+      "name": "al1ce.png",
+      "label": "al1ce",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1074411,
+      "sha256": "03d63a9f784777c1cf5df15390d2288465c40dcae7785502dd1c663943edd9e2",
+      "width": 1750,
+      "height": 2575,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/al1ce-320.webp",
+        "assets/images/al1ce-480.webp",
+        "assets/images/al1ce-640.webp",
+        "assets/images/al1ce-960.webp",
+        "assets/images/al1ce-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/al1ce-320.webp",
+          "publicPath": "/assets/images/al1ce-320.webp",
+          "bytes": 31762,
+          "sha256": "75795d5000168c8329aa7989cbfd7b2c34ac6528ddc79fc48d8a60bc68065088",
+          "sourceSha256": "03d63a9f784777c1cf5df15390d2288465c40dcae7785502dd1c663943edd9e2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/al1ce-480.webp",
+          "publicPath": "/assets/images/al1ce-480.webp",
+          "bytes": 56534,
+          "sha256": "09c86a10e2c2da3e8e39af58370eb0114d606aa7252a47fa959c5bdfe2d2931f",
+          "sourceSha256": "03d63a9f784777c1cf5df15390d2288465c40dcae7785502dd1c663943edd9e2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/al1ce-640.webp",
+          "publicPath": "/assets/images/al1ce-640.webp",
+          "bytes": 81684,
+          "sha256": "e71d2d6055707a4796963c6ff1f57297e4307accf7d6ea05e7b5f7245f625e9f",
+          "sourceSha256": "03d63a9f784777c1cf5df15390d2288465c40dcae7785502dd1c663943edd9e2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/al1ce-960.webp",
+          "publicPath": "/assets/images/al1ce-960.webp",
+          "bytes": 132302,
+          "sha256": "e32df9ddaec8d5a89836ded029bea2da2de758a5aeffd9eb88b98c6718fa3e78",
+          "sourceSha256": "03d63a9f784777c1cf5df15390d2288465c40dcae7785502dd1c663943edd9e2",
+          "width": 960
+        },
+        {
+          "path": "assets/images/al1ce-1600.webp",
+          "publicPath": "/assets/images/al1ce-1600.webp",
+          "bytes": 242582,
+          "sha256": "be9db8d7174a944d5c8a3a6761de5ce6a30c5f9781a49dbd8d44d39e3d9a1ee6",
+          "sourceSha256": "03d63a9f784777c1cf5df15390d2288465c40dcae7785502dd1c663943edd9e2",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-al1ce-juno.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/annihilation-guild.jpg",
+      "publicPath": "/assets/images/annihilation-guild.jpg",
+      "name": "annihilation-guild.jpg",
+      "label": "annihilation guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 275464,
+      "sha256": "52d778340fadfac744538d563c70a6ec97cc52e93f5792a40bb6724390177f05",
+      "width": 736,
+      "height": 1103,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/annihilation-guild-320.webp",
+        "assets/images/annihilation-guild-480.webp",
+        "assets/images/annihilation-guild-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [
+        "assets/images/annihilation-guild-640.webp"
+      ],
+      "derivatives": [
+        {
+          "path": "assets/images/annihilation-guild-320.webp",
+          "publicPath": "/assets/images/annihilation-guild-320.webp",
+          "bytes": 79040,
+          "sha256": "f2f64b892f38c932680153f1b3a62b30541c19e0c353cd51a34197f786a62fb8",
+          "sourceSha256": "52d778340fadfac744538d563c70a6ec97cc52e93f5792a40bb6724390177f05",
+          "width": 320
+        },
+        {
+          "path": "assets/images/annihilation-guild-480.webp",
+          "publicPath": "/assets/images/annihilation-guild-480.webp",
+          "bytes": 165380,
+          "sha256": "bcffdff1817340dd3b43e3c12025e71f91eb280f3b7a162e8305b7e43e06bc54",
+          "sourceSha256": "52d778340fadfac744538d563c70a6ec97cc52e93f5792a40bb6724390177f05",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-annihilation.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/attack-guild.png",
+      "publicPath": "/assets/images/attack-guild.png",
+      "name": "attack-guild.png",
+      "label": "attack guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 810562,
+      "sha256": "0582876ff0ebd0c9a8d51837c70aacc131c3a8ea7e60e536ea2b05be0a0ffd5f",
+      "width": 1000,
+      "height": 1400,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/attack-guild-320.webp",
+        "assets/images/attack-guild-480.webp",
+        "assets/images/attack-guild-640.webp",
+        "assets/images/attack-guild-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/attack-guild-320.webp",
+          "publicPath": "/assets/images/attack-guild-320.webp",
+          "bytes": 59096,
+          "sha256": "db7f3a70b39b93fc967206ea951f1157edab68e4db91879dae80d2763bb5eb58",
+          "sourceSha256": "0582876ff0ebd0c9a8d51837c70aacc131c3a8ea7e60e536ea2b05be0a0ffd5f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/attack-guild-480.webp",
+          "publicPath": "/assets/images/attack-guild-480.webp",
+          "bytes": 126234,
+          "sha256": "9be919e88cfdd20b2565b23b5e77a5d986ee0d67fe3379f8fa7c3d1ee775942e",
+          "sourceSha256": "0582876ff0ebd0c9a8d51837c70aacc131c3a8ea7e60e536ea2b05be0a0ffd5f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/attack-guild-640.webp",
+          "publicPath": "/assets/images/attack-guild-640.webp",
+          "bytes": 215950,
+          "sha256": "2fd5b571d018ab3e5ef4de2e91251d76d781013c37274f2f7f6a89a8f7aa613b",
+          "sourceSha256": "0582876ff0ebd0c9a8d51837c70aacc131c3a8ea7e60e536ea2b05be0a0ffd5f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/attack-guild-960.webp",
+          "publicPath": "/assets/images/attack-guild-960.webp",
+          "bytes": 421330,
+          "sha256": "59a01c389f25c583cf30cd4c71771d4cb98244c51f1f9ab74fd00021d50b0243",
+          "sourceSha256": "0582876ff0ebd0c9a8d51837c70aacc131c3a8ea7e60e536ea2b05be0a0ffd5f",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-attack.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/attack-poster.png",
+      "publicPath": "/assets/images/attack-poster.png",
+      "name": "attack-poster.png",
+      "label": "attack poster",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 903683,
+      "sha256": "ee61af834c16f864062ee1422b3a69dd863dd2529f71d5fd16348989b15a7772",
+      "width": 600,
+      "height": 889,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/attack-poster-320.webp",
+        "assets/images/attack-poster-480.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/attack-poster-320.webp",
+          "publicPath": "/assets/images/attack-poster-320.webp",
+          "bytes": 30122,
+          "sha256": "b725662cd17ad17243b0f0efb598da3e667f39836682a2055b4cffe506cc5a13",
+          "sourceSha256": "ee61af834c16f864062ee1422b3a69dd863dd2529f71d5fd16348989b15a7772",
+          "width": 320
+        },
+        {
+          "path": "assets/images/attack-poster-480.webp",
+          "publicPath": "/assets/images/attack-poster-480.webp",
+          "bytes": 53818,
+          "sha256": "9f2b874934ebb864aeaf8f399c8aa33416f69a39d3def7c835e4a1650e1a40fc",
+          "sourceSha256": "ee61af834c16f864062ee1422b3a69dd863dd2529f71d5fd16348989b15a7772",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/attack-poster.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/attack-vhs.png",
+      "publicPath": "/assets/images/attack-vhs.png",
+      "name": "attack-vhs.png",
+      "label": "attack vhs",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 281591,
+      "sha256": "1b6ebf4fe422a848a2cc3f10864efb678eefbce1d0195471cb85e4d30e2be956",
+      "width": 526,
+      "height": 935,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/attack-vhs-320.webp",
+        "assets/images/attack-vhs-480.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/attack-vhs-320.webp",
+          "publicPath": "/assets/images/attack-vhs-320.webp",
+          "bytes": 61114,
+          "sha256": "4cdc649994c8f0fca7f4d31ef7d7a6aee2a3860cfe0c6e6c88a4f55962cee17c",
+          "sourceSha256": "1b6ebf4fe422a848a2cc3f10864efb678eefbce1d0195471cb85e4d30e2be956",
+          "width": 320
+        },
+        {
+          "path": "assets/images/attack-vhs-480.webp",
+          "publicPath": "/assets/images/attack-vhs-480.webp",
+          "bytes": 122652,
+          "sha256": "be296c31ec6a11fa49b7f2b3a2151b29fc2ad77592ca6a0413a9cff425943338",
+          "sourceSha256": "1b6ebf4fe422a848a2cc3f10864efb678eefbce1d0195471cb85e4d30e2be956",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/attack-vhs.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/benefit.jpg",
+      "publicPath": "/assets/images/benefit.jpg",
+      "name": "benefit.jpg",
+      "label": "benefit",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 133313,
+      "sha256": "2a88b82dbc4756919a58673c805208df498d7b1fcdb47fcad1a47ee7cef7a2d4",
+      "width": 1185,
+      "height": 1470,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/benefit-320.webp",
+        "assets/images/benefit-480.webp",
+        "assets/images/benefit-640.webp",
+        "assets/images/benefit-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/benefit-320.webp",
+          "publicPath": "/assets/images/benefit-320.webp",
+          "bytes": 22084,
+          "sha256": "41e2431e1212a044c3f7b1c845bf7cd46aa96da211e201c2e399576e27ad6f78",
+          "sourceSha256": "2a88b82dbc4756919a58673c805208df498d7b1fcdb47fcad1a47ee7cef7a2d4",
+          "width": 320
+        },
+        {
+          "path": "assets/images/benefit-480.webp",
+          "publicPath": "/assets/images/benefit-480.webp",
+          "bytes": 35236,
+          "sha256": "97484986fcc7d868849a32982cc5fd5bab3d18da5809f34e97c8c14bcba231d5",
+          "sourceSha256": "2a88b82dbc4756919a58673c805208df498d7b1fcdb47fcad1a47ee7cef7a2d4",
+          "width": 480
+        },
+        {
+          "path": "assets/images/benefit-640.webp",
+          "publicPath": "/assets/images/benefit-640.webp",
+          "bytes": 49322,
+          "sha256": "66a57a84b701baca4dc8373353d942cf72a88e4bb7da206c8f5d6dfc60096470",
+          "sourceSha256": "2a88b82dbc4756919a58673c805208df498d7b1fcdb47fcad1a47ee7cef7a2d4",
+          "width": 640
+        },
+        {
+          "path": "assets/images/benefit-960.webp",
+          "publicPath": "/assets/images/benefit-960.webp",
+          "bytes": 78912,
+          "sha256": "af9e49111d30bbac0b3bbcc2dde5b0856a8a1c2e978f77e4f1be4aedfa0ba123",
+          "sourceSha256": "2a88b82dbc4756919a58673c805208df498d7b1fcdb47fcad1a47ee7cef7a2d4",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-dustwave-benefit.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/butterfingers-tshirt.png",
+      "publicPath": "/assets/images/butterfingers-tshirt.png",
+      "name": "butterfingers-tshirt.png",
+      "label": "butterfingers tshirt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 151841,
+      "sha256": "e2f492783fb1b50fb916a83525ff15a33cadcbc4114c80cfe433711722d2374a",
+      "width": 1010,
+      "height": 988,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/butterfingers-tshirt-320.webp",
+        "assets/images/butterfingers-tshirt-480.webp",
+        "assets/images/butterfingers-tshirt-640.webp",
+        "assets/images/butterfingers-tshirt-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/butterfingers-tshirt-320.webp",
+          "publicPath": "/assets/images/butterfingers-tshirt-320.webp",
+          "bytes": 5616,
+          "sha256": "d8a56943e8671e4298f1f2113afcad01f05d44f93e6c2f09c2be6cd367fdeb65",
+          "sourceSha256": "e2f492783fb1b50fb916a83525ff15a33cadcbc4114c80cfe433711722d2374a",
+          "width": 320
+        },
+        {
+          "path": "assets/images/butterfingers-tshirt-480.webp",
+          "publicPath": "/assets/images/butterfingers-tshirt-480.webp",
+          "bytes": 9560,
+          "sha256": "1d1246811e939306625ec7f04e9561bc8f18df0916c3d09d7f3fc040feff6973",
+          "sourceSha256": "e2f492783fb1b50fb916a83525ff15a33cadcbc4114c80cfe433711722d2374a",
+          "width": 480
+        },
+        {
+          "path": "assets/images/butterfingers-tshirt-640.webp",
+          "publicPath": "/assets/images/butterfingers-tshirt-640.webp",
+          "bytes": 14378,
+          "sha256": "c92f9cf831a93c9d38ed9d4c7f70dbd1c0ee52c8fda09efeca86e8a61ab6eb95",
+          "sourceSha256": "e2f492783fb1b50fb916a83525ff15a33cadcbc4114c80cfe433711722d2374a",
+          "width": 640
+        },
+        {
+          "path": "assets/images/butterfingers-tshirt-960.webp",
+          "publicPath": "/assets/images/butterfingers-tshirt-960.webp",
+          "bytes": 24834,
+          "sha256": "6795d308370ce7103f408777a55b8b53fc82edb53c64b1dab8421df2b821285c",
+          "sourceSha256": "e2f492783fb1b50fb916a83525ff15a33cadcbc4114c80cfe433711722d2374a",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-butterfingers-t-shirt.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/calendar-2026.png",
+      "publicPath": "/assets/images/calendar-2026.png",
+      "name": "calendar-2026.png",
+      "label": "calendar",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 401396,
+      "sha256": "ea1771936561bec3252fddb4e7d56b4a890be4bccf34d7adb65d5115a7b4a0eb",
+      "width": 1094,
+      "height": 845,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/calendar-2026-320.webp",
+        "assets/images/calendar-2026-480.webp",
+        "assets/images/calendar-2026-640.webp",
+        "assets/images/calendar-2026-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/calendar-2026-320.webp",
+          "publicPath": "/assets/images/calendar-2026-320.webp",
+          "bytes": 21158,
+          "sha256": "f4cafd0dfd54f5e14345bebb729a873227304e0f4775337e3fa0e499d19dabc0",
+          "sourceSha256": "ea1771936561bec3252fddb4e7d56b4a890be4bccf34d7adb65d5115a7b4a0eb",
+          "width": 320
+        },
+        {
+          "path": "assets/images/calendar-2026-480.webp",
+          "publicPath": "/assets/images/calendar-2026-480.webp",
+          "bytes": 38662,
+          "sha256": "93d82c0e8794c6359fc987bb69cd511afe027c18cf633a13b40210f1f0a64666",
+          "sourceSha256": "ea1771936561bec3252fddb4e7d56b4a890be4bccf34d7adb65d5115a7b4a0eb",
+          "width": 480
+        },
+        {
+          "path": "assets/images/calendar-2026-640.webp",
+          "publicPath": "/assets/images/calendar-2026-640.webp",
+          "bytes": 56882,
+          "sha256": "7811124c0b4f2bce6c6c6cfa778a94f139cf9db7a904190c01b4fec2ebbe7100",
+          "sourceSha256": "ea1771936561bec3252fddb4e7d56b4a890be4bccf34d7adb65d5115a7b4a0eb",
+          "width": 640
+        },
+        {
+          "path": "assets/images/calendar-2026-960.webp",
+          "publicPath": "/assets/images/calendar-2026-960.webp",
+          "bytes": 96378,
+          "sha256": "bc19656cc934905893acc190db40a0b28c032669c0da0406ff4c922367d9ba1b",
+          "sourceSha256": "ea1771936561bec3252fddb4e7d56b4a890be4bccf34d7adb65d5115a7b4a0eb",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-calendar-2026.md",
+          "count": 1
+        },
+        {
+          "path": "_products/dust-wave-free-rsvp.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/cloverfield-guild.png",
+      "publicPath": "/assets/images/cloverfield-guild.png",
+      "name": "cloverfield-guild.png",
+      "label": "cloverfield guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1082017,
+      "sha256": "1c6b9210a138e628b16e0f3976b9563cf388354aad35db53b9f55faf82aabf5b",
+      "width": 1024,
+      "height": 1536,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/cloverfield-guild-320.webp",
+        "assets/images/cloverfield-guild-480.webp",
+        "assets/images/cloverfield-guild-640.webp",
+        "assets/images/cloverfield-guild-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/cloverfield-guild-320.webp",
+          "publicPath": "/assets/images/cloverfield-guild-320.webp",
+          "bytes": 12100,
+          "sha256": "3b786e59c6caba6f02258b0538ee5ba2202572d54a1e121e664429f9272e52b7",
+          "sourceSha256": "1c6b9210a138e628b16e0f3976b9563cf388354aad35db53b9f55faf82aabf5b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/cloverfield-guild-480.webp",
+          "publicPath": "/assets/images/cloverfield-guild-480.webp",
+          "bytes": 25122,
+          "sha256": "8a051be54156bc23bd5380b1eb8945683b4fc41f3407daedc32520de980a7e18",
+          "sourceSha256": "1c6b9210a138e628b16e0f3976b9563cf388354aad35db53b9f55faf82aabf5b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/cloverfield-guild-640.webp",
+          "publicPath": "/assets/images/cloverfield-guild-640.webp",
+          "bytes": 49150,
+          "sha256": "ae3d2264415bbd5b589fe29854bc7347cdf8ca8f451a22057200764532e317a6",
+          "sourceSha256": "1c6b9210a138e628b16e0f3976b9563cf388354aad35db53b9f55faf82aabf5b",
+          "width": 640
+        },
+        {
+          "path": "assets/images/cloverfield-guild-960.webp",
+          "publicPath": "/assets/images/cloverfield-guild-960.webp",
+          "bytes": 142038,
+          "sha256": "20d688256bd73615363dbeed1f04120590b89cba4cc4ae83d36fc72736740bbd",
+          "sourceSha256": "1c6b9210a138e628b16e0f3976b9563cf388354aad35db53b9f55faf82aabf5b",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-cloverfield-guild.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/cronos-guild.png",
+      "publicPath": "/assets/images/cronos-guild.png",
+      "name": "cronos-guild.png",
+      "label": "cronos guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 827446,
+      "sha256": "836e090d2bbc89ae09fea2be57437d16c030709a5c1f70cf70379abdd7fcc4c7",
+      "width": 1024,
+      "height": 1536,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/cronos-guild-320.webp",
+        "assets/images/cronos-guild-480.webp",
+        "assets/images/cronos-guild-640.webp",
+        "assets/images/cronos-guild-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/cronos-guild-320.webp",
+          "publicPath": "/assets/images/cronos-guild-320.webp",
+          "bytes": 59124,
+          "sha256": "09bf8606d369b8faf324215f3c3beaf87bc861f8e71720680347f6b7a5ead938",
+          "sourceSha256": "836e090d2bbc89ae09fea2be57437d16c030709a5c1f70cf70379abdd7fcc4c7",
+          "width": 320
+        },
+        {
+          "path": "assets/images/cronos-guild-480.webp",
+          "publicPath": "/assets/images/cronos-guild-480.webp",
+          "bytes": 126250,
+          "sha256": "8a2a4af5f64eef895ea4305c0fbd015d820d65d8088f82ebc97a416b744177d6",
+          "sourceSha256": "836e090d2bbc89ae09fea2be57437d16c030709a5c1f70cf70379abdd7fcc4c7",
+          "width": 480
+        },
+        {
+          "path": "assets/images/cronos-guild-640.webp",
+          "publicPath": "/assets/images/cronos-guild-640.webp",
+          "bytes": 209178,
+          "sha256": "e99adaf25f7570a448f19f2b27d41b5ee5b80a15ecbc8a0f3adfca8ac2692f8c",
+          "sourceSha256": "836e090d2bbc89ae09fea2be57437d16c030709a5c1f70cf70379abdd7fcc4c7",
+          "width": 640
+        },
+        {
+          "path": "assets/images/cronos-guild-960.webp",
+          "publicPath": "/assets/images/cronos-guild-960.webp",
+          "bytes": 391436,
+          "sha256": "4fb7575ae1651c15fdc29ebadc4f4988333cdc2f4733176f755546e422d563d4",
+          "sourceSha256": "836e090d2bbc89ae09fea2be57437d16c030709a5c1f70cf70379abdd7fcc4c7",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-cronos.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/cure-guild.png",
+      "publicPath": "/assets/images/cure-guild.png",
+      "name": "cure-guild.png",
+      "label": "cure guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1234321,
+      "sha256": "c4316f67bf241f737ba206663eaefd642dd27b1345c9eb76d0439d68dd7dab0a",
+      "width": 1000,
+      "height": 1481,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/cure-guild-320.webp",
+        "assets/images/cure-guild-480.webp",
+        "assets/images/cure-guild-640.webp",
+        "assets/images/cure-guild-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/cure-guild-320.webp",
+          "publicPath": "/assets/images/cure-guild-320.webp",
+          "bytes": 86602,
+          "sha256": "7f81b09d0a73c1d3ff9d2239f3aa4de3ff8ec292e38f4aece6aac94a3e6bd6d7",
+          "sourceSha256": "c4316f67bf241f737ba206663eaefd642dd27b1345c9eb76d0439d68dd7dab0a",
+          "width": 320
+        },
+        {
+          "path": "assets/images/cure-guild-480.webp",
+          "publicPath": "/assets/images/cure-guild-480.webp",
+          "bytes": 172326,
+          "sha256": "ad0e038c430bc610c97c99649167dcf0d2a0b5f702ff865ee7d269ba339ea63d",
+          "sourceSha256": "c4316f67bf241f737ba206663eaefd642dd27b1345c9eb76d0439d68dd7dab0a",
+          "width": 480
+        },
+        {
+          "path": "assets/images/cure-guild-640.webp",
+          "publicPath": "/assets/images/cure-guild-640.webp",
+          "bytes": 276738,
+          "sha256": "79cc65df0b835bebffc75e844499e5fae88ac767e07f0509ae62a8e42f2b493a",
+          "sourceSha256": "c4316f67bf241f737ba206663eaefd642dd27b1345c9eb76d0439d68dd7dab0a",
+          "width": 640
+        },
+        {
+          "path": "assets/images/cure-guild-960.webp",
+          "publicPath": "/assets/images/cure-guild-960.webp",
+          "bytes": 525850,
+          "sha256": "99df4a93d94306995456500307f1371ca5ea2803f91e2acca9578ea4f4df7efa",
+          "sourceSha256": "c4316f67bf241f737ba206663eaefd642dd27b1345c9eb76d0439d68dd7dab0a",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-cure-guild.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/dancewave-alt.png",
+      "publicPath": "/assets/images/dancewave-alt.png",
+      "name": "dancewave-alt.png",
+      "label": "dancewave alt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 625581,
+      "sha256": "e148c4c54a3ab5b67d8c02e6f4e959b62d4c1b3deb78f8699769746982b8f403",
+      "width": 1545,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/dancewave-alt-320.webp",
+        "assets/images/dancewave-alt-480.webp",
+        "assets/images/dancewave-alt-640.webp",
+        "assets/images/dancewave-alt-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/dancewave-alt-320.webp",
+          "publicPath": "/assets/images/dancewave-alt-320.webp",
+          "bytes": 37538,
+          "sha256": "412f7810de34e2dc3b492286612ccfbba028f73b9b480e959e1f827e2eb80c8e",
+          "sourceSha256": "e148c4c54a3ab5b67d8c02e6f4e959b62d4c1b3deb78f8699769746982b8f403",
+          "width": 320
+        },
+        {
+          "path": "assets/images/dancewave-alt-480.webp",
+          "publicPath": "/assets/images/dancewave-alt-480.webp",
+          "bytes": 67400,
+          "sha256": "c893154a77417dd4360103ec4c0d5365494589dc81b3c28b0fc4106cf379a854",
+          "sourceSha256": "e148c4c54a3ab5b67d8c02e6f4e959b62d4c1b3deb78f8699769746982b8f403",
+          "width": 480
+        },
+        {
+          "path": "assets/images/dancewave-alt-640.webp",
+          "publicPath": "/assets/images/dancewave-alt-640.webp",
+          "bytes": 100064,
+          "sha256": "37800cf221f413bae863e71024365450a5a8bf35a04a40f8f7e66538d2eb5759",
+          "sourceSha256": "e148c4c54a3ab5b67d8c02e6f4e959b62d4c1b3deb78f8699769746982b8f403",
+          "width": 640
+        },
+        {
+          "path": "assets/images/dancewave-alt-960.webp",
+          "publicPath": "/assets/images/dancewave-alt-960.webp",
+          "bytes": 177524,
+          "sha256": "d860e1848a169137a9816e69337821c6cf84610c0ae0021152dc22a07823029b",
+          "sourceSha256": "e148c4c54a3ab5b67d8c02e6f4e959b62d4c1b3deb78f8699769746982b8f403",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/dancewave.png",
+      "publicPath": "/assets/images/dancewave.png",
+      "name": "dancewave.png",
+      "label": "dancewave",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 401630,
+      "sha256": "7d34f47d87aadb13320d9389f0fd342c4f5a5c3736999cc812c9b579a86439b8",
+      "width": 1545,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/dancewave-320.webp",
+        "assets/images/dancewave-480.webp",
+        "assets/images/dancewave-640.webp",
+        "assets/images/dancewave-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/dancewave-320.webp",
+          "publicPath": "/assets/images/dancewave-320.webp",
+          "bytes": 48998,
+          "sha256": "0d5d62cff744ea8be7cb316f85407a2fdeeac7e33d757821e2a5e21b0e45f324",
+          "sourceSha256": "7d34f47d87aadb13320d9389f0fd342c4f5a5c3736999cc812c9b579a86439b8",
+          "width": 320
+        },
+        {
+          "path": "assets/images/dancewave-480.webp",
+          "publicPath": "/assets/images/dancewave-480.webp",
+          "bytes": 87728,
+          "sha256": "dbe76d71ad3c6a5fdd6351b82a4ef2e11466aef0a8bcb963741406542a2b5ced",
+          "sourceSha256": "7d34f47d87aadb13320d9389f0fd342c4f5a5c3736999cc812c9b579a86439b8",
+          "width": 480
+        },
+        {
+          "path": "assets/images/dancewave-640.webp",
+          "publicPath": "/assets/images/dancewave-640.webp",
+          "bytes": 129366,
+          "sha256": "3b99dfd69e535ad96371988ad671e1a30ab5c6ead666b60225156a6ef78b3bd2",
+          "sourceSha256": "7d34f47d87aadb13320d9389f0fd342c4f5a5c3736999cc812c9b579a86439b8",
+          "width": 640
+        },
+        {
+          "path": "assets/images/dancewave-960.webp",
+          "publicPath": "/assets/images/dancewave-960.webp",
+          "bytes": 217852,
+          "sha256": "4343607b1248dbf2ef7ae5b286e74b01ef0fbb096e7846ce569d9cce90373e52",
+          "sourceSha256": "7d34f47d87aadb13320d9389f0fd342c4f5a5c3736999cc812c9b579a86439b8",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-dancewave.md",
+          "count": 1
+        },
+        {
+          "path": "_products/dust-wave-event-ticket.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/default.png",
+      "publicPath": "/assets/images/default.png",
+      "name": "default.png",
+      "label": "default",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1619,
+      "sha256": "309a9227f7d02106c5800d6d9a69fa5b0650f2094ef94a1e093b69c04f5c266d",
+      "width": 500,
+      "height": 400,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/default-320.webp",
+        "assets/images/default-480.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/default-320.webp",
+          "publicPath": "/assets/images/default-320.webp",
+          "bytes": 1038,
+          "sha256": "3fed4322352c412e5ffa4d1039cd93bbc4083807bb7e78bd3aa60a824feb75ee",
+          "sourceSha256": "309a9227f7d02106c5800d6d9a69fa5b0650f2094ef94a1e093b69c04f5c266d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/default-480.webp",
+          "publicPath": "/assets/images/default-480.webp",
+          "bytes": 1618,
+          "sha256": "b18ac70453023ead0bc0c6115f56a5fc3b611742208e0688f68fdcd8e57afe3f",
+          "sourceSha256": "309a9227f7d02106c5800d6d9a69fa5b0650f2094ef94a1e093b69c04f5c266d",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-digital-download.md",
+          "count": 1
+        },
+        {
+          "path": "_products/dust-wave-warriors-juno.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/defaults/dust-wave-square.png",
+      "publicPath": "/assets/images/defaults/dust-wave-square.png",
+      "name": "dust-wave-square.png",
+      "label": "dust wave square",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 72779,
+      "sha256": "712937c92275f097191948a4eea3cec569daf550c9513d2d67c6fb7f8ebc02e5",
+      "width": 1078,
+      "height": 985,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/defaults/dust-wave-square-320.webp",
+        "assets/images/defaults/dust-wave-square-480.webp",
+        "assets/images/defaults/dust-wave-square-640.webp",
+        "assets/images/defaults/dust-wave-square-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/defaults/dust-wave-square-320.webp",
+          "publicPath": "/assets/images/defaults/dust-wave-square-320.webp",
+          "bytes": 12528,
+          "sha256": "22b65927d805c4e9a676537ef5704119727818a772572817326f35e83fe696bb",
+          "sourceSha256": "712937c92275f097191948a4eea3cec569daf550c9513d2d67c6fb7f8ebc02e5",
+          "width": 320
+        },
+        {
+          "path": "assets/images/defaults/dust-wave-square-480.webp",
+          "publicPath": "/assets/images/defaults/dust-wave-square-480.webp",
+          "bytes": 19954,
+          "sha256": "fc7ed9c99b33487101a7c672dab9730bf2dbab961aa1d0005078eb36d8d6218b",
+          "sourceSha256": "712937c92275f097191948a4eea3cec569daf550c9513d2d67c6fb7f8ebc02e5",
+          "width": 480
+        },
+        {
+          "path": "assets/images/defaults/dust-wave-square-640.webp",
+          "publicPath": "/assets/images/defaults/dust-wave-square-640.webp",
+          "bytes": 27138,
+          "sha256": "99490905389a858f964b80833a2d9af20237a2dc80d1f567811e741ab0a9d1fe",
+          "sourceSha256": "712937c92275f097191948a4eea3cec569daf550c9513d2d67c6fb7f8ebc02e5",
+          "width": 640
+        },
+        {
+          "path": "assets/images/defaults/dust-wave-square-960.webp",
+          "publicPath": "/assets/images/defaults/dust-wave-square-960.webp",
+          "bytes": 42522,
+          "sha256": "fa0d93f2e3c18180b40f108416ab000bf08ada94be7676bfad20a49370945d75",
+          "sourceSha256": "712937c92275f097191948a4eea3cec569daf550c9513d2d67c6fb7f8ebc02e5",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_config.yml",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "path": "assets/images/dustwave-mug.png",
+      "publicPath": "/assets/images/dustwave-mug.png",
+      "name": "dustwave-mug.png",
+      "label": "dustwave mug",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 105242,
+      "sha256": "287ed136542d4af51cf4685d606ecb9a46064801827dc75c41eaa7878a61219d",
+      "width": 1000,
+      "height": 1000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/dustwave-mug-320.webp",
+        "assets/images/dustwave-mug-480.webp",
+        "assets/images/dustwave-mug-640.webp",
+        "assets/images/dustwave-mug-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/dustwave-mug-320.webp",
+          "publicPath": "/assets/images/dustwave-mug-320.webp",
+          "bytes": 7250,
+          "sha256": "4ce7ca1fdf46fd169ef8aaa0b4f00e549c88879fe27be7f44f08d8733a411e66",
+          "sourceSha256": "287ed136542d4af51cf4685d606ecb9a46064801827dc75c41eaa7878a61219d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/dustwave-mug-480.webp",
+          "publicPath": "/assets/images/dustwave-mug-480.webp",
+          "bytes": 11844,
+          "sha256": "488ec47166b631fa1d1d34067d9173d498ec032536dba0426c38800902f34494",
+          "sourceSha256": "287ed136542d4af51cf4685d606ecb9a46064801827dc75c41eaa7878a61219d",
+          "width": 480
+        },
+        {
+          "path": "assets/images/dustwave-mug-640.webp",
+          "publicPath": "/assets/images/dustwave-mug-640.webp",
+          "bytes": 17044,
+          "sha256": "92326b217ca070ed0eb4980687cd326bfa3672bbf41267ae0fa2371f73b45d1e",
+          "sourceSha256": "287ed136542d4af51cf4685d606ecb9a46064801827dc75c41eaa7878a61219d",
+          "width": 640
+        },
+        {
+          "path": "assets/images/dustwave-mug-960.webp",
+          "publicPath": "/assets/images/dustwave-mug-960.webp",
+          "bytes": 28260,
+          "sha256": "78bab86ede963061864e67182e35a82327197957626142b66e72a34ccd5f00af",
+          "sourceSha256": "287ed136542d4af51cf4685d606ecb9a46064801827dc75c41eaa7878a61219d",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-mug.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/dustwave-tshirt.png",
+      "publicPath": "/assets/images/dustwave-tshirt.png",
+      "name": "dustwave-tshirt.png",
+      "label": "dustwave tshirt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 60809,
+      "sha256": "d713a4f6ecda70071f8b5d29fa552487aa59089644aa5050bc8e8b86dc53975f",
+      "width": 1044,
+      "height": 1044,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/dustwave-tshirt-320.webp",
+        "assets/images/dustwave-tshirt-480.webp",
+        "assets/images/dustwave-tshirt-640.webp",
+        "assets/images/dustwave-tshirt-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/dustwave-tshirt-320.webp",
+          "publicPath": "/assets/images/dustwave-tshirt-320.webp",
+          "bytes": 5332,
+          "sha256": "c4dd1a58ec5b9560a96a61da83db8f3bedb6a684ee28b1fe08d217eb00fceb7b",
+          "sourceSha256": "d713a4f6ecda70071f8b5d29fa552487aa59089644aa5050bc8e8b86dc53975f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/dustwave-tshirt-480.webp",
+          "publicPath": "/assets/images/dustwave-tshirt-480.webp",
+          "bytes": 9186,
+          "sha256": "c3ef0ec3c79fd3d1e7174fd974cb456a1e9678a2f89a5cf9874128f7296a8e1e",
+          "sourceSha256": "d713a4f6ecda70071f8b5d29fa552487aa59089644aa5050bc8e8b86dc53975f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/dustwave-tshirt-640.webp",
+          "publicPath": "/assets/images/dustwave-tshirt-640.webp",
+          "bytes": 13534,
+          "sha256": "fc1d1b14555367829f5688592dcef56cb9609a617d4e6f68bfece50d47b2f3d0",
+          "sourceSha256": "d713a4f6ecda70071f8b5d29fa552487aa59089644aa5050bc8e8b86dc53975f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/dustwave-tshirt-960.webp",
+          "publicPath": "/assets/images/dustwave-tshirt-960.webp",
+          "bytes": 23680,
+          "sha256": "fcb5ee1702489b65b4796a9b2030adf49dea5f49681ba654cef53378c5c5d528",
+          "sourceSha256": "d713a4f6ecda70071f8b5d29fa552487aa59089644aa5050bc8e8b86dc53975f",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-t-shirt.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/evening-bucket.png",
+      "publicPath": "/assets/images/evening-bucket.png",
+      "name": "evening-bucket.png",
+      "label": "evening bucket",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 68695,
+      "sha256": "5d3f0ba1eea1872cecbd0f247b2bd941756fa24449f911510a7ae3c08a625c99",
+      "width": 700,
+      "height": 700,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/evening-bucket-320.webp",
+        "assets/images/evening-bucket-480.webp",
+        "assets/images/evening-bucket-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/evening-bucket-320.webp",
+          "publicPath": "/assets/images/evening-bucket-320.webp",
+          "bytes": 11784,
+          "sha256": "ca1b3fcb8a38a462f5b96d6332ba4abd46f7e16465c9c8f1880c6cd7d596d146",
+          "sourceSha256": "5d3f0ba1eea1872cecbd0f247b2bd941756fa24449f911510a7ae3c08a625c99",
+          "width": 320
+        },
+        {
+          "path": "assets/images/evening-bucket-480.webp",
+          "publicPath": "/assets/images/evening-bucket-480.webp",
+          "bytes": 20952,
+          "sha256": "f621d855ba536ed828902223f3c50dce9f5c70ee1524b6a7eb4d7bc67059be9b",
+          "sourceSha256": "5d3f0ba1eea1872cecbd0f247b2bd941756fa24449f911510a7ae3c08a625c99",
+          "width": 480
+        },
+        {
+          "path": "assets/images/evening-bucket-640.webp",
+          "publicPath": "/assets/images/evening-bucket-640.webp",
+          "bytes": 31822,
+          "sha256": "acf4524c023f166a3d64e3cb69b0d3c71567f1f8acc0f648e0999d63f2728651",
+          "sourceSha256": "5d3f0ba1eea1872cecbd0f247b2bd941756fa24449f911510a7ae3c08a625c99",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-popcorn-bucket.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/friday-studio.png",
+      "publicPath": "/assets/images/friday-studio.png",
+      "name": "friday-studio.png",
+      "label": "friday studio",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 996705,
+      "sha256": "237a521968329863458224b824ad7ce8e6de88dc9a04aa6940e7df0a29db5f6e",
+      "width": 1400,
+      "height": 2138,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/friday-studio-320.webp",
+        "assets/images/friday-studio-480.webp",
+        "assets/images/friday-studio-640.webp",
+        "assets/images/friday-studio-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/friday-studio-320.webp",
+          "publicPath": "/assets/images/friday-studio-320.webp",
+          "bytes": 32838,
+          "sha256": "8e8ff00437542724eb85f9d32bbe75d401c225ab582324e92cb8cddcc3e2a572",
+          "sourceSha256": "237a521968329863458224b824ad7ce8e6de88dc9a04aa6940e7df0a29db5f6e",
+          "width": 320
+        },
+        {
+          "path": "assets/images/friday-studio-480.webp",
+          "publicPath": "/assets/images/friday-studio-480.webp",
+          "bytes": 58238,
+          "sha256": "2ab13b40a734e89a0e24402a660d8f4f8c75fc5906e0ef7e767319f9b73d1807",
+          "sourceSha256": "237a521968329863458224b824ad7ce8e6de88dc9a04aa6940e7df0a29db5f6e",
+          "width": 480
+        },
+        {
+          "path": "assets/images/friday-studio-640.webp",
+          "publicPath": "/assets/images/friday-studio-640.webp",
+          "bytes": 91486,
+          "sha256": "fa83724b17f93ee5f511342939a65a0e8c5b347ac44af9a1925f89a5265831a1",
+          "sourceSha256": "237a521968329863458224b824ad7ce8e6de88dc9a04aa6940e7df0a29db5f6e",
+          "width": 640
+        },
+        {
+          "path": "assets/images/friday-studio-960.webp",
+          "publicPath": "/assets/images/friday-studio-960.webp",
+          "bytes": 179412,
+          "sha256": "bd0f2c82b859f0cf17d8f7f67f6c66e9981050f7f277f5420de99271a5ddd136",
+          "sourceSha256": "237a521968329863458224b824ad7ce8e6de88dc9a04aa6940e7df0a29db5f6e",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-his-girl-friday-studio.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/frights-delights.jpg",
+      "publicPath": "/assets/images/frights-delights.jpg",
+      "name": "frights-delights.jpg",
+      "label": "frights delights",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 193104,
+      "sha256": "333156a0c68607f07aa07445585c831785ddae14ea495cc9211a74eaca98a3fb",
+      "width": 1080,
+      "height": 1350,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/frights-delights-320.webp",
+        "assets/images/frights-delights-480.webp",
+        "assets/images/frights-delights-640.webp",
+        "assets/images/frights-delights-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/frights-delights-320.webp",
+          "publicPath": "/assets/images/frights-delights-320.webp",
+          "bytes": 26908,
+          "sha256": "3dde53b66c3561eaf73c4f3fe81aa22d3bc40f9dbe714fd08500d3e2a9b24107",
+          "sourceSha256": "333156a0c68607f07aa07445585c831785ddae14ea495cc9211a74eaca98a3fb",
+          "width": 320
+        },
+        {
+          "path": "assets/images/frights-delights-480.webp",
+          "publicPath": "/assets/images/frights-delights-480.webp",
+          "bytes": 45200,
+          "sha256": "3876ab00b57d27b2e6889819617ace0a3acf5c9e8da205ca2d060d1c4933ae1d",
+          "sourceSha256": "333156a0c68607f07aa07445585c831785ddae14ea495cc9211a74eaca98a3fb",
+          "width": 480
+        },
+        {
+          "path": "assets/images/frights-delights-640.webp",
+          "publicPath": "/assets/images/frights-delights-640.webp",
+          "bytes": 64980,
+          "sha256": "5005be06c81a9503c3149a73f680635c897996c3c8e03cce04bb16c06e3ee6c0",
+          "sourceSha256": "333156a0c68607f07aa07445585c831785ddae14ea495cc9211a74eaca98a3fb",
+          "width": 640
+        },
+        {
+          "path": "assets/images/frights-delights-960.webp",
+          "publicPath": "/assets/images/frights-delights-960.webp",
+          "bytes": 106354,
+          "sha256": "26f187878b9aa4f29820bf79fd280d48ab7a187ffa86801fee6f3deeb33a42a2",
+          "sourceSha256": "333156a0c68607f07aa07445585c831785ddae14ea495cc9211a74eaca98a3fb",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-frights-delights.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/froggy-sticker.png",
+      "publicPath": "/assets/images/froggy-sticker.png",
+      "name": "froggy-sticker.png",
+      "label": "froggy sticker",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 205923,
+      "sha256": "197330384d145abcae7cb11018dc18c0a5b6fdef50ddcd4e20bcdd0820bf0271",
+      "width": 700,
+      "height": 700,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/froggy-sticker-320.webp",
+        "assets/images/froggy-sticker-480.webp",
+        "assets/images/froggy-sticker-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/froggy-sticker-320.webp",
+          "publicPath": "/assets/images/froggy-sticker-320.webp",
+          "bytes": 16270,
+          "sha256": "715d20521eb0b1e2e0d5cb0a7bc82500cf87023b12d6313f03eea19a03b32586",
+          "sourceSha256": "197330384d145abcae7cb11018dc18c0a5b6fdef50ddcd4e20bcdd0820bf0271",
+          "width": 320
+        },
+        {
+          "path": "assets/images/froggy-sticker-480.webp",
+          "publicPath": "/assets/images/froggy-sticker-480.webp",
+          "bytes": 30476,
+          "sha256": "bd8a3f5476e9d2a6538d20d0ff02ccf9d1589900145359e300941247f72ab60e",
+          "sourceSha256": "197330384d145abcae7cb11018dc18c0a5b6fdef50ddcd4e20bcdd0820bf0271",
+          "width": 480
+        },
+        {
+          "path": "assets/images/froggy-sticker-640.webp",
+          "publicPath": "/assets/images/froggy-sticker-640.webp",
+          "bytes": 49780,
+          "sha256": "36798cd74ee79539f4946435ef9a40c80e276279ce265c7fdcfec82bbab61816",
+          "sourceSha256": "197330384d145abcae7cb11018dc18c0a5b6fdef50ddcd4e20bcdd0820bf0271",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-froggy-sticker.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/froggy-tshirt.png",
+      "publicPath": "/assets/images/froggy-tshirt.png",
+      "name": "froggy-tshirt.png",
+      "label": "froggy tshirt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 350803,
+      "sha256": "92cd211ab4e9ea148cf6d3f4f4cfff4289291fd7815809b7538337e43e690301",
+      "width": 1600,
+      "height": 1571,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/froggy-tshirt-320.webp",
+        "assets/images/froggy-tshirt-480.webp",
+        "assets/images/froggy-tshirt-640.webp",
+        "assets/images/froggy-tshirt-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/froggy-tshirt-320.webp",
+          "publicPath": "/assets/images/froggy-tshirt-320.webp",
+          "bytes": 11028,
+          "sha256": "a2c2603fe899c2a19d0e986c6d0a955f3718340255ae70928dcf1b079bf6237b",
+          "sourceSha256": "92cd211ab4e9ea148cf6d3f4f4cfff4289291fd7815809b7538337e43e690301",
+          "width": 320
+        },
+        {
+          "path": "assets/images/froggy-tshirt-480.webp",
+          "publicPath": "/assets/images/froggy-tshirt-480.webp",
+          "bytes": 18716,
+          "sha256": "081bd4e34f059622678ff0e09adcfbe85e54c2982c0de98edee9714f03bdbb45",
+          "sourceSha256": "92cd211ab4e9ea148cf6d3f4f4cfff4289291fd7815809b7538337e43e690301",
+          "width": 480
+        },
+        {
+          "path": "assets/images/froggy-tshirt-640.webp",
+          "publicPath": "/assets/images/froggy-tshirt-640.webp",
+          "bytes": 27554,
+          "sha256": "cef47f51fc4a1cb7a91049bd6eb1ffa92d18316f2dbbfac3b8a69338df7f2d48",
+          "sourceSha256": "92cd211ab4e9ea148cf6d3f4f4cfff4289291fd7815809b7538337e43e690301",
+          "width": 640
+        },
+        {
+          "path": "assets/images/froggy-tshirt-960.webp",
+          "publicPath": "/assets/images/froggy-tshirt-960.webp",
+          "bytes": 47360,
+          "sha256": "953f5d84cbdfb57d2568176e95ce0942a9251319bdac944fa1817098eb1ac45c",
+          "sourceSha256": "92cd211ab4e9ea148cf6d3f4f4cfff4289291fd7815809b7538337e43e690301",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-froggy-t-shirt.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/frograiser.png",
+      "publicPath": "/assets/images/frograiser.png",
+      "name": "frograiser.png",
+      "label": "frograiser",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 522719,
+      "sha256": "aa7cce94727bc35b593f3614c296ffe6e4c73c8ec2280bcf21aaeb2ebb0b2025",
+      "width": 1446,
+      "height": 1928,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/frograiser-320.webp",
+        "assets/images/frograiser-480.webp",
+        "assets/images/frograiser-640.webp",
+        "assets/images/frograiser-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/frograiser-320.webp",
+          "publicPath": "/assets/images/frograiser-320.webp",
+          "bytes": 38390,
+          "sha256": "04dbb053dabd97f23736a1192a24704efe0a3927be1b1b80fd8bbbc98f064ba0",
+          "sourceSha256": "aa7cce94727bc35b593f3614c296ffe6e4c73c8ec2280bcf21aaeb2ebb0b2025",
+          "width": 320
+        },
+        {
+          "path": "assets/images/frograiser-480.webp",
+          "publicPath": "/assets/images/frograiser-480.webp",
+          "bytes": 66048,
+          "sha256": "01a4b281972e81dda5d679bc60ea234291cc8a360003e4c9bff16f0a74c2e707",
+          "sourceSha256": "aa7cce94727bc35b593f3614c296ffe6e4c73c8ec2280bcf21aaeb2ebb0b2025",
+          "width": 480
+        },
+        {
+          "path": "assets/images/frograiser-640.webp",
+          "publicPath": "/assets/images/frograiser-640.webp",
+          "bytes": 95988,
+          "sha256": "93cb8c8b7ce8661025d8ff4523fc665ce61dc3fc4e9d3391cc8bc4dfad1e4d5d",
+          "sourceSha256": "aa7cce94727bc35b593f3614c296ffe6e4c73c8ec2280bcf21aaeb2ebb0b2025",
+          "width": 640
+        },
+        {
+          "path": "assets/images/frograiser-960.webp",
+          "publicPath": "/assets/images/frograiser-960.webp",
+          "bytes": 156962,
+          "sha256": "10154a80217fc1a3fd34606dc6c27eeed3d9fd5ae4aaee1f1243472fe12ab287",
+          "sourceSha256": "aa7cce94727bc35b593f3614c296ffe6e4c73c8ec2280bcf21aaeb2ebb0b2025",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-frograiser.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/fronteras-bumper.png",
+      "publicPath": "/assets/images/fronteras-bumper.png",
+      "name": "fronteras-bumper.png",
+      "label": "fronteras bumper",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 450482,
+      "sha256": "ef988d7353bcc32d45f2ff6c952f03d8647976e1d66a041593ef7ba7c54642bc",
+      "width": 2000,
+      "height": 373,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/fronteras-bumper-320.webp",
+        "assets/images/fronteras-bumper-480.webp",
+        "assets/images/fronteras-bumper-640.webp",
+        "assets/images/fronteras-bumper-960.webp",
+        "assets/images/fronteras-bumper-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/fronteras-bumper-320.webp",
+          "publicPath": "/assets/images/fronteras-bumper-320.webp",
+          "bytes": 9474,
+          "sha256": "5b686e520354173c68b61febecf6d5c18031c06a43d55d8c3d59af35015efd58",
+          "sourceSha256": "ef988d7353bcc32d45f2ff6c952f03d8647976e1d66a041593ef7ba7c54642bc",
+          "width": 320
+        },
+        {
+          "path": "assets/images/fronteras-bumper-480.webp",
+          "publicPath": "/assets/images/fronteras-bumper-480.webp",
+          "bytes": 22582,
+          "sha256": "42bdcf0786a98557de11d4f701bf65c2d151997f6a11f559922dadde3993d88f",
+          "sourceSha256": "ef988d7353bcc32d45f2ff6c952f03d8647976e1d66a041593ef7ba7c54642bc",
+          "width": 480
+        },
+        {
+          "path": "assets/images/fronteras-bumper-640.webp",
+          "publicPath": "/assets/images/fronteras-bumper-640.webp",
+          "bytes": 40296,
+          "sha256": "36e78bfb4b9a623b803813588d2528069ee49cfc409fec5b4b374cae06e29c8e",
+          "sourceSha256": "ef988d7353bcc32d45f2ff6c952f03d8647976e1d66a041593ef7ba7c54642bc",
+          "width": 640
+        },
+        {
+          "path": "assets/images/fronteras-bumper-960.webp",
+          "publicPath": "/assets/images/fronteras-bumper-960.webp",
+          "bytes": 86976,
+          "sha256": "79ac8cd670541d640b7d13b32dd497e463be370be0a085e6b599e1c453258ef3",
+          "sourceSha256": "ef988d7353bcc32d45f2ff6c952f03d8647976e1d66a041593ef7ba7c54642bc",
+          "width": 960
+        },
+        {
+          "path": "assets/images/fronteras-bumper-1600.webp",
+          "publicPath": "/assets/images/fronteras-bumper-1600.webp",
+          "bytes": 198836,
+          "sha256": "e9db1ea994a28529b148555eccb37bae6530feab95d337220b339ed6831ee3f0",
+          "sourceSha256": "ef988d7353bcc32d45f2ff6c952f03d8647976e1d66a041593ef7ba7c54642bc",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/fronteras-bumper.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/fronteras-poster.png",
+      "publicPath": "/assets/images/fronteras-poster.png",
+      "name": "fronteras-poster.png",
+      "label": "fronteras poster",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 909640,
+      "sha256": "b80de19d6cba6b8239328ad3e1e7f5e25d10447665f78ec0803da05ada45a9dc",
+      "width": 1333,
+      "height": 1333,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/fronteras-poster-320.webp",
+        "assets/images/fronteras-poster-480.webp",
+        "assets/images/fronteras-poster-640.webp",
+        "assets/images/fronteras-poster-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/fronteras-poster-320.webp",
+          "publicPath": "/assets/images/fronteras-poster-320.webp",
+          "bytes": 19450,
+          "sha256": "f8f1d17eba9d62b5c598a6260360b163d438dc6f05f40e113edd8f3c34d87133",
+          "sourceSha256": "b80de19d6cba6b8239328ad3e1e7f5e25d10447665f78ec0803da05ada45a9dc",
+          "width": 320
+        },
+        {
+          "path": "assets/images/fronteras-poster-480.webp",
+          "publicPath": "/assets/images/fronteras-poster-480.webp",
+          "bytes": 42550,
+          "sha256": "6964fba776a7e32f951a789d376fb4ae8abf9d98c618c4e1b173f1aa923b5f90",
+          "sourceSha256": "b80de19d6cba6b8239328ad3e1e7f5e25d10447665f78ec0803da05ada45a9dc",
+          "width": 480
+        },
+        {
+          "path": "assets/images/fronteras-poster-640.webp",
+          "publicPath": "/assets/images/fronteras-poster-640.webp",
+          "bytes": 76972,
+          "sha256": "50c66629ffef97cfedbfc0684f1b49c1b670220d8bd2e6349b89341c9700b028",
+          "sourceSha256": "b80de19d6cba6b8239328ad3e1e7f5e25d10447665f78ec0803da05ada45a9dc",
+          "width": 640
+        },
+        {
+          "path": "assets/images/fronteras-poster-960.webp",
+          "publicPath": "/assets/images/fronteras-poster-960.webp",
+          "bytes": 172476,
+          "sha256": "835f83a60c73b2a2f897c58932da70af24ba059bf84c9e9fb50bb504d8aca66e",
+          "sourceSha256": "b80de19d6cba6b8239328ad3e1e7f5e25d10447665f78ec0803da05ada45a9dc",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/fronteras-poster-big.md",
+          "count": 1
+        },
+        {
+          "path": "_products/fronteras-poster-small.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/fronteras-sticker.png",
+      "publicPath": "/assets/images/fronteras-sticker.png",
+      "name": "fronteras-sticker.png",
+      "label": "fronteras sticker",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 399410,
+      "sha256": "d1535963f42c25c49b73a410a1b0310f38141917447ab9bc2fe0318750c2447b",
+      "width": 1000,
+      "height": 1000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/fronteras-sticker-320.webp",
+        "assets/images/fronteras-sticker-480.webp",
+        "assets/images/fronteras-sticker-640.webp",
+        "assets/images/fronteras-sticker-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [
+        "assets/images/fronteras-sticker-960.webp"
+      ],
+      "derivatives": [
+        {
+          "path": "assets/images/fronteras-sticker-320.webp",
+          "publicPath": "/assets/images/fronteras-sticker-320.webp",
+          "bytes": 92492,
+          "sha256": "fecbdba603560c9f81c1d32978d6090a639d6f761629cc6a94203836e925894d",
+          "sourceSha256": "d1535963f42c25c49b73a410a1b0310f38141917447ab9bc2fe0318750c2447b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/fronteras-sticker-480.webp",
+          "publicPath": "/assets/images/fronteras-sticker-480.webp",
+          "bytes": 189794,
+          "sha256": "4e42830705c457ad86be25d01254b9e1f9839cc13c2d94caaba46644c5193c94",
+          "sourceSha256": "d1535963f42c25c49b73a410a1b0310f38141917447ab9bc2fe0318750c2447b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/fronteras-sticker-640.webp",
+          "publicPath": "/assets/images/fronteras-sticker-640.webp",
+          "bytes": 311260,
+          "sha256": "b35c5040dd2c516248daf8d8c57cc32ac8fec2917e46eec59788cc302cdfcf6e",
+          "sourceSha256": "d1535963f42c25c49b73a410a1b0310f38141917447ab9bc2fe0318750c2447b",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/fronteras-sticker.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/fronteras-tshirt.png",
+      "publicPath": "/assets/images/fronteras-tshirt.png",
+      "name": "fronteras-tshirt.png",
+      "label": "fronteras tshirt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 132359,
+      "sha256": "7bb3b96822c6711330a81e7b9114d38cd4a4e52800870f18b617358d5a380195",
+      "width": 1155,
+      "height": 646,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/fronteras-tshirt-320.webp",
+        "assets/images/fronteras-tshirt-480.webp",
+        "assets/images/fronteras-tshirt-640.webp",
+        "assets/images/fronteras-tshirt-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/fronteras-tshirt-320.webp",
+          "publicPath": "/assets/images/fronteras-tshirt-320.webp",
+          "bytes": 8298,
+          "sha256": "e2848e4acbc1805d6077f0ca4e7cd3ae70f13f048c4d110be0e3ff66e1fe4485",
+          "sourceSha256": "7bb3b96822c6711330a81e7b9114d38cd4a4e52800870f18b617358d5a380195",
+          "width": 320
+        },
+        {
+          "path": "assets/images/fronteras-tshirt-480.webp",
+          "publicPath": "/assets/images/fronteras-tshirt-480.webp",
+          "bytes": 14706,
+          "sha256": "633909e705654104d5c5c9408587bf2b429013dea5d95ee8f9ba11090509c0a3",
+          "sourceSha256": "7bb3b96822c6711330a81e7b9114d38cd4a4e52800870f18b617358d5a380195",
+          "width": 480
+        },
+        {
+          "path": "assets/images/fronteras-tshirt-640.webp",
+          "publicPath": "/assets/images/fronteras-tshirt-640.webp",
+          "bytes": 22508,
+          "sha256": "590537e3ef688da8f42fa34758e9cce8449d8f126e39d0ba36f286fac1c0b74e",
+          "sourceSha256": "7bb3b96822c6711330a81e7b9114d38cd4a4e52800870f18b617358d5a380195",
+          "width": 640
+        },
+        {
+          "path": "assets/images/fronteras-tshirt-960.webp",
+          "publicPath": "/assets/images/fronteras-tshirt-960.webp",
+          "bytes": 39228,
+          "sha256": "fab872a1f3208953de80e37158c8733a1001ffce124e1c7dd475528d0ee36c0b",
+          "sourceSha256": "7bb3b96822c6711330a81e7b9114d38cd4a4e52800870f18b617358d5a380195",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/fronteras-t-shirt.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/giallo.jpg",
+      "publicPath": "/assets/images/giallo.jpg",
+      "name": "giallo.jpg",
+      "label": "giallo",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 258715,
+      "sha256": "f45e07bbb193cf777e0cb343d012c3398935798b3a7598f104548fe59cd75ae2",
+      "width": 1582,
+      "height": 2048,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/giallo-320.webp",
+        "assets/images/giallo-480.webp",
+        "assets/images/giallo-640.webp",
+        "assets/images/giallo-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/giallo-320.webp",
+          "publicPath": "/assets/images/giallo-320.webp",
+          "bytes": 32900,
+          "sha256": "63287b978c735d936880ce4d2bbe4fa9d899a1fef7b24a469e639fdf33f098dd",
+          "sourceSha256": "f45e07bbb193cf777e0cb343d012c3398935798b3a7598f104548fe59cd75ae2",
+          "width": 320
+        },
+        {
+          "path": "assets/images/giallo-480.webp",
+          "publicPath": "/assets/images/giallo-480.webp",
+          "bytes": 55376,
+          "sha256": "7188541d79422521d754284f56e3e3e2f490162423f9a9e48cc5d0c3f8ebee3d",
+          "sourceSha256": "f45e07bbb193cf777e0cb343d012c3398935798b3a7598f104548fe59cd75ae2",
+          "width": 480
+        },
+        {
+          "path": "assets/images/giallo-640.webp",
+          "publicPath": "/assets/images/giallo-640.webp",
+          "bytes": 78412,
+          "sha256": "74d1f13b04fc6e6c0deca89b0240cac28c6e1cfab5603199024b4f4e9c9cbc4a",
+          "sourceSha256": "f45e07bbb193cf777e0cb343d012c3398935798b3a7598f104548fe59cd75ae2",
+          "width": 640
+        },
+        {
+          "path": "assets/images/giallo-960.webp",
+          "publicPath": "/assets/images/giallo-960.webp",
+          "bytes": 122266,
+          "sha256": "882bf6d76383ec82397f99f1849ada2f1ffdd69b02e325686b2220fd8af65c78",
+          "sourceSha256": "f45e07bbb193cf777e0cb343d012c3398935798b3a7598f104548fe59cd75ae2",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-giallo-disco.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/horsevamp.jpg",
+      "publicPath": "/assets/images/horsevamp.jpg",
+      "name": "horsevamp.jpg",
+      "label": "horsevamp",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 834304,
+      "sha256": "2ab754a70bd0a2224881006453f69f30d5b788d55c714b493256280fe8af00dd",
+      "width": 3000,
+      "height": 3000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/horsevamp-320.webp",
+        "assets/images/horsevamp-480.webp",
+        "assets/images/horsevamp-640.webp",
+        "assets/images/horsevamp-960.webp",
+        "assets/images/horsevamp-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/horsevamp-320.webp",
+          "publicPath": "/assets/images/horsevamp-320.webp",
+          "bytes": 40244,
+          "sha256": "60323e3914fda34070f8947b1f116495c2d6cb125c6d2b16cd07f21525812c2e",
+          "sourceSha256": "2ab754a70bd0a2224881006453f69f30d5b788d55c714b493256280fe8af00dd",
+          "width": 320
+        },
+        {
+          "path": "assets/images/horsevamp-480.webp",
+          "publicPath": "/assets/images/horsevamp-480.webp",
+          "bytes": 73444,
+          "sha256": "c6f64c6403c9d8a632868dbc4a562dc27e8041ad5c22a4027ed9848cf400672c",
+          "sourceSha256": "2ab754a70bd0a2224881006453f69f30d5b788d55c714b493256280fe8af00dd",
+          "width": 480
+        },
+        {
+          "path": "assets/images/horsevamp-640.webp",
+          "publicPath": "/assets/images/horsevamp-640.webp",
+          "bytes": 107886,
+          "sha256": "06470c2f7ef62cee08ab7f6255156e802386f231685d5c37b1c543646a8488ca",
+          "sourceSha256": "2ab754a70bd0a2224881006453f69f30d5b788d55c714b493256280fe8af00dd",
+          "width": 640
+        },
+        {
+          "path": "assets/images/horsevamp-960.webp",
+          "publicPath": "/assets/images/horsevamp-960.webp",
+          "bytes": 189796,
+          "sha256": "9c06c405fdad7877fb377120a098020947a274a44e6ea57d76aa8ae18fdc67f4",
+          "sourceSha256": "2ab754a70bd0a2224881006453f69f30d5b788d55c714b493256280fe8af00dd",
+          "width": 960
+        },
+        {
+          "path": "assets/images/horsevamp-1600.webp",
+          "publicPath": "/assets/images/horsevamp-1600.webp",
+          "bytes": 377808,
+          "sha256": "84d201f4b696d18c9f470399f79dd3c1a71fa433c9c91c4ffe7c5b866ef96603",
+          "sourceSha256": "2ab754a70bd0a2224881006453f69f30d5b788d55c714b493256280fe8af00dd",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-horse-vs-vamp.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/jho-shirt.png",
+      "publicPath": "/assets/images/jho-shirt.png",
+      "name": "jho-shirt.png",
+      "label": "jho shirt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 286536,
+      "sha256": "faa12ede12d9ef296cb666416e4f01b6d7ce357d62cf629c8d28edf0132dd7be",
+      "width": 540,
+      "height": 462,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/jho-shirt-320.webp",
+        "assets/images/jho-shirt-480.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/jho-shirt-320.webp",
+          "publicPath": "/assets/images/jho-shirt-320.webp",
+          "bytes": 6480,
+          "sha256": "7fa3ac4e76182ffba91b1e6829123e38ddf771be93f99d3ca0115d080e8fe066",
+          "sourceSha256": "faa12ede12d9ef296cb666416e4f01b6d7ce357d62cf629c8d28edf0132dd7be",
+          "width": 320
+        },
+        {
+          "path": "assets/images/jho-shirt-480.webp",
+          "publicPath": "/assets/images/jho-shirt-480.webp",
+          "bytes": 11556,
+          "sha256": "20a864923fec968233a2faf2304e80d0a5f0ada7fcccdb52ce865dcac2eec4f0",
+          "sourceSha256": "faa12ede12d9ef296cb666416e4f01b6d7ce357d62cf629c8d28edf0132dd7be",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/jho-t-shirt.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/jho-sticker.png",
+      "publicPath": "/assets/images/jho-sticker.png",
+      "name": "jho-sticker.png",
+      "label": "jho sticker",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 308505,
+      "sha256": "c4f46ab1897db82365242aa0752f94e551527f82ffeca183e17f74e12e86f1f1",
+      "width": 722,
+      "height": 660,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/jho-sticker-320.webp",
+        "assets/images/jho-sticker-480.webp",
+        "assets/images/jho-sticker-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/jho-sticker-320.webp",
+          "publicPath": "/assets/images/jho-sticker-320.webp",
+          "bytes": 33876,
+          "sha256": "5a8715a683244e12ff0b350c3b29ceaaa2ebeca907b11e2a51a485c4b2f7b2e5",
+          "sourceSha256": "c4f46ab1897db82365242aa0752f94e551527f82ffeca183e17f74e12e86f1f1",
+          "width": 320
+        },
+        {
+          "path": "assets/images/jho-sticker-480.webp",
+          "publicPath": "/assets/images/jho-sticker-480.webp",
+          "bytes": 60836,
+          "sha256": "5c8b8e03efd3577980d65a7b79a8407deed48b22c42d5e037e397e68698b5d12",
+          "sourceSha256": "c4f46ab1897db82365242aa0752f94e551527f82ffeca183e17f74e12e86f1f1",
+          "width": 480
+        },
+        {
+          "path": "assets/images/jho-sticker-640.webp",
+          "publicPath": "/assets/images/jho-sticker-640.webp",
+          "bytes": 86124,
+          "sha256": "378e1a332b1efffe85219b8ac522aaf686b5df94b704ba1572a0c9bd6996bcef",
+          "sourceSha256": "c4f46ab1897db82365242aa0752f94e551527f82ffeca183e17f74e12e86f1f1",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/jho-sticker.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/print.jpg",
+      "publicPath": "/assets/images/print.jpg",
+      "name": "print.jpg",
+      "label": "print",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 389158,
+      "sha256": "d79b0803252bbbb15f3eb04735cbd1427dd351cb9ce4e783663753fb1b158d8b",
+      "width": 3000,
+      "height": 2000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/print-320.webp",
+        "assets/images/print-480.webp",
+        "assets/images/print-640.webp",
+        "assets/images/print-960.webp",
+        "assets/images/print-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/print-320.webp",
+          "publicPath": "/assets/images/print-320.webp",
+          "bytes": 7972,
+          "sha256": "bf1086db93c754cad2b590127d36c6843ba5fd1830490bfbbf6b93ee88333567",
+          "sourceSha256": "d79b0803252bbbb15f3eb04735cbd1427dd351cb9ce4e783663753fb1b158d8b",
+          "width": 320
+        },
+        {
+          "path": "assets/images/print-480.webp",
+          "publicPath": "/assets/images/print-480.webp",
+          "bytes": 16620,
+          "sha256": "9f181c166f76279606fd32d087c565da9a2eecfbe5816f0c2713542dd2e28913",
+          "sourceSha256": "d79b0803252bbbb15f3eb04735cbd1427dd351cb9ce4e783663753fb1b158d8b",
+          "width": 480
+        },
+        {
+          "path": "assets/images/print-640.webp",
+          "publicPath": "/assets/images/print-640.webp",
+          "bytes": 28092,
+          "sha256": "28ac106cd26386341c96f404d3969c4ad47cc16164885e6009db3b6a5c3f2b70",
+          "sourceSha256": "d79b0803252bbbb15f3eb04735cbd1427dd351cb9ce4e783663753fb1b158d8b",
+          "width": 640
+        },
+        {
+          "path": "assets/images/print-960.webp",
+          "publicPath": "/assets/images/print-960.webp",
+          "bytes": 59310,
+          "sha256": "9d7aec3b54b9946f908be449296c2a90d8670dbdd46d88f65c47746c3449076e",
+          "sourceSha256": "d79b0803252bbbb15f3eb04735cbd1427dd351cb9ce4e783663753fb1b158d8b",
+          "width": 960
+        },
+        {
+          "path": "assets/images/print-1600.webp",
+          "publicPath": "/assets/images/print-1600.webp",
+          "bytes": 149118,
+          "sha256": "1dea03727fc2103d2c6ee95e07eb48e43b07727111fd2122d0c2928ed4e17d1b",
+          "sourceSha256": "d79b0803252bbbb15f3eb04735cbd1427dd351cb9ce4e783663753fb1b158d8b",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/fronteras-postcard.md",
+          "count": 1
+        },
+        {
+          "path": "_products/fronteras-print-large.md",
+          "count": 1
+        },
+        {
+          "path": "_products/fronteras-print-medium.md",
+          "count": 1
+        },
+        {
+          "path": "_products/fronteras-print-small.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/products/product-new-product-20260708-075131.png",
+      "publicPath": "/assets/images/products/product-new-product-20260708-075131.png",
+      "name": "product-new-product-20260708-075131.png",
+      "label": "product new product 20260708",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 995973,
+      "sha256": "8a063b31393bae647b5781c5ae70b468a71feb53b806d35d3b25d6ee3f74347a",
+      "width": 2000,
+      "height": 1500,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/products/product-new-product-20260708-075131-320.webp",
+        "assets/images/products/product-new-product-20260708-075131-480.webp",
+        "assets/images/products/product-new-product-20260708-075131-640.webp",
+        "assets/images/products/product-new-product-20260708-075131-960.webp",
+        "assets/images/products/product-new-product-20260708-075131-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/products/product-new-product-20260708-075131-320.webp",
+          "publicPath": "/assets/images/products/product-new-product-20260708-075131-320.webp",
+          "bytes": 15982,
+          "sha256": "322d6fcf0f91f32fc9669a98ab27bd2eb070df46069d72fb0593fe3004a6a8b5",
+          "sourceSha256": "8a063b31393bae647b5781c5ae70b468a71feb53b806d35d3b25d6ee3f74347a",
+          "width": 320
+        },
+        {
+          "path": "assets/images/products/product-new-product-20260708-075131-480.webp",
+          "publicPath": "/assets/images/products/product-new-product-20260708-075131-480.webp",
+          "bytes": 29830,
+          "sha256": "8569ad41f59f759c696c688aad10be95c110ff873b2a040d809d922ca857c237",
+          "sourceSha256": "8a063b31393bae647b5781c5ae70b468a71feb53b806d35d3b25d6ee3f74347a",
+          "width": 480
+        },
+        {
+          "path": "assets/images/products/product-new-product-20260708-075131-640.webp",
+          "publicPath": "/assets/images/products/product-new-product-20260708-075131-640.webp",
+          "bytes": 45632,
+          "sha256": "d4fcfb21379c4601e24d433ddabd132bdca1b1e281f03c7d0ac065c4a7dfac90",
+          "sourceSha256": "8a063b31393bae647b5781c5ae70b468a71feb53b806d35d3b25d6ee3f74347a",
+          "width": 640
+        },
+        {
+          "path": "assets/images/products/product-new-product-20260708-075131-960.webp",
+          "publicPath": "/assets/images/products/product-new-product-20260708-075131-960.webp",
+          "bytes": 87510,
+          "sha256": "b3fdd7656cf7206adec10ccc793e403188cbe998b0a81b15a89f43e8e4c4262b",
+          "sourceSha256": "8a063b31393bae647b5781c5ae70b468a71feb53b806d35d3b25d6ee3f74347a",
+          "width": 960
+        },
+        {
+          "path": "assets/images/products/product-new-product-20260708-075131-1600.webp",
+          "publicPath": "/assets/images/products/product-new-product-20260708-075131-1600.webp",
+          "bytes": 191630,
+          "sha256": "4e5d6713df927f8621e3a8959c1fdda6b6c4408f350e04bbe0db7dc16e01e1cc",
+          "sourceSha256": "8a063b31393bae647b5781c5ae70b468a71feb53b806d35d3b25d6ee3f74347a",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/film-fatale-at-the-guild-cinema.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/raiders-guild.jpg",
+      "publicPath": "/assets/images/raiders-guild.jpg",
+      "name": "raiders-guild.jpg",
+      "label": "raiders guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 121793,
+      "sha256": "d360e143ca6937c1a4e486915a3a0ea1196adc4b09d92d98c474602dbf86efaf",
+      "width": 700,
+      "height": 1050,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/raiders-guild-320.webp",
+        "assets/images/raiders-guild-480.webp",
+        "assets/images/raiders-guild-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/raiders-guild-320.webp",
+          "publicPath": "/assets/images/raiders-guild-320.webp",
+          "bytes": 18684,
+          "sha256": "e68e2c93dc5afd6440bedf6a14272ab6c07518c34d1d36dd11b56a0b7696ed42",
+          "sourceSha256": "d360e143ca6937c1a4e486915a3a0ea1196adc4b09d92d98c474602dbf86efaf",
+          "width": 320
+        },
+        {
+          "path": "assets/images/raiders-guild-480.webp",
+          "publicPath": "/assets/images/raiders-guild-480.webp",
+          "bytes": 34662,
+          "sha256": "7ea84975edcdae0d8f05f5b9fd65cb5f1810c4fbbe4447762e3aa11f804f8170",
+          "sourceSha256": "d360e143ca6937c1a4e486915a3a0ea1196adc4b09d92d98c474602dbf86efaf",
+          "width": 480
+        },
+        {
+          "path": "assets/images/raiders-guild-640.webp",
+          "publicPath": "/assets/images/raiders-guild-640.webp",
+          "bytes": 50996,
+          "sha256": "0b519bdd724990cd38d2da523bab58ebdfece78dd57240607b1f71db3cd541ab",
+          "sourceSha256": "d360e143ca6937c1a4e486915a3a0ea1196adc4b09d92d98c474602dbf86efaf",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-raiders-guild.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/redline.png",
+      "publicPath": "/assets/images/redline.png",
+      "name": "redline.png",
+      "label": "redline",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1137402,
+      "sha256": "6182ca8209bfa9ce424a8189e2060c9aa1e6491e168064dcaf77b25bc7752012",
+      "width": 2017,
+      "height": 3000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/redline-320.webp",
+        "assets/images/redline-480.webp",
+        "assets/images/redline-640.webp",
+        "assets/images/redline-960.webp",
+        "assets/images/redline-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/redline-320.webp",
+          "publicPath": "/assets/images/redline-320.webp",
+          "bytes": 52530,
+          "sha256": "29ca3abd030b40edd70b2de57087a902be2c8702e5f17127a5624e958587e5d9",
+          "sourceSha256": "6182ca8209bfa9ce424a8189e2060c9aa1e6491e168064dcaf77b25bc7752012",
+          "width": 320
+        },
+        {
+          "path": "assets/images/redline-480.webp",
+          "publicPath": "/assets/images/redline-480.webp",
+          "bytes": 96658,
+          "sha256": "e297aa2b52494d1ecd46bcb153751fcd641dd9ac27c3413de48ef61ae24302f1",
+          "sourceSha256": "6182ca8209bfa9ce424a8189e2060c9aa1e6491e168064dcaf77b25bc7752012",
+          "width": 480
+        },
+        {
+          "path": "assets/images/redline-640.webp",
+          "publicPath": "/assets/images/redline-640.webp",
+          "bytes": 149072,
+          "sha256": "9c0cd7adf2f8eb481b61dbced2c7f2cafd7d6f3ad42cb19c263f69c2d43a949f",
+          "sourceSha256": "6182ca8209bfa9ce424a8189e2060c9aa1e6491e168064dcaf77b25bc7752012",
+          "width": 640
+        },
+        {
+          "path": "assets/images/redline-960.webp",
+          "publicPath": "/assets/images/redline-960.webp",
+          "bytes": 264152,
+          "sha256": "8f83f83ded8518b36af49ee6d203d9eaf8c76d8fd3b3deaba314c71eea4abeb2",
+          "sourceSha256": "6182ca8209bfa9ce424a8189e2060c9aa1e6491e168064dcaf77b25bc7752012",
+          "width": 960
+        },
+        {
+          "path": "assets/images/redline-1600.webp",
+          "publicPath": "/assets/images/redline-1600.webp",
+          "bytes": 522730,
+          "sha256": "77d0f80639fdbc90339a2204be5ec275f2cb7870fec23864ba10f65e078f390d",
+          "sourceSha256": "6182ca8209bfa9ce424a8189e2060c9aa1e6491e168064dcaf77b25bc7752012",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-redline.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/rosemary.jpg",
+      "publicPath": "/assets/images/rosemary.jpg",
+      "name": "rosemary.jpg",
+      "label": "rosemary",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 389333,
+      "sha256": "1c90fb7b2835f1a34a8bf3d3b9d653136e6784eba1de1cebb51e2d6e58113fb8",
+      "width": 1100,
+      "height": 1616,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/rosemary-320.webp",
+        "assets/images/rosemary-480.webp",
+        "assets/images/rosemary-640.webp",
+        "assets/images/rosemary-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/rosemary-320.webp",
+          "publicPath": "/assets/images/rosemary-320.webp",
+          "bytes": 22280,
+          "sha256": "a00b08cea91337cdbb4988b7e031cf574e107b52f91b8646525f916b7dd5ac8c",
+          "sourceSha256": "1c90fb7b2835f1a34a8bf3d3b9d653136e6784eba1de1cebb51e2d6e58113fb8",
+          "width": 320
+        },
+        {
+          "path": "assets/images/rosemary-480.webp",
+          "publicPath": "/assets/images/rosemary-480.webp",
+          "bytes": 53480,
+          "sha256": "5cf748111a43590f4657d147acfbf9c144bae7186b2629897de8cefc156ee3eb",
+          "sourceSha256": "1c90fb7b2835f1a34a8bf3d3b9d653136e6784eba1de1cebb51e2d6e58113fb8",
+          "width": 480
+        },
+        {
+          "path": "assets/images/rosemary-640.webp",
+          "publicPath": "/assets/images/rosemary-640.webp",
+          "bytes": 101456,
+          "sha256": "6c9aef9fed5d16e5c4bc7b1213feb8244aab20a742b0c4b5a68f62180a6c8fae",
+          "sourceSha256": "1c90fb7b2835f1a34a8bf3d3b9d653136e6784eba1de1cebb51e2d6e58113fb8",
+          "width": 640
+        },
+        {
+          "path": "assets/images/rosemary-960.webp",
+          "publicPath": "/assets/images/rosemary-960.webp",
+          "bytes": 218512,
+          "sha256": "1eda0f9215cfaa68b7e0bf741153c0b8b8e373b4d64a6d713c21ee8a80800093",
+          "sourceSha256": "1c90fb7b2835f1a34a8bf3d3b9d653136e6784eba1de1cebb51e2d6e58113fb8",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-rosemarys-baby.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/sexpot-condom-pack.png",
+      "publicPath": "/assets/images/sexpot-condom-pack.png",
+      "name": "sexpot-condom-pack.png",
+      "label": "sexpot condom pack",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 238810,
+      "sha256": "2a6688350112e06bb86c7943be981127d50df5399c17f6b2e58445ae40c470db",
+      "width": 1146,
+      "height": 546,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/sexpot-condom-pack-320.webp",
+        "assets/images/sexpot-condom-pack-480.webp",
+        "assets/images/sexpot-condom-pack-640.webp",
+        "assets/images/sexpot-condom-pack-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/sexpot-condom-pack-320.webp",
+          "publicPath": "/assets/images/sexpot-condom-pack-320.webp",
+          "bytes": 17202,
+          "sha256": "3474c460e8ea4b2cd80c18cdfb84ce8778d86358c870bd9e1cf241e750061abf",
+          "sourceSha256": "2a6688350112e06bb86c7943be981127d50df5399c17f6b2e58445ae40c470db",
+          "width": 320
+        },
+        {
+          "path": "assets/images/sexpot-condom-pack-480.webp",
+          "publicPath": "/assets/images/sexpot-condom-pack-480.webp",
+          "bytes": 30664,
+          "sha256": "02af53799ddac5dc7f86e67d10e9cb15576e6ab1a4fa7de6a54a8dfda07ec098",
+          "sourceSha256": "2a6688350112e06bb86c7943be981127d50df5399c17f6b2e58445ae40c470db",
+          "width": 480
+        },
+        {
+          "path": "assets/images/sexpot-condom-pack-640.webp",
+          "publicPath": "/assets/images/sexpot-condom-pack-640.webp",
+          "bytes": 45072,
+          "sha256": "0f8375f6f8dfbdfcf8f4f15c239d2441f8bba24c348b19e789d152447d4a9226",
+          "sourceSha256": "2a6688350112e06bb86c7943be981127d50df5399c17f6b2e58445ae40c470db",
+          "width": 640
+        },
+        {
+          "path": "assets/images/sexpot-condom-pack-960.webp",
+          "publicPath": "/assets/images/sexpot-condom-pack-960.webp",
+          "bytes": 73108,
+          "sha256": "e1fb1642b317d081d2c13fe986b126a42045e17a626f8f8842c29dbe9fd23b81",
+          "sourceSha256": "2a6688350112e06bb86c7943be981127d50df5399c17f6b2e58445ae40c470db",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/sexpot-condoms.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/sexpot-poster.png",
+      "publicPath": "/assets/images/sexpot-poster.png",
+      "name": "sexpot-poster.png",
+      "label": "sexpot poster",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 166109,
+      "sha256": "642dba305fd8e5a65f728c8293abdaf3d8344a59ff211a17cdb164ff8e05345a",
+      "width": 500,
+      "height": 647,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/sexpot-poster-320.webp",
+        "assets/images/sexpot-poster-480.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/sexpot-poster-320.webp",
+          "publicPath": "/assets/images/sexpot-poster-320.webp",
+          "bytes": 27786,
+          "sha256": "c70b177ae6b040b295f082f2a4d4377c135cbbbfe0f127024291c03d737a7725",
+          "sourceSha256": "642dba305fd8e5a65f728c8293abdaf3d8344a59ff211a17cdb164ff8e05345a",
+          "width": 320
+        },
+        {
+          "path": "assets/images/sexpot-poster-480.webp",
+          "publicPath": "/assets/images/sexpot-poster-480.webp",
+          "bytes": 48972,
+          "sha256": "f6c34d9fb9a4e3f3d1d273d3bb42a5e98138c5c64f313a431e4d75b80684e522",
+          "sourceSha256": "642dba305fd8e5a65f728c8293abdaf3d8344a59ff211a17cdb164ff8e05345a",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/sexpot-poster.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/sexpot-t-shirt.png",
+      "publicPath": "/assets/images/sexpot-t-shirt.png",
+      "name": "sexpot-t-shirt.png",
+      "label": "sexpot t shirt",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 100419,
+      "sha256": "cb5db142e3dd129084f104c252da1387a3d958333156962a8862e9ee97d42c9a",
+      "width": 500,
+      "height": 648,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/sexpot-t-shirt-320.webp",
+        "assets/images/sexpot-t-shirt-480.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/sexpot-t-shirt-320.webp",
+          "publicPath": "/assets/images/sexpot-t-shirt-320.webp",
+          "bytes": 19156,
+          "sha256": "15f1ec9feb738da146d77d10c0df63c9839c5728e80de2463761e7a318e81a7c",
+          "sourceSha256": "cb5db142e3dd129084f104c252da1387a3d958333156962a8862e9ee97d42c9a",
+          "width": 320
+        },
+        {
+          "path": "assets/images/sexpot-t-shirt-480.webp",
+          "publicPath": "/assets/images/sexpot-t-shirt-480.webp",
+          "bytes": 33708,
+          "sha256": "4dd1cf5332ed45298c64f67199cf02d7cb14cdac603fb35725b862fd79cd4b69",
+          "sourceSha256": "cb5db142e3dd129084f104c252da1387a3d958333156962a8862e9ee97d42c9a",
+          "width": 480
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/sexpot-t-shirt.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/sexpot-thong.png",
+      "publicPath": "/assets/images/sexpot-thong.png",
+      "name": "sexpot-thong.png",
+      "label": "sexpot thong",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 74489,
+      "sha256": "81816b01488ea5903f7ae1053637d1f789d3395a1472662b29f6b852082520dd",
+      "width": 1200,
+      "height": 800,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/sexpot-thong-320.webp",
+        "assets/images/sexpot-thong-480.webp",
+        "assets/images/sexpot-thong-640.webp",
+        "assets/images/sexpot-thong-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/sexpot-thong-320.webp",
+          "publicPath": "/assets/images/sexpot-thong-320.webp",
+          "bytes": 5742,
+          "sha256": "62a08500a823ea8fadc3d5c8deb1b31e3cab33bbae866c2edeec741cff766ff6",
+          "sourceSha256": "81816b01488ea5903f7ae1053637d1f789d3395a1472662b29f6b852082520dd",
+          "width": 320
+        },
+        {
+          "path": "assets/images/sexpot-thong-480.webp",
+          "publicPath": "/assets/images/sexpot-thong-480.webp",
+          "bytes": 9410,
+          "sha256": "1fd4d8c4ec1c1e1b620300cc9714c4f41300f642b466e968a598f9588f7b180c",
+          "sourceSha256": "81816b01488ea5903f7ae1053637d1f789d3395a1472662b29f6b852082520dd",
+          "width": 480
+        },
+        {
+          "path": "assets/images/sexpot-thong-640.webp",
+          "publicPath": "/assets/images/sexpot-thong-640.webp",
+          "bytes": 13680,
+          "sha256": "1a2b17e29887359fbe5e4953d018ff4bcb2a2bf7a2090985dc5e55632ea4ce73",
+          "sourceSha256": "81816b01488ea5903f7ae1053637d1f789d3395a1472662b29f6b852082520dd",
+          "width": 640
+        },
+        {
+          "path": "assets/images/sexpot-thong-960.webp",
+          "publicPath": "/assets/images/sexpot-thong-960.webp",
+          "bytes": 20930,
+          "sha256": "96ca4f79977ab8980012a3c5510d88722e755399d903f062bb417a8219391b6f",
+          "sourceSha256": "81816b01488ea5903f7ae1053637d1f789d3395a1472662b29f6b852082520dd",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/sexpot-thong.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/share-icons/bluesky.png",
+      "publicPath": "/assets/images/share-icons/bluesky.png",
+      "name": "bluesky.png",
+      "label": "bluesky",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 881,
+      "sha256": "f8479973eb40e75864c179e7196cd41d8eaba1563dce3d3067fe6309ebb155a5",
+      "width": 18,
+      "height": 18,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/share-icons/email.png",
+      "publicPath": "/assets/images/share-icons/email.png",
+      "name": "email.png",
+      "label": "email",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 299,
+      "sha256": "92b7aa493d2ef3c276ab4af84ee7184359de3391fb7e43d5637fe176019818d7",
+      "width": 18,
+      "height": 18,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/share-icons/facebook.png",
+      "publicPath": "/assets/images/share-icons/facebook.png",
+      "name": "facebook.png",
+      "label": "facebook",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 696,
+      "sha256": "3b672d0427e94950a585b35202a06020a0ef96ca7cb3f0f6279be3b5b7f63a33",
+      "width": 18,
+      "height": 18,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/share-icons/sms.png",
+      "publicPath": "/assets/images/share-icons/sms.png",
+      "name": "sms.png",
+      "label": "sms",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 299,
+      "sha256": "92b7aa493d2ef3c276ab4af84ee7184359de3391fb7e43d5637fe176019818d7",
+      "width": 18,
+      "height": 18,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/share-icons/threads.png",
+      "publicPath": "/assets/images/share-icons/threads.png",
+      "name": "threads.png",
+      "label": "threads",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 1163,
+      "sha256": "d0bc22f2665b5709204cd41b4cb872e638931d86fe89db107994ea2f7a53b86b",
+      "width": 18,
+      "height": 18,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/share-icons/x.png",
+      "publicPath": "/assets/images/share-icons/x.png",
+      "name": "x.png",
+      "label": "x",
+      "type": "image",
+      "scope": "default",
+      "productSlug": "",
+      "bytes": 1078,
+      "sha256": "aec8ebb4b1cec8dfc9e2429a193bb9ea6028afed270965765e667d51825d142e",
+      "width": 18,
+      "height": 18,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": []
+    },
+    {
+      "path": "assets/images/sticker-glove.png",
+      "publicPath": "/assets/images/sticker-glove.png",
+      "name": "sticker-glove.png",
+      "label": "sticker glove",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 48301,
+      "sha256": "a0dd9807f805cd80c3aeb7e5e7deb684d403cb13f3815c25ed29bee8146d9740",
+      "width": 1000,
+      "height": 1000,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/sticker-glove-320.webp",
+        "assets/images/sticker-glove-480.webp",
+        "assets/images/sticker-glove-640.webp",
+        "assets/images/sticker-glove-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/sticker-glove-320.webp",
+          "publicPath": "/assets/images/sticker-glove-320.webp",
+          "bytes": 11838,
+          "sha256": "99d781657d60d054a6ee65946ae1f4e47058779921153084c27cfda3c1d420c7",
+          "sourceSha256": "a0dd9807f805cd80c3aeb7e5e7deb684d403cb13f3815c25ed29bee8146d9740",
+          "width": 320
+        },
+        {
+          "path": "assets/images/sticker-glove-480.webp",
+          "publicPath": "/assets/images/sticker-glove-480.webp",
+          "bytes": 17802,
+          "sha256": "9754a60f52bba2776304fd295465f73168be1b507a8585a478cfc8793c03e91a",
+          "sourceSha256": "a0dd9807f805cd80c3aeb7e5e7deb684d403cb13f3815c25ed29bee8146d9740",
+          "width": 480
+        },
+        {
+          "path": "assets/images/sticker-glove-640.webp",
+          "publicPath": "/assets/images/sticker-glove-640.webp",
+          "bytes": 24610,
+          "sha256": "48014bc31bf9bbd0084bd5176df23e18e1e5e0ebd7c14a2461a4bbeaec12dad9",
+          "sourceSha256": "a0dd9807f805cd80c3aeb7e5e7deb684d403cb13f3815c25ed29bee8146d9740",
+          "width": 640
+        },
+        {
+          "path": "assets/images/sticker-glove-960.webp",
+          "publicPath": "/assets/images/sticker-glove-960.webp",
+          "bytes": 37272,
+          "sha256": "5763265153e65cb5b96ff3a49dbf7a3cb0990583dfa478265acea2a56f9837b5",
+          "sourceSha256": "a0dd9807f805cd80c3aeb7e5e7deb684d403cb13f3815c25ed29bee8146d9740",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-sticker.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/trainspotting-guild.png",
+      "publicPath": "/assets/images/trainspotting-guild.png",
+      "name": "trainspotting-guild.png",
+      "label": "trainspotting guild",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 871162,
+      "sha256": "8708564fa0095594b7a4d95e588752879a3f9a9cde9e9634a21c3b6bd86b4014",
+      "width": 1500,
+      "height": 2120,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/trainspotting-guild-320.webp",
+        "assets/images/trainspotting-guild-480.webp",
+        "assets/images/trainspotting-guild-640.webp",
+        "assets/images/trainspotting-guild-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/trainspotting-guild-320.webp",
+          "publicPath": "/assets/images/trainspotting-guild-320.webp",
+          "bytes": 44298,
+          "sha256": "2a24d273cff6059a848f82b916af5e0feb7ddfa5c07df3a4e4d4447a37dc77b7",
+          "sourceSha256": "8708564fa0095594b7a4d95e588752879a3f9a9cde9e9634a21c3b6bd86b4014",
+          "width": 320
+        },
+        {
+          "path": "assets/images/trainspotting-guild-480.webp",
+          "publicPath": "/assets/images/trainspotting-guild-480.webp",
+          "bytes": 80426,
+          "sha256": "94b95427451f7706241ab026d42b766340dd824cee873110bae0768c0de6f751",
+          "sourceSha256": "8708564fa0095594b7a4d95e588752879a3f9a9cde9e9634a21c3b6bd86b4014",
+          "width": 480
+        },
+        {
+          "path": "assets/images/trainspotting-guild-640.webp",
+          "publicPath": "/assets/images/trainspotting-guild-640.webp",
+          "bytes": 123924,
+          "sha256": "72756fda2abbbb47c09bc9271704b9726d1b2dfd8c5c5486f36c99802e161cf8",
+          "sourceSha256": "8708564fa0095594b7a4d95e588752879a3f9a9cde9e9634a21c3b6bd86b4014",
+          "width": 640
+        },
+        {
+          "path": "assets/images/trainspotting-guild-960.webp",
+          "publicPath": "/assets/images/trainspotting-guild-960.webp",
+          "bytes": 219588,
+          "sha256": "2050c8317b9bc7c61d48d6d561343bc8fba63ca5a02804478a27345e26de110f",
+          "sourceSha256": "8708564fa0095594b7a4d95e588752879a3f9a9cde9e9634a21c3b6bd86b4014",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-trainspotting-guild.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/whodonut.png",
+      "publicPath": "/assets/images/whodonut.png",
+      "name": "whodonut.png",
+      "label": "whodonut",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 252879,
+      "sha256": "524599c0705821abf5d754b61c7d4f2c2b0ace2f68dbf8052002ab0c13c6a63d",
+      "width": 1080,
+      "height": 1080,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/whodonut-320.webp",
+        "assets/images/whodonut-480.webp",
+        "assets/images/whodonut-640.webp",
+        "assets/images/whodonut-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/whodonut-320.webp",
+          "publicPath": "/assets/images/whodonut-320.webp",
+          "bytes": 38316,
+          "sha256": "b88f7cbb2ace062c89ea50d972983165f65d6ef6795c8150dbef55a030f3a308",
+          "sourceSha256": "524599c0705821abf5d754b61c7d4f2c2b0ace2f68dbf8052002ab0c13c6a63d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/whodonut-480.webp",
+          "publicPath": "/assets/images/whodonut-480.webp",
+          "bytes": 68186,
+          "sha256": "4de69822f8622900330873254d307e65594c6e2338137f517ed88d7328d29287",
+          "sourceSha256": "524599c0705821abf5d754b61c7d4f2c2b0ace2f68dbf8052002ab0c13c6a63d",
+          "width": 480
+        },
+        {
+          "path": "assets/images/whodonut-640.webp",
+          "publicPath": "/assets/images/whodonut-640.webp",
+          "bytes": 101156,
+          "sha256": "5bbd4d75475fd9330472ec3714ed61ec771e0d1f6548ee70f50b6328b815c62b",
+          "sourceSha256": "524599c0705821abf5d754b61c7d4f2c2b0ace2f68dbf8052002ab0c13c6a63d",
+          "width": 640
+        },
+        {
+          "path": "assets/images/whodonut-960.webp",
+          "publicPath": "/assets/images/whodonut-960.webp",
+          "bytes": 163138,
+          "sha256": "3a6d8ca0a21646d18d9b43aa49ac55acbb4dc624559dd0ada31f918b1b09ac78",
+          "sourceSha256": "524599c0705821abf5d754b61c7d4f2c2b0ace2f68dbf8052002ab0c13c6a63d",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-whodonut-fundraiser.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/wto99.png",
+      "publicPath": "/assets/images/wto99.png",
+      "name": "wto99.png",
+      "label": "wto99",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 511129,
+      "sha256": "bb057bf678a7745efda4e525c5ce318d5dd7ba5af8c357e00f565f288f1d70cb",
+      "width": 750,
+      "height": 1125,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/wto99-320.webp",
+        "assets/images/wto99-480.webp",
+        "assets/images/wto99-640.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/wto99-320.webp",
+          "publicPath": "/assets/images/wto99-320.webp",
+          "bytes": 61848,
+          "sha256": "5a26e50fc5e81a9a772e23986ecae9c4bca59b7a2585709464f36a4bb6afba50",
+          "sourceSha256": "bb057bf678a7745efda4e525c5ce318d5dd7ba5af8c357e00f565f288f1d70cb",
+          "width": 320
+        },
+        {
+          "path": "assets/images/wto99-480.webp",
+          "publicPath": "/assets/images/wto99-480.webp",
+          "bytes": 128220,
+          "sha256": "097ff0a22ab54a60c96d91adc8ab33754a5d9072051b878eb2384307da2a3101",
+          "sourceSha256": "bb057bf678a7745efda4e525c5ce318d5dd7ba5af8c357e00f565f288f1d70cb",
+          "width": 480
+        },
+        {
+          "path": "assets/images/wto99-640.webp",
+          "publicPath": "/assets/images/wto99-640.webp",
+          "bytes": 206178,
+          "sha256": "817b3d8c709cfdf098c7f0e372589af1d2fb3d887b57a3a3d8f6734d971f376f",
+          "sourceSha256": "bb057bf678a7745efda4e525c5ce318d5dd7ba5af8c357e00f565f288f1d70cb",
+          "width": 640
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/dust-wave-wto99.md",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

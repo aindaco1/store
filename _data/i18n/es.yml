@@ -41,6 +41,58 @@ admin:
   image_size_error: La imagen debe ser de 8 MB o menos.
   no_file_chosen: Ningún archivo seleccionado
   no_image_selected: Ninguna imagen seleccionada.
+  media_image_size_error: La imagen debe tener 8 MB o menos.
+  media_video_size_error: El video debe tener 100 MB o menos.
+  media_audio_size_error: El audio debe tener 25 MB o menos.
+  media_type_error: Usa un archivo de imagen, video o audio compatible.
+  media_uploading: Subiendo %{filename}...
+  media_upload_missing_path: La carga no devolvió una ruta de recurso.
+  media_replaced: Medio reemplazado. Publica el contenido del producto para usarlo.
+  media_uploaded: Medio subido. Publica el contenido del producto para usarlo.
+  media_scope_product: producto
+  media_scope_add_on: complemento
+  media_scope_default: predeterminado
+  media_role_source: fuente
+  media_role_derived: derivado
+  media_status_ready: optimizado
+  media_status_missing_derivatives: faltan derivados
+  media_status_not_applicable: la optimización no aplica
+  media_warning_image_source_oversized: Imagen de origen sobredimensionada
+  media_warning_video_source_oversized: Video de origen sobredimensionado
+  media_warning_audio_source_oversized: Audio de origen sobredimensionado
+  media_reference_one: "%{count} referencia"
+  media_reference_other: "%{count} referencias"
+  media_empty: Aún no se encontraron medios del producto.
+  media_type_label: Tipo de medio
+  media_type_image: imagen
+  media_type_video: video
+  media_type_audio: audio
+  media_filter_all: Todos
+  media_search: Buscar medios
+  media_sort: Ordenar medios
+  media_sort_recent: Subidos recientemente
+  media_sort_name: Nombre
+  media_broken_one: "%{count} referencia de medio dañada necesita reparación."
+  media_broken_other: "%{count} referencias de medios dañadas necesitan reparación."
+  media_repair_changed: Reparar medios modificados
+  media_repair_all: Reparar todos los medios
+  media_repair_queued: Reparación en cola
+  media_no_matches: Ningún medio coincide con estos filtros.
+  media_field_requires: Este campo requiere medios de tipo %{types}.
+  media_or: o
+  media_generic: Medio
+  media_used_one: Usado en %{count} archivo de origen
+  media_used_other: Usado en %{count} archivos de origen
+  media_replace: Reemplazar
+  media_replace_label: Reemplazar %{name}
+  media_selected: Medio seleccionado.
+  media_choose_existing: Elegir archivo de %{type} existente
+  media_upload_video: Subir video
+  media_upload_audio: Subir audio
+  media_image_meaning: Función de la imagen
+  media_meaningful: Significativa — requiere texto alternativo
+  media_decorative: Decorativa — texto alternativo vacío
+  media_product_image_fallback: Imagen del producto
   store_analytics_intro: Revisa ingresos, cumplimiento, boletos, pagos y rendimiento de productos de %{platform} desde los registros de pedidos.
   store_marketing_intro: Crea enlaces UTM y de referencia para %{platform}, guarda referencias reutilizables y descarga codigos QR para campanas o socios.
   marketing_destination_label: Ruta de destino

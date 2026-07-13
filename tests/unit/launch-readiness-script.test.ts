@@ -77,6 +77,8 @@ TAX_PROVIDER = "nm_grt"
 SHIPPING_ORIGIN_ZIP = "87120"
 SHIPPING_ORIGIN_COUNTRY = "US"
 USPS_ENABLED = "true"
+EMAIL_OUTBOX_ENABLED = "true"
+PAYMENT_RECONCILIATION_ENABLED = "true"
 USPS_CLIENT_ID = "${options.uspsClientId ?? 'usps-client'}"
 STRIPE_PUBLISHABLE_KEY = "pk_live_fixture"
 

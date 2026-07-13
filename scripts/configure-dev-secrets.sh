@@ -220,6 +220,7 @@ prompt_optional_secret "STRIPE_WEBHOOK_SECRET_TEST" "Stripe test webhook signing
 prompt_optional_secret "STRIPE_PUBLISHABLE_KEY_TEST" "Stripe test publishable key"
 prompt_optional_secret "FILM_STRIPE_SUMMARY_ADAPTER_SECRET" "Film Stripe summary adapter bearer secret"
 prompt_optional_secret "RESEND_API_KEY" "Resend API key"
+prompt_optional_secret "RESEND_WEBHOOK_SECRET" "Resend delivery webhook signing secret"
 prompt_optional_secret "USPS_CLIENT_SECRET" "USPS client secret"
 prompt_optional_secret "ZIP_TAX_API_KEY" "ZIP.TAX API key"
 prompt_optional_secret "CLOUDFLARE_API_TOKEN" "Cloudflare user API token for local report/export scripts"

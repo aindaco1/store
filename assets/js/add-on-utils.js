@@ -2,6 +2,7 @@
   'use strict';
 
   const ADD_ON_INVENTORY_CACHE_KEY = 'store_add_on_inventory';
+  const MAX_AMOUNT_CENTS = 100000000;
 
   function getRuntimeConfig() {
     return window.STORE_CONFIG || window.StoreConfig || {};
@@ -77,6 +78,23 @@
     return variants.find((variant) => String(variant?.id || '') === String(variantId || '')) || null;
   }
 
+  function resolveUnitPrice(product, variant) {
+    const rawVariantPrice = variant?.price;
+    const hasVariantPrice = rawVariantPrice !== undefined &&
+      rawVariantPrice !== null &&
+      String(rawVariantPrice).trim() !== '';
+    const rawPrice = hasVariantPrice ? rawVariantPrice : product?.price;
+    const parsed = Number(rawPrice ?? 0);
+    const cents = Math.round(parsed * 100);
+    if (!Number.isFinite(parsed) || parsed < 0 || cents > MAX_AMOUNT_CENTS) {
+      const fallback = Number(product?.price ?? 0);
+      return Number.isFinite(fallback) && fallback >= 0
+        ? Math.min(fallback, MAX_AMOUNT_CENTS / 100)
+        : 0;
+    }
+    return parsed;
+  }
+
   function getConfiguredInventory(entry) {
     const parsed = Number(entry?.inventory);
     return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : null;
@@ -100,7 +118,7 @@
       if (!variant) return null;
       variantId = String(variant.id || '');
       variantLabel = String(variant.label || variantId);
-      unitPrice = Number(variant.price ?? product.price ?? 0);
+      unitPrice = resolveUnitPrice(product, variant);
     } else {
       variantId = '';
       variantLabel = '';
@@ -166,7 +184,7 @@
         name: String(product.name || ''),
         description: String(product.description || ''),
         imageUrl: String(product.image_url || ''),
-        unitPrice: Math.round(Number(variant?.price ?? product.price ?? 0) * 100),
+        unitPrice: Math.round(resolveUnitPrice(product, variant) * 100),
         category: getFulfillmentCategory(product),
         type: getProductType(product),
         fulfillmentType: String(product.fulfillment_type || product.category || 'digital'),
@@ -241,7 +259,7 @@
         return {
           id: variantId,
           label: String(variant?.label || variantId),
-          priceCents: Math.round(Number(variant?.price ?? product?.price ?? 0) * 100),
+          priceCents: Math.round(resolveUnitPrice(product, variant) * 100),
           inventory: configuredInventory,
           sold,
           remaining,
@@ -483,6 +501,7 @@
     getLowStockThreshold,
     findProduct,
     findVariant,
+    resolveUnitPrice,
     getSelectionKey,
     getOptionLabel,
     normalizeSelection,

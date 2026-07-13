@@ -32,8 +32,8 @@ const ADD_ON_CONFIG = {
       shipping_preset: 'tshirt',
       variant_option_name: 'Size',
       variants: [
-        { id: 'm', label: 'M', inventory: 4 },
-        { id: 'l', label: 'L', inventory: 4 }
+        { id: 'm', label: 'M', price: '', inventory: 4 },
+        { id: 'l', label: 'L', price: 0, inventory: 4 }
       ]
     },
     {
@@ -202,6 +202,26 @@ describe('add-on utils', () => {
     expect(medium?.remaining).toBe(2);
     expect(medium?.maxQuantity).toBe(2);
     expect(medium?.editableMaxQuantity).toBe(4);
+  });
+
+  it('inherits blank variant prices and preserves explicit zero-price overrides', async () => {
+    await import('../../assets/js/add-on-utils.js');
+
+    const addOnUtils = (window as Window & { StoreAddOnUtils?: any }).StoreAddOnUtils;
+    const product = ADD_ON_CONFIG.products.find((entry) => entry.id === 'dust-wave-tshirt');
+
+    expect(addOnUtils.resolveUnitPrice(product, product?.variants?.[0])).toBe(25);
+    expect(addOnUtils.resolveUnitPrice(product, product?.variants?.[1])).toBe(0);
+    expect(addOnUtils.normalizeSelection({
+      productId: 'dust-wave-tshirt',
+      variantId: 'm',
+      quantity: 1
+    }, ADD_ON_CONFIG).unitPrice).toBe(2500);
+    expect(addOnUtils.normalizeSelection({
+      productId: 'dust-wave-tshirt',
+      variantId: 'l',
+      quantity: 1
+    }, ADD_ON_CONFIG).unitPrice).toBe(0);
   });
 
   it('resolves physical add-on shipping from presets or explicit metadata and leaves digital add-ons unshippable', async () => {

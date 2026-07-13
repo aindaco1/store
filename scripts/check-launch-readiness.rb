@@ -28,6 +28,7 @@ REQUIRED_SECRETS = [
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'RESEND_API_KEY',
+  'RESEND_WEBHOOK_SECRET',
   'USPS_CLIENT_SECRET'
 ].freeze
 MANUAL_SMOKE_TESTS = [
@@ -35,7 +36,9 @@ MANUAL_SMOKE_TESTS = [
   'Paid digital checkout with signed download fulfillment.',
   'Paid ticket checkout with admin QR check-in.',
   'Free RSVP checkout with admin QR check-in.',
-  'Stripe webhook replay or equivalent signed test event.'
+  'Stripe webhook replay or equivalent signed test event.',
+  'Signed Resend delivery webhook event with minimized delivery evidence.',
+  'Bounded read-only payment reconciliation cycle with no unexplained critical break.'
 ].freeze
 
 Check = Struct.new(:id, :status, :message, :details, keyword_init: true) do
@@ -283,7 +286,9 @@ def check_wrangler(root, config)
     'TAX_PROVIDER' => 'nm_grt',
     'SHIPPING_ORIGIN_ZIP' => '87120',
     'SHIPPING_ORIGIN_COUNTRY' => 'US',
-    'USPS_ENABLED' => 'true'
+    'USPS_ENABLED' => 'true',
+    'EMAIL_OUTBOX_ENABLED' => 'true',
+    'PAYMENT_RECONCILIATION_ENABLED' => 'true'
   }
   var_mismatches = expected_vars.filter_map do |key, expected|
     next if normalize_string(vars[key]) == expected
@@ -446,6 +451,14 @@ def build_checks(root)
     {
       endpoint: "#{EXPECTED_WORKER_URL}/webhooks/stripe",
       events: ['payment_intent.succeeded', 'payment_intent.payment_failed']
+    }
+  )
+  checks << manual_check(
+    'resend-production-webhook',
+    'Create the Resend delivery webhook endpoint and set its signing secret.',
+    {
+      endpoint: "#{EXPECTED_WORKER_URL}/webhooks/resend",
+      events: ['email.delivered', 'email.bounced', 'email.complained', 'email.failed', 'email.suppressed']
     }
   )
   checks << manual_check(

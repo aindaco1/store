@@ -117,6 +117,8 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('group: production-operations');
     expect(workflow).toContain('CLOUDFLARE_ANALYTICS_API_TOKEN');
     expect(workflow).toContain('WORKERS_CACHE_EVIDENCE_SECRET');
+    expect(workflow).toContain('WORKERS_CACHE_EVIDENCE_ROUTE');
+    expect(workflow).toContain('--route="${WORKERS_CACHE_EVIDENCE_ROUTE}"');
     expect(workflow).toContain('npm run cache:observability');
     expect(workflow).toContain('permissions:\n  contents: read');
     expect(workflow).not.toMatch(/workers-cache\/purge|wrangler deploy|deploy:worker|contents: write|pull-requests: write/);
@@ -156,6 +158,7 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('group: production-operations');
     expect(workflow).toContain('STORE_BACKUP_AGE_IDENTITY');
     expect(workflow).toContain('STORE_BACKUP_ADMIN_LOGIN_TOKEN');
+    expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_ACCOUNT_ID');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_S3_URI');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_AWS_ACCESS_KEY_ID');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_AWS_SECRET_ACCESS_KEY');
@@ -182,6 +185,13 @@ describe('workflow security posture', () => {
     expect(drill).toContain('RESTORE_RESULT="${WORK_DIR}/restore-result.json"');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_S3_ENDPOINT');
+    expect(workflow).toContain("STORE_RECOVERY_ARCHIVE_LOCK_DAYS: ${{ vars.STORE_RECOVERY_ARCHIVE_LOCK_DAYS || '400' }}");
+    expect(workflow).toContain("STORE_RECOVERY_ARCHIVE_PROVIDER: ${{ vars.STORE_RECOVERY_ARCHIVE_PROVIDER || 'cloudflare-r2' }}");
+    expect(drill).toContain('The recovery archive account must be separate from production.');
+    expect(drill).toContain('STORE_RECOVERY_ARCHIVE_S3_URI must include a bounded Store-only prefix.');
+    expect(drill).toContain('archive-lock-probe');
+    expect(drill).toContain('s3 rm "$lock_probe_uri"');
+    expect(drill).toContain('archiveLockDeleteRejected: true');
     expect(drill).toContain('aws "${archive_cli_args[@]}" s3 cp');
     expect(drill).toContain('--endpoint-url "$ARCHIVE_ENDPOINT"');
     expect(drill).toContain('cmp -s');

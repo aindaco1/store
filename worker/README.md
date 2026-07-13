@@ -49,6 +49,7 @@ Local defaults:
 - `GET /abandoned-cart/unsubscribe`: suppress checkout reminder emails from a signed link.
 - `GET /abandoned-cart/resume`: restore a signed checkout reminder snapshot.
 - `POST /webhooks/stripe`: verify Stripe signatures and settle paid orders.
+- `POST /webhooks/resend`: verify signed Resend/Svix delivery events and update minimized delivery/suppression evidence.
 
 Legacy aliases `/cart/validate` and `/checkout/intent` still route to the Store validation/checkout handlers for browser runtime compatibility, but new callers should use `/api/cart/validate` and `/api/checkout/intent`.
 
@@ -65,8 +66,8 @@ Browser admin mutations use the `store_admin_session` cookie plus `x-store-admin
 - Auth/session: `POST /admin/auth/start`, `POST /admin/auth/exchange`, `GET /admin/session`, `GET /admin/sessions`, `POST /admin/sessions/revoke`, `POST /admin/logout`.
 - Settings/media/users: `GET /admin/settings`, `POST /admin/settings/preview`, `POST /admin/settings/publish`, `POST /admin/settings/logo-upload`, `POST /admin/settings/image-upload`, `POST /admin/settings/audio-upload`, `POST /admin/settings/video-upload`, `POST /admin/users`.
 - Readiness/diagnostics: `GET /admin/dashboard/summary`, `GET /admin/store/health`, `GET /admin/plan-usage`, `GET /admin/audit`, `GET /admin/audit.csv`, `GET /admin/cron/status`, `GET /admin/observability/webhooks`, `GET /admin/observability/performance`.
-- Orders: `GET /admin/store/orders`, `GET /admin/store/orders/download-abuse`, `GET /admin/store/orders.csv`, `GET /admin/store/attendees.csv`, `GET /admin/store/reconciliation.csv`, `POST /admin/store/orders/import-snipcart`, `POST /admin/store/orders/download-access`, `POST /admin/store/orders/check-in`.
-- Products/media: `GET /admin/store/products`, `GET /admin/store/products/media`, `GET /admin/store/products/address-lookup`, `POST /admin/store/products/preview`, `POST /admin/store/products/publish`, `POST /admin/store/products/bulk-publish`, `POST /admin/store/products/order`.
+- Orders: `GET /admin/store/orders`, `GET /admin/store/orders/download-abuse`, `GET /admin/store/orders.csv`, `GET /admin/store/attendees.csv`, `GET /admin/store/reconciliation.csv`, `POST /admin/store/reconciliation/run`, `POST /admin/store/orders/import-snipcart`, `POST /admin/store/orders/download-access`, `POST /admin/store/orders/check-in`.
+- Products/media: `GET /admin/store/products`, `GET /admin/store/products/media`, `GET /admin/store/products/address-lookup`, `POST /admin/store/products/media/optimize`, `POST /admin/store/products/preview`, `POST /admin/store/products/publish`, `POST /admin/store/products/bulk-publish`, `POST /admin/store/products/order`.
 - Coupons: `GET /admin/store/coupons`, `POST /admin/store/coupons`, `POST /admin/store/coupons/delete`.
 - Downloads: `GET /admin/store/downloads`, `POST /admin/store/downloads/create`, `POST /admin/store/downloads/upload`, `POST /admin/store/downloads/delete`.
 - Inventory/add-ons: `GET /admin/store/inventory`, `POST /admin/store/inventory`, `GET /admin/add-ons/inventory`, `POST /admin/add-ons/inventory`.
@@ -118,6 +119,7 @@ Production-required Worker secrets:
 - `CHECKOUT_INTENT_SECRET`.
 - `MAGIC_LINK_SECRET`.
 - `RESEND_API_KEY`.
+- `RESEND_WEBHOOK_SECRET` for signed provider delivery/suppression evidence in production.
 - `TURNSTILE_SECRET_KEY` when admin Turnstile is required.
 
 Operationally important optional secrets:
@@ -169,7 +171,9 @@ Keep the Worker posture conservative:
 
 ## Scheduled Work
 
-`worker/wrangler.toml` runs a minute cron. The handler records a bounded heartbeat, processes opted-in abandoned-checkout reminders, sends due event reminders, and records recent error state in `STORE_STATE`. Queue-state markers keep idle cron ticks cheap.
+`worker/wrangler.toml` runs a minute cron. The handler records a bounded heartbeat, produces/processes opted-in abandoned-checkout and event reminders, drains the durable email outbox, advances bounded daily read-only payment reconciliation, and records recent error state in `STORE_STATE`. Queue-state and reconciliation-state markers keep idle cron ticks cheap.
+
+Production config mirrors `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` from `_config.yml`. Dev keeps payment reconciliation off to avoid provider reads; test behavior can be selected explicitly. Reconciliation reads only `admin-store-orders:index:v2` and Stripe PaymentIntents. It never lists `orders:` or performs Stripe writes.
 
 ## Release Evidence And Dry Runs
 

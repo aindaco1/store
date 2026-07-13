@@ -437,12 +437,32 @@ function emailDryRunEnabled(env = {}) {
   return emailDryRunValueEnabled(env.STORE_EMAIL_DRY_RUN) || emailDryRunValueEnabled(env.RESEND_EMAIL_DRY_RUN);
 }
 
-async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
-  const preparedPayload = {
+function buildResendPayload(env, payload) {
+  const replyTo = String(getSupportEmail(env) || '').trim();
+  return {
     ...payload,
     text: payload.text || buildPlainTextFromHtml(payload.html || ''),
-    reply_to: payload.reply_to || getSupportEmail(env)
+    ...(payload.reply_to || replyTo ? { reply_to: payload.reply_to || replyTo } : {})
   };
+}
+
+export class ResendApiError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'ResendApiError';
+    this.type = String(details.type || 'resend_api_error');
+    this.statusCode = Number(details.statusCode || 0) || 0;
+    this.retryAfterSeconds = Number(details.retryAfterSeconds || 0) || 0;
+    this.retryable = details.retryable === true;
+    this.ambiguous = details.ambiguous === true;
+  }
+}
+
+export async function sendPreparedResendEmail(env, preparedPayload, {
+  idempotencyKey = '',
+  errorLabel = 'Resend error',
+  failureLabel = 'Failed to send email'
+} = {}) {
 
   if (emailDryRunEnabled(env)) {
     return {
@@ -453,22 +473,53 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
     };
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(preparedPayload)
-  });
+  let response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'store-worker/1.0.8',
+        ...(idempotencyKey ? { 'Idempotency-Key': String(idempotencyKey).slice(0, 256) } : {})
+      },
+      body: JSON.stringify(preparedPayload)
+    });
+  } catch {
+    throw new ResendApiError(`${failureLabel}: provider response was not received`, {
+      type: 'network_error',
+      retryable: true,
+      ambiguous: true
+    });
+  }
 
   if (!response.ok) {
     const detail = await parseResendError(response);
     console.error(`${errorLabel}:`, response.status, detail);
-    throw new Error(`${failureLabel}: ${response.status}${detail ? ` (${detail})` : ''}`);
+    const retryAfterSeconds = Number.parseInt(String(response.headers?.get?.('retry-after') || '0'), 10) || 0;
+    throw new ResendApiError(`${failureLabel}: ${response.status}${detail ? ` (${detail})` : ''}`, {
+      type: `resend_http_${response.status}`,
+      statusCode: response.status,
+      retryAfterSeconds,
+      retryable: response.status === 409 || response.status === 429 || response.status >= 500,
+      ambiguous: response.status >= 500
+    });
   }
 
   return response.json().catch(() => ({}));
+}
+
+async function sendResendEmail(env, payload, { errorLabel = 'Resend error', failureLabel = 'Failed to send email' } = {}) {
+  const preparedPayload = buildResendPayload(env, payload);
+  if (emailDryRunValueEnabled(env.STORE_EMAIL_CAPTURE_PAYLOAD)) {
+    env.__STORE_CAPTURED_EMAIL_PAYLOAD = preparedPayload;
+    return { captured: true, payload: preparedPayload };
+  }
+  return sendPreparedResendEmail(env, preparedPayload, {
+    idempotencyKey: env.STORE_EMAIL_IDEMPOTENCY_KEY,
+    errorLabel,
+    failureLabel
+  });
 }
 
 export async function sendAdminLoginEmail(env, { email, loginUrl, lang } = {}) {

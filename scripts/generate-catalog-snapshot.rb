@@ -205,13 +205,15 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
       slugify(variant['label'] || variant['name'])
     next unless variant_id
 
-    variant_price = numeric(variant.fetch('price', price), price)
+    variant_price_override = variant.key?('price') && !variant['price'].nil? && !String(variant['price']).strip.empty?
+    variant_price = variant_price_override ? numeric(variant['price'], price) : price
     compact_hash(
       'id' => variant_id,
       'label' => present_string(variant['label'] || variant['name']) || variant_id,
       'sku' => present_string(variant['sku']) || "#{id}-#{variant_id}",
       'price' => variant_price,
       'price_cents' => cents(variant_price),
+      'price_override' => variant_price_override,
       'inventory' => integer(variant.fetch('inventory', product['inventory']), 0),
       'status' => present_string(variant['status']) || status
     )

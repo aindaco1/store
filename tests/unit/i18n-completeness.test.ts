@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 function loadLocale(lang: string) {
@@ -71,6 +72,51 @@ describe('i18n completeness', () => {
       expect(spanishValue, `${keyPath} missing from Spanish catalog`).toEqual(expect.any(String));
       expect(spanishValue.trim(), `${keyPath} Spanish value is empty`).not.toBe('');
       expect(placeholders(spanishValue), `${keyPath} placeholder drift`).toEqual(placeholders(englishValue));
+    }
+  });
+
+  it('routes v1.0.8 media-admin copy through the shared runtime catalog', () => {
+    const en = loadLocale('en');
+    const es = loadLocale('es');
+    const mediaKeys = [
+      'media_image_size_error',
+      'media_video_size_error',
+      'media_audio_size_error',
+      'media_type_error',
+      'media_uploading',
+      'media_replaced',
+      'media_uploaded',
+      'media_status_missing_derivatives',
+      'media_reference_other',
+      'media_broken_other',
+      'media_field_requires',
+      'media_replace_label',
+      'media_choose_existing',
+      'media_meaningful',
+      'media_decorative'
+    ];
+    const runtimeInclude = readFileSync('_includes/runtime-messages-json.html', 'utf8');
+    const dashboard = readFileSync('assets/js/admin-dashboard.js', 'utf8');
+
+    for (const key of mediaKeys) {
+      const englishValue = valueAt(en, `admin.${key}`);
+      const spanishValue = valueAt(es, `admin.${key}`);
+      expect(englishValue, `admin.${key} missing from English catalog`).toEqual(expect.any(String));
+      expect(spanishValue, `admin.${key} missing from Spanish catalog`).toEqual(expect.any(String));
+      expect(placeholders(spanishValue), `admin.${key} placeholder drift`).toEqual(placeholders(englishValue));
+      expect(runtimeInclude).toContain(`admin.${key}`);
+    }
+
+    for (const hardcoded of [
+      'No product media found yet.',
+      'No media matches these filters.',
+      'Repair changed media',
+      'Repair all media',
+      'Meaningful — alt text required',
+      'Decorative — empty alt text',
+      'Use a supported image, video, or audio file.'
+    ]) {
+      expect(dashboard).not.toContain(`'${hardcoded}'`);
     }
   });
 });

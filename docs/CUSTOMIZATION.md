@@ -144,16 +144,21 @@ Limited admins use `accessScopes: ["store"]`.
 
 ## Media
 
-Product images should live under `assets/images/products/` when uploaded through admin. Source media stays in the repo; generated derivatives belong to the optimization pipeline.
+Product media should live under `assets/images/products/`, `assets/videos/products/`, or `assets/audio/products/` when uploaded through admin. Add-on and default media use the matching `add-ons/` and `defaults/` directories. Source media stays authoritative in Git; generated derivatives and `_data/media-optimization-manifest.json` belong to the deterministic optimization pipeline and are not a second media database.
 
-Settings image uploads use `assets/images/defaults/` by default. Product media uploads use `assets/images/products/` and can trigger the media optimization workflow in production.
+The manifest records source hashes, byte sizes, image dimensions, audio/video duration, derivative state, source references, intentionally skipped larger derivatives, and broken references. Placement budgets are warnings for product cards, detail pages, social previews, checkout/order presentation, and admin previews; unsafe types and paths remain hard failures.
+
+Meaningful product images require useful alt text. Use the explicit decorative state only when the image adds no information, in which case empty alt text is correct. Existing empty-alt content remains readable but should be migrated when touched.
 
 Run checks:
 
 ```bash
+npm run media:manifest
 npm run media:optimize:check
 npm run assets:minify:check
 ```
+
+Use `npm run media:optimize` for a reviewed full local repair. Dashboard uploads can dispatch the repository workflow with `scope=changed`; super-admins may request `scope=all`. Optimization runs outside the Worker, preserves source files, and keeps deliberately skipped larger derivatives recorded rather than generating wasteful output.
 
 ## Digital Downloads
 

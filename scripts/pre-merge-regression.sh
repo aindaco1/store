@@ -424,6 +424,12 @@ run_phase "3. I18N completeness" npm run test:i18n
 
 run_phase "4. Syntax checks" bash -lc '
   node --check worker/src/index.js
+  node --check worker/src/email-outbox.js
+  node --check worker/src/media-catalog.js
+  node --check worker/src/payment-integrity.js
+  node --check worker/src/store-payment-reconciliation.js
+  node --check scripts/optimize-media.mjs
+  node scripts/optimize-media.mjs --check --manifest-only >/dev/null
   node --check worker/src/tier-inventory-do.js
   node --check worker/src/catalog.js
   node --check worker/src/orders.js
@@ -432,6 +438,13 @@ run_phase "4. Syntax checks" bash -lc '
 run_phase "5. Focused Store regression suites" npx vitest run \
   tests/unit/product-content-security.test.ts \
   tests/unit/store-catalog.test.ts \
+  tests/unit/add-on-utils.test.ts \
+  tests/unit/media-optimization-script.test.ts \
+  tests/unit/email-outbox.test.ts \
+  tests/unit/payment-integrity.test.ts \
+  tests/unit/store-payment-reconciliation.test.ts \
+  tests/unit/stripe-client.test.ts \
+  tests/unit/stripe-webhook-resume.test.ts \
   tests/unit/shipping.test.ts \
   tests/unit/tax.test.ts \
   tests/unit/tier-inventory-do.test.ts \

@@ -446,7 +446,14 @@
     return currentLang || 'en';
   }
 
-  function localizedAdminText(key) {
+  function interpolateAdminText(text, replacements) {
+    var values = replacements || {};
+    return String(text || '').replace(/%\{([A-Za-z0-9_]+)\}/g, function(match, name) {
+      return Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match;
+    });
+  }
+
+  function localizedAdminText(key, replacements) {
     var lang = String(preferredLang()).split('-')[0];
     var runtimeAdminMessages = config.i18n && config.i18n.messages && config.i18n.messages.admin
       ? config.i18n.messages.admin
@@ -485,9 +492,39 @@
         ordersUnchanged: 'No hay cambios en los pedidos desde la ultima actualizacion.'
       }
     };
-    if (runtimeAdminMessages[key]) return runtimeAdminMessages[key];
+    if (runtimeAdminMessages[key]) return interpolateAdminText(runtimeAdminMessages[key], replacements);
     var langMessages = messages[lang] || messages.en;
-    return langMessages[key] || messages.en[key] || key;
+    return interpolateAdminText(langMessages[key] || messages.en[key] || key, replacements);
+  }
+
+  function localizedMediaType(type) {
+    var keys = { image: 'mediaTypeImage', video: 'mediaTypeVideo', audio: 'mediaTypeAudio' };
+    return localizedAdminText(keys[String(type || '').toLowerCase()] || 'mediaTypeLabel');
+  }
+
+  function localizedMediaTypeList(types) {
+    var values = (types || []).map(localizedMediaType);
+    try {
+      return new Intl.ListFormat(preferredLang(), { style: 'long', type: 'disjunction' }).format(values);
+    } catch (_error) {
+      return values.join(' ' + localizedAdminText('mediaOr') + ' ');
+    }
+  }
+
+  function localizedMediaCatalogValue(kind, value) {
+    var normalized = String(value || '').trim().toLowerCase();
+    var keys = {
+      scope: { product: 'mediaScopeProduct', add_on: 'mediaScopeAddOn', default: 'mediaScopeDefault' },
+      role: { source: 'mediaRoleSource', derived: 'mediaRoleDerived' },
+      status: { ready: 'mediaStatusReady', missing_derivatives: 'mediaStatusMissingDerivatives', not_applicable: 'mediaStatusNotApplicable' },
+      warning: {
+        image_source_oversized: 'mediaWarningImageSourceOversized',
+        video_source_oversized: 'mediaWarningVideoSourceOversized',
+        audio_source_oversized: 'mediaWarningAudioSourceOversized'
+      }
+    };
+    var key = keys[kind] && keys[kind][normalized];
+    return key ? localizedAdminText(key) : String(value || '').replace(/_/g, ' ');
   }
 
   function formatError(error) {
@@ -5122,32 +5159,49 @@
     if (status) setStatus(status, message, prominent);
   }
 
-  function rememberStoreProductMedia(product, path, label) {
+  function rememberStoreProductMedia(product, path, label, mediaType) {
     var productId = product.productId || '';
     var value = String(path || '').trim();
     if (!value) return;
-    var cached = storeProductMediaCache.get(productId) || [];
-    if (cached.some(function(item) { return item.path === value; })) return;
-    cached.unshift({
+    var cached = storeProductMediaCache.get(productId);
+    var payload = Array.isArray(cached) ? { media: cached } : Object.assign({}, cached || {});
+    var media = Array.isArray(payload.media) ? payload.media.slice() : [];
+    if (media.some(function(item) { return item.path === value; })) return;
+    media.unshift({
       path: value,
       label: label || product.name || value,
       productId: productId,
-      currentProduct: true
+      currentProduct: true,
+      type: mediaType || 'image',
+      scope: 'product',
+      warnings: [],
+      references: []
     });
-    storeProductMediaCache.set(productId, cached);
+    payload.media = media;
+    storeProductMediaCache.set(productId, payload);
   }
 
-  function uploadStoreProductImage(product, file, status) {
-    var allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-    if (allowedTypes.indexOf(file.type) < 0) {
-      return Promise.reject(new Error('Use a PNG, JPEG, WebP, or GIF image.'));
+  function storeProductMediaUploadConfig(file) {
+    var type = String(file && file.type || '').toLowerCase();
+    if (['image/png', 'image/jpeg', 'image/webp', 'image/gif'].indexOf(type) >= 0) {
+      return { type: 'image', endpoint: '/admin/settings/image-upload', maxBytes: 8 * 1024 * 1024, sizeErrorKey: 'mediaImageSizeError' };
     }
-    if (file.size > 8 * 1024 * 1024) {
-      return Promise.reject(new Error('Image must be 8 MB or smaller.'));
+    if (['video/mp4', 'video/webm', 'video/quicktime'].indexOf(type) >= 0) {
+      return { type: 'video', endpoint: '/admin/settings/video-upload', maxBytes: 100 * 1024 * 1024, sizeErrorKey: 'mediaVideoSizeError' };
     }
-    productUploadStatus(status, 'Uploading ' + file.name + '...');
+    if (['audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/wav', 'audio/x-wav', 'audio/webm'].indexOf(type) >= 0) {
+      return { type: 'audio', endpoint: '/admin/settings/audio-upload', maxBytes: 25 * 1024 * 1024, sizeErrorKey: 'mediaAudioSizeError' };
+    }
+    return null;
+  }
+
+  function uploadStoreProductMedia(product, file, status, replacement) {
+    var config = storeProductMediaUploadConfig(file);
+    if (!config) return Promise.reject(new Error(localizedAdminText('mediaTypeError')));
+    if (file.size > config.maxBytes) return Promise.reject(new Error(localizedAdminText(config.sizeErrorKey)));
+    productUploadStatus(status, localizedAdminText('mediaUploading', { filename: file.name }));
     return fileToDataUrl(file).then(function(content) {
-      return requestJson('/admin/settings/image-upload', {
+      return requestJson(config.endpoint, {
         method: 'POST',
         body: {
           filename: file.name,
@@ -5156,55 +5210,213 @@
           kind: 'store-product',
           productId: product.productId || '',
           filenameBase: product.name || product.productId || file.name,
-          createProduct: product.isNew === true
+          createProduct: product.isNew === true,
+          replaceGithubPath: replacement && replacement.githubPath || '',
+          replaceSha: replacement && replacement.contentSha || ''
         }
       });
     }).then(function(data) {
       var nextPath = data.path || data.publicPath || '';
-      if (!nextPath) throw new Error('Upload did not return an asset path.');
-      rememberStoreProductMedia(product, nextPath, file.name || product.name);
-      productUploadStatus(status, 'Image uploaded. Publish product to use it.');
+      if (!nextPath) throw new Error(localizedAdminText('mediaUploadMissingPath'));
+      rememberStoreProductMedia(product, nextPath, file.name || product.name, config.type);
+      productUploadStatus(status, localizedAdminText(replacement ? 'mediaReplaced' : 'mediaUploaded'));
       return nextPath;
     });
   }
 
-  function renderStoreProductMediaLibrary(container, media, onSelect) {
-    clear(container);
-    var items = Array.isArray(media) ? media : [];
-    if (!items.length) {
-      container.appendChild(createElement('p', 'admin-app__muted', 'No product media found yet.'));
-      return;
-    }
-    var list = createElement('div', 'admin-store-products__media-list');
-    items.forEach(function(item) {
-      var button = createElement('button', 'admin-store-products__media-item');
-      button.type = 'button';
-      button.dataset.storeProductMediaPath = item.path || '';
-      var thumb = createElement('span', 'admin-store-products__media-thumb');
-      var image = document.createElement('img');
-      image.loading = 'lazy';
-      image.src = mediaPreviewUrl(item.path || '');
-      image.alt = '';
-      thumb.appendChild(image);
-      var text = createElement('span', 'admin-store-products__media-text');
-      text.appendChild(createElement('strong', '', item.label || item.path || 'Image'));
-      text.appendChild(createElement('small', '', item.path || ''));
-      button.appendChild(thumb);
-      button.appendChild(text);
-      button.addEventListener('click', function() {
-        onSelect(item);
-      });
-      list.appendChild(button);
-    });
-    container.appendChild(list);
+  function uploadStoreProductImage(product, file, status) {
+    return uploadStoreProductMedia(product, file, status);
   }
 
-  function loadStoreProductMediaLibrary(product, container, status, onSelect) {
+  function storeProductMediaMetadata(item) {
+    var details = [localizedMediaCatalogValue('scope', item.scope)];
+    if (item.role) details.push(localizedMediaCatalogValue('role', item.role));
+    if (item.width && item.height) details.push(item.width + 'x' + item.height);
+    if (item.durationMs) details.push(Math.round(item.durationMs / 1000) + 's');
+    if (item.bytes) details.push(item.bytes < 1024 * 1024 ? Math.round(item.bytes / 1024) + ' KB' : (item.bytes / (1024 * 1024)).toFixed(1) + ' MB');
+    if (item.optimizationStatus) details.push(localizedMediaCatalogValue('status', item.optimizationStatus));
+    if (item.references && item.references.length) {
+      details.push(localizedAdminText(item.references.length === 1 ? 'mediaReferenceOne' : 'mediaReferenceOther', { count: item.references.length }));
+    }
+    return details.filter(Boolean).join(' · ');
+  }
+
+  function renderStoreProductMediaLibrary(container, payload, onSelect, options) {
+    clear(container);
+    var data = Array.isArray(payload) ? { media: payload } : (payload || {});
+    var items = Array.isArray(data.media) ? data.media.map(function(item) {
+      return Object.assign({ type: 'image', scope: 'product', warnings: [], references: [] }, item || {});
+    }) : [];
+    var allowedTypes = options && options.allowedTypes || [];
+    if (!items.length) {
+      container.appendChild(createElement('p', 'admin-app__muted', localizedAdminText('mediaEmpty')));
+      return;
+    }
+    var controls = createElement('div', 'admin-content-media-library__controls');
+    var tabs = createElement('div', 'admin-content-media-library__tabs');
+    tabs.setAttribute('role', 'group');
+    tabs.setAttribute('aria-label', localizedAdminText('mediaTypeLabel'));
+    var selectedType = allowedTypes.length === 1 ? allowedTypes[0] : 'all';
+    ['all', 'image', 'video', 'audio'].forEach(function(type) {
+      var tab = createElement('button', 'btn btn--secondary btn--small', type === 'all' ? localizedAdminText('mediaFilterAll') : localizedMediaType(type));
+      tab.type = 'button';
+      tab.dataset.mediaFilterType = type;
+      tab.setAttribute('aria-pressed', selectedType === type ? 'true' : 'false');
+      tabs.appendChild(tab);
+    });
+    var search = document.createElement('input');
+    search.type = 'search';
+    search.placeholder = localizedAdminText('mediaSearch');
+    search.setAttribute('aria-label', localizedAdminText('mediaSearch'));
+    var sort = document.createElement('select');
+    sort.setAttribute('aria-label', localizedAdminText('mediaSort'));
+    [['recent', localizedAdminText('mediaSortRecent')], ['name', localizedAdminText('mediaSortName')]].forEach(function(pair) {
+      var option = document.createElement('option');
+      option.value = pair[0];
+      option.textContent = pair[1];
+      sort.appendChild(option);
+    });
+    controls.appendChild(tabs);
+    controls.appendChild(search);
+    controls.appendChild(sort);
+    container.appendChild(controls);
+    if (Array.isArray(data.brokenReferences) && data.brokenReferences.length) {
+      container.appendChild(createElement('p', 'admin-content-media-library__warning', localizedAdminText(
+        data.brokenReferences.length === 1 ? 'mediaBrokenOne' : 'mediaBrokenOther',
+        { count: data.brokenReferences.length }
+      )));
+    }
+    var operations = createElement('div', 'admin-content-media-library__operations');
+    [['changed', localizedAdminText('mediaRepairChanged')], ['all', localizedAdminText('mediaRepairAll')]].forEach(function(pair) {
+      var repair = createElement('button', 'btn btn--secondary btn--small', pair[1]);
+      repair.type = 'button';
+      repair.addEventListener('click', function() {
+        repair.disabled = true;
+        requestJson('/admin/store/products/media/optimize', { method: 'POST', body: { scope: pair[0] } }).then(function() {
+          repair.textContent = localizedAdminText('mediaRepairQueued');
+        }).catch(function(error) {
+          repair.disabled = false;
+          repair.textContent = formatError(error);
+        });
+      });
+      operations.appendChild(repair);
+    });
+    container.appendChild(operations);
+    var results = createElement('div', 'admin-store-products__media-list');
+    container.appendChild(results);
+
+    function draw() {
+      clear(results);
+      var needle = search.value.trim().toLowerCase();
+      var visible = items.filter(function(item) {
+        return (selectedType === 'all' || item.type === selectedType) &&
+          (!needle || ((item.label || '') + ' ' + (item.path || '')).toLowerCase().indexOf(needle) >= 0);
+      }).slice().sort(function(a, b) {
+        return sort.value === 'name'
+          ? String(a.label || a.path).localeCompare(String(b.label || b.path))
+          : String(b.recentKey || '').localeCompare(String(a.recentKey || '')) || String(a.label || a.path).localeCompare(String(b.label || b.path));
+      });
+      if (!visible.length) {
+        results.appendChild(createElement('p', 'admin-app__muted', localizedAdminText('mediaNoMatches')));
+        return;
+      }
+      visible.forEach(function(item) {
+        var card = createElement('div', 'admin-store-products__media-card');
+        var button = createElement('button', 'admin-store-products__media-item');
+        button.type = 'button';
+        button.dataset.storeProductMediaPath = item.path || '';
+        var canSelect = !allowedTypes.length || allowedTypes.indexOf(item.type) >= 0;
+        button.disabled = !canSelect;
+        if (!canSelect) button.title = localizedAdminText('mediaFieldRequires', { types: localizedMediaTypeList(allowedTypes) });
+        var thumb = createElement('span', 'admin-store-products__media-thumb');
+        if (item.type === 'image') {
+          var image = document.createElement('img');
+          image.loading = 'lazy';
+          image.src = mediaPreviewUrl(item.path || '');
+          image.alt = '';
+          thumb.appendChild(image);
+        } else {
+          thumb.appendChild(createElement('span', 'admin-content-media-library__type-preview', localizedMediaType(item.type)));
+        }
+        var text = createElement('span', 'admin-store-products__media-text');
+        text.appendChild(createElement('strong', '', item.label || item.path || localizedAdminText('mediaGeneric')));
+        text.appendChild(createElement('small', '', item.path || ''));
+        text.appendChild(createElement('small', '', storeProductMediaMetadata(item)));
+        (item.warnings || []).forEach(function(warning) {
+          text.appendChild(createElement('small', 'admin-content-media-library__warning', localizedMediaCatalogValue('warning', warning)));
+        });
+        if (item.references && item.references.length) {
+          var referenceDetails = createElement('details', 'admin-content-media-library__references');
+          referenceDetails.appendChild(createElement('summary', '', localizedAdminText(
+            item.references.length === 1 ? 'mediaUsedOne' : 'mediaUsedOther',
+            { count: item.references.length }
+          )));
+          var referenceList = document.createElement('ul');
+          item.references.slice(0, 12).forEach(function(reference) {
+            referenceList.appendChild(createElement('li', '', String(reference.path || '') + (Number(reference.count || 0) > 1 ? ' (' + reference.count + ')' : '')));
+          });
+          referenceDetails.appendChild(referenceList);
+          text.appendChild(referenceDetails);
+        }
+        button.appendChild(thumb);
+        button.appendChild(text);
+        button.addEventListener('click', function() { onSelect(item); });
+        card.appendChild(button);
+        if (item.contentSha && options && typeof options.onReplace === 'function') {
+          var replaceInput = document.createElement('input');
+          replaceInput.type = 'file';
+          replaceInput.accept = item.type === 'video'
+            ? 'video/mp4,video/webm,video/quicktime'
+            : item.type === 'audio'
+              ? 'audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/wav,audio/webm'
+              : 'image/png,image/jpeg,image/webp,image/gif';
+          replaceInput.setAttribute('aria-label', localizedAdminText('mediaReplaceLabel', { name: item.label || item.name || localizedAdminText('mediaGeneric') }));
+          replaceInput.addEventListener('change', function() {
+            var file = replaceInput.files && replaceInput.files[0];
+            if (!file) return;
+            options.onReplace(item, file);
+          });
+          card.appendChild(createAdminFilePicker(replaceInput, {
+            buttonClass: 'btn--small btn--secondary',
+            buttonLabel: localizedAdminText('mediaReplace'),
+            className: 'admin-file-picker--compact',
+            emptyLabel: '',
+            idPrefix: 'admin-store-media-replace'
+          }));
+        }
+        results.appendChild(card);
+      });
+    }
+    tabs.addEventListener('click', function(event) {
+      var tab = event.target && event.target.closest('[data-media-filter-type]');
+      if (!tab) return;
+      selectedType = tab.dataset.mediaFilterType || 'all';
+      tabs.querySelectorAll('[data-media-filter-type]').forEach(function(button) {
+        button.setAttribute('aria-pressed', button === tab ? 'true' : 'false');
+      });
+      draw();
+    });
+    search.addEventListener('input', draw);
+    sort.addEventListener('change', draw);
+    draw();
+  }
+
+  function loadStoreProductMediaLibrary(product, container, status, onSelect, options) {
     var productId = product.productId || '';
     var cached = storeProductMediaCache.get(productId);
+    var renderOptions = Object.assign({}, options || {}, {
+      onReplace: function(item, file) {
+        return uploadStoreProductMedia(product, file, status, item).then(function(path) {
+          storeProductMediaCache.delete(productId);
+          onSelect(Object.assign({}, item, { path: path, githubPath: String(path || '').replace(/^\/+/, '') }));
+        }).catch(function(error) {
+          productUploadStatus(status, formatError(error), true);
+        });
+      }
+    });
     container.hidden = false;
     if (cached) {
-      renderStoreProductMediaLibrary(container, cached, onSelect);
+      renderStoreProductMediaLibrary(container, cached, onSelect, renderOptions);
       return Promise.resolve(cached);
     }
     clear(container);
@@ -5212,10 +5424,10 @@
     return requestJson('/admin/store/products/media', {
       params: { productId: productId }
     }).then(function(data) {
-      var media = data.media || data.images || [];
-      storeProductMediaCache.set(productId, media);
-      renderStoreProductMediaLibrary(container, media, onSelect);
-      return media;
+      data.media = data.media || data.images || [];
+      storeProductMediaCache.set(productId, data);
+      renderStoreProductMediaLibrary(container, data, onSelect, renderOptions);
+      return data.media;
     }).catch(function(error) {
       productUploadStatus(status, formatError(error), true);
       clear(container);
@@ -5282,8 +5494,8 @@
       loadStoreProductMediaLibrary(product, library, status, function(item) {
         setImage(item.path || '');
         library.hidden = true;
-        productUploadStatus(status, 'Image selected.');
-      });
+        productUploadStatus(status, localizedAdminText('mediaSelected'));
+      }, { allowedTypes: ['image'] });
     });
 
     actions.appendChild(createAdminFilePicker(uploadInput, {
@@ -5673,7 +5885,7 @@
       case 'quote':
         return { type: 'quote', text: '', author: '', align: align };
       case 'image':
-        return { type: 'image', src: '', alt: '', caption: '', align: align };
+        return { type: 'image', src: '', alt: '', decorative: false, caption: '', align: align };
       case 'gallery':
         return { type: 'gallery', layout: 'grid', caption_style: 'inline', images: [], caption: '', align: align };
       case 'video':
@@ -5700,6 +5912,7 @@
           return {
             src: String(image && image.src || ''),
             alt: String(image && image.alt || ''),
+            decorative: image && image.decorative === true,
             caption: String(image && image.caption || '')
           };
         }) : [];
@@ -5715,6 +5928,11 @@
       }
       if (key === 'provider' && type === 'video') {
         normalized.provider = storeProductDescriptionVideoProvider(block.provider);
+        return;
+      }
+      if (key === 'decorative') {
+        normalized.decorative = block.decorative === true || String(block.decorative || '').toLowerCase() === 'true';
+        if (normalized.decorative) normalized.alt = '';
         return;
       }
       normalized[key] = String(block[key] || '');
@@ -5931,7 +6149,9 @@
         control.appendChild(option);
       });
     }
-    control.value = String(block[field] || '');
+    control.value = options && options.boolean
+      ? (block[field] === true ? 'true' : 'false')
+      : String(block[field] || '');
     if (tagName === 'textarea') control.rows = options && options.rows || 3;
     if (options && options.placeholder) control.placeholder = options.placeholder;
     wrap.appendChild(label);
@@ -5945,7 +6165,8 @@
     var input = document.createElement('input');
     var status = createElement('span', 'admin-settings__image-status admin-content-block__media-status', '');
     input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    input.accept = options && options.accept || 'image/png,image/jpeg,image/webp,image/gif';
+    input.dataset.mediaType = options && options.mediaType || 'image';
     input.dataset.contentIndex = String(index);
     input.dataset.contentAction = options && options.action || 'select-media-upload';
     if (options && options.imageIndex !== undefined) input.dataset.contentImageIndex = String(options.imageIndex);
@@ -5962,12 +6183,14 @@
     return wrap;
   }
 
-  function storeProductDescriptionMediaLibraryButton(index, imageIndex) {
+  function storeProductDescriptionMediaLibraryButton(index, imageIndex, mediaType) {
     var wrap = createElement('div', 'admin-content-block__field admin-content-block__media-library-field');
-    var button = createElement('button', 'btn btn--secondary btn--small', 'Choose existing image');
+    var type = mediaType || 'image';
+    var button = createElement('button', 'btn btn--secondary btn--small', localizedAdminText('mediaChooseExisting', { type: localizedMediaType(type) }));
     button.type = 'button';
     button.dataset.contentIndex = String(index);
     button.dataset.contentAction = 'choose-media-library';
+    button.dataset.mediaType = type;
     if (imageIndex !== undefined) button.dataset.contentImageIndex = String(imageIndex);
     wrap.appendChild(button);
     return wrap;
@@ -6136,6 +6359,13 @@
       fields.appendChild(storeProductDescriptionMediaLibraryButton(index));
       fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'src', 'Source URL'));
       fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'alt', 'Alt text'));
+      fields.appendChild(storeProductDescriptionField(context, 'select', block, index, 'decorative', localizedAdminText('mediaImageMeaning'), {
+        boolean: true,
+        options: [
+          { value: 'false', label: localizedAdminText('mediaMeaningful') },
+          { value: 'true', label: localizedAdminText('mediaDecorative') }
+        ]
+      }));
     } else if (block.type === 'gallery') {
       fields.appendChild(storeProductDescriptionField(context, 'select', block, index, 'layout', 'Gallery layout', {
         options: [{ value: 'grid', label: 'Grid' }, { value: 'carousel', label: 'Carousel' }]
@@ -6152,6 +6382,12 @@
         options: [{ value: 'youtube', label: 'YouTube' }, { value: 'vimeo', label: 'Vimeo' }, { value: 'local', label: 'Uploaded video' }]
       }));
       if (storeProductDescriptionVideoProvider(block.provider) === 'local') {
+        fields.appendChild(storeProductDescriptionUploadField(context, block, index, {
+          buttonLabel: localizedAdminText('mediaUploadVideo'),
+          mediaType: 'video',
+          accept: 'video/mp4,video/webm,video/quicktime'
+        }));
+        fields.appendChild(storeProductDescriptionMediaLibraryButton(index, undefined, 'video'));
         fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'src', 'Source URL', {
           placeholder: '/assets/videos/example.mp4'
         }));
@@ -6162,6 +6398,12 @@
         fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'video_id', 'Video ID'));
       }
     } else if (block.type === 'audio') {
+      fields.appendChild(storeProductDescriptionUploadField(context, block, index, {
+        buttonLabel: localizedAdminText('mediaUploadAudio'),
+        mediaType: 'audio',
+        accept: 'audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/wav,audio/webm'
+      }));
+      fields.appendChild(storeProductDescriptionMediaLibraryButton(index, undefined, 'audio'));
       fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'src', 'Source URL', {
         placeholder: '/assets/audio/example.mp3'
       }));
@@ -6195,6 +6437,7 @@
     fields.appendChild(storeProductDescriptionMediaLibraryButton(index, imageIndex));
     fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'src', 'Source URL'));
     fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'alt', 'Alt text'));
+    fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'decorative', localizedAdminText('mediaImageMeaning')));
     fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'caption', 'Caption'));
     panel.appendChild(fields);
     galleryItem.appendChild(setting.button);
@@ -6205,14 +6448,24 @@
     var wrap = createElement('div', 'admin-content-block__field');
     var label = document.createElement('label');
     var controlId = 'store-product-gallery-field-' + context.id + '-' + index + '-' + imageIndex + '-' + field;
-    var control = document.createElement(field === 'caption' ? 'textarea' : 'input');
+    var control = document.createElement(field === 'caption' ? 'textarea' : field === 'decorative' ? 'select' : 'input');
     label.setAttribute('for', controlId);
     label.appendChild(createElement('span', '', labelText));
     control.id = controlId;
     control.dataset.contentIndex = String(index);
     control.dataset.contentImageIndex = String(imageIndex);
     control.dataset.contentField = field;
-    control.value = String(block.images && block.images[imageIndex] && block.images[imageIndex][field] || '');
+    if (field === 'decorative') {
+      [['false', localizedAdminText('mediaMeaningful')], ['true', localizedAdminText('mediaDecorative')]].forEach(function(pair) {
+        var option = document.createElement('option');
+        option.value = pair[0];
+        option.textContent = pair[1];
+        control.appendChild(option);
+      });
+      control.value = block.images && block.images[imageIndex] && block.images[imageIndex].decorative === true ? 'true' : 'false';
+    } else {
+      control.value = String(block.images && block.images[imageIndex] && block.images[imageIndex][field] || '');
+    }
     if (field === 'caption') control.rows = 2;
     wrap.appendChild(label);
     wrap.appendChild(control);
@@ -6560,7 +6813,8 @@
     if (control.dataset.contentImageIndex !== undefined && block.type === 'gallery') {
       var imageIndex = Number(control.dataset.contentImageIndex);
       if (!Number.isInteger(imageIndex) || !block.images[imageIndex]) return;
-      block.images[imageIndex][field] = control.value;
+      block.images[imageIndex][field] = field === 'decorative' ? control.value === 'true' : control.value;
+      if (field === 'decorative' && block.images[imageIndex].decorative) block.images[imageIndex].alt = '';
     } else if (field === 'provider') {
       block.provider = block.type === 'video' ? storeProductDescriptionVideoProvider(control.value) : String(control.value || '');
       storeProductDescriptionRenderBlocks(context, index);
@@ -6568,7 +6822,8 @@
     } else if (control.isContentEditable) {
       block[field] = field === 'body' ? storeProductEditorHtmlToMarkdown(control) : storeProductEditorNodeToMarkdown(control).trim();
     } else {
-      block[field] = control.value;
+      block[field] = field === 'decorative' ? control.value === 'true' : control.value;
+      if (field === 'decorative' && block.decorative) block.alt = '';
     }
     storeProductDescriptionSync(context);
   }
@@ -6663,9 +6918,11 @@
     var target = storeProductDescriptionUploadTarget(context, control);
     if (!target || !path) return;
     target.target.src = path;
-    if (!target.target.alt) target.target.alt = label || context.product.name || 'Product image';
+    if ((target.block.type === 'image' || target.block.type === 'gallery') && !target.target.alt) {
+      target.target.alt = label || context.product.name || localizedAdminText('mediaProductImageFallback');
+    }
     storeProductDescriptionRenderBlocks(context, target.index);
-    setStatus(context.status, 'Image selected.');
+    setStatus(context.status, localizedAdminText('mediaSelected'));
   }
 
   function storeProductDescriptionSelectUpload(context, control) {
@@ -6678,9 +6935,11 @@
       updateAdminFilePickerFilename(control);
       return;
     }
-    uploadStoreProductImage(context.product, file, context.status).then(function(path) {
+    uploadStoreProductMedia(context.product, file, context.status).then(function(path) {
       target.target.src = path;
-      if (!target.target.alt) target.target.alt = file.name || context.product.name || 'Product image';
+      if ((target.block.type === 'image' || target.block.type === 'gallery') && !target.target.alt) {
+        target.target.alt = file.name || context.product.name || localizedAdminText('mediaProductImageFallback');
+      }
       storeProductDescriptionRenderBlocks(context, target.index);
     }).catch(function(error) {
       logger.error('Failed to upload Store product description media', error);
@@ -6694,10 +6953,11 @@
   function storeProductDescriptionOpenMediaLibrary(context, button) {
     context.library.hidden = !context.library.hidden;
     if (context.library.hidden) return;
+    var mediaType = String(button.dataset.mediaType || 'image');
     loadStoreProductMediaLibrary(context.product, context.library, context.status, function(item) {
       storeProductDescriptionApplyMediaPath(context, button, item.path || '', item.label || context.product.name);
       context.library.hidden = true;
-    });
+    }, { allowedTypes: [mediaType] });
   }
 
   function storeProductDescriptionInsertSlashBlock(context, control) {
@@ -7458,7 +7718,9 @@
       ['id', source.id || '', 'derived'],
       ['sku', source.sku || '', 'derived'],
       ['downloadFileKey', source.downloadFileKey || '', 'download'],
-      ['price', productPrice(source.priceCents !== undefined || source.price !== undefined ? source : product), 'number'],
+      ['price', source.priceCents !== undefined && source.priceCents !== null
+        ? productPrice(source)
+        : (source.price !== undefined && source.price !== null && String(source.price).trim() !== '' ? Number(source.price) : ''), 'number'],
       ['inventory', source.inventory ?? '', 'number'],
       ['status', source.status || 'active', 'select']
     ].forEach(function(field) {
@@ -7557,7 +7819,7 @@
       id: base,
       label: 'Variant ' + index,
       sku: (product.productId || 'product') + '-' + base,
-      priceCents: product.priceCents ?? Math.round(Number(product.price || 0) * 100),
+      priceCents: null,
       inventory: product.inventory ?? 0,
       status: 'active'
     };
@@ -7616,7 +7878,7 @@
       $all('[data-store-variant-field]', row).forEach(function(input) {
         if (input.disabled) return;
         var key = input.dataset.storeVariantField;
-        if (key === 'price') variant[key] = Number(input.value || 0);
+        if (key === 'price') variant[key] = input.value === '' ? '' : Number(input.value);
         else if (key === 'inventory') variant[key] = input.value === '' ? '' : Number(input.value);
         else if (key === 'downloadFileKey') {
           variant[key] = input.value;

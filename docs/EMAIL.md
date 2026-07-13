@@ -91,6 +91,22 @@ The cron handler processes due reminders and retries failures with bounded backo
 
 Cron status and recent errors are visible in **Settings -> Store readiness** and through the authenticated cron/observability endpoints.
 
+## Durable Delivery
+
+Production order confirmations, event reminders, and opted-in abandoned-checkout reminders use the shared KV outbox when `EMAIL_OUTBOX_ENABLED=true`. The order or reminder state is committed first; email delivery is an independently retryable side effect.
+
+Each `email-outbox:v1:*` record has a deterministic job ID, a frozen Resend payload/content hash, a stable `store/<job-id>` idempotency key, bounded exponential backoff, and a 10-minute processing lease. Payloads expire after 30 days. Provider acceptance and signed delivery outcomes are minimized into `email-delivery:v1:*` for 400 days. Ambiguous outcomes stop for operator review rather than risking a duplicate send outside Resend's retry window.
+
+Admin sign-in, super-admin order notifications containing five-minute one-time admin links, and customer order-lookup messages containing 15-minute one-time lookup links remain immediate. Delaying those security-sensitive messages behind a background queue would consume a material part of their validity window. Explicit admin test sends also remain immediate.
+
+Create a Resend webhook at:
+
+```text
+https://checkout.dustwave.xyz/webhooks/resend
+```
+
+Subscribe to delivered, bounced, complained, failed, and suppressed events, then store its Svix signing secret as `RESEND_WEBHOOK_SECRET`. The Worker verifies the raw request body, `svix-id`, timestamp, and signature, and keeps the processed marker for 35 days. Permanent bounce and complaint events create a 400-day hashed-address suppression used by optional/marketing reminders; raw email addresses are not stored in the suppression record.
+
 ## Calendar And QR Behavior
 
 Calendar files are generated from structured product event fields:

@@ -3399,6 +3399,61 @@ textarea.admin-settings__input--readonly {
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
 }
 
+.admin-content-media-library__controls,
+.admin-content-media-library__operations,
+.admin-content-media-library__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-content-media-library__controls {
+  align-items: center;
+  margin-bottom: 10px;
+
+  input,
+  select {
+    border: 1px solid $border--strong;
+    border-radius: $radius--sm;
+    font: inherit;
+    padding: 8px 10px;
+
+    @include admin-control-focus;
+  }
+}
+
+.admin-content-media-library__tabs {
+  flex-basis: 100%;
+}
+
+.admin-content-media-library__tabs [aria-pressed="true"] {
+  border-color: $color--primary;
+  box-shadow: inset 0 -2px 0 $color--primary;
+}
+
+.admin-content-media-library__operations {
+  margin: 8px 0 12px;
+}
+
+.admin-content-media-library__warning {
+  color: $color--danger-text;
+}
+
+.admin-content-media-library__references {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  ul {
+    margin: 0.35rem 0 0;
+    padding-inline-start: 1.1rem;
+  }
+}
+
 .admin-store-products__media-item {
   align-items: center;
   background: $surface--base;
@@ -3411,6 +3466,16 @@ textarea.admin-settings__input--readonly {
   min-width: 0;
   padding: 6px;
   text-align: left;
+}
+
+.admin-store-products__media-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+
+  .admin-store-products__media-item {
+    width: 100%;
+  }
 }
 
 .admin-store-products__media-item:focus-visible {
@@ -3430,6 +3495,22 @@ textarea.admin-settings__input--readonly {
   height: 100%;
   object-fit: cover;
   width: 100%;
+}
+
+.admin-content-media-library__type-preview {
+  align-items: center;
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  height: 100%;
+  justify-content: center;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+.admin-store-products__media-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .admin-store-products__media-text {

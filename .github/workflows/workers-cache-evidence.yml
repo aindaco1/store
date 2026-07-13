@@ -26,6 +26,7 @@ jobs:
       WORKERS_CACHE_EVIDENCE_SECRET: ${{ secrets.WORKERS_CACHE_EVIDENCE_SECRET }}
       WORKER_BASE: ${{ vars.WORKER_BASE || 'https://checkout.dustwave.xyz' }}
       WORKERS_CACHE_ANALYTICS_DATASET: ${{ vars.WORKERS_CACHE_ANALYTICS_DATASET || 'store_workers_cache_metrics' }}
+      WORKERS_CACHE_EVIDENCE_ROUTE: ${{ vars.WORKERS_CACHE_EVIDENCE_ROUTE || 'orders' }}
       WORKERS_CACHE_MAX_RECENT_REQUESTS: ${{ vars.WORKERS_CACHE_MAX_RECENT_REQUESTS || '25' }}
       WORKERS_CACHE_MINIMUM_REQUESTS: ${{ vars.WORKERS_CACHE_MINIMUM_REQUESTS || '10' }}
       WORKERS_CACHE_MINIMUM_HIT_RATIO_PERCENT: ${{ vars.WORKERS_CACHE_MINIMUM_HIT_RATIO_PERCENT || '50' }}
@@ -47,6 +48,7 @@ jobs:
         run: >-
           npm run cache:observability --
           --strict
+          --route="${WORKERS_CACHE_EVIDENCE_ROUTE}"
           --hours=24
           --recent-minutes=15
           --max-recent-requests="${WORKERS_CACHE_MAX_RECENT_REQUESTS}"

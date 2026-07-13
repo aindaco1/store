@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DATASET = 'store_workers_cache_metrics';
 const HIT_STATUSES = new Set(['HIT', 'UPDATING']);
+const CACHE_ROUTES = Object.freeze(['orders', 'analytics', 'inventory', 'downloads']);
 const CACHE_STATUSES = Object.freeze([
   'HIT',
   'MISS',
@@ -73,6 +74,14 @@ function normalizedScriptName(value) {
     throw new Error('Cloudflare Worker script name is invalid.');
   }
   return scriptName;
+}
+
+function normalizedRoute(value) {
+  const route = String(value || 'orders').trim().toLowerCase();
+  if (!CACHE_ROUTES.includes(route)) {
+    throw new Error(`Unsupported Workers Cache evidence route: ${route || '<empty>'}.`);
+  }
+  return route;
 }
 
 function normalizedQueryStart(value) {
@@ -148,7 +157,7 @@ export function summarizeWorkersCacheAnalytics(rows = [], options = {}) {
 
   for (const rawRow of rows) {
     const route = String(rawRow?.route || '').trim().toLowerCase();
-    if (!['orders', 'analytics', 'inventory', 'downloads'].includes(route)) continue;
+    if (!CACHE_ROUTES.includes(route)) continue;
     if (!routes.has(route)) {
       routes.set(route, {
         route,
@@ -353,18 +362,30 @@ async function requestReadOnlyProbe({ workerBase, evidenceSecret, route, fetchIm
   return body;
 }
 
-function probeGate(probe = null) {
+function probeGate(probe = null, expectedRoute = 'orders') {
   if (!probe) return { state: 'skipped', passed: true, checks: [] };
+  const route = String(probe.route || '').trim().toLowerCase();
+  const statuses = ['probe', 'warmup', 'repeat']
+    .map((key) => String(probe[key]?.status || '').trim().toUpperCase());
+  const disabled = statuses.every((status) => status === 'DISABLED');
   const repeatStatus = String(probe.repeat?.status || '').toUpperCase();
   const checks = [
     { id: 'sanitized', ok: probe.containsResponseBodies === false && probe.containsCredentials === false && probe.containsCustomerData === false },
     { id: 'bounded-probe-reads', ok: numeric(probe.requestBudget?.probeReads) === 3 },
+    { id: 'expected-route', ok: route === expectedRoute && CACHE_ROUTES.includes(route) },
     { id: 'warmup-unchanged', ok: probe.route !== 'orders' || probe.warmup?.unchanged === true },
-    { id: 'repeat-cache-status', ok: HIT_STATUSES.has(repeatStatus) },
+    disabled
+      ? { id: 'disabled-route-consistent', ok: disabled }
+      : { id: 'repeat-cache-status', ok: HIT_STATUSES.has(repeatStatus) },
     { id: 'repeat-unchanged', ok: probe.route !== 'orders' || probe.repeat?.unchanged === true },
     { id: 'repeat-zero-kv-reads', ok: numeric(probe.repeat?.writeBudget?.kvReadsExpected) === 0 && numeric(probe.repeat?.writeBudget?.kvListExpected) === 0 }
   ];
-  return { state: 'evaluated', passed: checks.every((check) => check.ok), checks };
+  return {
+    state: disabled ? 'not_applicable' : 'evaluated',
+    reason: disabled ? 'route_disabled' : '',
+    passed: checks.every((check) => check.ok),
+    checks
+  };
 }
 
 export async function collectWorkersCacheObservability(options = {}) {
@@ -414,6 +435,7 @@ export async function collectWorkersCacheObservability(options = {}) {
   const analytics = summarizeWorkersCacheAnalytics(rows, options);
   const workerBase = normalizedWorkerBase(options.workerBase);
   const evidenceSecret = String(options.evidenceSecret || '').trim();
+  const route = normalizedRoute(options.route);
   const probeRequested = options.probe !== false;
   let probe = null;
   let probeSkipReason = '';
@@ -427,21 +449,34 @@ export async function collectWorkersCacheObservability(options = {}) {
     probe = await requestReadOnlyProbe({
       workerBase,
       evidenceSecret,
-      route: options.route || 'orders',
+      route,
       fetchImpl: options.fetchImpl
     });
   }
-  const evaluatedProbe = probeGate(probe);
+  const evaluatedProbe = probeGate(probe, route);
   const requestedProbeUnavailable = probeRequested && analytics.lowTraffic &&
     (!workerBase || !evidenceSecret);
   const evaluatedRoutes = analytics.routes.filter((route) => route.evidenceState === 'evaluated');
   let acceptanceState = 'passed';
+  let acceptanceReason = 'all_gates_passed';
   if (!evaluatedProbe.passed || requestedProbeUnavailable) {
     acceptanceState = 'failed';
-  } else if (!deployments.stable || evaluatedRoutes.length === 0) {
+    acceptanceReason = requestedProbeUnavailable ? 'probe_credentials_unavailable' : 'probe_failed';
+  } else if (!deployments.stable) {
     acceptanceState = 'inconclusive';
+    acceptanceReason = 'deployment_warmup';
+  } else if (evaluatedProbe.state === 'not_applicable' && evaluatedRoutes.length === 0) {
+    acceptanceState = 'not_applicable';
+    acceptanceReason = 'no_enabled_candidates';
+  } else if (evaluatedProbe.state === 'not_applicable') {
+    acceptanceState = 'failed';
+    acceptanceReason = 'probe_route_disabled_with_enabled_candidates';
+  } else if (evaluatedRoutes.length === 0) {
+    acceptanceState = 'inconclusive';
+    acceptanceReason = 'insufficient_data';
   } else if (!analytics.gatesPassed) {
     acceptanceState = 'failed';
+    acceptanceReason = 'analytics_gate_failed';
   }
   return {
     schemaVersion: 2,
@@ -464,8 +499,9 @@ export async function collectWorkersCacheObservability(options = {}) {
       minimumStableHours: deployments.minimumStableHours,
       evaluatedRoutes: evaluatedRoutes.map((route) => route.route),
       state: acceptanceState,
+      reason: acceptanceReason,
       conclusive: acceptanceState !== 'inconclusive',
-      passed: acceptanceState === 'passed'
+      passed: acceptanceState === 'passed' || acceptanceState === 'not_applicable'
     },
     routes: analytics.routes,
     probe: probe ? {
@@ -492,7 +528,7 @@ function writeOutput(output, value) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
-    console.log('Usage: node scripts/workers-cache-observability.mjs [--hours=24] [--recent-minutes=15] [--max-recent-requests=25] [--minimum-requests=10] [--minimum-hit-ratio-percent=50] [--minimum-stable-hours=4] [--worker-script=NAME] [--deployments-file=FILE] [--no-probe] [--output=FILE] [--strict]');
+    console.log('Usage: node scripts/workers-cache-observability.mjs [--route=orders] [--hours=24] [--recent-minutes=15] [--max-recent-requests=25] [--minimum-requests=10] [--minimum-hit-ratio-percent=50] [--minimum-stable-hours=4] [--worker-script=NAME] [--deployments-file=FILE] [--no-probe] [--output=FILE] [--strict]');
     console.log('Requires CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_ANALYTICS_API_TOKEN. Deployment-aware evidence also requires CLOUDFLARE_WORKERS_API_TOKEN and a Worker script name. A low-traffic probe requires WORKER_BASE and WORKERS_CACHE_EVIDENCE_SECRET.');
     return;
   }

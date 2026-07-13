@@ -1,8 +1,18 @@
 # Changelog
 
-## Unreleased
+## v1.0.8 - Unreleased
 
-No changes yet.
+### Store reliability, media, and operations
+
+- Moved and refreshed `AGENTS.md` at the repository root so Store checkout, payment recovery, email durability, media authority, retention, and release invariants are discovered automatically.
+- Added one shared add-on price resolver across browser cart, generated catalog, Worker validation, and admin serialization. Blank variant prices inherit the product price, explicit zero remains valid, current catalog prices govern new selections, confirmed order prices remain historical, and every path enforces the existing $1,000,000 ceiling.
+- Added a deterministic repository media manifest for image, video, and audio sources with hashes, dimensions/duration, sizes, derivatives, references, optimization state, placement budgets, intentionally skipped derivatives, and broken-reference evidence.
+- Expanded Store product media administration with accessible type tabs, search/sort/scope filters, previews, metadata and warnings, reference visibility, SHA-protected same-scope source replacement, explicit decorative-image semantics, and changed/all repair dispatch through the existing optimizer workflow.
+- Hardened Stripe requests with an explicit API version, deterministic idempotency on retry-safe writes, redacted errors and observations, explicit currency/value/booking/availability times, 35-day webhook dedupe markers with processing leases, and a 400-day minimized processor-event journal.
+- Added bounded scheduled and super-admin-triggered read-only reconciliation from the canonical order index to Stripe PaymentIntents. Open/resolved reconciliation breaks retain 400 days and no reconciliation path scans the order namespace or creates/retries charges.
+- Added a 30-day KV email outbox for order confirmations, event reminders, and opted-in abandoned-cart reminders, with frozen provider payloads, deterministic Resend idempotency, bounded retry/backoff, crash leases, signed delivery webhooks, 400-day minimized delivery/suppression evidence, and permanent-bounce/complaint suppression.
+- Updated canonical config synchronization, setup, secret inventory, admin readiness, data inventory, backup ordering, pre-merge coverage, operator docs, and roadmap status for these changes.
+- Prepared the Storefront and Worker packages as `1.0.8`; the immutable tag and release date remain pending until the reviewed production and protected-operations evidence is attached.
 
 ## v1.0.7 - 2026-07-11
 

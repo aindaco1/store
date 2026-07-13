@@ -253,6 +253,129 @@ describe('Workers Cache observability evidence', () => {
     expect(result.acceptance.passed).toBe(false);
   });
 
+  it('passes conclusively as not applicable when every optional route is disabled', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/analytics_engine/sql')) {
+        return new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({
+        schemaVersion: 1,
+        measuredAt: '2026-07-10T00:00:00.000Z',
+        route: 'orders',
+        containsResponseBodies: false,
+        containsCredentials: false,
+        containsCustomerData: false,
+        probe: { status: 'DISABLED', unchanged: false, writeBudget: { kvReadsExpected: 1, kvListExpected: 1 } },
+        warmup: { status: 'DISABLED', unchanged: true, writeBudget: { kvReadsExpected: 1, kvListExpected: 1 } },
+        repeat: { status: 'DISABLED', unchanged: true, writeBudget: { kvReadsExpected: 0, kvListExpected: 0 } },
+        requestBudget: { probeReads: 3 }
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    });
+
+    const result = await collectWorkersCacheObservability({
+      accountId: ACCOUNT_ID,
+      apiToken: 'analytics-secret',
+      workerBase: 'https://checkout.example.com',
+      evidenceSecret: 'evidence-secret',
+      fetchImpl
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result.acceptance).toMatchObject({
+      state: 'not_applicable',
+      reason: 'no_enabled_candidates',
+      conclusive: true,
+      passed: true,
+      evaluatedRoutes: []
+    });
+    expect(result.probeState).toBe('not_applicable');
+    expect(result.probeChecks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'sanitized', ok: true }),
+      expect.objectContaining({ id: 'bounded-probe-reads', ok: true }),
+      expect.objectContaining({ id: 'expected-route', ok: true }),
+      expect.objectContaining({ id: 'disabled-route-consistent', ok: true }),
+      expect.objectContaining({ id: 'repeat-zero-kv-reads', ok: true })
+    ]));
+  });
+
+  it('fails closed when a disabled-route probe leaks data or exceeds its budget', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/analytics_engine/sql')) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        route: 'orders',
+        containsResponseBodies: true,
+        containsCredentials: false,
+        containsCustomerData: false,
+        probe: { status: 'DISABLED' },
+        warmup: { status: 'DISABLED', unchanged: true },
+        repeat: { status: 'DISABLED', unchanged: true, writeBudget: { kvReadsExpected: 0, kvListExpected: 0 } },
+        requestBudget: { probeReads: 4 }
+      }), { status: 200 });
+    });
+
+    const result = await collectWorkersCacheObservability({
+      accountId: ACCOUNT_ID,
+      apiToken: 'analytics-secret',
+      workerBase: 'https://checkout.example.com',
+      evidenceSecret: 'evidence-secret',
+      fetchImpl
+    });
+
+    expect(result.acceptance).toMatchObject({ state: 'failed', reason: 'probe_failed', passed: false });
+    expect(result.probeChecks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'sanitized', ok: false }),
+      expect.objectContaining({ id: 'bounded-probe-reads', ok: false })
+    ]));
+  });
+
+  it('fails when the selected probe route is disabled but aggregate evidence has an enabled candidate', async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/analytics_engine/sql')) {
+        return new Response(JSON.stringify({ data: [{
+          route: 'analytics',
+          estimatedRequests: 30,
+          recentEstimatedRequests: 0,
+          averageDurationMs: 8,
+          hitRequests: 30
+        }] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        route: 'orders',
+        containsResponseBodies: false,
+        containsCredentials: false,
+        containsCustomerData: false,
+        probe: { status: 'DISABLED' },
+        warmup: { status: 'DISABLED', unchanged: true },
+        repeat: { status: 'DISABLED', unchanged: true, writeBudget: { kvReadsExpected: 0, kvListExpected: 0 } },
+        requestBudget: { probeReads: 3 }
+      }), { status: 200 });
+    });
+
+    const result = await collectWorkersCacheObservability({
+      accountId: ACCOUNT_ID,
+      apiToken: 'analytics-secret',
+      workerBase: 'https://checkout.example.com',
+      evidenceSecret: 'evidence-secret',
+      minimumRequests: 10,
+      fetchImpl
+    });
+
+    expect(result.acceptance).toMatchObject({
+      state: 'failed',
+      reason: 'probe_route_disabled_with_enabled_candidates',
+      passed: false,
+      evaluatedRoutes: ['analytics']
+    });
+  });
+
   it('uses current-deployment telemetry and reports a warming deployment as inconclusive', async () => {
     const now = new Date('2026-07-10T12:00:00.000Z');
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

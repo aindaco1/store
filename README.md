@@ -4,7 +4,8 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Current release line: `v1.0.7`. Its published tag remains immutable, while subsequent `1.0.7` hotfixes and lockdown work are recorded explicitly as post-release hardening without moving the tag.
+- Current release candidate: `v1.0.8`. The published `v1.0.7` tag remains immutable; `v1.0.8` is not complete until the release evidence records the reviewed deployment and the applicable production operations gates.
+- `v1.0.8` adapts applicable Pool `v1.0.9`, `v1.1.0`, and `v1.1.1` primitives: DRY variant pricing, repository media governance for images/video/audio, durable email delivery evidence, and crash-safe Stripe journaling/reconciliation. Code-path evidence is complete; production cache, provider, and protected recovery evidence remains explicitly tracked rather than inferred.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -45,6 +46,7 @@ npm run sync:worker-config
 bundle exec jekyll build --quiet
 npm run test:seo
 npm run test:content-security
+npm run media:optimize:check
 npm run test:unit
 npm run test:unit:coverage
 npm run test:security
@@ -77,6 +79,8 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 - `assets/js/cart-provider.js` - first-party cart, checkout, shipping/tax preview, coupon, add-on, and reminder-consent runtime.
 - `assets/js/admin-dashboard.js` - admin dashboard client.
 - `worker/src/index.js` - Worker routes, checkout, admin, fulfillment, cron, and observability.
+- `worker/src/email-outbox.js`, `worker/src/payment-integrity.js`, and `worker/src/store-payment-reconciliation.js` - durable notification delivery and minimized payment/reconciliation evidence.
+- `_data/media-optimization-manifest.json` and `worker/src/media-catalog.js` - rebuildable repository media metadata and shared classification/budget rules.
 - `worker/src/admin-store-read-model.js`, `worker/src/workers-cache-policy.js`, and `worker/src/workers-cache-telemetry.js` - shared order snapshot, cache policy, and privacy-safe telemetry contracts.
 - `worker/src/generated/catalog-snapshot.js` - generated Worker catalog snapshot.
 - `worker/src/tier-inventory-do.js` - reservation-aware SKU inventory coordinator.

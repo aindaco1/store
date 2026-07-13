@@ -41,6 +41,58 @@ admin:
   image_size_error: Image must be 8 MB or smaller.
   no_file_chosen: No file chosen
   no_image_selected: No image selected.
+  media_image_size_error: Image must be 8 MB or smaller.
+  media_video_size_error: Video must be 100 MB or smaller.
+  media_audio_size_error: Audio must be 25 MB or smaller.
+  media_type_error: Use a supported image, video, or audio file.
+  media_uploading: Uploading %{filename}...
+  media_upload_missing_path: Upload did not return an asset path.
+  media_replaced: Media replaced. Publish product content to use it.
+  media_uploaded: Media uploaded. Publish product content to use it.
+  media_scope_product: product
+  media_scope_add_on: add-on
+  media_scope_default: default
+  media_role_source: source
+  media_role_derived: derived
+  media_status_ready: optimized
+  media_status_missing_derivatives: missing derivatives
+  media_status_not_applicable: optimization not applicable
+  media_warning_image_source_oversized: Oversized image source
+  media_warning_video_source_oversized: Oversized video source
+  media_warning_audio_source_oversized: Oversized audio source
+  media_reference_one: "%{count} reference"
+  media_reference_other: "%{count} references"
+  media_empty: No product media found yet.
+  media_type_label: Media type
+  media_type_image: image
+  media_type_video: video
+  media_type_audio: audio
+  media_filter_all: All
+  media_search: Search media
+  media_sort: Sort media
+  media_sort_recent: Recently uploaded
+  media_sort_name: Name
+  media_broken_one: "%{count} broken media reference needs repair."
+  media_broken_other: "%{count} broken media references need repair."
+  media_repair_changed: Repair changed media
+  media_repair_all: Repair all media
+  media_repair_queued: Repair queued
+  media_no_matches: No media matches these filters.
+  media_field_requires: This field requires %{types} media.
+  media_or: or
+  media_generic: Media
+  media_used_one: Used in %{count} source file
+  media_used_other: Used in %{count} source files
+  media_replace: Replace
+  media_replace_label: Replace %{name}
+  media_selected: Media selected.
+  media_choose_existing: Choose existing %{type} file
+  media_upload_video: Upload video
+  media_upload_audio: Upload audio
+  media_image_meaning: Image meaning
+  media_meaningful: Meaningful — alt text required
+  media_decorative: Decorative — empty alt text
+  media_product_image_fallback: Product image
   store_analytics_intro: Review %{platform} revenue, fulfillment, ticket, payment, and product performance from Store order records.
   store_marketing_intro: Build %{platform} UTM and referral links, save reusable referrals, and download QR codes for campaigns or partners.
   marketing_destination_label: Destination path

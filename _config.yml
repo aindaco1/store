@@ -41,8 +41,8 @@ exclude:
   - Containerfile.playwright.dev
 platform:
   name: Shop
-  version: 1.0.7
-  release_label: v1.0.7
+  version: 1.0.8
+  release_label: v1.0.8
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>
@@ -55,6 +55,10 @@ platform:
   footer_logo_path: "/assets/images/defaults/dust-wave-square.png"
   favicon_path: "/assets/icons/favicon.png"
   default_social_image_path: "/assets/images/defaults/dust-wave-square.png"
+email:
+  outbox_enabled: true
+payments:
+  reconciliation_enabled: true
 admin:
   production_site_url: https://shop.dustwave.xyz
   production_worker_url: https://checkout.dustwave.xyz

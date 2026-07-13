@@ -77,6 +77,8 @@ Performance expectations:
 - response metadata and `writeBudget` expose cache status plus expected Workers/KV/R2 operations without adding per-hit KV counters
 - the authenticated gateway writes one asynchronous `STORE_CACHE_METRICS` Analytics Engine point per eligible admin read when `WORKERS_CACHE_TELEMETRY_ENABLED=true`; fields are limited to route, cache status/bypass, duration, response bytes, and expected operation counts
 - Analytics Engine telemetry adds one data-point write per eligible read and the nightly collector adds one SQL query plus, only below its recent cache-read threshold, a three-read full/no-change-warmup/no-change-repeat evidence probe with one rate-limit KV read/write; it never adds order-store KV counters
+- when every optional route is deliberately disabled, a sanitized three-read probe that consistently reports `DISABLED` closes as the conclusive `not_applicable`/`no_enabled_candidates` state; malformed, leaky, over-budget, mismatched-route, or mixed enabled/disabled evidence still fails closed
+- `WORKERS_CACHE_EVIDENCE_ROUTE` selects the single route exercised by the scheduled probe and must name the enabled candidate during a sequential experiment
 - super-admin and deploy-secret purges clear all known cache domains; deploy/version isolation remains enabled because `cross_version_cache` is off
 
 Sampled Worker observations retain bounded latency histograms and expose approximate p50/p95/p99, max, status counts, and slow routes in Admin -> Runtime diagnostics. The data remains aggregate-only and reuses the existing observability store.

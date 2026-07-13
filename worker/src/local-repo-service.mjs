@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 const DEFAULT_PORT = 8799;
 const DEFAULT_MAX_BODY_BYTES = 140 * 1024 * 1024;
@@ -94,6 +95,11 @@ function decodeBase64Content(value = '') {
   return Buffer.from(base64, 'base64');
 }
 
+async function localContentSha(filePath) {
+  const content = await fs.readFile(filePath);
+  return createHash('sha256').update(content).digest('hex');
+}
+
 async function handleRequest(req, res) {
   if (req.method === 'GET' && req.url === '/health') {
     jsonResponse(res, 200, { ok: true, repoRoot, maxBodyBytes });
@@ -111,7 +117,26 @@ async function handleRequest(req, res) {
     const filePath = absolute(repoPath);
     if (!filePath) throw Object.assign(new Error('Invalid local repository path.'), { status: 400, code: 'invalid_local_repo_path' });
     const content = await fs.readFile(filePath, 'utf8');
-    jsonResponse(res, 200, { ok: true, mode: 'local', path: repoPath, content, sha: '' });
+    jsonResponse(res, 200, { ok: true, mode: 'local', path: repoPath, content, sha: await localContentSha(filePath) });
+    return;
+  }
+
+  if (req.url === '/list') {
+    const repoPath = normalizeRepoPath(body.path);
+    const directoryPath = absolute(repoPath);
+    if (!directoryPath) throw Object.assign(new Error('Invalid local repository path.'), { status: 400, code: 'invalid_local_repo_path' });
+    const directoryEntries = await fs.readdir(directoryPath, { withFileTypes: true });
+    const entries = [];
+    for (const entry of directoryEntries) {
+      const childPath = `${repoPath}/${entry.name}`;
+      entries.push({
+        name: entry.name,
+        path: childPath,
+        type: entry.isDirectory() ? 'dir' : 'file',
+        sha: entry.isFile() ? await localContentSha(absolute(childPath)) : ''
+      });
+    }
+    jsonResponse(res, 200, { ok: true, mode: 'local', entries });
     return;
   }
 
@@ -120,6 +145,12 @@ async function handleRequest(req, res) {
     const filePath = absolute(repoPath);
     if (!filePath) throw Object.assign(new Error('Invalid local repository path.'), { status: 400, code: 'invalid_local_repo_path' });
     await fs.mkdir(path.dirname(filePath), { recursive: true });
+    if (body.expectedSha) {
+      const currentSha = await localContentSha(filePath).catch(() => '');
+      if (!currentSha || currentSha !== String(body.expectedSha)) {
+        throw Object.assign(new Error('Local repository file changed before it could be replaced.'), { status: 409, code: 'local_repo_file_changed' });
+      }
+    }
     if (req.url === '/write-base64') {
       await fs.writeFile(filePath, decodeBase64Content(body.content || body.base64), {
         flag: body.overwrite ? 'w' : 'wx'

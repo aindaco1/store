@@ -47,6 +47,8 @@ FILM_STRIPE_SUMMARY_ADAPTER_SECRET=
 
 # Email delivery.
 RESEND_API_KEY=
+# Svix signing secret from the Resend webhook at /webhooks/resend.
+RESEND_WEBHOOK_SECRET=
 
 # Dashboard publish and report helpers.
 # Local admin publishes use the local repo sidecar started by ./scripts/dev.sh.

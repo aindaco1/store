@@ -105,6 +105,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-xs",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -114,6 +115,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-s",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 3,
           "status": "active"
         },
@@ -123,6 +125,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-m",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 1,
           "status": "active"
         },
@@ -132,6 +135,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-l",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 11,
           "status": "active"
         },
@@ -141,6 +145,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 2,
           "status": "active"
         },
@@ -150,6 +155,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-2xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 1,
           "status": "active"
         },
@@ -159,6 +165,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-1-3xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         }
@@ -294,6 +301,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-xs",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -303,6 +311,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-s",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 1,
           "status": "active"
         },
@@ -312,6 +321,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-m",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 1,
           "status": "active"
         },
@@ -321,6 +331,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-l",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 4,
           "status": "active"
         },
@@ -330,6 +341,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 2,
           "status": "active"
         },
@@ -339,6 +351,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-2xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -348,6 +361,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-3-3xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         }
@@ -640,6 +654,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-xs",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -649,6 +664,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-s",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -658,6 +674,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-m",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -667,6 +684,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-l",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -676,6 +694,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -685,6 +704,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-2xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -694,6 +714,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-5-3xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         }
@@ -782,6 +803,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-xs",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -791,6 +813,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-s",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -800,6 +823,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-m",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -809,6 +833,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-l",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -818,6 +843,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -827,6 +853,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-2xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -836,6 +863,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-7-3xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         }
@@ -933,6 +961,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-xs",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 1,
           "status": "archived"
         },
@@ -942,6 +971,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-s",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 2,
           "status": "archived"
         },
@@ -951,6 +981,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-m",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 5,
           "status": "archived"
         },
@@ -960,6 +991,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-l",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 7,
           "status": "archived"
         },
@@ -969,6 +1001,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 3,
           "status": "archived"
         },
@@ -978,6 +1011,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-2xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 1,
           "status": "archived"
         },
@@ -987,6 +1021,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-4-3xl",
           "price": 25.0,
           "price_cents": 2500,
+          "price_override": true,
           "inventory": 0,
           "status": "archived"
         }
@@ -1702,6 +1737,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "dancewave-st1",
           "price": 35.0,
           "price_cents": 3500,
+          "price_override": true,
           "inventory": 0,
           "status": "archived"
         },
@@ -1711,6 +1747,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "dancewave-st2",
           "price": 60.0,
           "price_cents": 6000,
+          "price_override": true,
           "inventory": 0,
           "status": "archived"
         }
@@ -1774,6 +1811,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "benefit-eb",
           "price": 12.0,
           "price_cents": 1200,
+          "price_override": true,
           "inventory": 0,
           "status": "archived"
         },
@@ -1783,6 +1821,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "dancewave-sd",
           "price": 15.0,
           "price_cents": 1500,
+          "price_override": true,
           "inventory": 0,
           "status": "archived"
         }
@@ -2242,6 +2281,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-xs",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -2251,6 +2291,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-s",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 1,
           "status": "active"
         },
@@ -2260,6 +2301,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-m",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -2269,6 +2311,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-l",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 6,
           "status": "active"
         },
@@ -2278,6 +2321,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-xl",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 6,
           "status": "active"
         },
@@ -2287,6 +2331,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-2xl",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 4,
           "status": "active"
         },
@@ -2296,6 +2341,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "t-shirt-2-3xl",
           "price": 30.0,
           "price_cents": 3000,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         }
@@ -2720,6 +2766,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "ticket-1-general",
           "price": 12.0,
           "price_cents": 1200,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         },
@@ -2729,6 +2776,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "sku": "ticket-1-supporter",
           "price": 20.0,
           "price_cents": 2000,
+          "price_override": true,
           "inventory": 0,
           "status": "active"
         }
@@ -2801,7 +2849,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "a0273bbc9a2185e9b52447609acba659c1f73706fb5302235877908ccd793296"
+  "source_hash": "d50d0fc9774a79cd889fa9633ef56dc36f8d95f27e7cc44e04f12828e3b60e88"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

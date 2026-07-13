@@ -117,6 +117,40 @@ describe('Store catalog snapshot and validation', () => {
     expect(result.warnings.map((warning) => warning.code)).toContain('inventory_unset_or_empty');
   });
 
+  it('accepts inherited and zero variant prices but rejects catalog amounts above the Store ceiling', () => {
+    const snapshot = {
+      version: 1,
+      source: 'test',
+      defaults: { currency: 'USD' },
+      products: [{
+        id: 'priced-product',
+        sku: 'priced-product',
+        name: 'Priced product',
+        price_cents: 2500,
+        status: 'active',
+        fulfillment_type: 'digital',
+        variants: [
+          { id: 'inherit', sku: 'priced-product-inherit', label: 'Inherit', status: 'active' },
+          { id: 'free', sku: 'priced-product-free', label: 'Free', price_cents: 0, status: 'active' },
+          { id: 'excessive', sku: 'priced-product-excessive', label: 'Excessive', price_cents: 100000001, status: 'active' }
+        ]
+      }]
+    };
+
+    const inherited = validateStoreOrderDraft({ items: [{ id: 'priced-product__inherit', price: 25, quantity: 1 }] }, { snapshot });
+    const free = validateStoreOrderDraft({ items: [{ id: 'priced-product__free', price: 0, quantity: 1 }] }, { snapshot });
+    const excessive = validateStoreOrderDraft({ items: [{ id: 'priced-product__excessive', quantity: 1 }] }, { snapshot });
+
+    expect(inherited.valid).toBe(true);
+    expect(inherited.items[0].unitPriceCents).toBe(2500);
+    expect(free.valid).toBe(true);
+    expect(free.items[0].unitPriceCents).toBe(0);
+    expect(excessive.valid).toBe(false);
+    expect(excessive.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'catalog_price_invalid' })
+    ]));
+  });
+
   it('rejects submitted prices that do not match the catalog', () => {
     const result = validateStoreOrderDraft({
       items: [

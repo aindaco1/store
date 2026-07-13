@@ -99,6 +99,8 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
     checkoutProvider: 'first_party',
     source: STORE_ORDER_SOURCE_WEB,
     createdAt,
+    valueTime: createdAt,
+    bookedAt: createdAt,
     expiresAt,
     preferredLang,
     currency: currency.value,

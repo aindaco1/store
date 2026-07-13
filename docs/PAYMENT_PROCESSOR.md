@@ -475,6 +475,29 @@ After checkout, fulfillment, or payment changes:
 - Confirm failed/canceled payments release reservations.
 - Confirm Store order emails, admin notifications, lookup links, downloads, check-in actions, and CSV exports match the settled order state.
 
+### Processor journal and bounded reconciliation
+
+Store pins Stripe requests to API version `2026-02-25.clover`. Retry-safe writes use deterministic idempotency keys, and failures exposed outside the Worker are normalized/redacted. `processor-event:v1:*` records retain only Stripe/object/request IDs, operation, status, idempotency key, mode, currency/timing context, and reconciliation status for 400 days; raw provider payloads, card data, and customer email are excluded.
+
+New payment/order state distinguishes:
+
+- `valueTime`: the customer/processor event time.
+- `bookedAt`: when Store recorded the operation.
+- webhook settlement time.
+- processor creation and balance-availability time when Stripe provides them.
+
+Stripe webhook markers retain 35 days. A 10-minute processing lease lets concurrent delivery return a retryable conflict while a live handler is working, permits stale work to resume, and releases a failed lease. Replays remain idempotent and cannot re-confirm inventory or resend durable email work.
+
+The scheduler runs one bounded reconciliation cycle per day when `PAYMENT_RECONCILIATION_ENABLED=true`. Each invocation reads the fixed `admin-store-orders:index:v2` model and compares at most 20 orders by default with Stripe PaymentIntent reads; it never lists `orders:`. Differences become 400-day `reconciliation-break:v1:*` records with open/resolved status, severity, object IDs, reasons, timestamps, occurrence count, source, and bounded notes.
+
+A super admin may start the same read-only bounded operation with session, CSRF, and Store scope:
+
+```text
+POST /admin/store/reconciliation/run
+```
+
+This route may retrieve Stripe objects and write reconciliation evidence. It cannot create, confirm, retry, refund, or cancel a payment. Ambiguous money states stop for review; Store intentionally has no manual charge-recovery endpoint without distinct maker/checker operators.
+
 ## Testing
 
 Fast local checks:

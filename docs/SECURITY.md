@@ -75,6 +75,13 @@ GitHub Actions supply-chain rules:
 | `abandoned-cart-suppressed:*` | KV | Reminder suppression records | Medium |
 | `store-event-reminder:*` | KV | Event reminder queue records | Medium |
 | `stripe-event:{id}` | KV | Webhook idempotency marker | Low |
+| `processor-event:v1:*` | KV | Minimized Stripe request/webhook journal | Medium |
+| `reconciliation-break:v1:*` | KV | Open/resolved payment discrepancies | Medium |
+| `store-payment-reconciliation-state:v1` | KV | Bounded reconciliation cursor/lease/summary | Low |
+| `email-outbox:v1:*` | KV | Frozen pending provider payload with recipient/content | High |
+| `email-delivery:v1:*` | KV | Minimized provider outcome and content hash | Medium |
+| `email-suppression:v1:*` | KV | Hashed permanent-bounce/complaint suppression | Medium |
+| `resend-webhook:v1:*` | KV | Signed provider event dedupe marker | Low |
 | `admin-login:{hash}` | KV | One-time admin login nonce | Medium |
 | `admin-session:{hash}` | KV | Admin identity, role, scopes, CSRF, expiry | High |
 | `admin-users:v1` | KV | Runtime admin users and scopes | High |
@@ -86,6 +93,10 @@ GitHub Actions supply-chain rules:
 | `rl:{endpoint}:{ip}` | KV | Rate-limit counters | Low |
 
 The complete backup/restore classification, including quarantine and idempotency handling, lives in `config/store-data-inventory.json` and is checked by `npm run backup:inventory:audit`.
+
+Payment processor events, reconciliation breaks/state, durable delivery evidence, and hashed suppression retain 400 days to cover operational and annual review windows. Stripe and Resend webhook dedupe markers retain 35 days. Frozen outbox payloads retain at most 30 days and are quarantined from restore by default because they may contain recipient PII and restoring them can duplicate sends. Restore delivery/idempotency evidence before considering queue recovery.
+
+`RESEND_WEBHOOK_SECRET` is a Worker secret, never site config. It authenticates the raw Svix request for `/webhooks/resend`. The webhook stores only the signed event ID marker, provider delivery identifiers/status, content hash/category/order token where available, and a recipient hash for permanent suppression; it does not persist the raw provider payload.
 
 Rate-limit counters are shared through `RATELIMIT` KV and protected by a short-lived per-key queue within each Worker isolate, preventing concurrent requests handled by that isolate from overwriting one another's increments. Protected routes fail closed when the binding or counter operation is unavailable. KV is still not a globally atomic abuse ledger; use Cloudflare edge/WAF controls as an additional production layer for distributed attacks.
 

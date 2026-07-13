@@ -51,6 +51,8 @@ PLATFORM_TIMEZONE = "America/Denver"
 SUPPORT_EMAIL = "info@dustwave.xyz"
 ORDERS_EMAIL_FROM = "Shop <orders@shop.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "Shop <updates@shop.dustwave.xyz>"
+EMAIL_OUTBOX_ENABLED = "true"
+PAYMENT_RECONCILIATION_ENABLED = "true"
 PLATFORM_FOOTER_LOGO_PATH = "/assets/images/defaults/dust-wave-square.png"
 PLATFORM_FAVICON_PATH = "/assets/icons/favicon.png"
 PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/defaults/dust-wave-square.png"
@@ -158,6 +160,7 @@ preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 # - STRIPE_SECRET_KEY          (Stripe secret key - used if _TEST/_LIVE not set)
 # - MAGIC_LINK_SECRET          (HMAC secret for token signing)
 # - RESEND_API_KEY             (Resend email API key)
+# - RESEND_WEBHOOK_SECRET      (Resend/Svix webhook signing secret for delivery evidence)
 # - ADMIN_SECRET               (Admin API key for recovery/rebuild endpoints and scoped-secret fallback)
 # - TURNSTILE_SECRET_KEY       (shared Cloudflare Turnstile secret for admin sign-in)
 #
@@ -204,6 +207,8 @@ PLATFORM_TIMEZONE = "America/Denver"
 SUPPORT_EMAIL = "info@dustwave.xyz"
 ORDERS_EMAIL_FROM = "Shop <orders@shop.dustwave.xyz>"
 UPDATES_EMAIL_FROM = "Shop <updates@shop.dustwave.xyz>"
+EMAIL_OUTBOX_ENABLED = "true"
+PAYMENT_RECONCILIATION_ENABLED = "false"
 PLATFORM_FOOTER_LOGO_PATH = "/assets/images/defaults/dust-wave-square.png"
 PLATFORM_FAVICON_PATH = "/assets/icons/favicon.png"
 PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH = "/assets/images/defaults/dust-wave-square.png"

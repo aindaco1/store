@@ -162,6 +162,18 @@ Add-ons support:
 - shared shipping presets
 - inventory display and validation
 
+### Variant prices
+
+An add-on variant may set its own `price`. Store uses one canonical rule in catalog generation, admin serialization, Worker validation, and the browser cart:
+
+- A blank or omitted variant price inherits the add-on's base price.
+- An explicit `0` is a valid free override; truthiness must never be used to resolve prices.
+- A nonblank override must be a finite, nonnegative amount and must not exceed the Store-wide `$1,000,000` amount ceiling.
+- New selections and changed variants use current catalog pricing. Browser-submitted price values are never authoritative.
+- Confirmed orders keep their stored `unitPrice`; later catalog edits do not rewrite email, analytics, export, or historical order totals.
+
+Use `resolveUnitPrice` from `assets/js/add-on-utils.js` for browser behavior. Worker/admin/catalog code should preserve the same contract instead of adding local fallback math.
+
 For the current Dust Wave Store launch, keep the main sellable catalog in `_products/` and use add-ons sparingly.
 
 ## Coupons

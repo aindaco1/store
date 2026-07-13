@@ -8,6 +8,11 @@ import {
   rewriteMediaReferences,
   webmDerivativePathForVideo
 } from '../../scripts/optimize-media.mjs';
+import {
+  classifyMediaPath,
+  expectedMediaDerivativePaths,
+  mediaPlacementBudget
+} from '../../worker/src/media-catalog.js';
 
 function webpFixture(chunks) {
   const chunkBuffers = chunks.flatMap(([type, payload]) => {
@@ -83,5 +88,43 @@ describe('media optimization script helpers', () => {
       'hero_video: /assets/videos/defaults/hero.webm',
       'poster: /assets/images/products/frontiers-poster.jpg'
     ].join('\n'));
+  });
+
+  it('classifies Store source and generated media across product, default, add-on, and audio paths', () => {
+    const known = new Set([
+      'assets/images/products/poster.png',
+      'assets/images/products/poster-640.webp',
+      'assets/images/add-ons/sticker.jpg',
+      'assets/videos/defaults/loop.mp4',
+      'assets/videos/defaults/loop.webm',
+      'assets/audio/products/sample.mp3'
+    ]);
+
+    expect(classifyMediaPath('assets/images/products/poster.png', known)).toMatchObject({
+      type: 'image', role: 'source', scope: 'product'
+    });
+    expect(classifyMediaPath('assets/images/products/poster-640.webp', known)).toMatchObject({
+      type: 'image', role: 'derived', sourcePath: 'assets/images/products/poster.png', derivativeWidth: 640
+    });
+    expect(classifyMediaPath('assets/images/add-ons/sticker.jpg', known)).toMatchObject({
+      type: 'image', role: 'source', scope: 'add_on'
+    });
+    expect(classifyMediaPath('assets/videos/defaults/loop.webm', known)).toMatchObject({
+      type: 'video', role: 'derived', scope: 'default', sourcePath: 'assets/videos/defaults/loop.mp4'
+    });
+    expect(classifyMediaPath('assets/audio/products/sample.mp3', known)).toMatchObject({
+      type: 'audio', role: 'source', scope: 'product'
+    });
+  });
+
+  it('derives Store placement-aware optimization expectations from the shared policy', () => {
+    expect(expectedMediaDerivativePaths('assets/images/products/poster.png', { width: 700 }))
+      .toEqual([
+        'assets/images/products/poster-320.webp',
+        'assets/images/products/poster-480.webp',
+        'assets/images/products/poster-640.webp'
+      ]);
+    expect(mediaPlacementBudget('product_card')).toMatchObject({ maxBytes: 1_000_000, label: 'product card' });
+    expect(mediaPlacementBudget('checkout_order')).toMatchObject({ maxBytes: 750_000 });
   });
 });

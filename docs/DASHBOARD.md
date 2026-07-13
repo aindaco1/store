@@ -120,6 +120,15 @@ Product write endpoints:
 - `POST /admin/store/products/bulk-publish`
 - `POST /admin/store/products/order`
 - `GET /admin/store/products/media`
+- `POST /admin/store/products/media/optimize`
+
+### Product media browser
+
+The product editor uses the repository-backed media browser for images, video, and audio. It supports accessible type tabs, product/default/add-on scope, filename/reference search, recent/name sorting, local previews, dimensions or duration, byte size, derivative state, placement-budget warnings, and expandable source-reference locations.
+
+Source and derived assets are distinct. Generated derivatives do not appear as standalone selectable media. Broken references and missing/stale derivative warnings come from `_data/media-optimization-manifest.json`; the repository remains authoritative and the dashboard does not create a KV media catalog.
+
+Upload and replace operations are constrained to the matching Store media directory and type. Replacements use the current GitHub content SHA so concurrent changes fail with a conflict instead of overwriting newer work. Repair dispatch reuses the existing optimizer workflow with `changed` or reviewed super-admin `all` scope. Meaningful images require alt text; explicitly decorative images may use empty alt text.
 
 ## Coupons
 

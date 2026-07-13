@@ -37,7 +37,7 @@ Read these first for Store work:
 - [ETHICAL_RISK.md](ETHICAL_RISK.md)
 - [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
 
-Use `/Users/aindaco1/Desktop/agents.md` as the product brief when working in Codex.
+Use the repository-root [`AGENTS.md`](../AGENTS.md) as the operating guide and product boundary when working in Codex.
 
 ## Development Rules
 

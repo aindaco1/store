@@ -27,6 +27,8 @@ TOP_LEVEL_ORDER = [
   'SUPPORT_EMAIL',
   'ORDERS_EMAIL_FROM',
   'UPDATES_EMAIL_FROM',
+  'EMAIL_OUTBOX_ENABLED',
+  'PAYMENT_RECONCILIATION_ENABLED',
   'PLATFORM_FOOTER_LOGO_PATH',
   'PLATFORM_FAVICON_PATH',
   'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH',
@@ -118,6 +120,8 @@ DEV_ENV_ORDER = [
   'SUPPORT_EMAIL',
   'ORDERS_EMAIL_FROM',
   'UPDATES_EMAIL_FROM',
+  'EMAIL_OUTBOX_ENABLED',
+  'PAYMENT_RECONCILIATION_ENABLED',
   'PLATFORM_FOOTER_LOGO_PATH',
   'PLATFORM_FAVICON_PATH',
   'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH',
@@ -382,6 +386,8 @@ end
 
 def build_mirror_values(config, existing)
   platform = config['platform'] || {}
+  email = config['email'] || {}
+  payments = config['payments'] || {}
   admin = config['admin'] || {}
   pricing = config['pricing'] || {}
   tax = config['tax'] || {}
@@ -414,6 +420,8 @@ def build_mirror_values(config, existing)
     'SUPPORT_EMAIL' => platform['support_email'] || existing['SUPPORT_EMAIL'],
     'ORDERS_EMAIL_FROM' => platform['orders_email_from'] || existing['ORDERS_EMAIL_FROM'],
     'UPDATES_EMAIL_FROM' => platform['updates_email_from'] || existing['UPDATES_EMAIL_FROM'],
+    'EMAIL_OUTBOX_ENABLED' => email.key?('outbox_enabled') ? (email['outbox_enabled'] ? 'true' : 'false') : existing['EMAIL_OUTBOX_ENABLED'],
+    'PAYMENT_RECONCILIATION_ENABLED' => payments.key?('reconciliation_enabled') ? (payments['reconciliation_enabled'] ? 'true' : 'false') : existing['PAYMENT_RECONCILIATION_ENABLED'],
     'PLATFORM_FOOTER_LOGO_PATH' => platform.key?('footer_logo_path') ? platform['footer_logo_path'].to_s : existing['PLATFORM_FOOTER_LOGO_PATH'],
     'PLATFORM_FAVICON_PATH' => platform.key?('favicon_path') ? platform['favicon_path'].to_s : existing['PLATFORM_FAVICON_PATH'],
     'PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH' => platform.key?('default_social_image_path') ? platform['default_social_image_path'].to_s : existing['PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH'],
@@ -499,7 +507,10 @@ existing_top = parse_simple_assignments(content)
 existing_dev = parse_env_dev_vars(content)
 
 top_values = build_mirror_values(base_config, existing_top)
-dev_values = build_mirror_values(dev_config, existing_dev).merge('APP_MODE' => 'test')
+dev_values = build_mirror_values(dev_config, existing_dev).merge(
+  'APP_MODE' => 'test',
+  'PAYMENT_RECONCILIATION_ENABLED' => 'false'
+)
 top_values['APP_MODE'] = 'live'
 top_values['CANONICAL_SITE_BASE'] = top_values['SITE_BASE']
 top_values['CANONICAL_WORKER_BASE'] = top_values['WORKER_BASE']

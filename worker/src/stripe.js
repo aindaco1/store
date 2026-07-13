@@ -2,6 +2,22 @@
  * Stripe utilities for Cloudflare Workers
  */
 
+export const DEFAULT_STRIPE_API_VERSION = '2026-02-25.clover';
+
+export class StripeApiError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'StripeApiError';
+    this.type = details.type || 'stripe_api_error';
+    this.code = details.code || '';
+    this.declineCode = details.declineCode || '';
+    this.statusCode = Number(details.statusCode || 0) || 0;
+    this.requestId = details.requestId || '';
+    this.objectId = details.objectId || '';
+    this.retryable = details.retryable === true;
+  }
+}
+
 /**
  * Verify Stripe webhook signature
  * @see https://stripe.com/docs/webhooks/signatures
@@ -83,8 +99,35 @@ function timingSafeEqual(a, b) {
 /**
  * Create a minimal Stripe API client for Workers
  */
-export function createStripeClient(secretKey) {
+export function createStripeClient(secretKey, clientOptions = {}) {
   const baseUrl = 'https://api.stripe.com/v1';
+
+  async function notifyRequest(event) {
+    try {
+      await clientOptions.onRequest?.(event);
+    } catch {
+      // Observability must never change payment behavior.
+    }
+  }
+
+  function safeStripeErrorMessage(payload, status) {
+    const error = payload?.error || {};
+    return String(error.message || `Stripe API request failed (${status})`).replace(/\s+/g, ' ').trim().slice(0, 320);
+  }
+
+  function stripeErrorDetails(payload, response) {
+    const error = payload?.error || {};
+    const statusCode = response.status;
+    return {
+      type: String(error.type || 'stripe_api_error'),
+      code: String(error.code || ''),
+      declineCode: String(error.decline_code || ''),
+      statusCode,
+      requestId: String(response.headers?.get?.('request-id') || error.request_id || ''),
+      objectId: String(error.payment_intent?.id || error.setup_intent?.id || error.charge || ''),
+      retryable: statusCode === 409 || statusCode === 429 || statusCode >= 500
+    };
+  }
 
   async function request(method, path, data, requestOptions = {}) {
     const url = `${baseUrl}${path}`;
@@ -92,12 +135,14 @@ export function createStripeClient(secretKey) {
       method,
       headers: {
         'Authorization': `Bearer ${secretKey}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'store-worker/1.0.8'
       }
     };
 
-    if (requestOptions.stripeVersion) {
-      options.headers['Stripe-Version'] = requestOptions.stripeVersion;
+    const stripeVersion = requestOptions.stripeVersion || clientOptions.stripeVersion || DEFAULT_STRIPE_API_VERSION;
+    if (stripeVersion) {
+      options.headers['Stripe-Version'] = stripeVersion;
     }
 
     if (requestOptions.idempotencyKey) {
@@ -108,20 +153,60 @@ export function createStripeClient(secretKey) {
       options.body = new URLSearchParams(flattenObject(data)).toString();
     }
 
-    const response = await fetch(url, options);
-    return response.json();
+    let response;
+    let payload = {};
+    try {
+      response = await fetch(url, options);
+      payload = await response.json().catch(() => ({}));
+    } catch (_error) {
+      const networkError = new StripeApiError('Stripe API request failed before a response was received', {
+        type: 'network_error',
+        retryable: true
+      });
+      await notifyRequest({
+        method,
+        path: String(path || '').split('?')[0],
+        idempotencyKey: String(requestOptions.idempotencyKey || ''),
+        stripeVersion,
+        success: false,
+        status: 0,
+        errorType: networkError.type,
+        retryable: true
+      });
+      throw networkError;
+    }
+
+    const requestEvent = {
+      method,
+      path: String(path || '').split('?')[0],
+      idempotencyKey: String(requestOptions.idempotencyKey || ''),
+      stripeVersion,
+      success: response.ok,
+      status: response.status,
+      requestId: String(response.headers?.get?.('request-id') || ''),
+      objectId: String(payload?.id || ''),
+      objectType: String(payload?.object || ''),
+      errorType: String(payload?.error?.type || ''),
+      errorCode: String(payload?.error?.code || '')
+    };
+    await notifyRequest(requestEvent);
+
+    if (!response.ok) {
+      throw new StripeApiError(safeStripeErrorMessage(payload, response.status), stripeErrorDetails(payload, response));
+    }
+    return payload;
   }
 
   return {
     checkout: {
       sessions: {
         create: (data, requestOptions) => request('POST', '/checkout/sessions', data, requestOptions),
-        retrieve: (id) => request('GET', `/checkout/sessions/${id}`),
-        list: (params) => request('GET', `/checkout/sessions?${new URLSearchParams(params).toString()}`)
+        retrieve: (id, requestOptions) => request('GET', `/checkout/sessions/${id}`, null, requestOptions),
+        list: (params, requestOptions) => request('GET', `/checkout/sessions?${new URLSearchParams(params).toString()}`, null, requestOptions)
       }
     },
     setupIntents: {
-      retrieve: (id) => request('GET', `/setup_intents/${id}`)
+      retrieve: (id, requestOptions) => request('GET', `/setup_intents/${id}`, null, requestOptions)
     },
     paymentIntents: {
       create: (data, requestOptions) => request('POST', '/payment_intents', data, requestOptions),
@@ -131,13 +216,13 @@ export function createStripeClient(secretKey) {
       }
     },
     customers: {
-      create: (data) => request('POST', '/customers', data),
-      retrieve: (id) => request('GET', `/customers/${id}`),
-      update: (id, data) => request('POST', `/customers/${id}`, data)
+      create: (data, requestOptions) => request('POST', '/customers', data, requestOptions),
+      retrieve: (id, requestOptions) => request('GET', `/customers/${id}`, null, requestOptions),
+      update: (id, data, requestOptions) => request('POST', `/customers/${id}`, data, requestOptions)
     },
     paymentMethods: {
-      attach: (id, data) => request('POST', `/payment_methods/${id}/attach`, data),
-      retrieve: (id) => request('GET', `/payment_methods/${id}`)
+      attach: (id, data, requestOptions) => request('POST', `/payment_methods/${id}/attach`, data, requestOptions),
+      retrieve: (id, requestOptions) => request('GET', `/payment_methods/${id}`, null, requestOptions)
     }
   };
 }

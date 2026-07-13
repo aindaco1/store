@@ -1,4 +1,5 @@
 import STORE_CATALOG_SNAPSHOT from './generated/catalog-snapshot.js';
+import { isValidAmount } from './validation.js';
 
 const ACTIVE_STATUSES = new Set(['active', 'available', 'live']);
 const NON_SHIPPABLE_TYPES = new Set(['digital', 'ticket', 'rsvp', 'service']);
@@ -159,6 +160,13 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
   }
 
   const unitPriceCents = normalizeMoneyCents(variant?.price_cents ?? product.price_cents);
+  if (!isValidAmount(unitPriceCents)) {
+    errors.push(buildValidationIssue(
+      'catalog_price_invalid',
+      'Catalog price is outside the supported Store amount range.',
+      { index, productId: product.id, variantId: variant?.id || '' }
+    ));
+  }
   const submittedPriceCents = getSubmittedUnitPriceCents(rawItem);
   if (options.enforceSubmittedPrices !== false && submittedPriceCents !== null && submittedPriceCents !== unitPriceCents) {
     errors.push(buildValidationIssue(
