@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.8 - Unreleased
+## v1.0.8 - 2026-07-13
 
 ### Store reliability, media, and operations
 
@@ -12,7 +12,7 @@
 - Added bounded scheduled and super-admin-triggered read-only reconciliation from the canonical order index to Stripe PaymentIntents. The Stripe-specific comparator skips historical orders owned by other processors and versioned rechecks resolve stale provider-mismatch breaks. Open/resolved reconciliation breaks retain 400 days and no reconciliation path scans the order namespace or creates/retries charges.
 - Added a 30-day KV email outbox for order confirmations, event reminders, and opted-in abandoned-cart reminders, with frozen provider payloads, deterministic Resend idempotency, bounded retry/backoff, crash leases, signed delivery webhooks, 400-day minimized delivery/suppression evidence, and permanent-bounce/complaint suppression.
 - Updated canonical config synchronization, setup, secret inventory, admin readiness, data inventory, backup ordering, pre-merge coverage, operator docs, and roadmap status for these changes.
-- Prepared the Storefront and Worker packages as `1.0.8`; the immutable tag and release date remain pending until the reviewed production and protected-operations evidence is attached.
+- Released the Storefront and Worker packages as `1.0.8` after reviewed production deployment, live Stripe/Resend provider verification, read-only payment reconciliation, protected off-account recovery proof, and explicit Pool-aligned cache/offsite dispositions.
 
 ## v1.0.7 - 2026-07-11
 
