@@ -1,18 +1,6 @@
 # Store Roadmap
 
-Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. This roadmap tracks the current product surface and future Store-specific hardening. Version history lives in [../CHANGELOG.md](../CHANGELOG.md), and release evidence lives in [release-evidence/](release-evidence/).
-
-## Current State
-
-**Production baseline**
-
-- Store is live at `https://shop.dustwave.xyz` with the Cloudflare Worker at `https://checkout.dustwave.xyz`.
-- The primary implementation scope for checkout, fulfillment, admin operations, i18n, accessibility, SEO, Podman, and release evidence is complete.
-- `v1.0.6` added Workers Cache and recovery automation. `v1.0.7` added production quality budgets and admin/operations hardening. `v1.0.8` added product/media/add-on authoring, payment-integrity/reconciliation hardening, and durable Store email delivery. `v1.0.9` adapts Pool `v1.1.2` crawl integrity, policy disclosure, lazy localized admin review, and protected-recovery workflow hardening.
-- Published tags are immutable. `v1.0.9` points to exact reviewed and deployed commit `ef86626`; the GitHub release, Storefront, Worker, canonical configuration, release notes, and evidence were published after production and tag-scoped operations proof.
-- `v1.0.8` code-path, deployment, provider, reconciliation, and protected recovery evidence is complete. The owner-approved Pool posture keeps every optional Workers Cache route disabled/evidence-gated and treats the immutable separate-account archive as the required durable recovery copy.
-- `v1.0.9` code-path, production-deployment, live-crawl, provider, localized-policy, metadata, production-posture, and recovery-readiness evidence is complete.
-- Production Cloudflare DNS API evidence is covered by the non-deploying `Release Provider Evidence` GitHub Actions workflow on `main`; ongoing external evidence remains an operations gate, not a Store code gap.
+Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It is live at [shop.dustwave.xyz](https://shop.dustwave.xyz), with checkout, fulfillment, and private administration handled by the Cloudflare Worker at [checkout.dustwave.xyz](https://checkout.dustwave.xyz). This roadmap organizes the current production capabilities followed by future Store-specific hardening. Version history lives in [../CHANGELOG.md](../CHANGELOG.md), and release evidence lives in [release-evidence/](release-evidence/).
 
 ## Completed
 
