@@ -101,6 +101,8 @@ That runs:
 - `./scripts/test-worker.sh` against the started Podman stack
 - `./scripts/podman-playwright-run.sh npx playwright test`
 
+The Playwright wrapper derives its browser image tag from the exact `@playwright/test` version in `package-lock.json`. Dependency updates therefore build a matching versioned image automatically instead of reusing an incompatible browser image.
+
 The Worker smoke validates:
 
 - Store product catalog JSON from the static site

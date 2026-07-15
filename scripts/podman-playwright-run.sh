@@ -4,7 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:latest"
+PLAYWRIGHT_VERSION="$(node -e '
+  const lock = require("./package-lock.json");
+  const version = lock.packages?.["node_modules/@playwright/test"]?.version;
+  if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) process.exit(1);
+  process.stdout.write(version);
+')"
+PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:${PLAYWRIGHT_VERSION}"
 PLAYWRIGHT_NODE_MODULES_VOLUME="store-dev-playwright-node-modules"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_STACK_STARTED=false
@@ -110,7 +116,11 @@ fi
 
 if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$PLAYWRIGHT_IMAGE"; then
   echo "🔨 Building $PLAYWRIGHT_IMAGE..." >&2
-  podman build -t "$PLAYWRIGHT_IMAGE" -f "$ROOT_DIR/Containerfile.playwright.dev" "$ROOT_DIR" >&2
+  podman build \
+    --build-arg "PLAYWRIGHT_VERSION=$PLAYWRIGHT_VERSION" \
+    -t "$PLAYWRIGHT_IMAGE" \
+    -f "$ROOT_DIR/Containerfile.playwright.dev" \
+    "$ROOT_DIR" >&2
 fi
 
 podman volume exists "$PLAYWRIGHT_NODE_MODULES_VOLUME" >/dev/null 2>&1 || podman volume create "$PLAYWRIGHT_NODE_MODULES_VOLUME" >/dev/null
