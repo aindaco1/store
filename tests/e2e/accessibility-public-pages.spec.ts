@@ -67,22 +67,59 @@ test.describe('Public Page Accessibility', () => {
     ]);
   });
 
-  test('localized public navigation exposes stable shipping and return policy links', async ({ page }) => {
+  test('policy links stay in the footer on larger screens and move below Terms in the mobile menu', async ({ page }) => {
     await gotoDomReady(page, '/');
-    const englishPolicies = page.locator('.site-footer__policies');
-    await expect(englishPolicies.getByRole('link', { name: 'Shipping Policy' })).toHaveAttribute('href', '/terms/#shipping-policy');
-    await expect(englishPolicies.getByRole('link', { name: 'Return Policy' })).toHaveAttribute('href', '/terms/#returns-refunds');
 
-    await gotoDomReady(page, '/es/');
-    const spanishPolicies = page.locator('.site-footer__policies');
-    await expect(spanishPolicies.getByRole('link', { name: 'Política de envíos' })).toHaveAttribute('href', '/es/terms/#shipping-policy');
-    await expect(spanishPolicies.getByRole('link', { name: 'Política de devoluciones' })).toHaveAttribute('href', '/es/terms/#returns-refunds');
+    for (const viewport of [
+      { name: 'desktop', width: 1280, height: 900 },
+      { name: 'tablet', width: 820, height: 1180 }
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      const footer = page.locator('.site-footer');
+      const copyright = footer.locator('.site-footer__copyright');
+      const shipping = footer.getByRole('link', { name: 'Shipping', exact: true });
+      const returns = footer.getByRole('link', { name: 'Return Policy', exact: true });
+      await expect(shipping, viewport.name).toBeVisible();
+      await expect(returns, viewport.name).toBeVisible();
+      await expect(shipping).toHaveAttribute('href', '/terms/#shipping-policy');
+      await expect(returns).toHaveAttribute('href', '/terms/#returns-refunds');
+      await expect(page.locator('#mobile-nav .site-header__mobile-policy-link').first()).toBeHidden();
+      await expectNoHorizontalOverflow(page);
+
+      expect(await copyright.evaluate((element) => {
+        const copyrightBox = element.getBoundingClientRect();
+        const policiesBox = element.parentElement?.querySelector('.site-footer__policies')?.getBoundingClientRect();
+        return Boolean(policiesBox && policiesBox.left >= copyrightBox.right);
+      }), viewport.name).toBe(true);
+    }
 
     await page.setViewportSize({ width: 390, height: 844 });
+    const footer = page.locator('.site-footer');
+    await expect(footer.locator('.site-footer__policies')).toBeHidden();
+    const menu = page.locator('#mobile-nav');
+    const terms = menu.getByRole('link', { name: 'Terms', exact: true });
+    const shipping = menu.getByRole('link', { name: 'Shipping', exact: true });
+    const returns = menu.getByRole('link', { name: 'Return Policy', exact: true });
+    await expect(shipping).toBeHidden();
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    await expect(shipping).toBeVisible();
+    await expect(returns).toBeVisible();
+    await expect(shipping).toHaveAttribute('href', '/terms/#shipping-policy');
+    await expect(returns).toHaveAttribute('href', '/terms/#returns-refunds');
+    expect(await terms.evaluate((element) => {
+      const shippingLink = element.parentElement?.querySelector('.site-header__mobile-policy-link');
+      return Boolean(shippingLink && (element.compareDocumentPosition(shippingLink) & Node.DOCUMENT_POSITION_FOLLOWING));
+    })).toBe(true);
+    expect((await shipping.boundingBox())?.y || 0).toBeGreaterThan((await terms.boundingBox())?.y || 0);
+    await expectNoHorizontalOverflow(page);
+
+    await gotoDomReady(page, '/es/');
+    await expect(page.locator('.site-footer__policies')).toBeHidden();
     await page.getByRole('button', { name: 'Abrir menú' }).click();
-    const mobileNav = page.locator('#mobile-nav');
-    await expect(mobileNav.getByRole('link', { name: 'Política de envíos' })).toBeVisible();
-    await expect(mobileNav.getByRole('link', { name: 'Política de devoluciones' })).toBeVisible();
+    const spanishMenu = page.locator('#mobile-nav');
+    await expect(spanishMenu.getByRole('link', { name: 'Envío', exact: true })).toBeVisible();
+    await expect(spanishMenu.getByRole('link', { name: 'Política de devoluciones', exact: true })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
   });
 
   test('product detail page has no obvious axe violations', async ({ page }) => {
@@ -130,11 +167,14 @@ test.describe('Public Page Accessibility', () => {
   test('terms page has no obvious axe violations', async ({ page }) => {
     await gotoDomReady(page, '/terms/');
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('h1')).toContainText('Terms & Privacy');
+    await expect(page.locator('h1')).toContainText('Terms & Store Policies');
+    await expect(page.locator('#shipping-policy')).toContainText('4. Shipping and fulfillment');
+    await expect(page.locator('#returns-refunds')).toContainText('5. No returns, fulfillment problems, and refunds');
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
-      'heading "Terms & Privacy"',
-      'paragraph: Effective July 14, 2026.'
+      'heading "Terms & Store Policies"',
+      'heading "4. Shipping and fulfillment"',
+      'heading "5. No returns, fulfillment problems, and refunds"'
     ]);
   });
 

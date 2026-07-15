@@ -110,6 +110,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 
 - [x] Localization
   - English is the default locale; Spanish UI strings and route shells exist for home, Terms, Orders, Order Success, product presentation pages, and admin.
+  - The `v1.0.9` English/Spanish Terms use Pool's numbered plain-language structure adapted to Store orders, shipping, returns, events, downloads, communications, privacy, and open-source boundaries; the Spanish legal copy still requires native/legal review.
   - `_config.yml` owns supported languages, route mappings, and language labels; `_data/i18n/*` owns UI/runtime/email copy.
   - Product names, descriptions, and body copy stay creator-authored unless a product defines explicit localized overrides.
   - `npm run test:i18n` and release i18n/SEO evidence protect catalog completeness, placeholders, route copy, language alternates, and localized metadata behavior.
