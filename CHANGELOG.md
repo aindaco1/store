@@ -14,7 +14,7 @@
 - Added a protected-recovery workflow regression guard for Ubuntu 24.04: install `age`, use the AWS CLI v2 already supplied by GitHub-hosted runners, and never request the unavailable apt `awscli` package.
 - Preserved the existing fail-closed host/Podman Jekyll build behavior and added regression coverage so minification and artifact checks cannot validate stale `_site` output after a failed build.
 - Aligned local and production storefront visibility through one shared public active/sold-out predicate used by both the home grid and its LCP preload. This removes archived/private catalog markup from local public pages, cut the audited home document from about 330 KB to 197 KB, and reduced mobile Lighthouse LCP from about 4.3 seconds to 2.8 seconds.
-- Updated performance budgets, English/Spanish catalogs, workflow/security/SEO/browser tests, operator documentation, roadmap, and release evidence for the Store `v1.0.9` candidate.
+- Released the Storefront and Worker packages as `1.0.9` after reviewed production deployment, live crawl/provider verification, English/Spanish policy sampling, and exact-commit release closure.
 
 ## v1.0.8 - 2026-07-13
 

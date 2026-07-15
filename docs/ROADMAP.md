@@ -8,10 +8,10 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 
 - Store is live at `https://shop.dustwave.xyz` with the Cloudflare Worker at `https://checkout.dustwave.xyz`.
 - The primary implementation scope for checkout, fulfillment, admin operations, i18n, accessibility, SEO, Podman, and release evidence is complete.
-- `v1.0.6` added Workers Cache and recovery automation. `v1.0.7` added production quality budgets and admin/operations hardening. `v1.0.8` added product/media/add-on authoring, payment-integrity/reconciliation hardening, and durable Store email delivery. The `v1.0.9` candidate adapts Pool `v1.1.2` crawl integrity, policy disclosure, lazy localized admin review, and protected-recovery workflow hardening.
-- Published tags are immutable. `v1.0.8` points to exact reviewed and deployed commit `0eb660c`; the GitHub release, Storefront, Worker, canonical configuration, release notes, and evidence were published after production and protected-operations proof.
+- `v1.0.6` added Workers Cache and recovery automation. `v1.0.7` added production quality budgets and admin/operations hardening. `v1.0.8` added product/media/add-on authoring, payment-integrity/reconciliation hardening, and durable Store email delivery. `v1.0.9` adapts Pool `v1.1.2` crawl integrity, policy disclosure, lazy localized admin review, and protected-recovery workflow hardening.
+- Published tags are immutable. `v1.0.8` points to exact reviewed and deployed commit `0eb660c`; the Storefront, Worker, canonical configuration, release notes, and evidence are now packaged for the immutable `v1.0.9` release after reviewed production proof.
 - `v1.0.8` code-path, deployment, provider, reconciliation, and protected recovery evidence is complete. The owner-approved Pool posture keeps every optional Workers Cache route disabled/evidence-gated and treats the immutable separate-account archive as the required durable recovery copy.
-- `v1.0.9` remains a release candidate until its reviewed commit is deployed and the post-deploy crawl/provider checks are recorded; no current evidence is inferred from the prior release.
+- `v1.0.9` code-path, production-deployment, live-crawl, provider, localized-policy, and metadata evidence is complete. The final documentation commit must be deployed unchanged before its immutable tag is created.
 - Production Cloudflare DNS API evidence is covered by the non-deploying `Release Provider Evidence` GitHub Actions workflow on `main`; ongoing external evidence remains an operations gate, not a Store code gap.
 
 ## Completed
