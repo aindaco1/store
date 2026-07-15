@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.9 - 2026-07-14
+## v1.0.9 - 2026-07-15
 
 ### Pool v1.1.2 adaptation and release hardening
 
