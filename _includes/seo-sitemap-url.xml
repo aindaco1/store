@@ -13,7 +13,9 @@
 {%- endif -%}
   <url>
     <loc>{{ site_base }}{{ item.url | xml_escape }}</loc>
-    <lastmod>{{ site.time | date_to_xmlschema }}</lastmod>
+{%- if item.last_modified_at %}
+    <lastmod>{{ item.last_modified_at | date_to_xmlschema }}</lastmod>
+{%- endif %}
 {%- if localized_paths or localized_page -%}
   {%- for lang in supported_langs -%}
     {%- assign has_alternate_path = false -%}

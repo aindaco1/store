@@ -136,7 +136,7 @@ export function createStripeClient(secretKey, clientOptions = {}) {
       headers: {
         'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'store-worker/1.0.8'
+        'User-Agent': 'store-worker/1.0.9'
       }
     };
 

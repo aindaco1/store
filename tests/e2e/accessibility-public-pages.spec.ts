@@ -67,6 +67,24 @@ test.describe('Public Page Accessibility', () => {
     ]);
   });
 
+  test('localized public navigation exposes stable shipping and return policy links', async ({ page }) => {
+    await gotoDomReady(page, '/');
+    const englishPolicies = page.locator('.site-footer__policies');
+    await expect(englishPolicies.getByRole('link', { name: 'Shipping Policy' })).toHaveAttribute('href', '/terms/#shipping-policy');
+    await expect(englishPolicies.getByRole('link', { name: 'Return Policy' })).toHaveAttribute('href', '/terms/#returns-refunds');
+
+    await gotoDomReady(page, '/es/');
+    const spanishPolicies = page.locator('.site-footer__policies');
+    await expect(spanishPolicies.getByRole('link', { name: 'Política de envíos' })).toHaveAttribute('href', '/es/terms/#shipping-policy');
+    await expect(spanishPolicies.getByRole('link', { name: 'Política de devoluciones' })).toHaveAttribute('href', '/es/terms/#returns-refunds');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Abrir menú' }).click();
+    const mobileNav = page.locator('#mobile-nav');
+    await expect(mobileNav.getByRole('link', { name: 'Política de envíos' })).toBeVisible();
+    await expect(mobileNav.getByRole('link', { name: 'Política de devoluciones' })).toBeVisible();
+  });
+
   test('product detail page has no obvious axe violations', async ({ page }) => {
     await gotoDomReady(page, '/products/fronteras-poster-big/');
     await expect(page.locator('main')).toBeVisible();
@@ -104,6 +122,8 @@ test.describe('Public Page Accessibility', () => {
     await cart.getByRole('button', { name: 'Checkout' }).click();
     await expect(cart.getByLabel('Email address')).toBeVisible();
     await expect(cart).toContainText('Order summary');
+    await expect(cart).toContainText('All sales are final after payment.');
+    await expect(cart.getByRole('link', { name: 'Read the return and fulfillment policy.' })).toHaveAttribute('href', '/terms/#returns-refunds');
     await expectNoAxeViolations(page);
   });
 
@@ -114,7 +134,7 @@ test.describe('Public Page Accessibility', () => {
     await expectNoAxeViolations(page);
     await expectAriaSnapshotToContain(page.locator('main'), [
       'heading "Terms & Privacy"',
-      'paragraph: Effective July 1, 2026.'
+      'paragraph: Effective July 14, 2026.'
     ]);
   });
 

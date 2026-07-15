@@ -10,8 +10,13 @@
       <a href="{% include localized-url.html lang=current_lang translation_key='home' %}" class="site-footer__logo" aria-label="{% include t.html key='nav.home_aria' lang=current_lang title=platform_title %}">
         {% include responsive-image.html src=footer_logo_path alt=footer_logo_alt loading="lazy" decoding="async" sizes="32px" widths="320,480" %}
       </a>
-      <div class="site-footer__copyright">
-        <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
+      <div class="site-footer__brand-details">
+        <div class="site-footer__copyright">
+          <span>(ɔ) {{ 'now' | date: "%Y" }} {{ site.platform.company_name | default: site.author | upcase }}</span>
+        </div>
+        <nav class="site-footer__policies" aria-label="{% include t.html key='nav.policies' lang=current_lang %}">
+          {% include policy-links.html lang=current_lang %}
+        </nav>
       </div>
     </div>
     <div class="site-footer__meta">

@@ -3,6 +3,9 @@ nav:
   home: Home
   terms: Terms
   orders: Orders
+  shipping_policy: Shipping Policy
+  return_policy: Return Policy
+  policies: Store policies
   main_navigation: Main navigation
   language_switcher: Language switcher
   open_menu: Open menu
@@ -14,6 +17,48 @@ admin:
   email_label: Admin email
   challenge_aria_label: Admin sign-in security check
   send_link: Send magic link
+  login_email_sent: Check your email for a login link.
+  login_local_ready: Local login link ready.
+  login_open: Open admin
+  login_sending: Sending login link...
+  value_unavailable: Unavailable
+  value_unknown: Unknown
+  sessions_refresh: Refresh sessions
+  sessions_summary: "Active sessions: %{count}. Login metadata is retained for %{days} days without full IP addresses, full user agents, or precise location."
+  sessions_active_title: Active sessions
+  sessions_none_active: No active sessions.
+  sessions_recent_title: Recent logins
+  sessions_none_recent: No recent logins.
+  sessions_admin: Admin
+  sessions_client: Client
+  sessions_started: Started
+  sessions_expires: Expires
+  sessions_action: Action
+  sessions_current: Current session
+  sessions_revoke: Revoke
+  sessions_revoking: Revoking session...
+  sessions_revoked: Session revoked.
+  sessions_network_id: Network ID
+  sessions_state: State
+  sessions_active_state: Active
+  sessions_inactive_state: Inactive
+  sessions_loading: Loading admin sessions...
+  audit_date: Date
+  audit_action: Action
+  audit_email: Admin email
+  audit_search: Search
+  audit_apply: Apply filters
+  audit_export: Export filtered CSV
+  audit_preparing_csv: Preparing audit CSV...
+  audit_csv_started: Audit CSV download started.
+  audit_summary: "%{count} matching events. Sensitive event payloads are excluded."
+  audit_none: No matching audit events.
+  audit_time: Time
+  audit_admin: Admin
+  audit_target: Target
+  audit_mutation: Mutation
+  audit_system: System
+  audit_loading: Loading audit events...
   overview_title: Dashboard
   overview_help: Use this dashboard to manage Store settings, analytics, marketing links, orders, products, inventory, and downloads.
   logout: Log out
@@ -227,6 +272,8 @@ runtime:
     order_total: Order total
     order_summary: Order summary
     store_payment_consent: Your payment is processed securely by Stripe.
+    final_sale_notice: All sales are final after payment. No returns or exchanges; fulfillment problems and non-waivable rights remain covered.
+    return_policy: Read the return and fulfillment policy.
     decrease_quantity: Decrease quantity
     increase_quantity: Increase quantity
     continue_to_payment: Continue to payment

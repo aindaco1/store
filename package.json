@@ -1,6 +1,6 @@
 {
   "name": "store",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
   "main": "index.js",
   "directories": {
@@ -15,6 +15,7 @@
     "test:unit:coverage": "vitest run --coverage",
     "test:content-security": "node ./scripts/audit-product-content.mjs",
     "test:seo": "node ./scripts/audit-seo.mjs",
+    "test:crawl-endpoints": "node ./scripts/audit-crawl-endpoints.mjs",
     "test:performance:budgets": "node ./scripts/audit-performance-budgets.mjs",
     "test:performance:lighthouse": "./scripts/podman-stack-run.sh node ./scripts/performance-lighthouse.mjs",
     "test:performance:lighthouse:host": "node ./scripts/performance-lighthouse.mjs",

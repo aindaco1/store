@@ -3,6 +3,9 @@ nav:
   home: Inicio
   terms: Términos
   orders: Pedidos
+  shipping_policy: Política de envíos
+  return_policy: Política de devoluciones
+  policies: Políticas de la tienda
   main_navigation: Navegación principal
   language_switcher: Selector de idioma
   open_menu: Abrir menú
@@ -14,6 +17,48 @@ admin:
   email_label: Correo de administración
   challenge_aria_label: Comprobación de seguridad para iniciar sesión como administrador
   send_link: Enviar enlace mágico
+  login_email_sent: Revisa tu correo para encontrar el enlace de inicio de sesión.
+  login_local_ready: El enlace local de inicio de sesión está listo.
+  login_open: Abrir administración
+  login_sending: Enviando enlace de inicio de sesión...
+  value_unavailable: No disponible
+  value_unknown: Desconocido
+  sessions_refresh: Actualizar sesiones
+  sessions_summary: "Sesiones activas: %{count}. Los metadatos de inicio de sesión se conservan durante %{days} días sin direcciones IP completas, agentes de usuario completos ni ubicación precisa."
+  sessions_active_title: Sesiones activas
+  sessions_none_active: No hay sesiones activas.
+  sessions_recent_title: Inicios de sesión recientes
+  sessions_none_recent: No hay inicios de sesión recientes.
+  sessions_admin: Administración
+  sessions_client: Cliente
+  sessions_started: Inicio
+  sessions_expires: Vencimiento
+  sessions_action: Acción
+  sessions_current: Sesión actual
+  sessions_revoke: Revocar
+  sessions_revoking: Revocando sesión...
+  sessions_revoked: Sesión revocada.
+  sessions_network_id: ID de red
+  sessions_state: Estado
+  sessions_active_state: Activa
+  sessions_inactive_state: Inactiva
+  sessions_loading: Cargando sesiones de administración...
+  audit_date: Fecha
+  audit_action: Acción
+  audit_email: Correo de administración
+  audit_search: Buscar
+  audit_apply: Aplicar filtros
+  audit_export: Exportar CSV filtrado
+  audit_preparing_csv: Preparando CSV de auditoría...
+  audit_csv_started: Se inició la descarga del CSV de auditoría.
+  audit_summary: "%{count} eventos coincidentes. Se excluyen las cargas sensibles de los eventos."
+  audit_none: No hay eventos de auditoría coincidentes.
+  audit_time: Hora
+  audit_admin: Administración
+  audit_target: Destino
+  audit_mutation: Cambio
+  audit_system: Sistema
+  audit_loading: Cargando eventos de auditoría...
   overview_title: Panel de control
   overview_help: Usa este panel para administrar la configuracion de Store, analitica, enlaces de marketing, pedidos, productos, inventario y descargas.
   logout: Cerrar sesión
@@ -227,6 +272,8 @@ runtime:
     order_total: Total del pedido
     order_summary: Resumen del pedido
     store_payment_consent: Tu pago se procesa de forma segura con Stripe.
+    final_sale_notice: Todas las ventas son finales después del pago. No se aceptan devoluciones ni cambios; los problemas de entrega y los derechos que no pueden excluirse siguen cubiertos.
+    return_policy: Lee la política de devoluciones y problemas de entrega.
     decrease_quantity: Disminuir cantidad
     increase_quantity: Aumentar cantidad
     continue_to_payment: Continuar al pago

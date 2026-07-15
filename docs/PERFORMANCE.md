@@ -11,11 +11,13 @@ Store performance depends on static public pages, lazy cart loading, generated m
 - Order Success adds totals and fulfillment details without adding new public bundle dependencies.
 - Spanish public shells share the English page includes and runtime message payloads; they do not duplicate product rendering or add locale-specific bundles.
 - Admin dashboard tab restoration reads and writes one small sanitized `localStorage` object only when an admin tab or Settings section changes; it does not add network calls or polling.
+- Active-session and audit-review rendering lives in `admin-settings-review.js`, loaded only when a super admin opens either Settings section. It reuses the dashboard's request/format/i18n helpers and does not duplicate authentication or state ownership.
 - Generated assets are verified with `npm run assets:minify:check` after build.
 - `config/performance-budgets.json` now owns generated JS/CSS, Lighthouse category/Web Vital/resource, dashboard timing, Worker-route, and cache-policy budgets.
+- The minified core admin dashboard must remain at or below 320,000 bytes; the lazy session/audit review module has its own 30,000-byte ceiling and still counts toward the aggregate generated-JavaScript budget.
 - The local mobile Lighthouse hard gate requires at least 0.80 performance, 0.95 accessibility/SEO, 0.90 best practices, no more than 4,000 ms LCP, 0.10 CLS, 300 ms TBT, 1 MB total transfer, 300 KB images, 100 KB stylesheets, and 75 KB third-party transfer. This is a regression ceiling, not a claim that 4-second LCP is the desired production percentile; the external Adobe project should use [`font-display: optional` or `fallback`](https://helpx.adobe.com/fonts/using/font-display-settings.html) when the operator can update that licensed kit.
 - Public `main.css` excludes the roughly 5,000-line admin stylesheet; `/admin/` loads `admin.css` separately. Inter is a licensed local WOFF2 subset, while Adobe display CSS loads without blocking first render.
-- Home pages preload the responsive candidate set for the first visible catalog product. The preload and rendered image share `local_responsive_image_srcset`, so product reordering and media customization cannot silently leave a hard-coded LCP resource behind.
+- Home pages preload the responsive candidate set for the first visible catalog product. The preload and rendered grid share the same public active/sold-out visibility predicate and `local_responsive_image_srcset`, so environment changes, product reordering, and media customization cannot silently expose private/archive records or leave a hard-coded LCP resource behind.
 
 ## Public Site
 

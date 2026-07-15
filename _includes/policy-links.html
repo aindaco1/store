@@ -1,0 +1,4 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture terms_url -%}{% include localized-url.html lang=current_lang translation_key='terms' %}{%- endcapture -%}
+<a{% if include.link_class %} class="{{ include.link_class }}"{% endif %} href="{{ terms_url | strip }}#shipping-policy">{% include t.html key="nav.shipping_policy" lang=current_lang %}</a>
+<a{% if include.link_class %} class="{{ include.link_class }}"{% endif %} href="{{ terms_url | strip }}#returns-refunds">{% include t.html key="nav.return_policy" lang=current_lang %}</a>

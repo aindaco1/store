@@ -737,9 +737,14 @@ const ES_BRAND_SEO_OPTION_LABELS: Record<string, string> = {
 
 function localizeStoreSettingsSections(sections: any[], lang = 'en') {
   if (!String(lang || '').toLowerCase().startsWith('es')) return sections;
+  const sectionTitles: Record<string, string> = {
+    'Brand & SEO': 'Marca y SEO',
+    'Admin sessions': 'Sesiones de administración',
+    'Audit log': 'Registro de auditoría'
+  };
   return sections.map((section) => ({
     ...section,
-    title: section.title === 'Brand & SEO' ? 'Marca y SEO' : section.title,
+    title: sectionTitles[section.title] || section.title,
     rows: (section.rows || []).map((row: any) => {
       const label = ES_BRAND_SEO_SETTING_LABELS[row.path] || row.label;
       return {
@@ -3014,6 +3019,17 @@ test.describe('Admin Dashboard', () => {
       'No se permiten devoluciones'
     ]);
     await expect(page.getByRole('button', { name: 'Acerca de Pais de politica de devoluciones' })).toBeVisible();
+
+    await selectSettingsSection(page, 'Sesiones de administración');
+    await expect.poll(() => calls.adminSessions.length).toBe(1);
+    await expect(page.locator('[data-admin-session-results]')).toContainText('Sesiones activas: 1.');
+    await expect(page.getByRole('button', { name: 'Revocar' })).toBeVisible();
+
+    await selectSettingsSection(page, 'Registro de auditoría');
+    await expect.poll(() => calls.auditSearch.length).toBe(1);
+    await expect(page.locator('[data-admin-audit-results]')).toContainText('1 eventos coincidentes.');
+    await expect(page.getByRole('button', { name: 'Aplicar filtros' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Exportar CSV filtrado' })).toBeVisible();
 
     const tabs = page.locator('[data-admin-tabs] > .admin-tabs__list');
     await expect(tabs).toBeVisible();

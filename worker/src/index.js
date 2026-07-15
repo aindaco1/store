@@ -14474,6 +14474,11 @@ function adminSettingsSection(title, entries, lang = DEFAULT_I18N_LANG) {
 
 const ADMIN_SETTING_LOCALIZATIONS = {
   es: {
+    sections: {
+      'Brand & SEO': 'Marca y SEO',
+      'Admin sessions': 'Sesiones de administración',
+      'Audit log': 'Registro de auditoría'
+    },
     fields: {
       'platform.favicon_path': {
         label: 'Favicon',
@@ -14564,9 +14569,7 @@ function localizedAdminSettingSchema(path, schema, lang = DEFAULT_I18N_LANG) {
 }
 
 function localizedAdminSectionTitle(title, lang = DEFAULT_I18N_LANG) {
-  const key = adminLocaleKey(lang);
-  if (key === 'es' && title === 'Brand & SEO') return 'Marca y SEO';
-  return title;
+  return ADMIN_SETTING_LOCALIZATIONS[adminLocaleKey(lang)]?.sections?.[title] || title;
 }
 
 function preferredAdminSettingsLang(request) {
@@ -14648,8 +14651,8 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['seo.merchant_return_policy.applicable_country', { label: 'Return policy country', input: 'select', options: ADMIN_ORIGIN_COUNTRY_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Two-letter country code for the merchant return policy in product structured data.' }],
   ['seo.merchant_return_policy.return_policy_category', { label: 'Return policy type', input: 'select', options: ADMIN_RETURN_POLICY_CATEGORY_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Google merchant-listing return policy category emitted under Organization JSON-LD.' }],
   ['seo.merchant_return_policy.merchant_return_days', { label: 'Return window days', type: 'number', input: 'integer', min: 1, max: 3650, step: 1, layoutGroup: 'brand-return-policy', visibleWhen: { path: 'seo.merchant_return_policy.return_policy_category', value: 'https://schema.org/MerchantReturnFiniteReturnWindow' }, help: 'Required when the return policy type is a finite return window.' }],
-  ['seo.merchant_return_policy.return_fees', { label: 'Return fees', input: 'select', options: ADMIN_RETURN_FEES_OPTIONS, layoutGroup: 'brand-return-policy', help: 'How return shipping costs are represented in merchant listing structured data when returns are permitted.' }],
-  ['seo.merchant_return_policy.return_method', { label: 'Return method', input: 'select', options: ADMIN_RETURN_METHOD_OPTIONS, layoutGroup: 'brand-return-policy', help: 'Return method represented in merchant listing structured data when returns are permitted.' }],
+  ['seo.merchant_return_policy.return_fees', { label: 'Return fees', input: 'select', options: ADMIN_RETURN_FEES_OPTIONS, layoutGroup: 'brand-return-policy', visibleWhen: { path: 'seo.merchant_return_policy.return_policy_category', value: 'https://schema.org/MerchantReturnFiniteReturnWindow' }, help: 'How return shipping costs are represented in merchant listing structured data when returns are permitted.' }],
+  ['seo.merchant_return_policy.return_method', { label: 'Return method', input: 'select', options: ADMIN_RETURN_METHOD_OPTIONS, layoutGroup: 'brand-return-policy', visibleWhen: { path: 'seo.merchant_return_policy.return_policy_category', value: 'https://schema.org/MerchantReturnFiniteReturnWindow' }, help: 'Return method represented in merchant listing structured data when returns are permitted.' }],
   ['platform.site_url', { label: 'Production site URL', input: 'url', layoutGroup: 'canonical-urls' }],
   ['platform.worker_url', { label: 'Production Worker URL', input: 'url', layoutGroup: 'canonical-urls' }],
   ['checkout.stripe_publishable_key', { label: 'Stripe publishable key', input: 'stripe-publishable-key' }],
@@ -15472,7 +15475,7 @@ async function handleAdminSettings(request, env) {
   const platformFaviconPath = env.PLATFORM_FAVICON_PATH || '/assets/icons/favicon.png';
   const platformDefaultSocialImagePath = env.PLATFORM_DEFAULT_SOCIAL_IMAGE_PATH || platformLogoPath;
   const seoReturnPolicyCountry = env.SEO_RETURN_POLICY_APPLICABLE_COUNTRY || env.SHIPPING_ORIGIN_COUNTRY || 'US';
-  const seoReturnPolicyCategory = env.SEO_RETURN_POLICY_CATEGORY || 'https://schema.org/MerchantReturnFiniteReturnWindow';
+  const seoReturnPolicyCategory = env.SEO_RETURN_POLICY_CATEGORY || 'https://schema.org/MerchantReturnNotPermitted';
   const seoMerchantReturnDays = Number.parseInt(String(env.SEO_MERCHANT_RETURN_DAYS || '14'), 10) || 14;
   const seoReturnFees = env.SEO_RETURN_FEES || 'https://schema.org/ReturnFeesCustomerResponsibility';
   const seoReturnMethod = env.SEO_RETURN_METHOD || 'https://schema.org/ReturnByMail';

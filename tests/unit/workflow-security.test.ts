@@ -48,6 +48,7 @@ describe('workflow security posture', () => {
     expect(deploy).toContain('waiting for Worker propagation');
     expect(deploy).toContain('sleep "$((attempt * 5))"');
     expect(deploy).toContain('npm run cloudflare:admin-response-rule -- --verify-public --require-current');
+    expect(deploy).toContain('npm run test:crawl-endpoints -- --base=https://shop.dustwave.xyz');
     expect(deploy).not.toContain('CLOUDFLARE_CACHE_RULES_API_TOKEN');
     expect(deploy).not.toContain('CLOUDFLARE_EMAIL:');
     expect(deploy).not.toContain('CLOUDFLARE_KEY:');
@@ -183,6 +184,7 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('STRIPE_RECOVERY_READ_KEY');
     expect(workflow).toContain('sudo apt-get install -y age');
     expect(workflow).toContain('aws --version');
+    expect(workflow).not.toContain('sudo apt-get install -y age awscli');
     expect(drill).toContain('RESTORE_RESULT="${WORK_DIR}/restore-result.json"');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID');
     expect(workflow).toContain('STORE_RECOVERY_ARCHIVE_S3_ENDPOINT');

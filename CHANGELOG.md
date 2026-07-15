@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.0.9 - 2026-07-14
+
+### Pool v1.1.2 adaptation and release hardening
+
+- Added `/sitemap.txt` beside the canonical XML sitemap, with both formats generated from one shared public-page/product selector so archived, private, test-only, and non-indexable content cannot drift between crawl feeds.
+- Stopped inventing sitemap freshness from build time. XML `lastmod` now appears only when content supplies a real `last_modified_at`, and generated audits reject malformed XML, XML/text parity drift, duplicates, private URLs, and invalid or future timestamps.
+- Added a dependency-free post-deploy crawl audit that compares ordinary and Google Inspection sitemap responses, validates sitemap/robots status and MIME types, and fetches every submitted public URL with bounded propagation retries.
+- Aligned Store's default policy with Pool's final-sale posture: Terms now state no change-of-mind returns or exchanges while preserving remedies for damaged, defective, incorrect, missing, delayed, canceled, duplicate-charge, fraud, and legally required cases. Direct localized Shipping/Return Policy links appear in the desktop footer and mobile menu, and checkout discloses final-sale status before payment.
+- Kept merchant return metadata fork-configurable while making `MerchantReturnNotPermitted` the Store default, omitting fictitious return windows/methods/fees from JSON-LD and mirrored Worker settings when returns are disabled.
+- Moved active-session review/revocation and searchable audit review/CSV UI into a localized, lazy Settings module with a narrow injected API, reducing the core minified admin bundle below its executable budget without adding a second admin state model.
+- Added a protected-recovery workflow regression guard for Ubuntu 24.04: install `age`, use the AWS CLI v2 already supplied by GitHub-hosted runners, and never request the unavailable apt `awscli` package.
+- Preserved the existing fail-closed host/Podman Jekyll build behavior and added regression coverage so minification and artifact checks cannot validate stale `_site` output after a failed build.
+- Aligned local and production storefront visibility through one shared public active/sold-out predicate used by both the home grid and its LCP preload. This removes archived/private catalog markup from local public pages, cut the audited home document from about 330 KB to 197 KB, and reduced mobile Lighthouse LCP from about 4.3 seconds to 2.8 seconds.
+- Updated performance budgets, English/Spanish catalogs, workflow/security/SEO/browser tests, operator documentation, roadmap, and release evidence for the Store `v1.0.9` candidate.
+
 ## v1.0.8 - 2026-07-13
 
 ### Store reliability, media, and operations

@@ -63,6 +63,8 @@ Current Settings sections:
 
 Settings media fields use upload controls and image previews rather than manual path-only editing where supported.
 
+Admin sessions and Audit log load their shared localized UI module only when either section is opened. `assets/js/admin-settings-review.js` receives a narrow set of dashboard request, formatting, status, CSV, and translation helpers; authentication, role/scope state, and API ownership remain in the core dashboard. English and Spanish use the same module and runtime message catalog.
+
 Settings write/upload endpoints:
 
 - `POST /admin/settings/preview`
@@ -332,6 +334,7 @@ Responsive behavior currently covered by E2E tests:
 
 - Admin page: `_layouts/admin.html`
 - Admin behavior: `assets/js/admin-dashboard.js`
+- Lazy session/audit behavior: `assets/js/admin-settings-review.js`
 - Admin styles: `assets/partials/_admin.scss`
 - Worker admin API: `worker/src/index.js`
 - Admin auth helpers: `worker/src/admin-auth.js`

@@ -1,0 +1,9 @@
+{%- assign storefront_product = include.product -%}
+{%- assign storefront_product_status = storefront_product.status | default: "active" -%}
+{%- assign storefront_product_public = true -%}
+{%- if storefront_product.public == false -%}
+  {%- assign storefront_product_public = false -%}
+{%- endif -%}
+{%- if storefront_product.type != "archive" and storefront_product_public -%}
+  {%- if storefront_product_status == "active" or storefront_product_status == "sold_out" -%}true{%- else -%}false{%- endif -%}
+{%- else -%}false{%- endif -%}

@@ -5,38 +5,5 @@ sitemap: false
 ---
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-{%- assign sitemap_pages = site.pages | where_exp: "item", "item.layout == 'default'" | where_exp: "item", "item.sitemap != false" | where_exp: "item", "item.indexable != false" | where_exp: "item", "item.test_only != true" -%}
-{%- assign sitemap_localized_products = site.pages | where_exp: "item", "item.store_product == true" | where_exp: "item", "item.sitemap != false" | where_exp: "item", "item.indexable != false" | where_exp: "item", "item.test_only != true" -%}
-{%- assign sitemap_products = site.products | where_exp: "item", "item.sitemap != false" | where_exp: "item", "item.indexable != false" | where_exp: "item", "item.test_only != true" -%}
-{%- for item in sitemap_pages -%}
-  {%- include seo-sitemap-url.xml item=item -%}
-{%- endfor -%}
-{%- for item in sitemap_localized_products -%}
-  {%- assign product_status = item.status | default: "active" -%}
-  {%- assign product_public = true -%}
-  {%- if item.public == false -%}
-    {%- assign product_public = false -%}
-  {%- endif -%}
-  {%- assign product_sitemap_status = false -%}
-  {%- if product_status == "active" or product_status == "sold_out" -%}
-    {%- assign product_sitemap_status = true -%}
-  {%- endif -%}
-  {%- if product_public and product_sitemap_status -%}
-    {%- include seo-sitemap-url.xml item=item -%}
-  {%- endif -%}
-{%- endfor -%}
-{%- for item in sitemap_products -%}
-  {%- assign product_status = item.status | default: "active" -%}
-  {%- assign product_public = true -%}
-  {%- if item.public == false -%}
-    {%- assign product_public = false -%}
-  {%- endif -%}
-  {%- assign product_sitemap_status = false -%}
-  {%- if product_status == "active" or product_status == "sold_out" -%}
-    {%- assign product_sitemap_status = true -%}
-  {%- endif -%}
-  {%- if product_public and product_sitemap_status -%}
-    {%- include seo-sitemap-url.xml item=item -%}
-  {%- endif -%}
-{%- endfor -%}
+{%- include seo-sitemap-items.liquid format='xml' -%}
 </urlset>

@@ -1,6 +1,6 @@
 # Testing
 
-The `v1.0.7` gate added centralized performance/cache policy budgets, Podman Lighthouse, fixed-key order-index deduplication, session review privacy/revocation, searchable audit exports, signed-download soft locks, production posture drift, localization review packets, off-device backup copies, and snapshot duration/read-usage evidence. The `v1.0.8` gate adds deterministic repository media evidence, DRY add-on pricing, resumable Stripe processing and reconciliation, durable email delivery evidence, and explicit release-closure checks for cache and protected recovery operations.
+The `v1.0.8` gate added deterministic repository media evidence, DRY add-on pricing, resumable Stripe processing and reconciliation, durable email delivery evidence, and explicit release-closure checks for cache and protected recovery operations. The `v1.0.9` gate adds XML/text sitemap parity, deployed crawl verification, final-sale policy disclosure, a localized lazy admin review bundle, and a protected-recovery dependency regression guard.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -28,6 +28,7 @@ npm run build
 npm run test:performance:budgets
 npm run test:performance:lighthouse
 npm run test:cache-policy
+npm run test:crawl-endpoints -- --base=https://shop.dustwave.xyz
 npm run localization:review -- --output-dir=/tmp/store-localization-review
 npm run production:posture -- --secrets-file=/path/to/wrangler-secret-list.json
 ```
@@ -123,7 +124,7 @@ bundle exec jekyll build --quiet
 npm run test:seo
 ```
 
-The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, social metadata, JSON-LD, sitemap URLs, localized alternates, and crawl-control rules for `noindex` routes.
+The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, social metadata, JSON-LD, XML/text sitemap parity, localized alternates, real/non-future sitemap dates, return-policy metadata, and crawl-control rules for `noindex` routes. The live crawl command is a post-deploy check; its unit suite should be used before the candidate is published.
 
 ## Pre-Merge
 

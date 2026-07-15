@@ -480,7 +480,7 @@ export async function sendPreparedResendEmail(env, preparedPayload, {
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'store-worker/1.0.8',
+        'User-Agent': 'store-worker/1.0.9',
         ...(idempotencyKey ? { 'Idempotency-Key': String(idempotencyKey).slice(0, 256) } : {})
       },
       body: JSON.stringify(preparedPayload)

@@ -82,7 +82,7 @@ node -e '
   if (endpoint.hostname !== `${archive}.r2.cloudflarestorage.com`) {
     throw new Error("The recovery archive endpoint must match the separate Cloudflare R2 account.");
   }
-  if (lockDays !== "400") throw new Error("The recovery archive lock must be exactly 400 days for v1.0.8.");
+  if (lockDays !== "400") throw new Error("The recovery archive lock must be exactly 400 days for Store release snapshots.");
 ' "$CLOUDFLARE_ACCOUNT_ID" "$STORE_RECOVERY_ARCHIVE_ACCOUNT_ID" "$ARCHIVE_ENDPOINT" "$ARCHIVE_LOCK_DAYS"
 
 archive_cli_args=()

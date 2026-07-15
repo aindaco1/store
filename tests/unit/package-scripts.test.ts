@@ -53,6 +53,14 @@ describe('package test scripts', () => {
     expect(preMergeScript).not.toContain('run_phase "10. Headless E2E suite"');
   });
 
+  it('fails closed before generated-asset checks when either Jekyll build path fails', () => {
+    const preMergeScript = readFileSync(join(repoRoot, 'scripts/pre-merge-regression.sh'), 'utf8');
+
+    expect(preMergeScript).toContain('bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1');
+    expect(preMergeScript).toContain('minify_site_assets || return 1');
+    expect(preMergeScript).toContain('sitemap.txt is missing from the built site');
+  });
+
   it('keeps Podman wrappers alive until runtime checks finish', () => {
     const stackRun = readFileSync(join(repoRoot, 'scripts/podman-stack-run.sh'), 'utf8');
     const playwrightRun = readFileSync(join(repoRoot, 'scripts/podman-playwright-run.sh'), 'utf8');

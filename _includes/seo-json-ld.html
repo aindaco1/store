@@ -31,7 +31,7 @@
   {%- endif -%}
   {%- assign merchant_return_policy = site.seo.merchant_return_policy | default: empty -%}
   {%- assign return_policy_country = merchant_return_policy.applicable_country | default: site.shipping.origin_country | default: "US" -%}
-  {%- assign return_policy_category = merchant_return_policy.return_policy_category | default: "https://schema.org/MerchantReturnFiniteReturnWindow" -%}
+  {%- assign return_policy_category = merchant_return_policy.return_policy_category | default: "https://schema.org/MerchantReturnNotPermitted" -%}
   {%- assign return_policy_days = merchant_return_policy.merchant_return_days | default: 14 | plus: 0 -%}
   {%- assign return_fees = merchant_return_policy.return_fees | default: "https://schema.org/ReturnFeesCustomerResponsibility" -%}
   {%- assign return_method = merchant_return_policy.return_method | default: "https://schema.org/ReturnByMail" -%}

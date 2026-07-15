@@ -403,6 +403,7 @@ def build_mirror_values(config, existing)
   marketing = config['marketing'] || {}
   add_ons = config['add_ons'] || {}
   seo_return_policy = seo['merchant_return_policy'] || {}
+  returns_permitted = seo_return_policy['return_policy_category'] != 'https://schema.org/MerchantReturnNotPermitted'
 
   {
     'SITE_BASE' => platform['site_url'] || config['url'] || existing['SITE_BASE'],
@@ -430,9 +431,9 @@ def build_mirror_values(config, existing)
     'SEO_SAME_AS' => csv_value(seo['same_as'], existing['SEO_SAME_AS']),
     'SEO_RETURN_POLICY_APPLICABLE_COUNTRY' => seo_return_policy.key?('applicable_country') ? seo_return_policy['applicable_country'].to_s : existing['SEO_RETURN_POLICY_APPLICABLE_COUNTRY'],
     'SEO_RETURN_POLICY_CATEGORY' => seo_return_policy.key?('return_policy_category') ? seo_return_policy['return_policy_category'].to_s : existing['SEO_RETURN_POLICY_CATEGORY'],
-    'SEO_MERCHANT_RETURN_DAYS' => seo_return_policy.key?('merchant_return_days') ? format_int(seo_return_policy['merchant_return_days']) : existing['SEO_MERCHANT_RETURN_DAYS'],
-    'SEO_RETURN_FEES' => seo_return_policy.key?('return_fees') ? seo_return_policy['return_fees'].to_s : existing['SEO_RETURN_FEES'],
-    'SEO_RETURN_METHOD' => seo_return_policy.key?('return_method') ? seo_return_policy['return_method'].to_s : existing['SEO_RETURN_METHOD'],
+    'SEO_MERCHANT_RETURN_DAYS' => returns_permitted ? (seo_return_policy.key?('merchant_return_days') ? format_int(seo_return_policy['merchant_return_days']) : existing['SEO_MERCHANT_RETURN_DAYS']) : '',
+    'SEO_RETURN_FEES' => returns_permitted ? (seo_return_policy.key?('return_fees') ? seo_return_policy['return_fees'].to_s : existing['SEO_RETURN_FEES']) : '',
+    'SEO_RETURN_METHOD' => returns_permitted ? (seo_return_policy.key?('return_method') ? seo_return_policy['return_method'].to_s : existing['SEO_RETURN_METHOD']) : '',
     'STRIPE_PUBLISHABLE_KEY' => checkout.key?('stripe_publishable_key') ? checkout['stripe_publishable_key'].to_s : existing['STRIPE_PUBLISHABLE_KEY'],
     'EMAIL_LOGO_PATH' => platform.key?('logo_path') ? platform['logo_path'].to_s : existing['EMAIL_LOGO_PATH'],
     'DESIGN_LAYOUT_MAX_WIDTH' => design.key?('layout_max_width') ? design['layout_max_width'].to_s : existing['DESIGN_LAYOUT_MAX_WIDTH'],

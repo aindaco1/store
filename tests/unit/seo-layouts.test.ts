@@ -25,6 +25,7 @@ describe('Store SEO templates', () => {
     const pagePrefetch = readRepoFile('_includes', 'page-prefetch.html');
     const responsiveImage = readRepoFile('_includes', 'responsive-image.html');
     const storefrontLcpPreload = readRepoFile('_includes', 'storefront-lcp-preload.html');
+    const storefrontProductVisible = readRepoFile('_includes', 'storefront-product-visible.html');
     const imageFilters = readRepoFile('_plugins', 'image_dimensions.rb');
     const homePage = readRepoFile('index.html');
     const storefrontHome = readRepoFile('_includes', 'storefront-home.html');
@@ -43,6 +44,12 @@ describe('Store SEO templates', () => {
     expect(productLayout).toContain('store-product-options.js');
     expect(homePage).toContain('{% include storefront-home.html');
     expect(storefrontHome).toContain('site.products | sort: "order"');
+    expect(storefrontHome).toContain('storefront-product-visible.html product=product');
+    expect(storefrontLcpPreload).toContain('storefront-product-visible.html product=product');
+    expect(storefrontProductVisible).toContain('storefront_product.public == false');
+    expect(storefrontProductVisible).toContain('storefront_product_status == "active" or storefront_product_status == "sold_out"');
+    expect(storefrontHome).not.toContain('jekyll.environment');
+    expect(storefrontLcpPreload).not.toContain('jekyll.environment');
     expect(storefrontHome).toContain('visible_product_index == 0');
     expect(storefrontHome).toContain('product_image_decoding = "sync"');
     expect(storefrontHome).toContain('image_loading=product_image_loading');
@@ -130,6 +137,8 @@ describe('Store SEO templates', () => {
     const orderSuccess = readRepoFile('order-success.md');
     const robots = readRepoFile('robots.txt');
     const sitemap = readRepoFile('sitemap.xml');
+    const textSitemap = readRepoFile('sitemap.txt');
+    const sitemapItems = readRepoFile('_includes', 'seo-sitemap-items.liquid');
 
     expect(adminLayout).toContain('indexable=false');
     expect(adminLayout).toContain('social=false');
@@ -158,18 +167,20 @@ describe('Store SEO templates', () => {
     expect(robots).not.toContain('Disallow: /order-success/');
     expect(robots).toContain('Disallow: /api/');
     expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">');
-    expect(sitemap).toContain('assign sitemap_products = site.products');
-    expect(sitemap).toContain('assign sitemap_localized_products = site.pages');
-    expect(sitemap).toContain("item.sitemap != false");
-    expect(sitemap).toContain("item.indexable != false");
-    expect(sitemap).toContain("item.test_only != true");
-    expect(sitemap).toContain('assign product_public = true');
-    expect(sitemap).toContain('assign product_sitemap_status = false');
-    expect(sitemap).toContain('product_status == "active" or product_status == "sold_out"');
-    expect(sitemap).toContain('seo-sitemap-url.xml');
-    expect(sitemap).toContain('{%- for item in sitemap_products -%}');
-    expect(sitemap).toContain('{%- for item in sitemap_localized_products -%}');
-    expect(sitemap).not.toContain('site.campaigns');
+    expect(sitemap).toContain("seo-sitemap-items.liquid format='xml'");
+    expect(textSitemap).toContain("seo-sitemap-items.liquid format='text'");
+    expect(sitemapItems).toContain('assign sitemap_products = site.products');
+    expect(sitemapItems).toContain('assign sitemap_localized_products = site.pages');
+    expect(sitemapItems).toContain("item.sitemap != false");
+    expect(sitemapItems).toContain("item.indexable != false");
+    expect(sitemapItems).toContain("item.test_only != true");
+    expect(sitemapItems).toContain('assign product_public = true');
+    expect(sitemapItems).toContain('product_status == "active" or product_public and product_status == "sold_out"');
+    expect(sitemapItems).toContain('seo-sitemap-url.xml');
+    expect(sitemapItems).toContain('seo-sitemap-url.txt');
+    expect(sitemapItems).toContain('{%- for item in sitemap_products -%}');
+    expect(sitemapItems).toContain('{%- for item in sitemap_localized_products -%}');
+    expect(sitemapItems).not.toContain('site.campaigns');
     const sitemapUrlInclude = readRepoFile('_includes', 'seo-sitemap-url.xml');
     expect(sitemapUrlInclude).toContain('xhtml:link rel="alternate"');
     expect(sitemapUrlInclude).toContain('hreflang="x-default"');
@@ -185,7 +196,8 @@ describe('Store SEO templates', () => {
       ['assets', 'js', 'video-first-frame-poster.js'],
       ['assets', 'js', 'form-control-identity.js'],
       ['assets', 'js', 'vendor', 'qrcode-generator.js'],
-      ['assets', 'js', 'admin-dashboard.js']
+      ['assets', 'js', 'admin-dashboard.js'],
+      ['assets', 'js', 'admin-settings-review.js']
     ].map((segments) => readRepoFile(...segments)).join('\n');
 
     expect(adminRuntime).not.toMatch(/\beval\s*\(/);
@@ -214,8 +226,10 @@ describe('Store SEO templates', () => {
     expect(seoJsonLd).toContain('"inLanguage": {{ current_lang | jsonify }}');
     expect(config).toContain('product_path_prefixes:');
     expect(config).toContain('merchant_return_policy:');
-    expect(config).toContain('return_policy_category: https://schema.org/MerchantReturnFiniteReturnWindow');
-    expect(config).toContain('return_fees: https://schema.org/ReturnFeesCustomerResponsibility');
+    expect(config).toContain('return_policy_category: https://schema.org/MerchantReturnNotPermitted');
+    expect(config).not.toContain('merchant_return_days:');
+    expect(config).not.toContain('return_fees:');
+    expect(config).not.toContain('return_method:');
     expect(config).toMatch(/es:\s*["']?\/es\/products\/["']?/);
     expect(config).toContain('pages:');
     expect(config).toContain('home:');

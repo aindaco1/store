@@ -126,7 +126,9 @@ The admin **Settings -> Brand & SEO** section can publish:
 - same-as/social profile URLs
 - merchant return policy values used in Product JSON-LD
 
-The Terms page is the source for customer-facing policy copy. The Spanish Terms route is currently machine translated and should receive legal/native review before production/legal-sensitive use.
+Store defaults to `https://schema.org/MerchantReturnNotPermitted`. With that category, Worker synchronization clears return-window, method, and fee variables so JSON-LD cannot publish a fictitious return program. Forks that intentionally support returns may choose a finite return category and provide the matching days, method, and fee values through the same Settings/config surface.
+
+The Terms page is the source for customer-facing policy copy and follows the configured category: Store's default is final sale for change-of-mind, preference, fit, and sizing, while fulfillment errors, damaged/defective/incorrect/missing items, delayed or canceled fulfillment, duplicate charges, fraud, and legally required remedies remain separate. Checkout exposes the final-sale rule before payment, and stable `#shipping-policy` and `#returns-refunds` anchors power direct policy links. The Spanish Terms route is currently machine translated and should receive legal/native review before production/legal-sensitive use.
 
 ## Admin Users
 

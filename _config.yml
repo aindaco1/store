@@ -10,10 +10,7 @@ seo:
   default_social_image_alt: Dust Wave Shop
   merchant_return_policy:
     applicable_country: US
-    return_policy_category: https://schema.org/MerchantReturnFiniteReturnWindow
-    merchant_return_days: 14
-    return_fees: https://schema.org/ReturnFeesCustomerResponsibility
-    return_method: https://schema.org/ReturnByMail
+    return_policy_category: https://schema.org/MerchantReturnNotPermitted
   og_locale_overrides:
     en: en_US
 debug:
@@ -41,8 +38,8 @@ exclude:
   - Containerfile.playwright.dev
 platform:
   name: Shop
-  version: 1.0.8
-  release_label: v1.0.8
+  version: 1.0.9
+  release_label: v1.0.9
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>

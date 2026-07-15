@@ -1,0 +1,6 @@
+---
+layout: null
+permalink: /sitemap.txt
+sitemap: false
+---
+{%- include seo-sitemap-items.liquid format='text' -%}

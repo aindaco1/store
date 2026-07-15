@@ -2,9 +2,10 @@
 layout: default
 lang: es
 title: Términos
-description: Términos de Dust Wave Shop, política de reembolsos, política de envíos, política de boletos, política de descargas y política de privacidad.
+description: Términos de Dust Wave Shop, política de no devoluciones y problemas de entrega, política de envíos, boletos, descargas y privacidad.
 translation_key: terms
 permalink: /es/terms/
+last_modified_at: 2026-07-14
 ---
 
 {%- capture platform_title -%}{% include platform-display-title.html %}{%- endcapture -%}
@@ -12,11 +13,14 @@ permalink: /es/terms/
 {%- assign platform_name = site.platform.name | default: site.title | default: "Store" | strip -%}
 {%- assign platform_company = site.platform.company_name | default: site.author | default: "Dust Wave" | strip -%}
 {%- assign support_email = site.platform.support_email | default: "info@dustwave.xyz" | strip -%}
+{%- assign merchant_return_policy = site.seo.merchant_return_policy | default: empty -%}
+{%- assign return_policy_category = merchant_return_policy.return_policy_category | default: "https://schema.org/MerchantReturnNotPermitted" -%}
+{%- assign return_policy_days = merchant_return_policy.merchant_return_days | default: 14 | plus: 0 -%}
 
 <section class="storefront">
   <div class="storefront__header">
     <h1>Términos y privacidad</h1>
-    <p>Vigente a partir del 1 de julio de 2026.</p>
+    <p>Vigente a partir del 14 de julio de 2026.</p>
   </div>
 
   <div class="storefront__product-copy">
@@ -37,11 +41,24 @@ permalink: /es/terms/
     <p>Los pedidos físicos se envían desde Nuevo México. Las opciones de envío y los cargos estimados se muestran durante el checkout. Las fechas de entrega son estimaciones, no garantías, porque retrasos del transportista, clima, problemas de dirección y horarios de eventos pueden afectar los tiempos.</p>
     <p>Si un pedido no puede enviarse dentro del plazo esperado, nos comunicaremos contigo con una estimación actualizada o una opción de reembolso. Contáctanos pronto si tu dirección de envío es incorrecta; no podemos garantizar cambios después de que comience el cumplimiento.</p>
 
-    <h2 id="returns-refunds">Devoluciones y reembolsos</h2>
-    <p>Para mercancía física, contáctanos dentro de los 14 días posteriores a la entrega si quieres solicitar una devolución o cambio. Los artículos devueltos deben estar sin usar, sin vestir, sin lavar y en condiciones razonables para reventa, salvo que el problema sea daño, defecto o error nuestro de cumplimiento.</p>
+    <h2 id="returns-refunds">Devoluciones, problemas de entrega y reembolsos</h2>
+    {%- if return_policy_category == "https://schema.org/MerchantReturnNotPermitted" %}
+    <p><strong>Política predeterminada: no se aceptan devoluciones ni cambios.</strong> Una vez cobrado un pedido, la mercancía física, los boletos de eventos, los productos digitales y los complementos son venta final. No aceptamos devoluciones ni cambios por arrepentimiento, preferencia, ajuste o talla.</p>
+    <p>Esta política de venta final no elimina las soluciones disponibles para un artículo físico dañado, defectuoso, incorrecto o faltante:</p>
+    <ol>
+      <li>Escribe a <a href="mailto:{{ support_email }}">{{ support_email }}</a> tan pronto como sea razonablemente posible y, por lo general, dentro de los <strong>siete días calendario posteriores a la fecha en que el transportista marque el envío como entregado</strong>.</li>
+      <li>Incluye la referencia del pedido, una descripción del problema y fotos claras del artículo, empaque y etiqueta de envío cuando estén razonablemente disponibles.</li>
+      <li>Verificamos el reporte con los registros disponibles de seguimiento y preparación. Si el envío no tiene seguimiento o no existe una fecha confiable de entrega, revisamos de buena fe el momento del reporte y la evidencia.</li>
+      <li>Cuando se verifica el problema, la solución disponible puede ser reparación, reemplazo, entrega de artículos faltantes o reembolso del artículo afectado, según el problema y el inventario disponible.</li>
+    </ol>
+    <p>El periodo de siete días es una <strong>pauta para reportar problemas, no un plazo de devolución</strong>. Un reporte posterior no elimina derechos que legalmente no puedan excluirse, aunque la demora puede dificultar una reclamación al transportista o la verificación de los hechos.</p>
+    <p>Si un artículo cobrado no puede entregarse, {{ platform_company }} proporcionará un plan actualizado y podrá ofrecer un envío posterior, un sustituto razonable con tu aprobación o un reembolso por el artículo no entregado. Los cobros duplicados, errores del procesador, sospechas de fraude, eventos cancelados y reembolsos exigidos por la ley se revisan por separado de las devoluciones ordinarias.</p>
+    {%- else %}
+    <p>Para mercancía física, contáctanos dentro de los {{ return_policy_days }} días posteriores a la entrega si quieres solicitar una devolución o cambio. Los artículos devueltos deben estar sin usar, sin vestir, sin lavar y en condiciones razonables para reventa, salvo que el problema sea daño, defecto o error nuestro de cumplimiento.</p>
     <p>Los cargos de envío no son reembolsables salvo que la devolución sea causada por nuestro error o por un artículo dañado o defectuoso. El envío de devolución normalmente es responsabilidad del comprador, a menos que aprobemos lo contrario.</p>
-    <p>Los artículos dañados, defectuosos o incorrectos deben reportarse dentro de los 7 días posteriores a la entrega con el número de pedido y fotos. Podemos ofrecer reemplazo, reparación, crédito de tienda o reembolso según la disponibilidad.</p>
-    <p>Los artículos de venta final incluyen descargas digitales después de que se entregue el acceso, boletos de evento después de que el evento comience, RSVPs gratuitos, ropa usada, productos íntimos abiertos y artículos marcados como venta final. Esto no limita derechos que puedas tener bajo la ley aplicable.</p>
+    <p>Los artículos dañados, defectuosos, incorrectos o faltantes deben reportarse normalmente dentro de los siete días calendario posteriores a la entrega con el número de pedido y fotos. Podemos ofrecer reemplazo, reparación, entrega de artículos faltantes, crédito de tienda o reembolso según el problema y la disponibilidad.</p>
+    <p>Las descargas digitales después de que se entregue el acceso, los boletos después de que comience el evento, los RSVPs gratuitos, la ropa usada, los productos íntimos abiertos y los artículos marcados como venta final siguen sin ser elegibles para devoluciones ordinarias. Esto no limita derechos que legalmente no puedan excluirse.</p>
+    {%- endif %}
 
     <h2>Boletos y RSVPs</h2>
     <p>Los boletos y RSVPs son válidos solo para el evento indicado al momento de compra. Pueden incluir credenciales QR o de check-in vinculadas al pedido. No publiques enlaces de boletos, códigos QR ni enlaces de pedidos en público.</p>

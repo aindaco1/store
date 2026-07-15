@@ -3497,6 +3497,15 @@
       const showCustomCheckoutConfirmButton = wantsCustomCheckout &&
         !isDeferredCustomCheckoutStart &&
         (hasCustomCheckoutSession || (isCustomCheckout && !requiresTaxLocation));
+      const returnPolicyUrl = getCurrentLang().toLowerCase().startsWith('es')
+        ? '/es/terms/#returns-refunds'
+        : '/terms/#returns-refunds';
+      const finalSaleNoticeMarkup = `
+        <p class="store-first-party-cart__policy-notice">
+          ${escapeHtml(getRuntimeMessage('cart.finalSaleNotice', 'All sales are final after payment. No returns or exchanges; fulfillment problems and non-waivable rights remain covered.'))}
+          <a href="${escapeAttribute(returnPolicyUrl)}">${escapeHtml(getRuntimeMessage('cart.returnPolicy', 'Read the return and fulfillment policy.'))}</a>
+        </p>
+      `;
       const checkoutErrorMarkup = `
         <p class="store-first-party-cart__error" data-cart-checkout-error role="alert" ${checkoutUiState.error ? '' : 'hidden'}>${escapeHtml(checkoutUiState.error || '')}</p>
       `;
@@ -3772,6 +3781,7 @@
         ${cartEstimateMarkup}
       `;
       const footerActions = isCheckoutPreview ? `
+          ${finalSaleNoticeMarkup}
           <div class="store-first-party-cart__actions">
             <button type="button" class="store-first-party-cart__action store-first-party-cart__action--secondary" data-cart-back>${escapeHtml(getRuntimeMessage('cart.backToCart', 'Back to cart'))}</button>
             ${showCustomCheckoutConfirmButton ? `

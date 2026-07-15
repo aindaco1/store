@@ -8,9 +8,10 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 
 - Store is live at `https://shop.dustwave.xyz` with the Cloudflare Worker at `https://checkout.dustwave.xyz`.
 - The primary implementation scope for checkout, fulfillment, admin operations, i18n, accessibility, SEO, Podman, and release evidence is complete.
-- `v1.0.6` added Workers Cache performance/read-efficiency hardening, versioned backup/restore/disaster-recovery automation, and Podman-backed default runtime tests. `v1.0.7` added production quality budgets, fixed-key order-index rebuild deduplication, admin session/audit/download-abuse hardening, scheduled posture/localization review, and approved recovery objectives/retention controls. `v1.0.8` adds product/media/add-on authoring, payment-integrity/reconciliation hardening, and durable Store email delivery.
+- `v1.0.6` added Workers Cache and recovery automation. `v1.0.7` added production quality budgets and admin/operations hardening. `v1.0.8` added product/media/add-on authoring, payment-integrity/reconciliation hardening, and durable Store email delivery. The `v1.0.9` candidate adapts Pool `v1.1.2` crawl integrity, policy disclosure, lazy localized admin review, and protected-recovery workflow hardening.
 - Published tags are immutable. `v1.0.8` points to exact reviewed and deployed commit `0eb660c`; the GitHub release, Storefront, Worker, canonical configuration, release notes, and evidence were published after production and protected-operations proof.
 - `v1.0.8` code-path, deployment, provider, reconciliation, and protected recovery evidence is complete. The owner-approved Pool posture keeps every optional Workers Cache route disabled/evidence-gated and treats the immutable separate-account archive as the required durable recovery copy.
+- `v1.0.9` remains a release candidate until its reviewed commit is deployed and the post-deploy crawl/provider checks are recorded; no current evidence is inferred from the prior release.
 - Production Cloudflare DNS API evidence is covered by the non-deploying `Release Provider Evidence` GitHub Actions workflow on `main`; ongoing external evidence remains an operations gate, not a Store code gap.
 
 ## Completed
@@ -119,10 +120,11 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 - [x] SEO and crawl control
   - Public product/home/terms pages emit canonical URLs, localized alternates, Open Graph/Twitter tags, Product/Offer/Breadcrumb/Organization JSON-LD, sitemap entries, and merchant return policy metadata.
   - Admin, token-scoped, order lookup, fulfillment, reminder, and check-in surfaces stay private/noindex or outside public crawl paths as appropriate.
-  - `npm run test:seo` validates rendered metadata, JSON-LD, sitemap, robots, private-route noindex behavior, localized `inLanguage`, and product breadcrumbs.
+  - XML and text sitemaps share one selector, emit only real content modification dates, and stay in exact URL parity. `npm run test:seo` validates rendered metadata/feeds while the deploy workflow compares ordinary and Google Inspection responses and fetches every submitted URL with bounded retries.
 - [x] Performance baseline
   - Public pages are statically rendered, the cart runtime loads lazily, generated assets are minified, and media optimizer checks keep responsive derivatives aligned.
   - Worker reads use generated catalog snapshots, indexed order state, bounded queue-state markers, and explicit admin reads instead of background polling.
+  - Session/audit review is a localized lazy Settings module with a narrow injected API; the core and lazy bundles have separate executable size ceilings and remain inside the aggregate JavaScript budget.
 - [x] Production quality gates and admin operations hardening
   - `config/performance-budgets.json` centralizes generated JavaScript/CSS budgets, Lighthouse category/Web Vital/resource budgets, dashboard timing targets, Worker route targets, and public/private cache-policy expectations. Public CSS is split from the admin-only bundle, Inter is served as a licensed local subset, Adobe display fonts no longer block CSS, and priority loading plus responsive head preloading are limited to the catalog-derived LCP candidate.
   - Podman-backed Lighthouse covers home, product, and Terms routes. Cache-policy audits cover static assets, catalog/add-on JSON, products, social images, public order shells, private admin HTML/session APIs, and invalid tokenized order APIs.
@@ -231,6 +233,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
   - `.github/workflows/podman-e2e.yml` provides scheduled non-deploying Podman E2E drift detection, and `.github/workflows/release-provider-evidence.yml` provides production Cloudflare DNS API evidence through GitHub Actions secrets.
   - Stripe CLI readiness regression coverage proves signed-out environments do not invoke endpoint commands or surface interactive authentication output.
   - The `v1.0.8` adaptation and release record separates local code-path passes from deployment, provider, edge-cache, and protected recovery evidence, including explicit owner-approved Pool-aligned dispositions rather than inferred passes.
+  - The `v1.0.9` release record maps every Pool `v1.1.2` item to adopted, already-present, Store-adapted, or Pool-only status and keeps live crawl/deployment evidence open until the candidate is published.
 - [x] Cross-repo parity and docs-as-code
   - [MERGE_SMOKE_CHECKLIST.md](MERGE_SMOKE_CHECKLIST.md), [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md), [TESTING.md](TESTING.md), and [release-evidence/](release-evidence/) document the Store release discipline.
   - Store/Pool parity rules treat shared work as transferable primitives while preserving Store-specific nouns, storage boundaries, checkout, fulfillment, admin, inventory, and SEO behavior.

@@ -188,6 +188,17 @@ body.store-cart-open {
   padding-top: 14px;
 }
 
+.store-first-party-cart__policy-notice {
+  margin: 0 0 10px;
+  @include type-meta;
+  color: $color--secondary;
+
+  a {
+    color: $color--primary;
+    text-underline-offset: 0.16em;
+  }
+}
+
 .store-first-party-cart__body {
   flex: 1 1 auto;
   min-height: 0;

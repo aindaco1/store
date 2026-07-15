@@ -44,7 +44,12 @@ describe('i18n completeness', () => {
       'admin.store_coupons_intro',
       'admin.store_downloads_intro',
       'admin.store_marketing_intro',
+      'admin.login_local_ready',
+      'admin.sessions_summary',
+      'admin.audit_summary',
       'runtime.cart.checkout_title',
+      'runtime.cart.final_sale_notice',
+      'runtime.cart.return_policy',
       'runtime.cart.shipping_address',
       'runtime.cart.coupon_invalid',
       'runtime.cart.hosted_checkout_note',
@@ -73,6 +78,36 @@ describe('i18n completeness', () => {
       expect(spanishValue.trim(), `${keyPath} Spanish value is empty`).not.toBe('');
       expect(placeholders(spanishValue), `${keyPath} placeholder drift`).toEqual(placeholders(englishValue));
     }
+  });
+
+  it('routes the lazy admin review module through the shared runtime catalog', () => {
+    const en = loadLocale('en');
+    const es = loadLocale('es');
+    const runtimeInclude = readFileSync('_includes/runtime-messages-json.html', 'utf8');
+    const reviewModule = readFileSync('assets/js/admin-settings-review.js', 'utf8');
+    const keys = [
+      'value_unavailable',
+      'sessions_refresh',
+      'sessions_summary',
+      'sessions_revoke',
+      'sessions_loading',
+      'audit_apply',
+      'audit_export',
+      'audit_summary',
+      'audit_loading'
+    ];
+
+    for (const key of keys) {
+      const englishValue = valueAt(en, `admin.${key}`);
+      const spanishValue = valueAt(es, `admin.${key}`);
+      expect(englishValue, `admin.${key} missing from English catalog`).toEqual(expect.any(String));
+      expect(spanishValue, `admin.${key} missing from Spanish catalog`).toEqual(expect.any(String));
+      expect(placeholders(spanishValue), `admin.${key} placeholder drift`).toEqual(placeholders(englishValue));
+      expect(runtimeInclude).toContain(`admin.${key}`);
+    }
+
+    expect(reviewModule).toContain("'adminSessionsSummary'");
+    expect(reviewModule).toContain("'adminAuditSummary'");
   });
 
   it('routes v1.0.8 media-admin copy through the shared runtime catalog', () => {

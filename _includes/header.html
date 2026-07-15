@@ -13,6 +13,7 @@
       <nav class="site-header__nav" id="mobile-nav" role="navigation" aria-label="{% include t.html key='nav.main_navigation' lang=current_lang %}">
         <a href="{% include localized-url.html lang=current_lang translation_key='orders' %}">{% include t.html key="nav.orders" lang=current_lang %}</a>
         <a href="{% include localized-url.html lang=current_lang translation_key='terms' %}">{% include t.html key="nav.terms" lang=current_lang %}</a>
+        {% include policy-links.html lang=current_lang link_class="site-header__mobile-policy-link" %}
       </nav>
       {% unless include.hide_cart %}
         {% include cart-icon.html %}

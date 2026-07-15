@@ -1,23 +1,11 @@
 {%- assign products = site.products | sort: "order" -%}
 {%- assign lcp_product = nil -%}
-{%- assign show_all_products_locally = false -%}
-{%- if jekyll.environment != "production" -%}
-  {%- assign show_all_products_locally = true -%}
-{%- endif -%}
 {%- for product in products -%}
-  {%- assign product_status = product.status | default: "active" -%}
-  {%- assign product_public = true -%}
-  {%- if product.public == false -%}
-    {%- assign product_public = false -%}
+  {%- capture product_visible -%}{% include storefront-product-visible.html product=product %}{%- endcapture -%}
+  {%- if product_visible == "true" -%}
+    {%- assign lcp_product = product -%}
+    {%- break -%}
   {%- endif -%}
-  {%- unless product.type == "archive" -%}
-    {%- if show_all_products_locally or product_public -%}
-      {%- if show_all_products_locally or product_status == "active" or product_status == "sold_out" -%}
-        {%- assign lcp_product = product -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endif -%}
-  {%- endunless -%}
 {%- endfor -%}
 {%- if lcp_product and lcp_product.image -%}
   {%- assign lcp_sizes = "(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" -%}

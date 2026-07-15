@@ -159,3 +159,6 @@ jobs:
         run: npm run cloudflare:admin-response-rule -- --verify-public --require-current
         env:
           SITE_BASE: https://shop.dustwave.xyz
+
+      - name: Verify public crawl endpoints
+        run: npm run test:crawl-endpoints -- --base=https://shop.dustwave.xyz --attempts=6 --retry-delay-ms=5000

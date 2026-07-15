@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import {
+  validateSitemapResponse,
+  validateTextSitemapResponse
+} from './audit-crawl-endpoints.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..');
@@ -122,9 +126,11 @@ if (!fs.existsSync(siteDir)) {
 
 const htmlFiles = walkFiles(siteDir, '.html');
 const sitemapPath = path.join(siteDir, 'sitemap.xml');
+const textSitemapPath = path.join(siteDir, 'sitemap.txt');
 const robotsPath = path.join(siteDir, 'robots.txt');
 const errors = [];
 const sitemapLocs = new Set();
+const sitemapUrls = [];
 const seenCanonicals = new Map();
 
 let siteBase = process.env.SEO_SITE_BASE || siteBaseFromConfig();
@@ -138,25 +144,41 @@ if (!process.env.SEO_SITE_BASE && fs.existsSync(sitemapPath)) {
 }
 
 if (!fs.existsSync(sitemapPath)) errors.push('missing /sitemap.xml');
+if (!fs.existsSync(textSitemapPath)) errors.push('missing /sitemap.txt');
 if (!fs.existsSync(robotsPath)) errors.push('missing /robots.txt');
 
-let sitemapText = '';
 if (fs.existsSync(sitemapPath)) {
-  sitemapText = readFile(sitemapPath);
+  const sitemapText = readFile(sitemapPath);
+  const validation = validateSitemapResponse({
+    response: new Response(sitemapText, { status: 200, headers: { 'content-type': 'application/xml' } }),
+    body: sitemapText,
+    baseUrl: siteBase
+  });
+  errors.push(...validation.errors.map((error) => `sitemap.xml: ${error}`));
+  for (const loc of validation.urls) {
+    sitemapLocs.add(loc);
+    sitemapUrls.push(loc);
+  }
   if (!sitemapText.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"')) {
     errors.push('sitemap.xml: missing xhtml namespace for hreflang alternates');
   }
   const sitemapDocument = new JSDOM(sitemapText, { contentType: 'text/xml' }).window.document;
-  for (const loc of Array.from(sitemapDocument.querySelectorAll('loc')).map((node) => node.textContent.trim())) {
-    sitemapLocs.add(loc);
-    assertAbsoluteSiteUrl(loc, siteBase, 'sitemap loc', '/sitemap.xml', errors);
-    const url = new URL(loc);
-    if (/^\/(?:admin|es\/admin|api|orders|es\/orders|order-success|es\/order-success)(?:\/|$)/.test(url.pathname)) {
-      errors.push(`sitemap.xml: private route included (${url.pathname})`);
-    }
-  }
+  if (sitemapDocument.querySelector('parsererror')) errors.push('sitemap.xml: malformed XML');
   if (!sitemapText.includes('xhtml:link rel="alternate"')) {
     errors.push('sitemap.xml: missing hreflang alternate links');
+  }
+}
+
+if (fs.existsSync(textSitemapPath)) {
+  const textSitemap = readFile(textSitemapPath);
+  const validation = validateTextSitemapResponse({
+    response: new Response(textSitemap, { status: 200, headers: { 'content-type': 'text/plain; charset=utf-8' } }),
+    body: textSitemap,
+    baseUrl: siteBase
+  });
+  errors.push(...validation.errors.map((error) => `sitemap.txt: ${error}`));
+  if (JSON.stringify(validation.urls) !== JSON.stringify(sitemapUrls)) {
+    errors.push('sitemap.txt: URL list must exactly match sitemap.xml');
   }
 }
 
@@ -251,6 +273,9 @@ for (const filePath of htmlFiles) {
       }
       if (returnPolicy.returnPolicyCategory === 'https://schema.org/MerchantReturnFiniteReturnWindow' && !returnPolicy.merchantReturnDays) {
         errors.push(`${route}: finite MerchantReturnPolicy missing merchantReturnDays`);
+      }
+      if (returnPolicy.returnPolicyCategory === 'https://schema.org/MerchantReturnNotPermitted' && returnPolicy.merchantReturnDays) {
+        errors.push(`${route}: no-returns MerchantReturnPolicy must not publish merchantReturnDays`);
       }
     }
   }

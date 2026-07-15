@@ -1,8 +1,9 @@
 ---
 layout: default
 title: Terms
-description: Dust Wave Shop terms, refund policy, shipping policy, ticket policy, download policy, and privacy policy.
+description: Dust Wave Shop terms, no-returns and fulfillment policy, shipping policy, ticket policy, download policy, and privacy policy.
 translation_key: terms
+last_modified_at: 2026-07-14
 ---
 
 {%- capture platform_title -%}{% include platform-display-title.html %}{%- endcapture -%}
@@ -10,11 +11,14 @@ translation_key: terms
 {%- assign platform_name = site.platform.name | default: site.title | default: "Store" | strip -%}
 {%- assign platform_company = site.platform.company_name | default: site.author | default: "Dust Wave" | strip -%}
 {%- assign support_email = site.platform.support_email | default: "info@dustwave.xyz" | strip -%}
+{%- assign merchant_return_policy = site.seo.merchant_return_policy | default: empty -%}
+{%- assign return_policy_category = merchant_return_policy.return_policy_category | default: "https://schema.org/MerchantReturnNotPermitted" -%}
+{%- assign return_policy_days = merchant_return_policy.merchant_return_days | default: 14 | plus: 0 -%}
 
 <section class="storefront">
   <div class="storefront__header">
     <h1>Terms & Privacy</h1>
-    <p>Effective July 1, 2026.</p>
+    <p>Effective July 14, 2026.</p>
   </div>
 
   <div class="storefront__product-copy">
@@ -32,11 +36,24 @@ translation_key: terms
     <p>Physical orders ship from New Mexico. Shipping options and estimated charges are shown at checkout. Delivery dates are estimates, not guarantees, because carrier delays, weather, address issues, and event schedules can affect timing.</p>
     <p>If an order cannot ship within the expected timeframe, we will contact you with an updated estimate or a refund option. Please contact us promptly if your shipping address is wrong; we cannot guarantee changes after fulfillment begins.</p>
 
-    <h2 id="returns-refunds">Returns and Refunds</h2>
-    <p>For physical merchandise, contact us within 14 days of delivery if you want to request a return or exchange. Returned items must be unused, unworn, unwashed, and in reasonably resaleable condition unless the issue is damage, defect, or our fulfillment error.</p>
-    <p>Shipping charges are not refundable unless the return is caused by our mistake or a damaged/defective item. Return shipping is usually the buyer's responsibility unless we approve otherwise.</p>
-    <p>Damaged, defective, or incorrect items should be reported within 7 days of delivery with the order number and photos. We may offer a replacement, repair, store credit, or refund depending on availability.</p>
-    <p>Final-sale items include digital downloads after access is delivered, event tickets after the event starts, free RSVPs, worn apparel, opened intimate goods, and items marked final sale. This does not limit rights you may have under applicable law.</p>
+    <h2 id="returns-refunds">Returns, Fulfillment Problems, and Refunds</h2>
+    {%- if return_policy_category == "https://schema.org/MerchantReturnNotPermitted" %}
+    <p><strong>Default policy: no returns or exchanges.</strong> Once a successful order is charged, physical merchandise, event tickets, digital products, and add-ons are final sale. We do not accept returns or exchanges for change of mind, preference, fit, or sizing.</p>
+    <p>This final-sale policy does not remove remedies for a damaged, defective, incorrect, or missing physical item:</p>
+    <ol>
+      <li>Email <a href="mailto:{{ support_email }}">{{ support_email }}</a> as soon as reasonably possible and ordinarily within <strong>seven calendar days after the carrier marks the shipment delivered</strong>.</li>
+      <li>Include the order reference, a description of the problem, and clear photos of the item, packaging, and shipping label when reasonably available.</li>
+      <li>We verify the report against available carrier tracking and fulfillment records. If a shipment has no tracking or no reliable delivered timestamp, we review timing and evidence in good faith.</li>
+      <li>When the problem is verified, the available remedy may be repair, replacement, completion of missing items, or a refund for the affected item, depending on the problem and available inventory.</li>
+    </ol>
+    <p>The seven-day period is a <strong>problem-reporting guideline, not a return window</strong>. Reporting later does not waive rights that cannot legally be waived, although delay may make carrier claims or factual verification harder.</p>
+    <p>If a charged item cannot be fulfilled, {{ platform_company }} will provide an updated plan and may offer a later shipment, a reasonable substitute with your agreement, or a refund for the unfulfilled item. Duplicate charges, processor errors, suspected fraud, canceled events, and legally required refunds are reviewed separately from ordinary returns.</p>
+    {%- else %}
+    <p>For physical merchandise, contact us within {{ return_policy_days }} days of delivery if you want to request a return or exchange. Returned items must be unused, unworn, unwashed, and in reasonably resaleable condition unless the issue is damage, defect, or our fulfillment error.</p>
+    <p>Shipping charges are not refundable unless the return is caused by our mistake or a damaged or defective item. Return shipping is usually the buyer's responsibility unless we approve otherwise.</p>
+    <p>Damaged, defective, incorrect, or missing items should ordinarily be reported within seven calendar days of delivery with the order number and photos. We may offer a replacement, repair, completion of missing items, store credit, or refund depending on the problem and availability.</p>
+    <p>Digital downloads after access is delivered, event tickets after the event starts, free RSVPs, worn apparel, opened intimate goods, and items marked final sale remain ineligible for ordinary returns. This does not limit rights that cannot legally be waived.</p>
+    {%- endif %}
 
     <h2>Tickets and RSVPs</h2>
     <p>Tickets and RSVPs are valid only for the event listed at purchase. They may include QR or check-in credentials tied to the order. Do not post ticket links, QR codes, or order links publicly.</p>
