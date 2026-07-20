@@ -11,7 +11,7 @@
     "tail": "wrangler tail"
   },
   "devDependencies": {
-    "wrangler": "^4.107.1"
+    "wrangler": "^4.110.0"
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
