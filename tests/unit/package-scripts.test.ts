@@ -87,6 +87,18 @@ describe('package test scripts', () => {
     expect(playwrightEntrypoint).not.toContain('npm install');
   });
 
+  it('keeps the Podman browser image aligned with the locked Playwright version', () => {
+    const playwrightContainer = readFileSync(join(repoRoot, 'Containerfile.playwright.dev'), 'utf8');
+    const playwrightRun = readFileSync(join(repoRoot, 'scripts/podman-playwright-run.sh'), 'utf8');
+
+    expect(playwrightContainer).toContain('ARG PLAYWRIGHT_VERSION');
+    expect(playwrightContainer).toContain('FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble');
+    expect(playwrightContainer).not.toMatch(/playwright:v\d/);
+    expect(playwrightRun).toContain('lock.packages?.["node_modules/@playwright/test"]?.version');
+    expect(playwrightRun).toContain('PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:${PLAYWRIGHT_VERSION}"');
+    expect(playwrightRun).toContain('--build-arg "PLAYWRIGHT_VERSION=$PLAYWRIGHT_VERSION"');
+  });
+
   it('does not terminate the Podman wrapper process group when Stripe forwarding is skipped', () => {
     const podmanDev = readFileSync(join(repoRoot, 'scripts/dev-podman.sh'), 'utf8');
 

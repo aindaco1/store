@@ -78,11 +78,11 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
+    "@playwright/test": "^1.61.1",
     "@vitest/coverage-v8": "^4.1.10",
     "axe-core": "^4.11.2",
     "esbuild": "^0.28.1",
-    "jsdom": "^24.0.0",
+    "jsdom": "^29.1.1",
     "lighthouse": "^12.6.1",
     "smol-toml": "^1.7.0",
     "vitest": "^4.1.10"
