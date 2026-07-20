@@ -207,14 +207,41 @@ describe('Store SEO templates', () => {
   });
 
   it('keeps locale and navigation plumbing on canonical Store pages', () => {
+    const header = readRepoFile('_includes', 'header.html');
     const footer = readRepoFile('_includes', 'site-footer.html');
+    const policyLinks = readRepoFile('_includes', 'policy-links.html');
     const switcher = readRepoFile('_includes', 'language-switcher.html');
     const localizedUrl = readRepoFile('_includes', 'localized-url.html');
     const seoJsonLd = readRepoFile('_includes', 'seo-json-ld.html');
     const config = readRepoFile('_config.yml');
+    const englishTerms = readRepoFile('terms.md');
+    const spanishTerms = readRepoFile('es', 'terms.md');
 
     expect(footer).toContain('translation_key=current_translation_key');
     expect(footer).toContain('localized_paths=current_localized_paths');
+    expect(footer.indexOf('site-footer__policies')).toBeGreaterThan(footer.indexOf('site-footer__copyright'));
+    expect(footer.indexOf('site-footer__policies')).toBeLessThan(footer.indexOf('site-footer__meta'));
+    expect(footer).toContain('{% include policy-links.html lang=current_lang %}');
+    expect(header).toContain('{% include policy-links.html lang=current_lang link_class="site-header__mobile-policy-link" %}');
+    expect(header.indexOf('policy-links.html')).toBeGreaterThan(header.indexOf('key="nav.terms"'));
+    expect(policyLinks).toContain('#shipping-policy');
+    expect(policyLinks).toContain('#returns-refunds');
+    expect(policyLinks).toContain('key="nav.shipping_policy"');
+    expect(policyLinks).toContain('key="nav.return_policy"');
+    expect(readRepoFile('_data', 'i18n', 'en.yml')).toContain('shipping_policy: Shipping');
+    expect(readRepoFile('_data', 'i18n', 'es.yml')).toContain('return_policy: Política de devoluciones');
+    expect(englishTerms).toContain('# Terms & Store Policies');
+    expect(englishTerms).toContain('{: #shipping-policy}');
+    expect(englishTerms).toContain('{: #returns-refunds}');
+    expect(englishTerms).toContain('https://schema.org/MerchantReturnNotPermitted');
+    expect(englishTerms).toContain('https://schema.org/MerchantReturnFiniteReturnWindow');
+    expect(englishTerms).toContain('https://schema.org/MerchantReturnUnlimitedWindow');
+    expect(englishTerms).toContain('ask whether you agree to the delay or cancel the unshipped merchandise');
+    expect(englishTerms).toContain('We do not sell customer personal information.');
+    expect(spanishTerms).toContain('# Términos y políticas de la tienda');
+    expect(spanishTerms).toContain('{: #shipping-policy}');
+    expect(spanishTerms).toContain('{: #returns-refunds}');
+    expect(spanishTerms).toContain('te pediremos que aceptes el retraso o cancelaremos la mercancía no enviada');
     expect(switcher).toContain('switcher_target_count');
     expect(switcher).toContain('include.lang | default: page.lang');
     expect(switcher).toContain('include.localized_paths | default: page.localized_paths');

@@ -300,6 +300,7 @@ main {
     
     @include xsm {
       align-items: center;
+      gap: $space-sm;
       padding-top: $space-md;
       padding-bottom: $space-md;
     }
