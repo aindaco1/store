@@ -83,7 +83,7 @@
     "axe-core": "^4.11.2",
     "esbuild": "^0.28.1",
     "jsdom": "^29.1.1",
-    "lighthouse": "^13.4.0",
+    "lighthouse": "^12.6.1",
     "smol-toml": "^1.7.0",
     "vitest": "^4.1.10"
   }
