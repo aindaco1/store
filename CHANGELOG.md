@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.1.0 - Unreleased
+
+### Shared platform foundation
+
+- Added the pinned `aindaco1/dust-wave-platform` submodule as the versioned boundary for primitives shared with Pool, Dust Wave, and Podcast.
+- Moved the byte-identical Turnstile implementation into `@dustwave/worker-core` while retaining Store's local import seam and adding a consumer contract test.
+- Kept Store's catalog, order, inventory, fulfillment, configuration, session, storage, and deployment authority independent; the submodule contains no Store data or secrets and can be rolled back by pointer.
+
 ## v1.0.9 - 2026-07-15
 
 ### Crawl integrity, policy clarity, and release hardening

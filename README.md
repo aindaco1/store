@@ -4,8 +4,8 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Current release candidate: `v1.0.9`. The published `v1.0.8` tag remains immutable; `v1.0.9` is not complete until the release evidence records the reviewed deployment and applicable production operations gates.
-- `v1.0.9` adapts applicable Pool `v1.1.2` primitives to Store: a DRY XML/text sitemap source plus deployed crawl audit, crawl-stable modification dates, a Store-specific English/Spanish Terms rewrite, explicit responsive policy navigation and final-sale checkout disclosure, a localized lazy admin review bundle, and a regression guard for the protected recovery dependency path.
+- Current release branch candidate: `v1.1.0`. It begins the independently reversible migration to the versioned `dust-wave-platform` shared primitives while preserving Store's deployment, data, and business-rule boundaries.
+- The published `v1.0.9` tag remains immutable and is the prior production baseline.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -27,10 +27,13 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 Host flow:
 
 ```bash
+git submodule update --init --recursive
 npm install
 bundle install
 ./scripts/dev.sh
 ```
+
+Clone with `--recurse-submodules` when possible. Existing checkouts must initialize the recorded shared-platform commit before installing or testing; CI never follows the submodule's moving branch.
 
 Podman flow:
 

@@ -1,6 +1,6 @@
 {
   "name": "store",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
   "main": "index.js",
   "directories": {
