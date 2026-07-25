@@ -10,6 +10,11 @@
   typed product-neutral crypto and Stripe mechanics for Podcast without moving
   Store business rules or changing Store's existing Turnstile adapter.
 - Kept Store's catalog, order, inventory, fulfillment, configuration, session, storage, and deployment authority independent; the submodule contains no Store data or secrets and can be rolled back by pointer.
+- Advanced the shared workspace to 0.6.0 and
+  `@dustwave/admin-shell` 0.2.0, moving Store and Pool's byte-identical QR
+  generator into the pinned shared boundary. Store still loads the same
+  characterized implementation through its static admin shell; only the
+  source authority and generated path changed.
 
 ## v1.0.9 - 2026-07-15
 

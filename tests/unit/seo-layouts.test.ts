@@ -143,13 +143,21 @@ describe('Store SEO templates', () => {
     expect(adminLayout).toContain('indexable=false');
     expect(adminLayout).toContain('social=false');
     expect(adminLayout).toContain('data-cfasync="false"');
-    expect(adminLayout).toContain('/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}');
+    expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}');
     expect(adminCsp).toContain('https://challenges.cloudflare.com');
     expect(adminCsp).not.toContain('cloudflareinsights.com');
     expect(adminCsp).not.toContain("'sha256-");
     expect(adminCsp).not.toContain("'unsafe-inline'");
     expect(adminCsp).not.toContain("'unsafe-eval'");
-    const qrVendor = readRepoFile('assets', 'js', 'vendor', 'qrcode-generator.js');
+    const qrVendor = readRepoFile(
+      'shared',
+      'dust-wave-platform',
+      'packages',
+      'admin-shell',
+      'src',
+      'vendor',
+      'qrcode-generator.js'
+    );
     expect(qrVendor).toContain('QR Code Generator for JavaScript');
     expect(qrVendor).toContain('window.qrcode = qrcode');
     expect(adminPage).toContain('indexable: false');
@@ -195,7 +203,15 @@ describe('Store SEO templates', () => {
       ['assets', 'js', 'logger.js'],
       ['assets', 'js', 'video-first-frame-poster.js'],
       ['assets', 'js', 'form-control-identity.js'],
-      ['assets', 'js', 'vendor', 'qrcode-generator.js'],
+      [
+        'shared',
+        'dust-wave-platform',
+        'packages',
+        'admin-shell',
+        'src',
+        'vendor',
+        'qrcode-generator.js'
+      ],
       ['assets', 'js', 'admin-dashboard.js'],
       ['assets', 'js', 'admin-settings-review.js']
     ].map((segments) => readRepoFile(...segments)).join('\n');
