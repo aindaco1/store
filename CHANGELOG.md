@@ -15,6 +15,9 @@
   generator into the pinned shared boundary. Store still loads the same
   characterized implementation through its static admin shell; only the
   source authority and generated path changed.
+- Finished the v1.1.0 release identity across canonical site config and the
+  Worker provider User-Agent, with an executable contract that keeps both
+  package locks, both packages, config, Stripe, and Resend aligned.
 
 ## v1.0.9 - 2026-07-15
 
