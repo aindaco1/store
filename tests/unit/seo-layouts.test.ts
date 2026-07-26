@@ -144,6 +144,7 @@ describe('Store SEO templates', () => {
     expect(adminLayout).toContain('social=false');
     expect(adminLayout).toContain('data-cfasync="false"');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}');
+    expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}');
     expect(adminCsp).toContain('https://challenges.cloudflare.com');
     expect(adminCsp).not.toContain('cloudflareinsights.com');
     expect(adminCsp).not.toContain("'sha256-");
@@ -315,6 +316,10 @@ describe('Store SEO templates', () => {
     const adminDashboardRuntime = readRepoFile('assets', 'js', 'admin-dashboard.js');
     expect(adminDashboardRuntime).toContain("params: { preferredLang: preferredLang() }");
     expect(adminDashboardRuntime).toContain("about: 'Acerca de'");
+    expect(adminDashboardRuntime).toContain('requestCredentialedBlob');
+    expect(adminDashboardRuntime).toContain('triggerBlobDownload');
+    expect(adminDashboardRuntime).toContain('maximumBytes: 16 * 1024 * 1024');
+    expect(adminDashboardRuntime).not.toContain('response.blob()');
     expect(dashboardSpec).toContain('seo.merchant_return_policy.return_fees');
     expect(dashboardDocs).toContain('merchant return policy controls');
   });

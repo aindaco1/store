@@ -2,6 +2,7 @@
   'use strict';
 
   var script = document.currentScript || document.querySelector('script[data-admin-dashboard-script]');
+  var credentialedDownloadModulePromise = null;
   var config = window.STORE_CONFIG || window.StoreConfig || {};
   var logger = window.StoreLogger && window.StoreLogger.createLogger
     ? window.StoreLogger.createLogger('admin')
@@ -405,19 +406,40 @@
     });
   }
 
+  function credentialedDownloads() {
+    var moduleUrl = String(
+      script && script.dataset
+        ? script.dataset.adminDownloadModule || ''
+        : ''
+    ).trim();
+    if (!moduleUrl) {
+      return Promise.reject(new Error('Shared download module is not configured.'));
+    }
+    if (!credentialedDownloadModulePromise) {
+      credentialedDownloadModulePromise = import(moduleUrl);
+    }
+    return credentialedDownloadModulePromise;
+  }
+
   function requestBlob(path, options) {
     var opts = options || {};
     var headers = new Headers(opts.headers || {});
     headers.set('Accept', opts.accept || 'text/csv');
-    return fetch(apiUrl(path, opts.params), {
-      method: opts.method || 'GET',
-      headers: headers,
-      credentials: 'include'
-    }).then(function(response) {
-      if (!response.ok) throw new Error('Download failed.');
-      return response.blob().then(function(blob) {
-        return { blob: blob, response: response };
+    return credentialedDownloads().then(function(tools) {
+      return tools.requestCredentialedBlob(apiUrl(path, opts.params), {
+        fetchImpl: fetch,
+        method: opts.method || 'GET',
+        headers: headers,
+        signal: opts.signal,
+        maximumBytes: 16 * 1024 * 1024,
+        allowedContentTypes: ['text/csv']
       });
+    });
+  }
+
+  function downloadBlobResult(result, fallbackFilename) {
+    return credentialedDownloads().then(function(tools) {
+      return tools.triggerBlobDownload(result, fallbackFilename);
     });
   }
 
@@ -426,16 +448,11 @@
     var status = opts.status || null;
     setStatus(status, opts.loadingMessage || 'Preparing CSV...');
     requestBlob(opts.path, { params: opts.params || {}, accept: opts.accept || 'text/csv' }).then(function(result) {
-      var disposition = result.response.headers.get('content-disposition') || '';
-      var filename = (disposition.match(/filename="?([^";]+)"?/i) || [])[1] || opts.fallbackFilename || 'store-export.csv';
-      var url = URL.createObjectURL(result.blob);
-      var link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+      return downloadBlobResult(
+        result,
+        opts.fallbackFilename || 'store-export.csv'
+      );
+    }).then(function() {
       setStatus(status, opts.completeMessage || 'CSV download started.');
     }).catch(function(error) {
       setStatus(status, formatError(error), true);
