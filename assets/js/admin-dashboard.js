@@ -813,36 +813,40 @@
     button.dataset.adminPrepared = 'true';
   }
 
-  function ensureMobileSelect(tabList, labelText, onChange) {
-    if (!tabList) return null;
-    var sibling = tabList.nextElementSibling;
-    var wrapper = sibling && sibling.classList.contains('admin-mobile-tab-select') ? sibling : null;
-    if (!wrapper) {
-      wrapper = createElement('label', 'admin-mobile-tab-select');
-      var label = createElement('span', 'admin-mobile-tab-select__label', labelText || 'Section');
-      var select = document.createElement('select');
-      wrapper.appendChild(label);
-      wrapper.appendChild(select);
-      tabList.insertAdjacentElement('afterend', wrapper);
-      select.addEventListener('change', function() {
-        if (onChange) onChange(select.value);
-      });
-    }
-    return wrapper.querySelector('select');
-  }
-
   function syncMobileSelect(tabList, selector, activeValue, labelText, onChange) {
-    var select = ensureMobileSelect(tabList, labelText, onChange);
-    if (!select) return;
-    clear(select);
-    $all(selector, tabList).forEach(function(button) {
-      if (button.hidden) return;
-      var option = document.createElement('option');
-      option.value = button.dataset.adminTab || button.dataset.settingsSectionIndex || '';
-      option.textContent = button.getAttribute('aria-label') || button.textContent.trim();
-      select.appendChild(option);
+    if (!tabList) return;
+    var tabsApi = window.DustWaveAdminShellTabs;
+    if (!tabsApi?.mountResponsiveTabSelect) {
+      logger.error('Shared responsive admin tabs did not initialize.');
+      return;
+    }
+    tabsApi.mountResponsiveTabSelect(tabList, {
+      activeValue: activeValue || '',
+      activate: function(value, button) {
+        if (onChange) onChange(value);
+        else button.click();
+      },
+      buttonSelector: selector,
+      label: labelText || 'Section',
+      labelClass: 'admin-mobile-tab-select__label',
+      labelTag: 'span',
+      minimumTabs: 0,
+      optionLabel: function(button) {
+        return button.getAttribute('aria-label') || button.textContent.trim();
+      },
+      selectClass: '',
+      tabList: tabList,
+      tabs: function() {
+        return $all(selector, tabList).filter(function(button) {
+          return !button.hidden;
+        });
+      },
+      value: function(button) {
+        return button.dataset.adminTab || button.dataset.settingsSectionIndex || '';
+      },
+      wrapperClass: 'admin-mobile-tab-select',
+      wrapperTag: 'label'
     });
-    select.value = activeValue || '';
   }
 
   function setupAdminTabs() {

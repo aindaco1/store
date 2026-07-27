@@ -143,6 +143,7 @@ describe('Store SEO templates', () => {
     expect(adminLayout).toContain('indexable=false');
     expect(adminLayout).toContain('social=false');
     expect(adminLayout).toContain('data-cfasync="false"');
+    expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}');
     expect(adminCsp).toContain('https://challenges.cloudflare.com');
@@ -204,6 +205,14 @@ describe('Store SEO templates', () => {
       ['assets', 'js', 'logger.js'],
       ['assets', 'js', 'video-first-frame-poster.js'],
       ['assets', 'js', 'form-control-identity.js'],
+      [
+        'shared',
+        'dust-wave-platform',
+        'packages',
+        'admin-shell',
+        'src',
+        'tabs-browser.js'
+      ],
       [
         'shared',
         'dust-wave-platform',
@@ -314,6 +323,7 @@ describe('Store SEO templates', () => {
     expect(dashboardSpec).toContain('Return policy country');
     expect(dashboardSpec).toContain('Pais de politica de devoluciones');
     const adminDashboardRuntime = readRepoFile('assets', 'js', 'admin-dashboard.js');
+    expect(adminDashboardRuntime).toContain('window.DustWaveAdminShellTabs');
     expect(adminDashboardRuntime).toContain("params: { preferredLang: preferredLang() }");
     expect(adminDashboardRuntime).toContain("about: 'Acerca de'");
     expect(adminDashboardRuntime).toContain('requestCredentialedBlob');
