@@ -245,6 +245,11 @@ SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-w
 PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
 ```
 
+`npm run test:secrets` is a thin Store policy adapter over the shared Dust
+Wave scanner. It preserves the ignored `worker/.dev.vars` and test-fixture
+rules, scans tracked credential forms plus exact local values in the
+worktree/history, and never prints or partially masks a matched value.
+
 For production smoke, also complete a real Stripe test checkout for each fulfillment class:
 
 - physical paid product with tax and shipping
