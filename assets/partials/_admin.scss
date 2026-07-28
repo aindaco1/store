@@ -115,6 +115,14 @@ $admin-section-gap: clamp(16px, 2vw, 24px);
   min-height: 65px;
 }
 
+// The shared helper switches below its 300px flexible-widget minimum.
+// The Admin container contributes 40px of horizontal padding at this width.
+@media (max-width: 339px) {
+  .admin-auth__turnstile {
+    min-height: 140px;
+  }
+}
+
 .admin-dashboard__status {
   min-height: 1.5em;
 }
