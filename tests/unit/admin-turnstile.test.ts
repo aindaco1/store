@@ -39,6 +39,9 @@ describe('admin Turnstile sign-in', () => {
       i18n: { currentLang: 'en' },
       platform: { workerUrl: 'https://checkout.dustwave.xyz' }
     };
+    (window as any).DustWaveAdminShellTurnstile = {
+      responsiveSize: vi.fn(() => 'compact')
+    };
   });
 
   afterEach(() => {
@@ -46,6 +49,7 @@ describe('admin Turnstile sign-in', () => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
     delete (window as any).STORE_CONFIG;
+    delete (window as any).DustWaveAdminShellTurnstile;
     delete (window as any).turnstile;
   });
 
@@ -77,8 +81,14 @@ describe('admin Turnstile sign-in', () => {
       document.querySelector('[data-admin-turnstile-widget]'),
       expect.objectContaining({
         sitekey: 'site-key',
-        action: 'admin_login'
+        action: 'admin_login',
+        size: 'compact'
       })
+    );
+    expect(
+      (window as any).DustWaveAdminShellTurnstile.responsiveSize
+    ).toHaveBeenCalledWith(
+      document.querySelector('[data-admin-turnstile-widget]')
     );
 
     const email = document.getElementById('admin-email') as HTMLInputElement;

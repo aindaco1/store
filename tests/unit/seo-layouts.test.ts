@@ -144,6 +144,7 @@ describe('Store SEO templates', () => {
     expect(adminLayout).toContain('social=false');
     expect(adminLayout).toContain('data-cfasync="false"');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}');
+    expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}');
     expect(adminCsp).toContain('https://challenges.cloudflare.com');
@@ -212,6 +213,14 @@ describe('Store SEO templates', () => {
         'admin-shell',
         'src',
         'tabs-browser.js'
+      ],
+      [
+        'shared',
+        'dust-wave-platform',
+        'packages',
+        'admin-shell',
+        'src',
+        'turnstile-browser.js'
       ],
       [
         'shared',

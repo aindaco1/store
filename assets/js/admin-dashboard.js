@@ -301,7 +301,9 @@
       action: 'admin_login',
       appearance: 'always',
       execution: 'render',
-      size: 'flexible',
+      size: window.DustWaveAdminShellTurnstile?.responsiveSize?.(
+        adminTurnstileWidgetRoot
+      ) || 'compact',
       theme: 'light',
       callback: function(token) {
         adminTurnstileToken = String(token || '');
