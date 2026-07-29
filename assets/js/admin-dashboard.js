@@ -260,14 +260,13 @@
   }
 
   function setDirtyButtonState(button, dirty, cleanText, dirtyText, options) {
-    if (!(button instanceof HTMLButtonElement)) return;
-    var opts = options || {};
-    button.classList.toggle('is-dirty', Boolean(dirty));
-    button.dataset.dirtyState = dirty ? 'dirty' : 'clean';
-    button.textContent = dirty ? dirtyText : cleanText;
-    if (opts.disableWhenClean !== false) {
-      button.disabled = !dirty || Boolean(opts.forceDisabled);
+    var sharedSetter = window.DustWaveAdminShellDirtyControls &&
+      window.DustWaveAdminShellDirtyControls.setDirtyButtonState;
+    if (typeof sharedSetter === 'function') {
+      return sharedSetter(button, dirty, cleanText, dirtyText, options);
     }
+    if (button instanceof HTMLButtonElement) button.disabled = true;
+    return false;
   }
 
   function setAdminLoginStartStatus(data) {
@@ -4256,9 +4255,7 @@
     var save = scope ? $('[data-store-products-order-save]', scope) : null;
     if (!save) return;
     var dirty = storeProductsOrderIsDirty();
-    save.disabled = !dirty;
-    save.classList.toggle('is-dirty', dirty);
-    save.dataset.dirtyState = dirty ? 'dirty' : 'clean';
+    setDirtyButtonState(save, dirty, save.textContent, save.textContent);
   }
 
   function syncStoreProductsControls(root) {

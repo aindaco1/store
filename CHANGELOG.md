@@ -20,6 +20,10 @@
   restored HTML through the existing allowlist sanitizer; Store behavior is
   unchanged until a form opts into it, and rollback remains a one-commit
   submodule-pointer change.
+- Advanced `@dustwave/admin-shell` to 0.8.1 and replaced Store's duplicated
+  dirty-action state logic, including product-order saving, with the shared
+  class, state-attribute, label, and clean-state disabling primitive. Store
+  retains its editor baselines, force-disabled rules, and focus-ring style.
 - Finished the v1.1.0 release identity across canonical site config and the
   Worker provider User-Agent, with an executable contract that keeps both
   package locks, both packages, config, Stripe, and Resend aligned.

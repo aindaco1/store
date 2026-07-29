@@ -144,6 +144,7 @@ describe('Store SEO templates', () => {
     expect(adminLayout).toContain('social=false');
     expect(adminLayout).toContain('data-cfasync="false"');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}');
+    expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}');
     expect(adminLayout).toContain('/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}');
@@ -333,6 +334,7 @@ describe('Store SEO templates', () => {
     expect(dashboardSpec).toContain('Pais de politica de devoluciones');
     const adminDashboardRuntime = readRepoFile('assets', 'js', 'admin-dashboard.js');
     expect(adminDashboardRuntime).toContain('window.DustWaveAdminShellTabs');
+    expect(adminDashboardRuntime).toContain('window.DustWaveAdminShellDirtyControls');
     expect(adminDashboardRuntime).toContain("params: { preferredLang: preferredLang() }");
     expect(adminDashboardRuntime).toContain("about: 'Acerca de'");
     expect(adminDashboardRuntime).toContain('requestCredentialedBlob');
