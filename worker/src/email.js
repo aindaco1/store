@@ -20,13 +20,16 @@ import {
   getSupportEmail,
   getUpdatesEmailFrom
 } from './provider-config.js';
+import {
+  DEFAULT_STORE_I18N_LANG as DEFAULT_I18N_LANG,
+  getStoreTranslator,
+  normalizeStoreLang
+} from './i18n.js';
 import { getScopedConsole } from './logger.js';
 
-const DEFAULT_I18N_LANG = 'en';
 const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE || 'https://shop.dustwave.xyz';
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 const EMAIL_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
-const EMAIL_I18N_CACHE = new Map();
 let console = globalThis.console;
 
 function configureEmailLogging(env) {
@@ -73,67 +76,11 @@ function buildPlainTextFromHtml(html) {
 }
 
 function normalizeLang(value, fallback = DEFAULT_I18N_LANG) {
-  const normalized = String(value || '').trim().toLowerCase();
-  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(normalized) ? normalized : fallback;
-}
-
-function interpolateTemplate(template, replacements = {}) {
-  let result = String(template || '');
-  for (const [key, value] of Object.entries(replacements)) {
-    result = result.replaceAll(`%{${key}}`, String(value ?? ''));
-  }
-  return result;
-}
-
-function getNestedValue(source, key) {
-  return String(key || '')
-    .split('.')
-    .reduce((value, segment) => (value && typeof value === 'object' ? value[segment] : undefined), source);
-}
-
-async function loadEmailCatalog(env = {}) {
-  if (env.I18N_CATALOG && typeof env.I18N_CATALOG === 'object') {
-    return env.I18N_CATALOG;
-  }
-
-  if (env.I18N_CATALOG_JSON) {
-    const cacheKey = `json:${env.I18N_CATALOG_JSON}`;
-    if (!EMAIL_I18N_CACHE.has(cacheKey)) {
-      EMAIL_I18N_CACHE.set(cacheKey, Promise.resolve()
-        .then(() => JSON.parse(String(env.I18N_CATALOG_JSON || '{}')))
-        .catch(() => ({})));
-    }
-    return EMAIL_I18N_CACHE.get(cacheKey);
-  }
-
-  const siteBase = getResolvedSiteBase(env);
-  const cacheKey = `site:${siteBase}`;
-  if (!EMAIL_I18N_CACHE.has(cacheKey)) {
-    EMAIL_I18N_CACHE.set(cacheKey, (async () => {
-      try {
-        const response = await fetch(safeSiteUrl('/assets/i18n.json', siteBase));
-        if (!response.ok) return {};
-        return await response.json();
-      } catch (_error) {
-        return {};
-      }
-    })());
-  }
-  return EMAIL_I18N_CACHE.get(cacheKey);
+  return normalizeStoreLang(value, fallback);
 }
 
 async function getEmailTranslator(env, preferredLang) {
-  const lang = normalizeLang(preferredLang);
-  const catalog = await loadEmailCatalog(env);
-
-  return {
-    lang,
-    t(key, fallback, replacements = {}) {
-      const localized = getNestedValue(catalog?.[lang]?.email, key);
-      const defaultValue = getNestedValue(catalog?.[DEFAULT_I18N_LANG]?.email, key);
-      return interpolateTemplate(localized ?? defaultValue ?? fallback ?? key, replacements);
-    }
-  };
+  return getStoreTranslator(env, preferredLang, 'email');
 }
 
 function getLocalizedPath(path, preferredLang = DEFAULT_I18N_LANG) {

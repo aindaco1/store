@@ -41,6 +41,7 @@ Default posture:
 | API/admin recovery secrets | Operator routes | Bearer/header secrets stay in Worker secrets or ignored local files. |
 | Cache evidence secret | `POST /admin/workers-cache/evidence` | Dedicated read-only bearer; returns bounded metrics only and cannot purge or expose Store rows. |
 | Download abuse lock | Signed download routes | Ten failures per order plus keyed network fingerprint in 15 minutes cause a 30-minute soft lock. |
+| Ticket check-in capability | Signed ticket/RSVP QR routes | Browser navigation returns localized private/no-store/noindex verification without customer email. New links expire after the event check-in window; legacy HMAC-valid links receive only that same event-bounded grace period. The public route cannot mutate attendance. |
 
 Secret storage rules:
 
