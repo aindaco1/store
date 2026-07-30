@@ -72,6 +72,7 @@ import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STO
 import { getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { MEDIA_MANIFEST_PATH, classifyMediaPath, mediaPathLabel, mediaPlacementBudget, normalizeMediaManifest } from './media-catalog.js';
 import { getScopedConsole } from './logger.js';
+import { getStoreTranslator, normalizeStoreLang } from './i18n.js';
 import { isValidSlug, isValidEmail, isValidAmount, SECURITY_HEADERS, getAllowedOrigin } from './validation.js';
 import { verifyTurnstile } from './turnstile.js';
 import {
@@ -890,10 +891,7 @@ function getSiteOrigin(env) {
 }
 
 function normalizePreferredLang(value, fallback = DEFAULT_I18N_LANG) {
-  const normalized = String(value || '')
-    .trim()
-    .toLowerCase();
-  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/.test(normalized) ? normalized : fallback;
+  return normalizeStoreLang(value, fallback);
 }
 
 function getLocalizedPath(path, preferredLang = DEFAULT_I18N_LANG) {
@@ -5541,7 +5539,7 @@ async function signStoreFulfillmentToken(env, payload = {}, ttlSeconds = STORE_F
   return `${payloadB64}.${base64urlEncodeBytes(signature)}`;
 }
 
-async function verifyStoreFulfillmentToken(env, token, expected = {}) {
+async function verifyStoreFulfillmentToken(env, token, expected = {}, options = {}) {
   const secret = getStoreFulfillmentSecret(env);
   if (!secret) {
     return { ok: false, status: 503, error: 'Store fulfillment signing is not configured' };
@@ -5565,7 +5563,15 @@ async function verifyStoreFulfillmentToken(env, token, expected = {}) {
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
-  if (Number(payload.exp || 0) < nowSeconds) {
+  const signedExpiresAt = Number(payload.exp || 0);
+  if (!Number.isFinite(signedExpiresAt) || signedExpiresAt <= 0) {
+    return { ok: false, status: 403, error: 'Invalid fulfillment link' };
+  }
+  const legacyEventWindowEndsAt = Math.min(
+    Number(options.allowExpiredUntilSeconds || 0) || 0,
+    nowSeconds + STORE_EVENT_REMINDER_TTL_SECONDS
+  );
+  if (signedExpiresAt < nowSeconds && legacyEventWindowEndsAt < nowSeconds) {
     return { ok: false, status: 410, error: 'Fulfillment link expired' };
   }
 
@@ -5735,16 +5741,31 @@ function buildStoreFulfillmentPublicUrl(env, orderToken, section, itemId, suffix
   }
 }
 
-function getStoreEventFulfillmentTokenTtlSeconds(event = null) {
+function getStoreEventFulfillmentExpiresAtSeconds(event = null) {
   const startsAtMs = parseTimestampMs(event?.startsAt);
-  if (!Number.isFinite(startsAtMs)) return STORE_FULFILLMENT_TOKEN_TTL_SECONDS;
+  if (!Number.isFinite(startsAtMs)) return 0;
   const endsAtMs = parseTimestampMs(event?.endsAt);
   const safeEndsAtMs = Number.isFinite(endsAtMs) && endsAtMs > startsAtMs
     ? endsAtMs
     : startsAtMs + (2 * 60 * 60 * 1000);
-  const expiresAtMs = safeEndsAtMs + (24 * 60 * 60 * 1000);
-  const ttlSeconds = Math.ceil((expiresAtMs - Date.now()) / 1000);
+  return Math.floor((safeEndsAtMs + (24 * 60 * 60 * 1000)) / 1000);
+}
+
+function getStoreEventFulfillmentTokenTtlSeconds(event = null) {
+  const expiresAtSeconds = getStoreEventFulfillmentExpiresAtSeconds(event);
+  if (!expiresAtSeconds) return STORE_FULFILLMENT_TOKEN_TTL_SECONDS;
+  const ttlSeconds = expiresAtSeconds - Math.floor(Date.now() / 1000);
   return Math.max(60, Math.min(STORE_EVENT_REMINDER_TTL_SECONDS, ttlSeconds));
+}
+
+function getStoreCheckInHtmlUrl(value = '') {
+  try {
+    const url = new URL(String(value || ''));
+    url.searchParams.set('format', 'html');
+    return url.toString();
+  } catch {
+    return String(value || '');
+  }
 }
 
 async function buildStoreCheckInQrSvg(checkInUrl = '') {
@@ -5763,14 +5784,22 @@ async function buildStoreTicketEmailArtifacts(env, storedOrder = {}, item = {}, 
   if (!isStoreTicketLikeItem(item)) return null;
   const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
   const event = summarizeStoreEventDetails(item.eventDetails);
+  const requestedTokenTtlSeconds = Number(options.tokenTtlSeconds || 0);
   const tokenTtlSeconds = Math.max(
-    STORE_FULFILLMENT_TOKEN_TTL_SECONDS,
-    Number(options.tokenTtlSeconds || getStoreEventFulfillmentTokenTtlSeconds(event)) || STORE_FULFILLMENT_TOKEN_TTL_SECONDS
+    60,
+    Math.min(
+      STORE_EVENT_REMINDER_TTL_SECONDS,
+      Number.isFinite(requestedTokenTtlSeconds) && requestedTokenTtlSeconds > 0
+        ? requestedTokenTtlSeconds
+        : getStoreEventFulfillmentTokenTtlSeconds(event)
+    )
   );
   const checkInToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'check_in' }, tokenTtlSeconds);
   if (!orderToken || !checkInToken) return null;
 
-  const checkInUrl = buildStoreFulfillmentPublicUrl(env, orderToken, 'check-in', itemId, '', checkInToken);
+  const checkInUrl = getStoreCheckInHtmlUrl(
+    buildStoreFulfillmentPublicUrl(env, orderToken, 'check-in', itemId, '', checkInToken)
+  );
   const qrSvg = await buildStoreCheckInQrSvg(checkInUrl);
   const ticketSvg = buildStoreTicketSvg(env, storedOrder, item, itemId, checkInUrl, qrSvg);
   return { checkInUrl, qrSvg, ticketSvg, tokenTtlSeconds };
@@ -5994,29 +6023,42 @@ async function buildStoreSummaryItem(request, env, storedOrder, item = {}, index
   }
 
   if (isStoreTicketLikeItem(item)) {
-    const ticketToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'ticket' });
-    const checkInToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'check_in' });
+    const eventTokenTtlSeconds = getStoreEventFulfillmentTokenTtlSeconds(summary.event);
+    const ticketToken = await signStoreFulfillmentToken(
+      env,
+      { orderToken, itemId, action: 'ticket' },
+      eventTokenTtlSeconds
+    );
+    const checkInToken = await signStoreFulfillmentToken(
+      env,
+      { orderToken, itemId, action: 'check_in' },
+      eventTokenTtlSeconds
+    );
     if (ticketToken) {
       summary.actions.ticket = {
         href: buildStoreFulfillmentUrl(request, env, orderToken, 'tickets', itemId, '.svg', ticketToken),
         label: type === 'rsvp' ? 'Open RSVP' : 'Open ticket',
-        expiresInSeconds: STORE_FULFILLMENT_TOKEN_TTL_SECONDS
+        expiresInSeconds: eventTokenTtlSeconds
       };
     }
     if (checkInToken) {
       summary.actions.checkIn = {
         href: buildStoreFulfillmentUrl(request, env, orderToken, 'check-in', itemId, '', checkInToken),
         label: 'Check-in',
-        expiresInSeconds: STORE_FULFILLMENT_TOKEN_TTL_SECONDS
+        expiresInSeconds: eventTokenTtlSeconds
       };
     }
     if (item.eventDetails?.ics !== false && item.eventDetails?.starts_at) {
-      const calendarToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'calendar' });
+      const calendarToken = await signStoreFulfillmentToken(
+        env,
+        { orderToken, itemId, action: 'calendar' },
+        eventTokenTtlSeconds
+      );
       if (calendarToken) {
         summary.actions.calendar = {
           href: buildStoreFulfillmentUrl(request, env, orderToken, 'calendar', itemId, '.ics', calendarToken),
           label: 'Add to calendar',
-          expiresInSeconds: STORE_FULFILLMENT_TOKEN_TTL_SECONDS
+          expiresInSeconds: eventTokenTtlSeconds
         };
       }
     }
@@ -6125,7 +6167,7 @@ async function handleStoreOrderRoute(request, env, route) {
 
   const loaded = await loadStoreOrderForRead(env, route.orderToken);
   if (!loaded.ok) {
-    return privateJsonResponse({ error: loaded.error }, loaded.status || 404, env);
+    return storeFulfillmentErrorResponse(request, env, route, loaded.error, loaded.status || 404);
   }
 
   if (route.kind === 'summary') {
@@ -6133,25 +6175,50 @@ async function handleStoreOrderRoute(request, env, route) {
   }
 
   if (!isStoreOrderFulfillmentReady(loaded.storedOrder)) {
-    return privateJsonResponse({ error: 'Store order is not ready for fulfillment' }, 409, env);
+    return storeFulfillmentErrorResponse(
+      request,
+      env,
+      route,
+      'Store order is not ready for fulfillment',
+      409,
+      loaded.storedOrder
+    );
   }
 
   const match = findStoreFulfillmentItem(loaded.storedOrder, route.itemId);
   if (!match) {
-    return privateJsonResponse({ error: 'Store fulfillment item not found' }, 404, env);
+    return storeFulfillmentErrorResponse(
+      request,
+      env,
+      route,
+      'Store fulfillment item not found',
+      404,
+      loaded.storedOrder
+    );
   }
 
   const tokenCheck = await verifyStoreFulfillmentToken(env, new URL(request.url).searchParams.get('token'), {
     orderToken: route.orderToken,
     itemId: match.itemId,
     action: route.kind
+  }, {
+    allowExpiredUntilSeconds: route.kind === 'check_in'
+      ? getStoreEventFulfillmentExpiresAtSeconds(summarizeStoreEventDetails(match.item.eventDetails))
+      : 0
   });
   if (!tokenCheck.ok) {
     if (route.kind === 'download') {
       const failure = await recordStoreDownloadFailure(request, env, route.orderToken, abuse);
       if (failure.locked) return failure.response;
     }
-    return privateJsonResponse({ error: tokenCheck.error }, tokenCheck.status || 403, env);
+    return storeFulfillmentErrorResponse(
+      request,
+      env,
+      route,
+      tokenCheck.error,
+      tokenCheck.status || 403,
+      loaded.storedOrder
+    );
   }
 
   if (route.kind === 'download') {
@@ -6965,8 +7032,15 @@ async function handleStoreTicketSvg(request, env, storedOrder = {}, item = {}, i
   }
 
   const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
-  const checkInToken = await signStoreFulfillmentToken(env, { orderToken, itemId, action: 'check_in' });
-  const checkInUrl = buildStoreFulfillmentUrl(request, env, orderToken, 'check-in', itemId, '', checkInToken);
+  const event = summarizeStoreEventDetails(item.eventDetails);
+  const checkInToken = await signStoreFulfillmentToken(
+    env,
+    { orderToken, itemId, action: 'check_in' },
+    getStoreEventFulfillmentTokenTtlSeconds(event)
+  );
+  const checkInUrl = getStoreCheckInHtmlUrl(
+    buildStoreFulfillmentUrl(request, env, orderToken, 'check-in', itemId, '', checkInToken)
+  );
   const qrSvg = await buildStoreCheckInQrSvg(checkInUrl);
   const ticketSvg = buildStoreTicketSvg(env, storedOrder, item, itemId, checkInUrl, qrSvg);
   return new Response(ticketSvg, {
@@ -6987,6 +7061,8 @@ function buildStoreTicketSvg(env, storedOrder = {}, item = {}, itemId = '', chec
   const event = summarizeStoreEventDetails(item.eventDetails);
   const eventTime = formatStoreEventDisplay(event, env);
   const holder = storedOrder.orderDraft?.customer?.name || storedOrder.orderDraft?.customer?.email || '';
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  const orderReference = getStoreOrderDisplayReference(orderToken);
   const qrDataUri = `data:image/svg+xml;base64,${base64EncodeString(qrSvg)}`;
   const contentX = 88;
   const contentWidth = 544;
@@ -7000,11 +7076,29 @@ function buildStoreTicketSvg(env, storedOrder = {}, item = {}, itemId = '', chec
     fill: '#101215',
     lineHeightFactor: 1.12
   });
-  const eventTimeY = titleBlock.bottomY + 56;
-  const venueY = eventTimeY + 50;
+  const eventTimeBlock = renderSvgTextBlock(eventTime || 'Event details pending', {
+    x: contentX,
+    y: titleBlock.bottomY + 56,
+    maxWidth: contentWidth,
+    maxLines: 2,
+    fontSizes: [25, 23, 21],
+    fontWeight: 400,
+    fill: '#252930',
+    lineHeightFactor: 1.2
+  });
+  const venueBlock = renderSvgTextBlock(event?.venue || '', {
+    x: contentX,
+    y: eventTimeBlock.bottomY + 50,
+    maxWidth: contentWidth,
+    maxLines: 2,
+    fontSizes: [24, 22, 20],
+    fontWeight: 400,
+    fill: '#252930',
+    lineHeightFactor: 1.18
+  });
   const addressBlock = renderSvgTextBlock(event?.address || '', {
     x: contentX,
-    y: venueY + 38,
+    y: venueBlock.bottomY + 38,
     maxWidth: contentWidth,
     maxLines: 2,
     fontSizes: [20, 18],
@@ -7020,28 +7114,49 @@ function buildStoreTicketSvg(env, storedOrder = {}, item = {}, itemId = '', chec
     qrY = Math.min(qrY, maxQrBottom - qrSize);
   }
   const qrX = Math.round((720 - qrSize) / 2);
+  const orderBlock = renderSvgTextBlock(`Order: ${orderReference}`, {
+    x: contentX,
+    y: 908,
+    maxWidth: contentWidth,
+    maxLines: 2,
+    fontSizes: [20, 18, 16],
+    fontWeight: 400,
+    fill: '#252930',
+    lineHeightFactor: 1.18
+  });
+  const detailsBlock = renderSvgTextBlock(`Qty: ${quantity}${holder ? ` · ${holder}` : ''}`, {
+    x: contentX,
+    y: Math.min(968, orderBlock.bottomY + 34),
+    maxWidth: contentWidth,
+    maxLines: 1,
+    fontSizes: [20, 18, 16],
+    fontWeight: 400,
+    fill: '#252930',
+    lineHeightFactor: 1.18
+  });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="1040" viewBox="0 0 720 1040" role="img" aria-label="${escapeXml(`${heading} ${ticketTitle}`)}">
+  <desc>${escapeXml(`${heading} ${ticketTitle}. Order ${orderToken}. Quantity ${quantity}.`)}</desc>
   <rect width="720" height="1040" fill="#f0f1ed"/>
   <rect x="44" y="44" width="632" height="952" rx="18" fill="#ffffff" stroke="#101215" stroke-width="4"/>
   <text x="88" y="132" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="800" fill="#252930" letter-spacing="3">${escapeXml(heading.toUpperCase())}</text>
   ${titleBlock.markup}
-  <text x="${contentX}" y="${eventTimeY}" font-family="Inter, Arial, sans-serif" font-size="25" fill="#252930">${escapeXml(eventTime || 'Event details pending')}</text>
-  <text x="${contentX}" y="${venueY}" font-family="Inter, Arial, sans-serif" font-size="24" fill="#252930">${escapeXml(event?.venue || '')}</text>
+  ${eventTimeBlock.markup}
+  ${venueBlock.markup}
   ${addressBlock.markup}
   <image href="${qrDataUri}" x="${qrX}" y="${qrY}" width="${qrSize}" height="${qrSize}"/>
-  <text x="88" y="908" font-family="Inter, Arial, sans-serif" font-size="22" fill="#252930">Order: ${escapeXml(storedOrder.orderToken || '')}</text>
-  <text x="88" y="944" font-family="Inter, Arial, sans-serif" font-size="22" fill="#252930">Qty: ${quantity}${holder ? ` · ${escapeXml(holder)}` : ''}</text>
+  ${orderBlock.markup}
+  ${detailsBlock.markup}
 </svg>`;
 }
 
-function formatStoreEventDisplay(event = null, env = {}) {
+function formatStoreEventDisplay(event = null, env = {}, preferredLang = DEFAULT_I18N_LANG) {
   if (!event?.startsAt) return '';
   const start = new Date(event.startsAt);
   if (Number.isNaN(start.getTime())) return '';
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(normalizePreferredLang(preferredLang).startsWith('es') ? 'es-US' : 'en-US', {
       timeZone: getPlatformTimeZone(env),
       weekday: 'short',
       month: 'short',
@@ -7056,13 +7171,191 @@ function formatStoreEventDisplay(event = null, env = {}) {
   }
 }
 
-function handleStoreCheckIn(_request, env, storedOrder = {}, item = {}, itemId = '') {
+function getStoreOrderDisplayReference(value = '') {
+  const orderToken = String(value || '').trim();
+  return orderToken.replace(/^store-order-/i, '') || orderToken;
+}
+
+function storeCheckInPrefersHtml(request) {
+  const url = new URL(request.url);
+  const requestedFormat = String(url.searchParams.get('format') || '').trim().toLowerCase();
+  if (requestedFormat === 'json') return false;
+  if (requestedFormat === 'html') return true;
+  return String(request.headers.get('Accept') || '').toLowerCase().includes('text/html');
+}
+
+function getStoreCheckInPreferredLang(request, storedOrder = {}) {
+  const storedLang = storedOrder.orderDraft?.preferredLang || storedOrder.preferredLang;
+  if (storedLang) return normalizePreferredLang(storedLang);
+  const urlLang = new URL(request.url).searchParams.get('lang');
+  if (urlLang) return normalizePreferredLang(urlLang);
+  const requestedLang = String(request.headers.get('Accept-Language') || '').split(',')[0];
+  return normalizePreferredLang(requestedLang);
+}
+
+function formatStoreCheckInTimestamp(value, env = {}, preferredLang = DEFAULT_I18N_LANG) {
+  const timestamp = new Date(String(value || ''));
+  if (Number.isNaN(timestamp.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat(normalizePreferredLang(preferredLang).startsWith('es') ? 'es-US' : 'en-US', {
+      timeZone: getPlatformTimeZone(env),
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(timestamp);
+  } catch {
+    return timestamp.toISOString();
+  }
+}
+
+function storeCheckInPageStyles() {
+  return `
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html { background: #f0f1ed; color: #252930; }
+    body { margin: 0; min-width: 0; min-height: 100svh; padding: clamp(1rem, 5vw, 3rem); display: grid; place-items: center; }
+    main { width: min(100%, 44rem); min-width: 0; }
+    .card { min-width: 0; overflow: hidden; padding: clamp(1.25rem, 5vw, 3rem); background: #fff; border: 3px solid #101215; border-radius: 1rem; box-shadow: 0 1rem 3rem rgba(16, 18, 21, .12); }
+    .eyebrow { margin: 0 0 .75rem; color: #5d6573; font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    .status { display: inline-flex; max-width: 100%; align-items: center; gap: .45rem; margin: 0 0 1rem; padding: .45rem .7rem; border: 2px solid currentColor; border-radius: 999px; font-size: .9rem; font-weight: 800; overflow-wrap: anywhere; }
+    .status--valid { color: #17683a; background: #eef9f2; }
+    .status--used { color: #7b4b00; background: #fff7e8; }
+    .status--error { color: #9b1c1c; background: #fff0f0; }
+    h1 { max-width: 100%; margin: 0; color: #101215; font-size: clamp(2rem, 8vw, 4.5rem); line-height: .98; letter-spacing: -.035em; overflow-wrap: anywhere; }
+    .event { max-width: 100%; margin: 1.25rem 0 0; font-size: clamp(1.2rem, 4vw, 1.65rem); font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+    .variant { margin: .4rem 0 0; color: #5d6573; font-size: 1rem; overflow-wrap: anywhere; }
+    dl { min-width: 0; margin: 2rem 0 0; display: grid; gap: 0; border-top: 1px solid #d2d7df; }
+    .detail { min-width: 0; padding: .9rem 0; display: grid; gap: .25rem; border-bottom: 1px solid #d2d7df; }
+    dt { color: #5d6573; font-size: .78rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    dd { min-width: 0; margin: 0; font-size: 1rem; line-height: 1.45; overflow-wrap: anywhere; word-break: break-word; }
+    .reference { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-size: .92rem; }
+    .notice { max-width: 100%; margin: 1.5rem 0 0; padding: 1rem; background: #f0f1ed; border-radius: .6rem; color: #4d5562; line-height: 1.5; overflow-wrap: anywhere; }
+    .actions { margin: 1.5rem 0 0; }
+    .actions a { display: inline-flex; max-width: 100%; min-height: 2.75rem; align-items: center; justify-content: center; padding: .7rem 1rem; color: #fff; background: #101215; border: 2px solid #101215; border-radius: .4rem; font-weight: 800; text-align: center; text-decoration: none; overflow-wrap: anywhere; }
+    .actions a:hover { color: #101215; background: #fff; }
+    .actions a:focus-visible { outline: 3px solid #101215; outline-offset: 3px; }
+    @media (min-width: 40rem) {
+      .detail { grid-template-columns: minmax(7rem, 9rem) minmax(0, 1fr); align-items: baseline; gap: 1rem; }
+    }
+  `;
+}
+
+function buildStoreCheckInDocument({
+  lang = DEFAULT_I18N_LANG,
+  pageTitle = '',
+  statusLabel = '',
+  statusTone = 'error',
+  heading = '',
+  eventName = '',
+  variantLabel = '',
+  details = [],
+  notice = '',
+  returnLabel = '',
+  returnUrl = '/'
+} = {}) {
+  const normalizedTone = ['valid', 'used', 'error'].includes(statusTone) ? statusTone : 'error';
+  const detailMarkup = details
+    .filter((entry) => entry?.label && entry?.value)
+    .map((entry) => `<div class="detail">
+      <dt>${escapeXml(entry.label)}</dt>
+      <dd${entry.reference ? ' class="reference"' : ''}>${escapeXml(entry.value)}</dd>
+    </div>`)
+    .join('');
+
+  return `<!doctype html>
+<html lang="${escapeXml(lang)}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>${escapeXml(pageTitle)}</title>
+  <style>${storeCheckInPageStyles()}</style>
+</head>
+<body>
+  <main>
+    <section class="card" aria-labelledby="check-in-heading">
+      <p class="eyebrow">${escapeXml(pageTitle)}</p>
+      <p class="status status--${normalizedTone}">${escapeXml(statusLabel)}</p>
+      <h1 id="check-in-heading">${escapeXml(heading)}</h1>
+      ${eventName ? `<p class="event">${escapeXml(eventName)}</p>` : ''}
+      ${variantLabel ? `<p class="variant">${escapeXml(variantLabel)}</p>` : ''}
+      ${detailMarkup ? `<dl>${detailMarkup}</dl>` : ''}
+      ${notice ? `<p class="notice">${escapeXml(notice)}</p>` : ''}
+      ${returnLabel ? `<p class="actions"><a href="${escapeXml(returnUrl)}">${escapeXml(returnLabel)}</a></p>` : ''}
+    </section>
+  </main>
+</body>
+</html>`;
+}
+
+function privateStoreHtmlResponse(html, status, env, lang) {
+  return new Response(html, {
+    status,
+    headers: privateArtifactHeaders(env, 'text/html; charset=utf-8', {
+      'Content-Language': normalizePreferredLang(lang),
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      'Permissions-Policy': 'camera=(), geolocation=(), microphone=()',
+      'X-Robots-Tag': 'noindex, nofollow, noarchive',
+      Vary: 'Accept'
+    })
+  });
+}
+
+function getStoreCheckInReturnUrl(env, preferredLang) {
+  const siteBase = String(getSiteBase(env) || env.SITE_BASE || DEFAULT_SITE_BASE || '').trim();
+  try {
+    return new URL(getLocalizedPath('/', preferredLang), siteBase).toString();
+  } catch {
+    return getLocalizedPath('/', preferredLang);
+  }
+}
+
+async function storeFulfillmentErrorResponse(request, env, route, error, status = 400, storedOrder = {}) {
+  if (route?.kind !== 'check_in' || !storeCheckInPrefersHtml(request)) {
+    return privateJsonResponse(
+      { error },
+      status,
+      env,
+      route?.kind === 'check_in' ? { Vary: 'Accept' } : {}
+    );
+  }
+
+  const lang = getStoreCheckInPreferredLang(request, storedOrder);
+  const { t } = await getStoreTranslator(env, lang, 'fulfillment');
+  const message = status === 410
+    ? t('check_in.expired_error', 'This ticket link has expired. Open the latest ticket from the order page.')
+    : status === 404
+      ? t('check_in.missing_error', 'This ticket could not be found.')
+      : status === 409
+        ? t('check_in.pending_error', 'This order is not ready for ticket verification yet.')
+        : t('check_in.invalid_error', 'This ticket link is invalid. Open the latest ticket from the order page.');
+  const pageTitle = t('check_in.error_title', 'Unable to verify ticket');
+  const html = buildStoreCheckInDocument({
+    lang,
+    pageTitle,
+    statusLabel: pageTitle,
+    statusTone: 'error',
+    heading: message,
+    returnLabel: t('check_in.return_to_store', 'Return to the store'),
+    returnUrl: getStoreCheckInReturnUrl(env, lang)
+  });
+  return privateStoreHtmlResponse(html, status, env, lang);
+}
+
+async function handleStoreCheckIn(request, env, storedOrder = {}, item = {}, itemId = '') {
   if (!isStoreTicketLikeItem(item)) {
-    return privateJsonResponse({ error: 'Store item is not a ticket or RSVP' }, 404, env);
+    return storeFulfillmentErrorResponse(
+      request,
+      env,
+      { kind: 'check_in' },
+      'Store item is not a ticket or RSVP',
+      404,
+      storedOrder
+    );
   }
 
   const checkIn = getStoreItemCheckInState(storedOrder, itemId, item);
-  return privateJsonResponse({
+  const event = summarizeStoreEventDetails(item.eventDetails);
+  const payload = {
     ok: true,
     valid: true,
     orderToken: storedOrder.orderToken || '',
@@ -7078,12 +7371,58 @@ function handleStoreCheckIn(_request, env, storedOrder = {}, item = {}, itemId =
       fulfillmentType: getStoreFulfillmentType(item)
     },
     customer: {
-      email: storedOrder.orderDraft?.customer?.email || '',
       name: storedOrder.orderDraft?.customer?.name || ''
     },
-    event: summarizeStoreEventDetails(item.eventDetails),
+    event,
     generatedAt: new Date().toISOString()
-  }, 200, env);
+  };
+
+  if (!storeCheckInPrefersHtml(request)) {
+    return privateJsonResponse(payload, 200, env, { Vary: 'Accept' });
+  }
+
+  const lang = getStoreCheckInPreferredLang(request, storedOrder);
+  const { t } = await getStoreTranslator(env, lang, 'fulfillment');
+  const type = getStoreFulfillmentType(item);
+  const pageTitle = type === 'rsvp'
+    ? t('check_in.rsvp_title', 'RSVP verification')
+    : t('check_in.ticket_title', 'Ticket verification');
+  const eventTime = formatStoreEventDisplay(event, env, lang) || t('check_in.event_pending', 'Event details pending');
+  const eventLocation = [event?.venue, event?.address].filter(Boolean).join(' · ');
+  const holder = String(storedOrder.orderDraft?.customer?.name || '').trim();
+  const checkedInAt = formatStoreCheckInTimestamp(checkIn.checkedInAt, env, lang);
+  const html = buildStoreCheckInDocument({
+    lang,
+    pageTitle,
+    statusLabel: checkIn.checkedIn
+      ? t('check_in.checked_in_status', 'Already checked in')
+      : t('check_in.valid_status', 'Valid ticket'),
+    statusTone: checkIn.checkedIn ? 'used' : 'valid',
+    heading: checkIn.checkedIn
+      ? t('check_in.checked_in_heading', 'This ticket has already been checked in.')
+      : t('check_in.valid_heading', 'This ticket is valid.'),
+    eventName: item.name || pageTitle,
+    variantLabel: item.variantLabel || '',
+    details: [
+      { label: t('check_in.when', 'When'), value: eventTime },
+      { label: t('check_in.where', 'Where'), value: eventLocation },
+      { label: t('check_in.quantity', 'Quantity'), value: String(Math.max(1, Number(item.quantity || 1) || 1)) },
+      { label: t('check_in.holder', 'Holder'), value: holder },
+      {
+        label: t('check_in.order_reference', 'Order reference'),
+        value: getStoreOrderDisplayReference(storedOrder.orderToken || storedOrder.orderDraft?.orderToken),
+        reference: true
+      },
+      { label: t('check_in.checked_in_at', 'Checked in'), value: checkedInAt }
+    ],
+    notice: t(
+      'check_in.staff_note',
+      'This page verifies the ticket. Attendance changes remain available only to authorized staff in the Store admin.'
+    ),
+    returnLabel: t('check_in.return_to_store', 'Return to the store'),
+    returnUrl: getStoreCheckInReturnUrl(env, lang)
+  });
+  return privateStoreHtmlResponse(html, 200, env, lang);
 }
 
 function buildStoreCalendarIcs(env, storedOrder = {}, item = {}, itemId = '', options = {}) {
@@ -17473,6 +17812,8 @@ export {
   buildAdminStoreOrdersWorkersCachePurgeRequest,
   buildAdminStoreOrdersWorkersCacheProps,
   buildAdminStoreProductPreviewHtml,
+  buildStoreCheckInDocument,
+  buildStoreTicketEmailArtifacts,
   buildStoreTicketSvg,
   buildStoreOrderAdminNotificationPayloads,
   buildStoreOrderEmailPayload,
@@ -17485,5 +17826,6 @@ export {
   workersCacheEnabledForAdminStoreOrders,
   storeOrderReconciliationRowsCsv,
   processStoreEventReminders,
-  queueStoreEventReminders
+  queueStoreEventReminders,
+  signStoreFulfillmentToken
 };
