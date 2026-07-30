@@ -7,7 +7,7 @@
   var statusNode = root.querySelector('[data-store-order-status]');
   var bodyNode = root.querySelector('[data-store-order-body]');
   var headingNode = document.querySelector('[data-store-order-summary-heading]');
-  var MAX_POLLS = 12;
+  var MAX_POLLS = 48;
   var POLL_DELAY_MS = 2500;
 
   function getRuntimeConfig() {
@@ -270,8 +270,20 @@
         window.setTimeout(function() {
           loadOrder(orderToken, pollCount + 1);
         }, POLL_DELAY_MS);
+      } else {
+        setStatus(message(
+          'processing_delayed',
+          'Your payment is taking longer than usual to confirm. Keep this page open or return later using your order link.'
+        ));
       }
     } catch (error) {
+      if (pollCount < MAX_POLLS) {
+        setStatus(message('retrying_order', 'Reconnecting to your order...'));
+        window.setTimeout(function() {
+          loadOrder(orderToken, pollCount + 1);
+        }, POLL_DELAY_MS);
+        return;
+      }
       setStatus(error?.message || message('unable_load_order', 'Unable to load order.'));
     }
   }

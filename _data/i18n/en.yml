@@ -229,6 +229,7 @@ runtime:
     tax_location_required_nm: Enter your billing street address, city, state, and postal code to finalize New Mexico tax before continuing.
     payment_method: Payment method
     payment_consent: Your payment is processed securely by Stripe.
+    checkout_reminder_consent: Email me one reminder if I leave checkout.
     tip_label: Tip %{platform} for platform maintenance.
     tip_copy: "Optional tips help keep %{platform} doing its thing."
     tip_with_percent: "%{platform} tip (%{percent}%)"
@@ -327,6 +328,10 @@ runtime:
     loading: Loading orders...
     verified: Lookup link verified.
   order_success:
+    eyebrow: Order
+    page_title: Order received
+    initial_heading: Your payment is being finalized. Fulfillment details will appear here when the order is ready.
+    return_to_store: Return to the store
     subtotal: Subtotal
     discount: Discount
     discount_with_code: "Discount (%{code})"
@@ -362,6 +367,8 @@ runtime:
     payment_failed_status: Payment failed.
     payment_failed_heading: The payment did not complete. Please return to the store and try again.
     payment_processing: Payment is still processing.
+    retrying_order: Reconnecting to your order...
+    processing_delayed: Your payment is taking longer than usual to confirm. Keep this page open or return later using your order link.
     missing_token: Missing order token.
 email:
   subjects:

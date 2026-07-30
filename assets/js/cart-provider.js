@@ -2628,9 +2628,12 @@
 
   function buildStoreOrderSuccessPath(orderToken) {
     const normalizedToken = String(orderToken || '').trim();
-    return normalizedToken
-      ? `${STORE_ORDER_SUCCESS_PATH}?orderToken=${encodeURIComponent(normalizedToken)}`
+    const localizedPath = String(getCurrentLang() || '').trim().toLowerCase().startsWith('es')
+      ? `/es${STORE_ORDER_SUCCESS_PATH}`
       : STORE_ORDER_SUCCESS_PATH;
+    return normalizedToken
+      ? `${localizedPath}?orderToken=${encodeURIComponent(normalizedToken)}`
+      : localizedPath;
   }
 
   function buildStoreOrderSuccessUrl(orderToken) {
@@ -3144,6 +3147,7 @@
     let currentRoute = null;
     let isCartOpen = false;
     let suppressDrawerRerender = false;
+    let checkoutRedirectCommitted = false;
     let activeCustomCheckoutMount = null;
     let customCheckoutShippingQuoteToken = 0;
     let customCheckoutTaxQuoteToken = 0;
@@ -5398,12 +5402,17 @@
         }
 
         checkoutUiState.status = 'redirecting';
+        setCheckoutUiError('');
+        setCustomCheckoutEmailError('');
+        setCustomCheckoutShippingError('');
+        setCustomCheckoutTaxError('');
         syncCustomCheckoutConfirmButton();
 
         if (!confirmingStorePaymentIntent) {
           throw new Error('Store payment confirmation was not active.');
         }
 
+        checkoutRedirectCommitted = true;
         clearStoreCartAfterOrder();
         redirectWindow(buildStoreOrderSuccessPath(orderId));
         return;
@@ -5715,6 +5724,9 @@
         }
 
         if (data?.nextAction === 'order_confirmed' || data?.requiresPayment === false) {
+          checkoutUiState.status = 'redirecting';
+          checkoutRedirectCommitted = true;
+          setCheckoutUiError('');
           clearStoreCartAfterOrder();
           redirectWindow(buildStoreOrderSuccessPath(data?.orderToken || ''));
           return;
@@ -6265,6 +6277,7 @@
 
         syncCheckoutStartButton();
         syncCustomCheckoutEmailToStripe(customCheckoutEmailField.value).catch((error) => {
+          if (isCustomCheckoutBusy() || checkoutRedirectCommitted) return;
           checkoutUiState.status = 'idle';
           setCheckoutUiError(error?.message || 'Email validation failed.');
           syncCustomCheckoutConfirmButton();
@@ -6610,6 +6623,7 @@
         nextShippingSignature !== lastCustomCheckoutShippingSignature;
 
       lastCustomCheckoutShippingSignature = nextShippingSignature;
+      if (checkoutRedirectCommitted) return;
       writePersistedFirstPartyCartState(state);
       if (suppressDrawerRerender && isCartOpen && currentRoute !== CHECKOUT_VIEW_ROUTE) {
         syncFirstPartyCartTipUI();

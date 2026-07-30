@@ -1,0 +1,18 @@
+{%- assign current_lang = include.lang | default: page.lang | default: site.i18n.default_lang | default: site.lang | default: "en" -%}
+{%- capture localized_home -%}{% include localized-url.html lang=current_lang translation_key="home" %}{%- endcapture -%}
+
+<section class="storefront">
+  <div class="storefront__header">
+    <p class="storefront__eyebrow">{% include t.html key="runtime.order_success.eyebrow" lang=current_lang %}</p>
+    <h1>{% include t.html key="runtime.order_success.page_title" lang=current_lang %}</h1>
+    <p data-store-order-summary-heading>{% include t.html key="runtime.order_success.initial_heading" lang=current_lang %}</p>
+  </div>
+
+  <div class="store-order" data-store-order-success>
+    <div class="store-order__status" data-store-order-status role="status" aria-live="polite">{% include t.html key="runtime.order_success.loading_order" lang=current_lang %}</div>
+    <div class="store-order__body" data-store-order-body hidden></div>
+    <div class="store-order__footer">
+      <a class="btn btn--secondary" href="{{ localized_home | strip }}">{% include t.html key="runtime.order_success.return_to_store" lang=current_lang %}</a>
+    </div>
+  </div>
+</section>
