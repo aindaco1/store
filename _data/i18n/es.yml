@@ -370,6 +370,28 @@ runtime:
     retrying_order: Reconectando con tu pedido...
     processing_delayed: Tu pago está tardando más de lo habitual en confirmarse. Mantén esta página abierta o vuelve más tarde con el enlace de tu pedido.
     missing_token: Falta el token del pedido.
+fulfillment:
+  check_in:
+    ticket_title: Verificación de boleto
+    rsvp_title: Verificación de RSVP
+    valid_status: Boleto válido
+    checked_in_status: Registro ya realizado
+    valid_heading: Este boleto es válido.
+    checked_in_heading: Este boleto ya fue registrado.
+    when: Cuándo
+    where: Dónde
+    quantity: Cantidad
+    holder: Titular
+    order_reference: Referencia del pedido
+    checked_in_at: Registrado
+    event_pending: Detalles del evento pendientes
+    staff_note: Esta página verifica el boleto. Los cambios de asistencia siguen disponibles solo para el personal autorizado en la administración de la Tienda.
+    error_title: No se pudo verificar el boleto
+    invalid_error: Este enlace de boleto no es válido. Abre el boleto más reciente desde la página del pedido.
+    expired_error: Este enlace de boleto ha caducado. Abre el boleto más reciente desde la página del pedido.
+    missing_error: No se pudo encontrar este boleto.
+    pending_error: Este pedido todavía no está listo para verificar el boleto.
+    return_to_store: Volver a la tienda
 email:
   subjects:
     admin_login: Tu enlace de administración

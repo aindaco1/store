@@ -3,9 +3,11 @@ permalink: /assets/i18n.json
 ---
 {
   "en": {
+    "fulfillment": {{ site.data.i18n.en.fulfillment | jsonify }},
     "email": {{ site.data.i18n.en.email | jsonify }}
   },
   "es": {
+    "fulfillment": {{ site.data.i18n.es.fulfillment | jsonify }},
     "email": {{ site.data.i18n.es.email | jsonify }}
   }
 }

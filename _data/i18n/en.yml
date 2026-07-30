@@ -370,6 +370,28 @@ runtime:
     retrying_order: Reconnecting to your order...
     processing_delayed: Your payment is taking longer than usual to confirm. Keep this page open or return later using your order link.
     missing_token: Missing order token.
+fulfillment:
+  check_in:
+    ticket_title: Ticket verification
+    rsvp_title: RSVP verification
+    valid_status: Valid ticket
+    checked_in_status: Already checked in
+    valid_heading: This ticket is valid.
+    checked_in_heading: This ticket has already been checked in.
+    when: When
+    where: Where
+    quantity: Quantity
+    holder: Holder
+    order_reference: Order reference
+    checked_in_at: Checked in
+    event_pending: Event details pending
+    staff_note: This page verifies the ticket. Attendance changes remain available only to authorized staff in the Store admin.
+    error_title: Unable to verify ticket
+    invalid_error: This ticket link is invalid. Open the latest ticket from the order page.
+    expired_error: This ticket link has expired. Open the latest ticket from the order page.
+    missing_error: This ticket could not be found.
+    pending_error: This order is not ready for ticket verification yet.
+    return_to_store: Return to the store
 email:
   subjects:
     admin_login: Admin sign-in link

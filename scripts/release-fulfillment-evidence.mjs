@@ -245,6 +245,24 @@ function physicalItem() {
 
 const storeState = new MockKVNamespace();
 const downloads = new MockR2Bucket();
+const fulfillmentI18n = {
+  en: {
+    fulfillment: {
+      check_in: {
+        ticket_title: 'Ticket verification',
+        valid_status: 'Valid ticket',
+        valid_heading: 'This ticket is valid.',
+        when: 'When',
+        where: 'Where',
+        quantity: 'Quantity',
+        holder: 'Holder',
+        order_reference: 'Order reference',
+        staff_note: 'This page verifies the ticket. Attendance changes remain available only to authorized staff in the Store admin.',
+        return_to_store: 'Return to the store'
+      }
+    }
+  }
+};
 const env = {
   APP_MODE: 'test',
   SITE_BASE,
@@ -263,6 +281,7 @@ const env = {
   STORE_STATE: storeState,
   RATELIMIT: new MockKVNamespace(),
   STORE_DOWNLOADS: downloads,
+  I18N_CATALOG: fulfillmentI18n,
   OBSERVABILITY_SAMPLE_RATE: '0'
 };
 
@@ -473,9 +492,37 @@ async function run() {
   if (!checkInAction?.href) {
     fail('Ticket check-in summary', 'ticket check-in action missing');
   } else {
+    assert(
+      checkInAction.expiresInSeconds > (72 * 60 * 60),
+      'Ticket event-scoped link lifetime',
+      'ticket remains valid through the event check-in window'
+    );
     const publicCheckIn = await workerRequest(checkInAction.href);
     const publicBody = await jsonResponse(publicCheckIn);
-    assert(publicCheckIn.status === 200 && publicBody.valid === true && publicBody.checkedIn === false, 'Ticket public check-in preview', 'signed check-in link validates before admin check-in');
+    assert(
+      publicCheckIn.status === 200 &&
+        publicBody.valid === true &&
+        publicBody.checkedIn === false &&
+        !publicBody.customer?.email,
+      'Ticket public check-in preview',
+      'signed check-in link validates before admin check-in without exposing customer email'
+    );
+
+    const browserCheckIn = await workerRequest(checkInAction.href, {
+      headers: { Accept: 'text/html' }
+    });
+    const browserCheckInHtml = await browserCheckIn.text();
+    assert(
+      browserCheckIn.status === 200 &&
+        String(browserCheckIn.headers.get('content-type') || '').includes('text/html') &&
+        String(browserCheckIn.headers.get('cache-control') || '').includes('private, no-store') &&
+        String(browserCheckIn.headers.get('content-security-policy') || '').includes("default-src 'none'") &&
+        browserCheckInHtml.includes('This ticket is valid.') &&
+        browserCheckInHtml.includes('overflow-wrap: anywhere') &&
+        !browserCheckInHtml.includes('ticket@example.com'),
+      'Ticket browser check-in page',
+      'responsive private HTML verifies the ticket without exposing customer email'
+    );
   }
 
   const ticketCheckIn = await adminPost('/admin/store/orders/check-in', session, {
