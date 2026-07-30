@@ -48,6 +48,8 @@ describe('i18n completeness', () => {
       'admin.sessions_summary',
       'admin.audit_summary',
       'runtime.cart.checkout_title',
+      'runtime.cart.checkout_reminder_consent',
+      'runtime.cart.subtotal',
       'runtime.cart.final_sale_notice',
       'runtime.cart.return_policy',
       'runtime.cart.shipping_address',
@@ -56,7 +58,10 @@ describe('i18n completeness', () => {
       'runtime.order_lookup.generic_sent',
       'runtime.order_lookup.sending',
       'runtime.order_success.ready_fulfillment',
+      'runtime.order_success.page_title',
+      'runtime.order_success.return_to_store',
       'runtime.order_success.confirmed_heading',
+      'runtime.order_success.processing_delayed',
       'runtime.order_success.download_note',
       'email.subjects.store_order_confirmed',
       'email.subjects.store_order_lookup',
@@ -78,6 +83,10 @@ describe('i18n completeness', () => {
       expect(spanishValue.trim(), `${keyPath} Spanish value is empty`).not.toBe('');
       expect(placeholders(spanishValue), `${keyPath} placeholder drift`).toEqual(placeholders(englishValue));
     }
+
+    expect(valueAt(es, 'runtime.cart.subtotal')).toBe('Total parcial');
+    expect(valueAt(es, 'runtime.order_success.subtotal')).toBe('Total parcial');
+    expect(valueAt(es, 'email.store_order.subtotal')).toBe('Total parcial');
   });
 
   it('routes the lazy admin review module through the shared runtime catalog', () => {
@@ -108,6 +117,22 @@ describe('i18n completeness', () => {
 
     expect(reviewModule).toContain("'adminSessionsSummary'");
     expect(reviewModule).toContain("'adminAuditSummary'");
+  });
+
+  it('keeps the localized order-success shell and checkout redirect DRY', () => {
+    const englishPage = readFileSync('order-success.md', 'utf8');
+    const spanishPage = readFileSync('es/order-success.md', 'utf8');
+    const sharedShell = readFileSync('_includes/order-success-content.html', 'utf8');
+    const runtimeInclude = readFileSync('_includes/runtime-messages-json.html', 'utf8');
+    const cartProvider = readFileSync('assets/js/cart-provider.js', 'utf8');
+
+    expect(englishPage).toContain('{% include order-success-content.html lang="en" %}');
+    expect(spanishPage).toContain('{% include order-success-content.html lang="es" %}');
+    expect(sharedShell).toContain('runtime.order_success.page_title');
+    expect(sharedShell).toContain('runtime.order_success.return_to_store');
+    expect(runtimeInclude).toContain('checkout_reminder_consent');
+    expect(cartProvider).toContain('? `/es${STORE_ORDER_SUCCESS_PATH}`');
+    expect(cartProvider).toContain('checkoutRedirectCommitted = true');
   });
 
   it('routes v1.0.8 media-admin copy through the shared runtime catalog', () => {

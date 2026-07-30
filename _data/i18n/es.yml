@@ -229,11 +229,12 @@ runtime:
     tax_location_required_nm: Introduce tu dirección de facturación, ciudad, estado y código postal para finalizar el impuesto de Nuevo México antes de continuar.
     payment_method: Método de pago
     payment_consent: Tu pago se procesa de forma segura con Stripe.
+    checkout_reminder_consent: Envíame un recordatorio si no termino la compra.
     tip_label: Propina para %{platform} para el mantenimiento de la plataforma.
     tip_copy: "Las propinas opcionales ayudan a que %{platform} siga haciendo lo suyo."
     tip_with_percent: Propina para %{platform} (%{percent}%)
     estimated_total: Total estimado
-    subtotal: Subtotal
+    subtotal: Total parcial
     discount: Descuento
     discount_with_code: "Descuento (%{code})"
     coupon_code: Código de cupón
@@ -327,7 +328,11 @@ runtime:
     loading: Cargando pedidos...
     verified: Enlace de búsqueda verificado.
   order_success:
-    subtotal: Subtotal
+    eyebrow: Pedido
+    page_title: Pedido recibido
+    initial_heading: Tu pago se está finalizando. Los detalles de cumplimiento aparecerán aquí cuando el pedido esté listo.
+    return_to_store: Volver a la tienda
+    subtotal: Total parcial
     discount: Descuento
     discount_with_code: "Descuento (%{code})"
     tip: Propina
@@ -362,6 +367,8 @@ runtime:
     payment_failed_status: Pago fallido.
     payment_failed_heading: El pago no se completó. Vuelve a la tienda e inténtalo de nuevo.
     payment_processing: El pago sigue procesándose.
+    retrying_order: Reconectando con tu pedido...
+    processing_delayed: Tu pago está tardando más de lo habitual en confirmarse. Mantén esta página abierta o vuelve más tarde con el enlace de tu pedido.
     missing_token: Falta el token del pedido.
 email:
   subjects:
@@ -375,7 +382,7 @@ email:
   common:
     questions_prefix: "¿Preguntas? Responde a este correo o visita"
   store_order:
-    subtotal: Subtotal
+    subtotal: Total parcial
     discount: Descuento
     tip: Propina
     shipping: Envío

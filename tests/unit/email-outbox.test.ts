@@ -98,6 +98,80 @@ describe('Store durable Resend email outbox', () => {
     });
   });
 
+  it('replaces stale failed evidence when an explicitly requeued job is accepted', async () => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    const queued = await enqueueEmailOutbox(env, {
+      kind: 'store_order',
+      dedupeKey: 'operator-retry',
+      orderToken: 'store-order-one',
+      payload: orderPayload()
+    });
+    await kv.put(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`, JSON.stringify({
+      version: 1,
+      status: 'failed',
+      kind: 'store_order',
+      updatedAt: '2027-07-13T11:00:00.000Z'
+    }));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'email_operator_retry' }), { status: 200 })));
+
+    const result = await processEmailOutbox(env, { now: new Date('2027-07-13T12:00:00Z') });
+
+    expect(result.sent).toBe(1);
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`, { type: 'json' })).toMatchObject({
+      status: 'accepted',
+      providerId: 'email_operator_retry'
+    });
+  });
+
+  it('keeps pre-provider rendering failures retryable without risking a duplicate send', async () => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    const queued = await enqueueEmailOutbox(env, {
+      kind: 'store_order',
+      dedupeKey: 'render-retry',
+      orderToken: 'store-order-one',
+      payload: orderPayload()
+    });
+    const key = `${EMAIL_OUTBOX_PREFIX}${queued.jobId}`;
+    const pending = await kv.get(key, { type: 'json' });
+    await kv.put(key, JSON.stringify({ ...pending, kind: 'temporarily_unavailable' }));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await processEmailOutbox(env, { now: new Date('2027-07-13T12:00:00Z') });
+
+    expect(first).toMatchObject({ sent: 0, retried: 1, failed: 0 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await kv.get(key, { type: 'json' })).toMatchObject({
+      status: 'retry',
+      attempts: 1,
+      lastError: {
+        type: 'Error',
+        statusCode: 0,
+        stage: 'render'
+      }
+    });
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`)).toBeNull();
+
+    const retry = await kv.get(key, { type: 'json' });
+    await kv.put(key, JSON.stringify({
+      ...retry,
+      kind: 'store_order',
+      nextAttemptAt: '2027-07-13T12:02:00.000Z'
+    }));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'email_after_retry' }), { status: 200 })));
+
+    const second = await processEmailOutbox(env, { now: new Date('2027-07-13T12:02:00Z') });
+
+    expect(second).toMatchObject({ sent: 1, retried: 0, failed: 0 });
+    expect(await kv.get(key)).toBeNull();
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`, { type: 'json' })).toMatchObject({
+      status: 'accepted',
+      providerId: 'email_after_retry'
+    });
+  });
+
   it.each([
     ['store_abandoned_cart', { email: 'buyer@example.com', resumeUrl: 'https://shop.test/cart', unsubscribeUrl: 'https://shop.test/unsubscribe' }],
     ['store_event_reminder', { email: 'buyer@example.com', orderToken: 'store-order-one', item: { name: 'Event' } }]
