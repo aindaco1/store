@@ -124,6 +124,14 @@ function retryDelayMs(error, attempts) {
   return Math.min(24 * 60 * 60 * 1000, Math.max(60 * 1000, (2 ** Math.min(attempts, 8)) * 60 * 1000));
 }
 
+function deliveryErrorEvidence(error, stage) {
+  return {
+    type: String(error?.type || error?.name || 'Error'),
+    statusCode: Number(error?.statusCode || 0) || 0,
+    stage: String(stage || 'unknown')
+  };
+}
+
 async function recipientSuppressed(env, job) {
   if (!MARKETING_KINDS.has(job.kind)) return false;
   const email = normalizeEmail(job.payload?.email || job.payload?.to);
@@ -191,6 +199,7 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       continue;
     }
 
+    let deliveryStage = job.providerPayload ? 'provider' : 'render';
     try {
       if (!job.providerPayload) {
         job.providerPayload = await renderProviderPayload(env, job);
@@ -200,7 +209,9 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       job.attempts = Number(job.attempts || 0) + 1;
       job.firstAttemptAt = job.firstAttemptAt || now.toISOString();
       job.lastAttemptAt = now.toISOString();
+      deliveryStage = 'persist';
       await env.STORE_STATE.put(key, JSON.stringify(job), { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
+      deliveryStage = 'provider';
       const { sendPreparedResendEmail } = await import('./email.js');
       const response = await sendPreparedResendEmail(env, job.providerPayload, {
         idempotencyKey: `store/${job.jobId}`,
@@ -209,7 +220,7 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       });
       const acceptedAt = new Date().toISOString();
       const existingDelivery = await env.STORE_STATE.get(deliveryKey(job.jobId), { type: 'json' });
-      const status = ['delivered', 'bounced', 'complained', 'failed', 'suppressed'].includes(existingDelivery?.status) ? existingDelivery.status : 'accepted';
+      const status = ['delivered', 'bounced', 'complained', 'suppressed'].includes(existingDelivery?.status) ? existingDelivery.status : 'accepted';
       await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({
         ...(existingDelivery || {}), version: 1, status, kind: job.kind, orderToken: job.orderToken,
         providerId: String(existingDelivery?.providerId || response?.id || ''), contentHash: job.contentHash, acceptedAt
@@ -218,13 +229,21 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       await env.STORE_STATE.delete(key);
       results.sent += 1;
     } catch (error) {
+      const failedBeforeProvider = deliveryStage !== 'provider';
+      if (deliveryStage === 'render') {
+        job.attempts = Number(job.attempts || 0) + 1;
+        job.firstAttemptAt = job.firstAttemptAt || now.toISOString();
+        job.lastAttemptAt = now.toISOString();
+        if (!job.contentHash) job.providerPayload = null;
+      }
       const firstAttemptMs = Date.parse(job.firstAttemptAt || '');
       const ambiguityExpired = error?.ambiguous && Number.isFinite(firstAttemptMs) && now.getTime() - firstAttemptMs > RESEND_IDEMPOTENCY_RETRY_WINDOW_MS;
-      if (!error?.retryable || ambiguityExpired) {
+      const retryable = error?.retryable === true || failedBeforeProvider;
+      if (!retryable || ambiguityExpired) {
         await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({
           version: 1, status: ambiguityExpired ? 'ambiguous' : 'failed', kind: job.kind, orderToken: job.orderToken,
           contentHash: job.contentHash, attempts: job.attempts,
-          lastError: { type: String(error?.type || error?.name || 'Error'), statusCode: Number(error?.statusCode || 0) || 0 }, updatedAt: now.toISOString()
+          lastError: deliveryErrorEvidence(error, deliveryStage), updatedAt: now.toISOString()
         }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
         await env.STORE_STATE.delete(key);
         results.failed += 1;
@@ -233,7 +252,7 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       const next = new Date(now.getTime() + retryDelayMs(error, job.attempts));
       job.status = 'retry';
       job.nextAttemptAt = next.toISOString();
-      job.lastError = { type: String(error?.type || error?.name || 'Error'), statusCode: Number(error?.statusCode || 0) || 0 };
+      job.lastError = deliveryErrorEvidence(error, deliveryStage);
       await env.STORE_STATE.put(key, JSON.stringify(job), { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
       hasPending = true;
       if (!nextDueAt || next.getTime() < Date.parse(nextDueAt)) nextDueAt = next.toISOString();
