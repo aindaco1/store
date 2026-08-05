@@ -13,6 +13,9 @@
   "devDependencies": {
     "wrangler": "^4.115.0"
   },
+  "overrides": {
+    "undici": "7.29.0"
+  },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
     "qrcode": "^1.5.4",
