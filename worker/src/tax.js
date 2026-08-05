@@ -1,4 +1,5 @@
 import SalesTax from 'sales-tax';
+import { calculateManualTax } from '../../shared/dust-wave-platform/packages/tax-core/src/index.js';
 
 import { normalizeDestinationCountry, normalizeDestinationPostalCode } from './destination-validation.js';
 import { getSalesTaxRate, getShippingOriginCountry } from './provider-config.js';
@@ -214,7 +215,10 @@ function buildFlatRateQuote(env = {}, {
   const normalizedSubtotal = Math.max(0, Number(subtotalCents) || 0);
   const normalizedShipping = Math.max(0, Number(shippingCents) || 0);
   const effectiveRate = getSalesTaxRate(env);
-  const taxCents = Math.round(normalizedSubtotal * effectiveRate);
+  const taxCents = calculateManualTax({
+    subtotalCents: Math.round(normalizedSubtotal),
+    ratePartsPerMillion: Math.round(effectiveRate * 1_000_000)
+  }).taxCents;
   const normalizedDestination = normalizeJurisdictionDestination(destination);
 
   return {

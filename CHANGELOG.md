@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.1.0 - Unreleased
+
+### Shared platform foundation
+
+- Added the pinned `aindaco1/dust-wave-platform` submodule as the versioned boundary for primitives shared with Pool, Dust Wave, and Podcast.
+- Moved the byte-identical Turnstile implementation into `@dustwave/worker-core` while retaining Store's local import seam and adding a consumer contract test.
+- Advanced the shared boundary to `@dustwave/worker-core` 0.2.0, which adds
+  typed product-neutral crypto and Stripe mechanics for Podcast without moving
+  Store business rules or changing Store's existing Turnstile adapter.
+- Kept Store's catalog, order, inventory, fulfillment, configuration, session, storage, and deployment authority independent; the submodule contains no Store data or secrets and can be rolled back by pointer.
+- Advanced the shared workspace to 0.6.0 and
+  `@dustwave/admin-shell` 0.2.0, moving Store and Pool's byte-identical QR
+  generator into the pinned shared boundary. Store still loads the same
+  characterized implementation through its static admin shell; only the
+  source authority and generated path changed.
+- Advanced the pinned shared workspace to 0.8.1 and
+  `@dustwave/admin-shell` 0.7.1. The additive rich-editor `setHtml` API routes
+  restored HTML through the existing allowlist sanitizer; Store behavior is
+  unchanged until a form opts into it, and rollback remains a one-commit
+  submodule-pointer change.
+- Advanced `@dustwave/admin-shell` to 0.8.1 and replaced Store's duplicated
+  dirty-action state logic, including product-order saving, with the shared
+  class, state-attribute, label, and clean-state disabling primitive. Store
+  retains its editor baselines, force-disabled rules, and focus-ring style.
+- Finished the v1.1.0 release identity across canonical site config and the
+  Worker provider User-Agent, with an executable contract that keeps both
+  package locks, both packages, config, Stripe, and Resend aligned.
+
 ## v1.0.9 - 2026-07-15
 
 ### Crawl integrity, policy clarity, and release hardening

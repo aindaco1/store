@@ -300,12 +300,16 @@
   <script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
   <script data-cfasync="false" src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
   <script data-cfasync="false" src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
-  <script data-cfasync="false" src="/assets/js/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
   <script
     data-cfasync="false"
     src="/assets/js/admin-dashboard.js?v={{ asset_version }}"
     defer
     data-admin-dashboard-script="true"
+    data-admin-download-module="/shared/dust-wave-platform/packages/admin-shell/src/credentialed-download.js?v={{ asset_version }}"
     data-canonical-site-url="{{ site.admin_production_site_url | default: admin_config.production_site_url | default: site.platform.site_url | default: site.url | escape }}"
     data-canonical-worker-base="{{ site.admin_production_worker_url | default: admin_config.production_worker_url | default: site.platform.worker_url | escape }}"
     data-marketing-default-utm-source="{{ site.marketing.default_utm_source | default: 'dustwave' | escape }}"

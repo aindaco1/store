@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const repoRoot = resolve(__dirname, '..', '..');
 
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -17,6 +21,16 @@ async function waitFor(predicate: () => boolean, timeoutMs = 1000) {
 }
 
 describe('admin Turnstile sign-in', () => {
+  it('reserves the shared compact challenge height at the narrow breakpoint', () => {
+    const adminStyles = readFileSync(
+      resolve(repoRoot, 'assets', 'partials', '_admin.scss'),
+      'utf8'
+    );
+    expect(adminStyles).toMatch(
+      /@media \(max-width: 339px\)[\s\S]+\.admin-auth__turnstile[\s\S]+min-height: 140px/
+    );
+  });
+
   beforeEach(() => {
     vi.resetModules();
     document.documentElement.lang = 'en';
@@ -39,6 +53,9 @@ describe('admin Turnstile sign-in', () => {
       i18n: { currentLang: 'en' },
       platform: { workerUrl: 'https://checkout.dustwave.xyz' }
     };
+    (window as any).DustWaveAdminShellTurnstile = {
+      responsiveSize: vi.fn(() => 'compact')
+    };
   });
 
   afterEach(() => {
@@ -46,6 +63,7 @@ describe('admin Turnstile sign-in', () => {
     document.head.innerHTML = '';
     document.body.innerHTML = '';
     delete (window as any).STORE_CONFIG;
+    delete (window as any).DustWaveAdminShellTurnstile;
     delete (window as any).turnstile;
   });
 
@@ -77,8 +95,14 @@ describe('admin Turnstile sign-in', () => {
       document.querySelector('[data-admin-turnstile-widget]'),
       expect.objectContaining({
         sitekey: 'site-key',
-        action: 'admin_login'
+        action: 'admin_login',
+        size: 'compact'
       })
+    );
+    expect(
+      (window as any).DustWaveAdminShellTurnstile.responsiveSize
+    ).toHaveBeenCalledWith(
+      document.querySelector('[data-admin-turnstile-widget]')
     );
 
     const email = document.getElementById('admin-email') as HTMLInputElement;

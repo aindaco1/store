@@ -2,6 +2,7 @@
   'use strict';
 
   var script = document.currentScript || document.querySelector('script[data-admin-dashboard-script]');
+  var credentialedDownloadModulePromise = null;
   var config = window.STORE_CONFIG || window.StoreConfig || {};
   var logger = window.StoreLogger && window.StoreLogger.createLogger
     ? window.StoreLogger.createLogger('admin')
@@ -259,14 +260,13 @@
   }
 
   function setDirtyButtonState(button, dirty, cleanText, dirtyText, options) {
-    if (!(button instanceof HTMLButtonElement)) return;
-    var opts = options || {};
-    button.classList.toggle('is-dirty', Boolean(dirty));
-    button.dataset.dirtyState = dirty ? 'dirty' : 'clean';
-    button.textContent = dirty ? dirtyText : cleanText;
-    if (opts.disableWhenClean !== false) {
-      button.disabled = !dirty || Boolean(opts.forceDisabled);
+    var sharedSetter = window.DustWaveAdminShellDirtyControls &&
+      window.DustWaveAdminShellDirtyControls.setDirtyButtonState;
+    if (typeof sharedSetter === 'function') {
+      return sharedSetter(button, dirty, cleanText, dirtyText, options);
     }
+    if (button instanceof HTMLButtonElement) button.disabled = true;
+    return false;
   }
 
   function setAdminLoginStartStatus(data) {
@@ -300,7 +300,9 @@
       action: 'admin_login',
       appearance: 'always',
       execution: 'render',
-      size: 'flexible',
+      size: window.DustWaveAdminShellTurnstile?.responsiveSize?.(
+        adminTurnstileWidgetRoot
+      ) || 'compact',
       theme: 'light',
       callback: function(token) {
         adminTurnstileToken = String(token || '');
@@ -405,19 +407,40 @@
     });
   }
 
+  function credentialedDownloads() {
+    var moduleUrl = String(
+      script && script.dataset
+        ? script.dataset.adminDownloadModule || ''
+        : ''
+    ).trim();
+    if (!moduleUrl) {
+      return Promise.reject(new Error('Shared download module is not configured.'));
+    }
+    if (!credentialedDownloadModulePromise) {
+      credentialedDownloadModulePromise = import(moduleUrl);
+    }
+    return credentialedDownloadModulePromise;
+  }
+
   function requestBlob(path, options) {
     var opts = options || {};
     var headers = new Headers(opts.headers || {});
     headers.set('Accept', opts.accept || 'text/csv');
-    return fetch(apiUrl(path, opts.params), {
-      method: opts.method || 'GET',
-      headers: headers,
-      credentials: 'include'
-    }).then(function(response) {
-      if (!response.ok) throw new Error('Download failed.');
-      return response.blob().then(function(blob) {
-        return { blob: blob, response: response };
+    return credentialedDownloads().then(function(tools) {
+      return tools.requestCredentialedBlob(apiUrl(path, opts.params), {
+        fetchImpl: fetch,
+        method: opts.method || 'GET',
+        headers: headers,
+        signal: opts.signal,
+        maximumBytes: 16 * 1024 * 1024,
+        allowedContentTypes: ['text/csv']
       });
+    });
+  }
+
+  function downloadBlobResult(result, fallbackFilename) {
+    return credentialedDownloads().then(function(tools) {
+      return tools.triggerBlobDownload(result, fallbackFilename);
     });
   }
 
@@ -426,16 +449,11 @@
     var status = opts.status || null;
     setStatus(status, opts.loadingMessage || 'Preparing CSV...');
     requestBlob(opts.path, { params: opts.params || {}, accept: opts.accept || 'text/csv' }).then(function(result) {
-      var disposition = result.response.headers.get('content-disposition') || '';
-      var filename = (disposition.match(/filename="?([^";]+)"?/i) || [])[1] || opts.fallbackFilename || 'store-export.csv';
-      var url = URL.createObjectURL(result.blob);
-      var link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+      return downloadBlobResult(
+        result,
+        opts.fallbackFilename || 'store-export.csv'
+      );
+    }).then(function() {
       setStatus(status, opts.completeMessage || 'CSV download started.');
     }).catch(function(error) {
       setStatus(status, formatError(error), true);
@@ -796,36 +814,40 @@
     button.dataset.adminPrepared = 'true';
   }
 
-  function ensureMobileSelect(tabList, labelText, onChange) {
-    if (!tabList) return null;
-    var sibling = tabList.nextElementSibling;
-    var wrapper = sibling && sibling.classList.contains('admin-mobile-tab-select') ? sibling : null;
-    if (!wrapper) {
-      wrapper = createElement('label', 'admin-mobile-tab-select');
-      var label = createElement('span', 'admin-mobile-tab-select__label', labelText || 'Section');
-      var select = document.createElement('select');
-      wrapper.appendChild(label);
-      wrapper.appendChild(select);
-      tabList.insertAdjacentElement('afterend', wrapper);
-      select.addEventListener('change', function() {
-        if (onChange) onChange(select.value);
-      });
-    }
-    return wrapper.querySelector('select');
-  }
-
   function syncMobileSelect(tabList, selector, activeValue, labelText, onChange) {
-    var select = ensureMobileSelect(tabList, labelText, onChange);
-    if (!select) return;
-    clear(select);
-    $all(selector, tabList).forEach(function(button) {
-      if (button.hidden) return;
-      var option = document.createElement('option');
-      option.value = button.dataset.adminTab || button.dataset.settingsSectionIndex || '';
-      option.textContent = button.getAttribute('aria-label') || button.textContent.trim();
-      select.appendChild(option);
+    if (!tabList) return;
+    var tabsApi = window.DustWaveAdminShellTabs;
+    if (!tabsApi?.mountResponsiveTabSelect) {
+      logger.error('Shared responsive admin tabs did not initialize.');
+      return;
+    }
+    tabsApi.mountResponsiveTabSelect(tabList, {
+      activeValue: activeValue || '',
+      activate: function(value, button) {
+        if (onChange) onChange(value);
+        else button.click();
+      },
+      buttonSelector: selector,
+      label: labelText || 'Section',
+      labelClass: 'admin-mobile-tab-select__label',
+      labelTag: 'span',
+      minimumTabs: 0,
+      optionLabel: function(button) {
+        return button.getAttribute('aria-label') || button.textContent.trim();
+      },
+      selectClass: '',
+      tabList: tabList,
+      tabs: function() {
+        return $all(selector, tabList).filter(function(button) {
+          return !button.hidden;
+        });
+      },
+      value: function(button) {
+        return button.dataset.adminTab || button.dataset.settingsSectionIndex || '';
+      },
+      wrapperClass: 'admin-mobile-tab-select',
+      wrapperTag: 'label'
     });
-    select.value = activeValue || '';
   }
 
   function setupAdminTabs() {
@@ -4233,9 +4255,7 @@
     var save = scope ? $('[data-store-products-order-save]', scope) : null;
     if (!save) return;
     var dirty = storeProductsOrderIsDirty();
-    save.disabled = !dirty;
-    save.classList.toggle('is-dirty', dirty);
-    save.dataset.dirtyState = dirty ? 'dirty' : 'clean';
+    setDirtyButtonState(save, dirty, save.textContent, save.textContent);
   }
 
   function syncStoreProductsControls(root) {
