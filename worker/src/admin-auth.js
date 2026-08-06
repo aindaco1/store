@@ -10,6 +10,13 @@ import {
   sha256Hex,
   timingSafeEqual
 } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
+import {
+  clearSessionCookie as serializeClearedSessionCookie,
+  createSessionCookie,
+  isTrustedSameOriginRequest,
+  signExpiringToken,
+  verifyExpiringToken
+} from '../../shared/dust-wave-platform/packages/worker-core/src/session-security.js';
 
 export const ADMIN_SESSION_COOKIE = 'store_admin_session';
 export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
@@ -143,34 +150,15 @@ function getAdminSecret(env) {
 const hmacSign = (secret, data) => hmacSha256(data, secret);
 
 async function signLoginToken(env, nonce, email, ttlSeconds = ADMIN_LOGIN_TTL_SECONDS) {
-  const payload = {
-    nonce,
-    email,
-    exp: Math.floor(Date.now() / 1000) + Math.max(60, Number(ttlSeconds || ADMIN_LOGIN_TTL_SECONDS) || ADMIN_LOGIN_TTL_SECONDS)
-  };
-  const payloadJson = JSON.stringify(payload);
-  const payloadB64 = btoa(payloadJson).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const signature = await hmacSign(getAdminSecret(env), payloadB64);
-  return `${payloadB64}.${signature}`;
+  return signExpiringToken({ nonce, email }, getAdminSecret(env), {
+    ttlSeconds: Math.max(60, Number(ttlSeconds || ADMIN_LOGIN_TTL_SECONDS) || ADMIN_LOGIN_TTL_SECONDS)
+  });
 }
 
 async function verifyLoginToken(env, token) {
-  if (!getAdminSecret(env)) return null;
-  const [payloadB64, signature] = String(token || '').split('.');
-  if (!payloadB64 || !signature) return null;
-  const expected = await hmacSign(getAdminSecret(env), payloadB64);
-  if (!timingSafeEqual(signature, expected)) return null;
-
-  try {
-    const normalized = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized.padEnd(normalized.length + ((4 - normalized.length % 4) % 4), '=');
-    const payload = JSON.parse(atob(padded));
-    if (!payload?.nonce || !payload?.email) return null;
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch {
-    return null;
-  }
+  return verifyExpiringToken(token, getAdminSecret(env), {
+    requiredClaims: ['nonce', 'email']
+  });
 }
 
 function getAdminCsrfHeader(request) {
@@ -188,27 +176,10 @@ function getAdminSiteOrigin(env) {
 }
 
 function isTrustedAdminOriginRequest(request, env) {
-  const expectedOrigin = getAdminSiteOrigin(env);
-  if (!expectedOrigin) return true;
-
-  const secFetchSite = String(request.headers.get('Sec-Fetch-Site') || '').trim().toLowerCase();
-  if (secFetchSite === 'cross-site') {
-    return false;
-  }
-
-  const origin = String(request.headers.get('Origin') || '').trim();
-  if (origin) {
-    return timingSafeEqual(origin, expectedOrigin);
-  }
-
-  const referer = String(request.headers.get('Referer') || '').trim();
-  if (!referer) return true;
-
-  try {
-    return timingSafeEqual(new URL(referer).origin, expectedOrigin);
-  } catch {
-    return false;
-  }
+  return isTrustedSameOriginRequest(request, getAdminSiteOrigin(env), {
+    allowMissingSource: true,
+    allowUnconfigured: true
+  });
 }
 
 function getSiteAdminPath(lang) {
@@ -437,20 +408,18 @@ export async function createAdminLoginUrl(env, {
 }
 
 function getSessionCookie(token, request, maxAge = ADMIN_SESSION_TTL_SECONDS) {
-  const secure = new URL(request.url).protocol === 'https:';
-  const parts = [
-    `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
-    'Path=/admin',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${Math.max(0, maxAge)}`
-  ];
-  if (secure) parts.push('Secure');
-  return parts.join('; ');
+  return createSessionCookie(ADMIN_SESSION_COOKIE, token, {
+    requestUrl: request.url,
+    path: '/admin',
+    maxAgeSeconds: Math.max(0, maxAge)
+  });
 }
 
 function clearSessionCookie(request) {
-  return getSessionCookie('', request, 0);
+  return serializeClearedSessionCookie(ADMIN_SESSION_COOKIE, {
+    requestUrl: request.url,
+    path: '/admin'
+  });
 }
 
 async function getStoredAdminUser(env, email) {

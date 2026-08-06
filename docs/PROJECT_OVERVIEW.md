@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.1.6`. The preceding `v1.1.5` release remains independently reversible. Store pins Platform v0.16.0 and consumes its characterized Resend/Svix verification, error metadata, and retry classification without moving provider transport, recipients, templates, outbox policy, webhook effects, catalog, checkout, inventory, credentials, storage, or deployment authority out of Store.
+Current release: `v1.1.7`. The preceding `v1.1.6` release remains independently reversible. Store pins Platform v0.17.0 and consumes its characterized signed-token, session-cookie, and same-origin mechanics without moving secret selection, notification-login policy, nonce/session records, roles/scopes, CSRF, routes, catalog, checkout, inventory, credentials, storage, or deployment authority out of Store.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 

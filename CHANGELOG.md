@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.1.7 - 2026-08-06
+
+### Shared session security mechanics
+
+- Advanced the immutable Platform pin to `v0.17.0`
+  (`3a526defd21d692292c73652966a044167f881d7`) and Worker Core `0.8.0`.
+- Replaced Store's characterized login-token encoding/verification,
+  session-cookie serialization/clearing, and same-origin request checks with
+  bounded shared primitives through thin Store policy adapters.
+- Preserved the exact secure admin cookie, current missing-origin-header and
+  local unconfigured-origin behavior, normal TTLs, the five-minute order-email
+  login and 30-minute notification session, one-time nonce consumption, and
+  independent rollback.
+- Added rejection coverage for extra token segments and retained existing
+  login replay, CSRF/origin, session-review, redacted-history, role/scope, and
+  notification-link coverage.
+- Store continues to own secret selection, login/session records, roles and
+  scopes, CSRF tokens and header names, routes, storage, email, credentials,
+  deployment, and rollback.
+
 ## v1.1.6 - 2026-08-06
 
 ### Shared Resend security and retry mechanics

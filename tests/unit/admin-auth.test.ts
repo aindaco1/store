@@ -112,6 +112,13 @@ describe('admin auth links', () => {
     });
     const token = new URL(loginUrl).searchParams.get('admin_login') || '';
 
+    const malformedResponse = await handleAdminAuthExchange(
+      new Request('https://shop.dustwave.xyz/admin/auth/exchange', { method: 'POST' }),
+      env,
+      { token: `${token}.suffix` }
+    );
+    expect(malformedResponse.status).toBe(401);
+
     const firstResponse = await handleAdminAuthExchange(
       new Request('https://shop.dustwave.xyz/admin/auth/exchange', { method: 'POST' }),
       env,
