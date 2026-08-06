@@ -202,7 +202,32 @@ describe('Store durable Resend email outbox', () => {
     const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
     const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${rawBody}`));
     const signature = btoa(String.fromCharCode(...new Uint8Array(digest)));
-    await expect(verifyResendWebhook(rawBody, { id, timestamp, signature: `v1,${signature}` }, secret, now)).resolves.toMatchObject({ valid: true, id });
+    await expect(verifyResendWebhook(rawBody, {
+      id,
+      timestamp,
+      signature: `v1,invalid v1,${signature}`
+    }, secret, now)).resolves.toMatchObject({ valid: true, id });
+    await expect(verifyResendWebhook(rawBody, {
+      id,
+      timestamp,
+      signature: `v1,${signature}`
+    }, secret, new Date(now.getTime() + 301_000))).resolves.toMatchObject({
+      valid: false,
+      error: 'timestamp_outside_tolerance'
+    });
+    await expect(verifyResendWebhook(rawBody, {
+      id,
+      timestamp,
+      signature: `v1,${signature}`
+    }, 'whsec_***', now)).resolves.toMatchObject({
+      valid: false,
+      error: 'invalid_secret'
+    });
+    await expect(verifyResendWebhook(`${rawBody} `, {
+      id,
+      timestamp,
+      signature: `v1,${signature}`
+    }, secret, now)).resolves.toEqual({ valid: false, id });
     const kv = new MemoryKV();
     const result = await processResendWebhook({ STORE_STATE: kv }, {
       type: 'email.bounced', created_at: now.toISOString(), data: {
