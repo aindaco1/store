@@ -58,4 +58,15 @@ describe('platform timezone utilities', () => {
     expect(isPlatformDatePast('2026-04-21', { PLATFORM_TIMEZONE: 'Asia/Tokyo' }, new Date('2026-04-21T15:00:00.000Z'))).toBe(true);
     expect(isPlatformDatePast('2026-04-21', { PLATFORM_TIMEZONE: 'America/Denver' }, new Date('2026-04-21T15:00:00.000Z'))).toBe(false);
   });
+
+  it('preserves Store date boundaries across 23-hour and 25-hour Denver days', () => {
+    expect(platformDateStart('2026-03-08', 'America/Denver').toISOString())
+      .toBe('2026-03-08T07:00:00.000Z');
+    expect(platformDateEnd('2026-03-08', 'America/Denver').toISOString())
+      .toBe('2026-03-09T05:59:59.000Z');
+    expect(platformDateStart('2026-11-01', 'America/Denver').toISOString())
+      .toBe('2026-11-01T06:00:00.000Z');
+    expect(platformDateEnd('2026-11-01', 'America/Denver').toISOString())
+      .toBe('2026-11-02T06:59:59.000Z');
+  });
 });

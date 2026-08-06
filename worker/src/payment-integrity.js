@@ -1,3 +1,4 @@
+import { randomToken } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import { createStripeClient, DEFAULT_STRIPE_API_VERSION } from './stripe.js';
 
 export const PROCESSOR_EVENT_PREFIX = 'processor-event:v1:';
@@ -18,7 +19,7 @@ function stripeMode(secretKey = '') {
 
 function eventKey(now = new Date()) {
   const timestamp = now.toISOString().replace(/[-:.TZ]/g, '');
-  const random = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2);
+  const random = randomToken(24);
   return `${PROCESSOR_EVENT_PREFIX}${timestamp}:${random}`;
 }
 

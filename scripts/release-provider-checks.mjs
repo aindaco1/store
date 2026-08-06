@@ -4,6 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import {
+  buildProviderEvidence,
+  providerEvidenceShouldFail
+} from '../shared/dust-wave-platform/packages/release-core/src/provider-evidence.js';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
 import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
@@ -66,18 +70,41 @@ function failOrWarn(label, detail) {
   add(strict ? 'FAIL' : 'WARN', label, detail);
 }
 
-function writeStructuredEvidence(summary) {
+function storeProviderEvidence(evidence) {
+  return {
+    schemaVersion: evidence.schemaVersion,
+    checkedAt: evidence.generatedAt,
+    strict: evidence.strict,
+    cloudflareDnsOnly: evidence.cloudflareDnsOnly,
+    summary: {
+      failCount: evidence.failCount,
+      warnCount: evidence.warnCount,
+      skipCount: evidence.skipCount
+    },
+    results: evidence.results,
+    containsCredentials: evidence.containsCredentials,
+    containsCustomerData: evidence.containsCustomerData
+  };
+}
+
+function writeStructuredEvidence(evidence) {
   if (!jsonOutput) return;
   const outputPath = path.resolve(jsonOutput);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(outputPath, `${JSON.stringify({
-    schemaVersion: 1,
-    checkedAt: new Date().toISOString(),
+  fs.writeFileSync(outputPath, `${JSON.stringify(storeProviderEvidence(evidence), null, 2)}\n`, { mode: 0o600 });
+}
+
+function finalizeResults() {
+  const evidence = buildProviderEvidence(results, {
     strict,
     cloudflareDnsOnly,
-    summary,
-    results
-  }, null, 2)}\n`, { mode: 0o600 });
+    usedDevVars: useDevVars
+  });
+  console.log('');
+  console.log(`Summary: ${evidence.failCount} fail, ${evidence.warnCount} warn, ${evidence.skipCount} skip`);
+  writeStructuredEvidence(evidence);
+  if (providerEvidenceShouldFail(evidence)) process.exitCode = 1;
+  return evidence;
 }
 
 function readKeyValueFile(filePath) {
@@ -521,14 +548,7 @@ async function main() {
   }
 
   if (cloudflareDnsOnly) {
-    const failCount = results.filter((entry) => entry.status === 'FAIL').length;
-    const warnCount = results.filter((entry) => entry.status === 'WARN').length;
-    const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
-    console.log('');
-    console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
-    writeStructuredEvidence({ failCount, warnCount, skipCount });
-
-    if (failCount || (strict && (warnCount || skipCount))) process.exit(1);
+    finalizeResults();
     return;
   }
 
@@ -604,14 +624,7 @@ async function main() {
     else add('FAIL', 'USPS quote smoke', String(result.stderr || result.stdout || 'npm run test:usps failed').split(/\r?\n/).filter(Boolean).slice(-1)[0] || 'npm run test:usps failed');
   }
 
-  const failCount = results.filter((entry) => entry.status === 'FAIL').length;
-  const warnCount = results.filter((entry) => entry.status === 'WARN').length;
-  const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
-  console.log('');
-  console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
-  writeStructuredEvidence({ failCount, warnCount, skipCount });
-
-  if (failCount || (strict && (warnCount || skipCount))) process.exit(1);
+  finalizeResults();
 }
 
 main().catch((error) => {

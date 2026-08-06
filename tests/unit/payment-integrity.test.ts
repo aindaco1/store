@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PROCESSOR_EVENT_RETENTION_SECONDS,
   createStoreStripeClient,
@@ -7,6 +7,8 @@ import {
 } from '../../worker/src/payment-integrity.js';
 
 describe('Store payment integrity evidence', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it('stores a bounded redacted processor event for 400 days', async () => {
     const put = vi.fn();
     const result = await recordStripeProcessorEvent({ STORE_STATE: { put } }, {
@@ -66,5 +68,16 @@ describe('Store payment integrity evidence', () => {
     });
     expect(result.record).toMatchObject({ status: 'open', severity: 'critical', reasons: ['amount_mismatch'] });
     expect(put.mock.calls[0][0]).toBe('reconciliation-break:v1:order-one');
+  });
+
+  it('fails closed when secure randomness is unavailable', async () => {
+    const put = vi.fn();
+    vi.stubGlobal('crypto', {});
+
+    await expect(recordStripeProcessorEvent({ STORE_STATE: { put } }, {
+      method: 'POST',
+      path: '/payment_intents'
+    })).rejects.toThrow();
+    expect(put).not.toHaveBeenCalled();
   });
 });
