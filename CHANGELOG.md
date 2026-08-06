@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.2 - 2026-08-06
+
+### Shared exact-duplicate extraction
+
+- Advanced the exact `dust-wave-platform` gitlink to immutable `v0.12.0`,
+  including `@dustwave/build-core` `0.1.0`, `@dustwave/site-shell` `0.1.0`,
+  `@dustwave/tax-core` `0.2.0`, and `@dustwave/worker-core` `0.4.0`.
+- Migrated the byte-identical header navigation, live announcements, Worker
+  timezone primitives, New Mexico GRT starter snapshot, updater, and generated
+  asset minifier to their pinned Platform sources.
+- Removed Store's duplicate implementation files while preserving its
+  characterization suites and executable exact-pin/source-path contract.
+- Retained Store ownership of templates, localization, catalog and product
+  content, tax-provider and taxability policy, checkout, orders, inventory,
+  fulfillment, credentials, storage, build orchestration, and deployment.
+- Recorded a one-commit, consumer-only rollback to `v1.1.1` and Platform
+  `v0.11.5`; Pool, Dust Wave, Podcast, and Platform do not need to roll back
+  with Store.
+
 ## v1.1.1 - 2026-08-06
 
 ### Public inventory accuracy

@@ -25,7 +25,7 @@ describe('header nav script', () => {
   });
 
   it('toggles and closes the mobile nav accessibly', async () => {
-    await import('../../assets/js/header-nav.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/header-nav-browser.js');
 
     const toggle = document.getElementById('menu-toggle') as HTMLButtonElement;
     const nav = document.getElementById('mobile-nav') as HTMLElement;
@@ -44,7 +44,7 @@ describe('header nav script', () => {
   });
 
   it('preserves the current query string and hash on language switcher links', async () => {
-    await import('../../assets/js/header-nav.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/header-nav-browser.js');
 
     const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
     expect(langLink.getAttribute('href')).toBe('/es/order-success/?orderId=order-123#section');
@@ -59,7 +59,7 @@ describe('header nav script', () => {
       <button id="menu-toggle" data-open-label="Open menu" data-close-label="Close menu" type="button"></button>
     `;
 
-    await import('../../assets/js/header-nav.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/header-nav-browser.js');
 
     const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
     expect(langLink.getAttribute('href')).toBe('/es/admin/?tab=orders#content');
@@ -70,7 +70,7 @@ describe('header nav script', () => {
     window.history.replaceState({}, '', '/es/admin/?admin_login=secret-token#reports');
     document.body.innerHTML = '<a href="/admin/" data-lang-switcher-link="true">English</a>';
 
-    await import('../../assets/js/header-nav.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/header-nav-browser.js');
 
     const langLink = document.querySelector('[data-lang-switcher-link="true"]') as HTMLAnchorElement;
     expect(langLink.getAttribute('href')).toBe('/admin/#reports');

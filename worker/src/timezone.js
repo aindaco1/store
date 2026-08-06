@@ -4,7 +4,7 @@ import {
   getTimeZoneOptions,
   isSupportedTimeZone,
   normalizeTimeZone
-} from './timezones.js';
+} from '../../shared/dust-wave-platform/packages/worker-core/src/timezones.js';
 
 export {
   DEFAULT_PLATFORM_TIME_ZONE,

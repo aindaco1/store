@@ -8,7 +8,7 @@ import {
   isMinifiableAssetPath,
   minifyAssetSource,
   minifySiteAssets
-} from '../../scripts/minify-site-assets.mjs';
+} from '../../shared/dust-wave-platform/packages/build-core/src/site-assets.js';
 
 const tempDirs: string[] = [];
 
