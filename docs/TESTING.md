@@ -48,7 +48,7 @@ Default Playwright specs:
 - `tests/e2e/public-page-controls.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
 
-These cover public layout/accessibility, product-card and product-detail controls, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
+These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 
@@ -62,6 +62,8 @@ npm run test:unit:coverage
 ```
 
 The coverage command uses the declared `@vitest/coverage-v8` provider and writes text plus local HTML reports. Coverage is diagnostic rather than a release percentage claim: risk-based route, security, Podman, and browser gates remain authoritative, and changes should add focused assertions for touched behavior instead of inflating totals with low-value execution.
+
+`tests/unit/public-store-inventory-endpoint.test.ts`, `tests/unit/store-inventory-projection.test.ts`, and `tests/unit/store-product-options.test.ts` prove that the public inventory route performs one cold projection read behind a fixed-key edge cache, strips limits/claims/product/customer metadata, fails closed without cacheable state, updates all tracked cards and variants from one request, and preserves sold-out controls.
 
 Focused Store runs:
 

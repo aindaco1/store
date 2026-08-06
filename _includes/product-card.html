@@ -286,6 +286,7 @@
               <option
                 value="{{ variant_id | escape }}"
                 data-label="{{ variant.label | default: variant.name | escape }}"
+                data-sku="{{ variant.sku | default: product.sku | default: product_id | escape }}"
                 data-price="{{ variant_price }}"
                 data-inventory="{{ variant_inventory }}"
                 data-inventory-configured="{{ variant_inventory_configured }}"
@@ -306,7 +307,7 @@
               {%- assign size_options = "XS,S,M,L,XL,2XL,3XL" | split: "," -%}
             {%- endunless -%}
             {%- for size in size_options -%}
-              <option value="{{ size | slugify }}" data-label="{{ size | escape }}" data-price="{{ product_price }}" data-inventory="{{ product_inventory }}" data-status="{{ product_status | escape }}">{{ size | escape }}</option>
+              <option value="{{ size | slugify }}" data-label="{{ size | escape }}" data-sku="{{ product.sku | default: product_id | escape }}" data-price="{{ product_price }}" data-inventory="{{ product_inventory }}" data-status="{{ product_status | escape }}">{{ size | escape }}</option>
             {%- endfor -%}
           </select>
         </div>

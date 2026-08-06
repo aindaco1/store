@@ -266,6 +266,41 @@ test.describe('Store Public Page Controls', () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test('homepage and product detail refresh the mug from confirmed live inventory', async ({ page }) => {
+    let inventoryRequests = 0;
+    await page.route('**/api/store/inventory', async (route: any) => {
+      inventoryRequests += 1;
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'access-control-allow-origin': '*',
+          'cache-control': 'public, max-age=15'
+        },
+        body: JSON.stringify({
+          ok: true,
+          status: 'ready',
+          inventory: {
+            'mug-1': { available: 4 }
+          }
+        })
+      });
+    });
+
+    await gotoDomReady(page, '/');
+    const homeMug = page.locator(PRODUCT_CARD).filter({ hasText: 'DUST WAVE Mug' });
+    await expect(homeMug.locator('[data-store-availability]')).toHaveText('Only 4 left');
+    await expect(homeMug.locator('.store-add-item')).toHaveAttribute('data-product-inventory', '4');
+    expect(inventoryRequests).toBe(1);
+
+    await gotoDomReady(page, '/products/dust-wave-mug/');
+    const detailMug = page.locator('.storefront__product-detail > .store-product-card').first();
+    await expect(detailMug.locator('[data-store-availability]')).toHaveText('Only 4 left');
+    await expect(detailMug.locator('.store-add-item')).toHaveAttribute('data-product-inventory', '4');
+    expect(inventoryRequests).toBe(2);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test('product quantity stepper updates the card button total', async ({ page }) => {
     await gotoDomReady(page, '/');
 

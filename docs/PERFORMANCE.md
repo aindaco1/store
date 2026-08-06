@@ -5,6 +5,7 @@ Store performance depends on static public pages, lazy cart loading, generated m
 ## Current Baseline
 
 - Public pages remain statically rendered and cart runtime loading remains lazy.
+- Inventory-tracked catalog pages make one non-blocking `GET /api/store/inventory` request per navigation and never poll. The response is a sanitized SKU/available projection from the existing Durable Object-synced KV key, is cached in the browser and Workers Cache for 15 seconds without stale serving, and never invokes the coordinator or scans orders.
 - Store order-derived reads share `admin-store-orders:index:v2`, including a deterministic non-PII watermark. Orders, Analytics, Film summaries, dashboard totals, and exports no longer require parallel order namespace scans. Live inventory availability is not order-derived; Products and Inventory reuse one SKU coordinator projection helper and perform no order scan.
 - Admin Orders can use Cloudflare Workers Cache through `CachedAdminStoreReads`; Analytics, inventory, and download readiness use the same policy entrypoint but remain off by default pending real-edge evidence.
 - Admin login no longer requests and discards `/admin/dashboard/summary`.
@@ -25,6 +26,7 @@ Store performance depends on static public pages, lazy cart loading, generated m
 ## Public Site
 
 - Product pages are statically rendered by Jekyll.
+- Static inventory is the no-JavaScript/failure fallback. When tracked products are present, one small live projection response updates every card and variant on the page; untracked catalog pages do not make the request.
 - Public cart runtime loads lazily.
 - Product images should use optimized source files and responsive derivatives.
 - Generated CSS/JS should stay minified.
@@ -44,6 +46,7 @@ npm run test:cache-policy
 ## Worker
 
 - Cart validation uses the generated catalog snapshot.
+- Public inventory reads use the existing `store-inventory:v1:store` derived projection, expose only per-SKU `available`, and perform one KV read on a cold edge-cache miss. Query strings are removed from the cache key to keep cardinality bounded. Active reservations intentionally remain coordinator-only; checkout revalidates all requested quantities authoritatively.
 - Checkout writes compact order drafts.
 - Inventory reads use SKU-level coordinator projections and overrides. Each explicit Products or Inventory refresh makes one coordinator request, regardless of catalog size.
 - Admin order/product/download/inventory views are explicit reads, not background polling.

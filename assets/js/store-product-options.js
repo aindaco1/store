@@ -6,6 +6,8 @@
   var productImageRecoveryReady = false;
   var productImageRefreshQueued = false;
   var maxProductImageRetries = 2;
+  var publicInventoryRequest = null;
+  var productOptionsScript = document.currentScript || document.querySelector('script[data-store-product-options-script]');
 
   function formatMoney(value) {
     var amount = Number(value || 0);
@@ -331,6 +333,7 @@
     return {
       id: option.value || '',
       label: option.getAttribute('data-label') || option.textContent.trim() || '',
+      sku: option.getAttribute('data-sku') || '',
       price: Number(option.getAttribute('data-price') || 0),
       inventory: Number(option.getAttribute('data-inventory') || 0),
       inventoryConfigured: option.getAttribute('data-inventory-configured') === 'true',
@@ -446,11 +449,87 @@
       : (total > 0 ? labelBase + ' - ' + formatMoney(total) : labelBase);
   }
 
+  function getWorkerBase() {
+    return String(
+      productOptionsScript?.dataset?.workerBase ||
+      window.StoreConfig?.workerBase ||
+      window.STORE_CONFIG?.workerBase ||
+      ''
+    ).replace(/\/+$/, '');
+  }
+
+  function normalizePublicAvailability(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    var available = Number(entry.available);
+    if (!Number.isFinite(available) || available < 0) return null;
+    return Math.floor(available);
+  }
+
+  function inventoryStatusIsUnavailable(value) {
+    var status = String(value || '').trim().toLowerCase();
+    return ['archived', 'archive', 'draft', 'sold_out', 'sold-out', 'unavailable'].indexOf(status) >= 0;
+  }
+
+  function applyPublicInventorySnapshot(snapshot) {
+    if (snapshot?.ok !== true || snapshot?.status !== 'ready' || !snapshot.inventory || typeof snapshot.inventory !== 'object') {
+      return false;
+    }
+
+    document.querySelectorAll('[data-store-product-controls]').forEach(function(controls) {
+      var button = getButton(controls);
+      if (!button || button.getAttribute('data-product-inventory-tracking') !== 'true') return;
+
+      var select = controls.querySelector('[data-store-variant-select]');
+      if (select) {
+        Array.prototype.forEach.call(select.options || [], function(option) {
+          var sku = option.getAttribute('data-sku') || '';
+          var available = normalizePublicAvailability(snapshot.inventory[sku]);
+          if (available === null) return;
+          option.setAttribute('data-inventory', String(available));
+          option.setAttribute('data-inventory-configured', 'true');
+          option.disabled = available <= 0 || inventoryStatusIsUnavailable(option.getAttribute('data-status'));
+        });
+      } else {
+        var sku = button.getAttribute('data-product-sku') || '';
+        var available = normalizePublicAvailability(snapshot.inventory[sku]);
+        if (available !== null) {
+          button.setAttribute('data-product-inventory', String(available));
+          button.setAttribute('data-product-inventory-configured', 'true');
+        }
+      }
+
+      syncControls(controls);
+    });
+
+    return true;
+  }
+
+  function refreshPublicInventory() {
+    if (publicInventoryRequest) return publicInventoryRequest;
+    var workerBase = getWorkerBase();
+    if (!workerBase || !document.querySelector('[data-product-inventory-tracking="true"]')) {
+      return Promise.resolve(false);
+    }
+
+    publicInventoryRequest = fetch(workerBase + '/api/store/inventory', {
+      headers: { Accept: 'application/json' }
+    }).then(function(response) {
+      if (!response.ok) throw new Error('Public inventory unavailable');
+      return response.json();
+    }).then(applyPublicInventorySnapshot).catch(function() {
+      return false;
+    }).finally(function() {
+      publicInventoryRequest = null;
+    });
+    return publicInventoryRequest;
+  }
+
   function initProductOptions() {
     document.querySelectorAll('[data-store-product-controls]').forEach(syncControls);
     initProductImageRecovery();
     initStorefrontFilters();
     initProductTitleFit();
+    refreshPublicInventory();
 
     document.addEventListener('change', function(event) {
       var controls = getControls(event.target);
@@ -476,6 +555,8 @@
 
     document.documentElement.dataset.storeProductOptionsReady = 'true';
     window.StoreProductOptions = Object.assign({}, window.StoreProductOptions, {
+      applyPublicInventorySnapshot: applyPublicInventorySnapshot,
+      refreshPublicInventory: refreshPublicInventory,
       refreshProductCardImages: refreshProductCardImages,
       retryProductCardImage: retryProductCardImage
     });
