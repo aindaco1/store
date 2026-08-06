@@ -427,10 +427,12 @@ function firstTokenChoice(choices) {
 async function main() {
   const wranglerContent = fs.existsSync(WRANGLER_PATH) ? fs.readFileSync(WRANGLER_PATH, 'utf8') : '';
   const vars = wranglerContent ? parseTomlVars(wranglerContent) : {};
+  const stagingVars = wranglerContent ? parseTomlVars(wranglerContent, '[env.staging.vars]') : {};
   const kvNamespaces = wranglerContent ? parseTomlBlocks(wranglerContent, 'kv_namespaces') : [];
   const r2Buckets = wranglerContent ? parseTomlBlocks(wranglerContent, 'r2_buckets') : [];
   const siteBase = vars.SITE_BASE || 'https://shop.dustwave.xyz';
   const workerBase = vars.WORKER_BASE || 'https://checkout.dustwave.xyz';
+  const testWorkerBase = envValue('STRIPE_TEST_WEBHOOK_BASE') || stagingVars.WORKER_BASE || workerBase;
   const siteHost = hostFromUrl(siteBase);
   const workerHost = hostFromUrl(workerBase);
 
@@ -578,16 +580,16 @@ async function main() {
 
   const stripeTestCli = listStripeWebhooksWithCli({ live: false, authState: stripeCliAuth });
   if (stripeTestCli.ok) {
-    const testEndpoint = findRequiredStripeWebhook(stripeTestCli.data, workerBase, { livemode: false });
+    const testEndpoint = findRequiredStripeWebhook(stripeTestCli.data, testWorkerBase, { livemode: false });
     if (testEndpoint) {
-      add('PASS', 'Stripe test webhook endpoint', `test endpoint targets ${workerBase}/webhooks/stripe with required events`);
+      add('PASS', 'Stripe test webhook endpoint', `test endpoint targets ${testWorkerBase}/webhooks/stripe with required events`);
     } else {
       add('WARN', 'Stripe test webhook endpoint', 'test endpoint not found with required payment_intent events; direct local webhook smoke can still cover settlement');
     }
   } else if (stripeKeyForReadiness().key) {
     const webhooks = await listStripeWebhooksWithApi(stripeKeyForReadiness().key);
     if (!webhooks.ok) add('WARN', 'Stripe test webhook endpoint', `test endpoint API returned ${webhooks.status || 'unavailable'}`);
-    else if (findRequiredStripeWebhook(webhooks.data, workerBase, { livemode: false })) add('PASS', 'Stripe test webhook endpoint', `test endpoint targets ${workerBase}/webhooks/stripe with required events`);
+    else if (findRequiredStripeWebhook(webhooks.data, testWorkerBase, { livemode: false })) add('PASS', 'Stripe test webhook endpoint', `test endpoint targets ${testWorkerBase}/webhooks/stripe with required events`);
     else add('WARN', 'Stripe test webhook endpoint', 'test endpoint not found with required payment_intent events; direct local webhook smoke can still cover settlement');
   } else {
     add('SKIP', 'Stripe test webhook endpoint', 'set STRIPE_SECRET_KEY_TEST or authenticate stripe CLI for test endpoint verification');

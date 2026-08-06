@@ -179,6 +179,23 @@ Use an existing recording instead with `--screen-reader-audio-file <recording>`.
 
 `npm run release:providers` is read-only. It checks public DNS and, when credentials or authenticated CLIs are present, GitHub deploy secret names, Cloudflare API/KV/R2/DNS records, Stripe webhook endpoints, Resend domains, and USPS quote fixtures. The probe uses `gh`, `wrangler`, and `stripe` CLI auth as fallback evidence without printing secrets. Stripe endpoint reads require a successful captured `stripe whoami`; a signed-out CLI is skipped without starting interactive login, and raw auth output is never included in evidence. `npm run release:payment-smoke` always runs payment contract checks; the release-grade mutation path is the direct local signed-webhook matrix with `PAYMENT_SMOKE_ALLOW_MUTATION=1`.
 
+Store also maintains a persistent provider-originated Stripe test path at
+`https://store-worker-staging.jogo.workers.dev/webhooks/stripe`. Its Wrangler
+environment has isolated KV/R2 state, no route or cron, no production provider
+credentials, and email dry-run mode. To prove Stripe delivery and settlement
+through that endpoint, run the paid-digital scenario with explicit staging
+URLs and `PAYMENT_SMOKE_CONFIRM=1`; the script blocks the production Worker by
+default:
+
+```bash
+PAYMENT_SMOKE_ALLOW_MUTATION=1 \
+PAYMENT_SMOKE_CONFIRM=1 \
+PAYMENT_SMOKE_SCENARIOS=paid-digital \
+PAYMENT_SMOKE_WORKER_URL=https://store-worker-staging.jogo.workers.dev \
+PAYMENT_SMOKE_SITE_URL=https://shop.dustwave.xyz \
+npm run release:payment-smoke
+```
+
 Release provider and payment probes read `worker/.dev.vars` by default, with shell environment values taking precedence. Use `--no-dev-vars` only for clean-shell CI probes. The direct local webhook path is:
 
 ```bash
@@ -265,6 +282,7 @@ Provider and runtime checks:
 - Worker secrets are set in Cloudflare, not in Git, including Stripe, Resend, admin session/login, checkout intent, magic link, download/order lookup, Turnstile, and USPS secrets as applicable.
 - Production runtime config uses `SITE_BASE=https://shop.dustwave.xyz`, `WORKER_BASE=https://checkout.dustwave.xyz`, `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`, `TAX_PROVIDER=nm_grt`, `SHIPPING_ORIGIN_ZIP=87120`, `SHIPPING_ORIGIN_COUNTRY=US`, and `USPS_ENABLED=true` unless intentionally changed.
 - Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes at least to `payment_intent.succeeded` and `payment_intent.payment_failed`.
+- Stripe test webhook endpoint targets `https://store-worker-staging.jogo.workers.dev/webhooks/stripe`, subscribes to the same two events, and uses `STRIPE_WEBHOOK_SECRET_TEST` only in the isolated staging Worker.
 - Resend sender domains and `ORDERS_EMAIL_FROM` / `UPDATES_EMAIL_FROM` are verified.
 - Resend delivery webhook targets `https://checkout.dustwave.xyz/webhooks/resend`, subscribes to delivered/bounced/complained/failed/suppressed events, and its signing secret is stored as `RESEND_WEBHOOK_SECRET`.
 - `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` are present in the deployed production binding summary; the admin readiness checks report their dependencies as ready.
