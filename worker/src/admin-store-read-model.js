@@ -140,6 +140,12 @@ export function buildStoreInventorySoldCountsFromOrders(orders = []) {
   let confirmedOrders = 0;
   for (const order of Array.isArray(orders) ? orders : []) {
     if (String(order?.status || '').trim().toLowerCase() !== 'confirmed') continue;
+    const source = String(order?.source || '').trim().toLowerCase();
+    const checkoutProvider = String(order?.checkoutProvider || '').trim().toLowerCase();
+    const paymentProvider = String(order?.payment?.provider || '').trim().toLowerCase();
+    if (order?.importedAt || source === 'snipcart' || checkoutProvider === 'snipcart' || paymentProvider === 'snipcart') {
+      continue;
+    }
     confirmedOrders += 1;
     for (const item of Array.isArray(order?.items) ? order.items : []) {
       const sku = String(item?.sku || '').trim();

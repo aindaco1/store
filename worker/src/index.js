@@ -97,6 +97,10 @@ import {
   parseReadModelTimestamp as parseTimestampMs
 } from './admin-store-read-model.js';
 import {
+  aggregateStoreInventoryAvailability,
+  buildStoreInventoryAvailability
+} from './store-inventory-projection.js';
+import {
   ADMIN_STORE_READ_CACHE_POLICIES,
   ADMIN_STORE_ORDER_INDEX_CACHE_CONTROL,
   ADMIN_STORE_ORDER_INDEX_CACHE_ENTRYPOINT,
@@ -2283,7 +2287,11 @@ async function getEffectiveStoreCatalogSnapshot(env) {
 }
 
 async function buildStoreCatalogInventorySnapshot(env) {
-  const catalog = normalizeStoreCatalogSnapshot(await getEffectiveStoreCatalogSnapshot(env));
+  return buildStoreCatalogInventorySnapshotFromCatalog(await getEffectiveStoreCatalogSnapshot(env));
+}
+
+function buildStoreCatalogInventorySnapshotFromCatalog(snapshot = {}) {
+  const catalog = normalizeStoreCatalogSnapshot(snapshot);
   const inventory = {};
 
   for (const product of catalog.products || []) {
@@ -2303,6 +2311,42 @@ async function buildStoreCatalogInventorySnapshot(env) {
   }
 
   return inventory;
+}
+
+async function readStoreInventoryCoordinatorSnapshot(env, catalogInventory = null) {
+  if (!hasStoreInventoryCoordinator(env)) {
+    return {
+      ok: false,
+      status: 'unavailable',
+      inventory: {},
+      reservedCounts: {},
+      updatedAt: null
+    };
+  }
+
+  try {
+    const snapshot = await callStoreInventoryCoordinator(env, '/snapshot', {
+      inventory: catalogInventory || await buildStoreCatalogInventorySnapshot(env)
+    });
+    return {
+      ok: snapshot?.success === true,
+      status: snapshot?.success === true ? 'ready' : 'unavailable',
+      inventory: snapshot?.inventory && typeof snapshot.inventory === 'object' ? snapshot.inventory : {},
+      reservedCounts: snapshot?.reservedCounts && typeof snapshot.reservedCounts === 'object'
+        ? snapshot.reservedCounts
+        : {},
+      updatedAt: snapshot?.updatedAt || null
+    };
+  } catch (_error) {
+    console.error('Failed to read Store inventory coordinator snapshot');
+    return {
+      ok: false,
+      status: 'unavailable',
+      inventory: {},
+      reservedCounts: {},
+      updatedAt: null
+    };
+  }
 }
 
 function buildStoreCatalogInventoryEntry(product = {}, variant = null) {
@@ -2550,6 +2594,7 @@ function buildAdminStoreInventoryReadPayload(snapshot = {}) {
   return {
     scope: STORE_ADMIN_SCOPE,
     rows: snapshot.rows,
+    availability: snapshot.availability,
     overridesUpdatedAt: snapshot.overridesUpdatedAt,
     updatedAt: snapshot.updatedAt,
     page: {
@@ -2557,18 +2602,13 @@ function buildAdminStoreInventoryReadPayload(snapshot = {}) {
       indexed: snapshot.indexed,
       truncated: snapshot.truncated,
       cache: snapshot.cache || null,
-      generatedAt: snapshot.ordersGeneratedAt || '',
-      latestKnownUpdatedAt: snapshot.latestKnownUpdatedAt || '',
-      watermark: snapshot.watermark || ''
+      generatedAt: snapshot.availability?.updatedAt || '',
+      latestKnownUpdatedAt: '',
+      watermark: ''
     },
     writeBudget: snapshot.writeBudget && typeof snapshot.writeBudget === 'object'
       ? adminReadBudget(snapshot.writeBudget)
-      : adminReadBudget({
-        kvListExpected: snapshot.cache?.hit ? 0 : (snapshot.listCalls ?? 1),
-        kvReadsExpected: snapshot.cache?.hit
-          ? (snapshot.cache?.source === 'kv_index' ? 1 : 0)
-          : snapshot.scanned
-      })
+      : adminReadBudget({ workersRequestsExpected: snapshot.availability?.status === 'ready' ? 1 : 0 })
   };
 }
 
@@ -2645,7 +2685,7 @@ async function readAdminStoreOrderScanThroughWorkersCache(env, ctx, auth) {
 
 async function buildAdminStoreCachedReadPayload(routeId, request, env, options = {}) {
   const auth = options.auth;
-  const orderSnapshot = ['orders', 'analytics', 'inventory'].includes(routeId)
+  const orderSnapshot = ['orders', 'analytics'].includes(routeId)
     ? await readAdminStoreOrderScanThroughWorkersCache(env, options.ctx || null, auth)
     : null;
   if (routeId === 'orders') {
@@ -2674,10 +2714,7 @@ async function buildAdminStoreCachedReadPayload(routeId, request, env, options =
     return { ok: true, payload };
   }
   if (routeId === 'inventory') {
-    const snapshot = await buildAdminStoreInventorySnapshot(env, {
-      ctx: options.ctx || null,
-      orderSnapshot
-    });
+    const snapshot = await buildAdminStoreInventorySnapshot(env);
     if (!snapshot.ok) {
       return { ok: false, response: privateJsonResponse({ error: snapshot.error }, snapshot.status || 503, env) };
     }
@@ -8106,7 +8143,7 @@ function buildAdminStoreInventoryRow({
   effectiveProduct = {},
   effectiveVariant = null,
   overrides = {},
-  soldBySku = {}
+  coordinator = null
 } = {}) {
   const productId = String(product.id || '').trim();
   const variantId = String(variant?.id || '').trim();
@@ -8114,8 +8151,7 @@ function buildAdminStoreInventoryRow({
   const configuredInventory = getConfiguredStoreInventory(variant?.inventory ?? product.inventory);
   const inventory = getConfiguredStoreInventory(effectiveVariant?.inventory ?? effectiveProduct.inventory);
   const overrideInventory = getStoreInventoryOverrideValue(overrides, productId, variantId);
-  const sold = Math.max(0, Number(soldBySku[sku] || 0) || 0);
-  const remaining = inventory === null ? null : Math.max(0, inventory - sold);
+  const availability = buildStoreInventoryAvailability({ sku, baseline: inventory, coordinator });
   return {
     productId,
     variantId,
@@ -8130,16 +8166,17 @@ function buildAdminStoreInventoryRow({
     inventory,
     overrideInventory,
     hasOverride: overrideInventory !== null,
-    sold,
-    remaining,
-    soldOut: remaining === null ? false : remaining <= 0
+    ...availability,
+    soldOut: availability.available === null ? false : availability.available <= 0,
+    inventoryUpdatedAt: coordinator?.updatedAt || null
   };
 }
 
 function buildAdminStoreProductRow({
   product = {},
   effectiveProduct = {},
-  overrides = {}
+  overrides = {},
+  coordinator = null
 } = {}) {
   const productId = String(product.id || '').trim();
   const sku = String(product.sku || product.id || '').trim();
@@ -8163,6 +8200,17 @@ function buildAdminStoreProductRow({
   const inventory = inventoryValues.every((value) => value !== null)
     ? inventoryValues.reduce((sum, value) => sum + value, 0)
     : null;
+  const availability = variantCount
+    ? aggregateStoreInventoryAvailability(variants.map((variant) => {
+      const variantId = String(variant?.id || '');
+      const effectiveVariant = effectiveVariantsById.get(variantId) || variant;
+      return buildStoreInventoryAvailability({
+        sku: String(variant?.sku || product.sku || product.id || '').trim(),
+        baseline: getConfiguredStoreInventory(effectiveVariant?.inventory),
+        coordinator
+      });
+    }))
+    : buildStoreInventoryAvailability({ sku, baseline: inventory, coordinator });
   const overrideInventory = getStoreInventoryOverrideValue(overrides, productId, '');
   const variantOverrideCount = variants.filter((variant) => (
     getStoreInventoryOverrideValue(overrides, productId, String(variant?.id || '').trim()) !== null
@@ -8209,6 +8257,8 @@ function buildAdminStoreProductRow({
     inventoryTracking: product.inventory_tracking === true,
     configuredInventory,
     inventory,
+    ...availability,
+    inventoryUpdatedAt: coordinator?.updatedAt || null,
     overrideInventory,
     hasOverride: overrideInventory !== null || variantOverrideCount > 0,
     variantOverrideCount,
@@ -9710,6 +9760,10 @@ async function buildAdminStoreProductsSnapshot(env) {
     buildAdminStoreDownloadsSnapshot(env)
   ]);
   const effectiveSnapshot = applyStoreInventoryOverridesToSnapshot(baseSnapshot, overrides);
+  const coordinator = await readStoreInventoryCoordinatorSnapshot(
+    env,
+    buildStoreCatalogInventorySnapshotFromCatalog(effectiveSnapshot)
+  );
   const baseCatalog = normalizeStoreCatalogSnapshot(baseSnapshot);
   const effectiveCatalog = normalizeStoreCatalogSnapshot(effectiveSnapshot);
   const catalogProducts = [...(baseCatalog.products || [])].sort(compareAdminStoreProducts);
@@ -9726,7 +9780,8 @@ async function buildAdminStoreProductsSnapshot(env) {
     rows.push(buildAdminStoreProductRow({
       product,
       effectiveProduct,
-      overrides
+      overrides,
+      coordinator
     }));
   }
 
@@ -9766,6 +9821,10 @@ async function buildAdminStoreProductsSnapshot(env) {
       sourceHash: baseCatalog.sourceHash,
       shippingPresets: Object.keys(baseCatalog.shipping?.presets || {})
     },
+    availability: {
+      status: coordinator.status,
+      updatedAt: coordinator.updatedAt
+    },
     overridesUpdatedAt: overrides.updatedAt || null,
     updatedAt: new Date().toISOString()
   };
@@ -9784,9 +9843,13 @@ async function handleAdminStoreProducts(request, env) {
     counts: snapshot.counts,
     downloads: snapshot.downloads,
     catalog: snapshot.catalog,
+    availability: snapshot.availability,
     overridesUpdatedAt: snapshot.overridesUpdatedAt,
     updatedAt: snapshot.updatedAt,
-    writeBudget: adminReadBudget({ kvListExpected: 0 })
+    writeBudget: adminReadBudget({
+      kvListExpected: 0,
+      workersRequestsExpected: hasStoreInventoryCoordinator(env) ? 1 : 0
+    })
   }, 200, env);
 }
 
@@ -10827,17 +10890,16 @@ async function handleAdminStoreProductOrderPublish(request, env) {
   }, 200, env);
 }
 
-async function buildAdminStoreInventorySnapshot(env, options = {}) {
+async function buildAdminStoreInventorySnapshot(env) {
   const baseSnapshot = getStoreCatalogSnapshot(env);
   const overrides = await getStoreInventoryOverrides(env);
   const effectiveSnapshot = applyStoreInventoryOverridesToSnapshot(baseSnapshot, overrides);
   const baseCatalog = normalizeStoreCatalogSnapshot(baseSnapshot);
   const effectiveCatalog = normalizeStoreCatalogSnapshot(effectiveSnapshot);
-  const sold = await buildStoreInventorySoldCounts(env, {
-    ctx: options.ctx || null,
-    orderSnapshot: options.orderSnapshot || null
-  });
-  if (!sold.ok) return sold;
+  const coordinator = await readStoreInventoryCoordinatorSnapshot(
+    env,
+    buildStoreCatalogInventorySnapshotFromCatalog(effectiveSnapshot)
+  );
 
   const rows = [];
   for (const product of baseCatalog.products || []) {
@@ -10855,7 +10917,7 @@ async function buildAdminStoreInventorySnapshot(env, options = {}) {
           effectiveProduct,
           effectiveVariant: effectiveVariants.get(String(variant?.id || '')) || null,
           overrides,
-          soldBySku: sold.soldBySku
+          coordinator
         }));
       }
       continue;
@@ -10865,24 +10927,28 @@ async function buildAdminStoreInventorySnapshot(env, options = {}) {
       product,
       effectiveProduct,
       overrides,
-      soldBySku: sold.soldBySku
+      coordinator
     }));
   }
 
   return {
     ok: true,
     rows,
+    availability: {
+      status: coordinator.status,
+      updatedAt: coordinator.updatedAt
+    },
     overridesUpdatedAt: overrides.updatedAt || null,
     updatedAt: new Date().toISOString(),
-    scanned: sold.scanned,
-    indexed: sold.indexed,
-    listCalls: sold.listCalls,
-    truncated: sold.truncated,
-    cache: sold.cache || null,
-    ordersGeneratedAt: sold.generatedAt || '',
-    latestKnownUpdatedAt: sold.latestKnownUpdatedAt || '',
-    watermark: sold.watermark || '',
-    writeBudget: sold.writeBudget || null
+    scanned: 0,
+    indexed: 0,
+    listCalls: 0,
+    truncated: false,
+    cache: null,
+    writeBudget: adminReadBudget({
+      kvListExpected: 0,
+      workersRequestsExpected: hasStoreInventoryCoordinator(env) ? 1 : 0
+    })
   };
 }
 
@@ -10978,16 +11044,18 @@ async function mutateStoreInventoryOverride(env, mutation = {}) {
       configuredInventory: before.configuredInventory,
       inventory: before.inventory,
       overrideInventory: before.overrideInventory,
-      sold: before.sold,
-      remaining: before.remaining,
+      claimed: before.claimed,
+      reserved: before.reserved,
+      available: before.available,
       hasOverride: Boolean(before.hasOverride)
     },
     after: {
       configuredInventory: after?.configuredInventory ?? null,
       inventory: after?.inventory ?? null,
       overrideInventory: after?.overrideInventory ?? null,
-      sold: after?.sold ?? 0,
-      remaining: after?.remaining ?? null,
+      claimed: after?.claimed ?? null,
+      reserved: after?.reserved ?? null,
+      available: after?.available ?? null,
       hasOverride: Boolean(after?.hasOverride)
     },
     storageWrite: persistResult.storageWrite,
@@ -11001,7 +11069,7 @@ async function handleAdminStoreInventory(request, env, ctx = null) {
 
   const cached = await tryAdminStoreReadWorkersCache(request, env, ctx, auth, 'inventory');
   if (cached.response) return cached.response;
-  const snapshot = await buildAdminStoreInventorySnapshot(env, { ctx });
+  const snapshot = await buildAdminStoreInventorySnapshot(env);
   if (!snapshot.ok) {
     return privateJsonResponse({ error: snapshot.error }, snapshot.status || 503, env);
   }
@@ -11047,7 +11115,12 @@ async function handleAdminStoreInventoryMutation(request, env, ctx = null) {
       success: true,
       mutation,
       auditKey,
-      writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: mutation.storageWrite ? 2 : 1, kvListExpected: 2 })
+      writeBudget: adminWriteBudget({
+        readOnly: false,
+        kvWritesExpected: mutation.storageWrite ? 2 : 1,
+        kvListExpected: 0,
+        workersRequestsExpected: hasStoreInventoryCoordinator(env) ? 2 : 0
+      })
     }, 200, env);
   } catch (error) {
     return privateJsonResponse({
@@ -15043,7 +15116,7 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['cache.workers_telemetry_enabled', { label: 'Workers Cache telemetry enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls sanitized Analytics Engine cache status, latency, response-size, and operation-budget evidence without customer or order identifiers.' }],
   ['cache.workers_admin_orders_enabled', { label: 'Workers Cache admin Orders enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls the route-level Workers Cache gateway for non-search admin Orders list reads.' }],
   ['cache.workers_admin_analytics_enabled', { label: 'Workers Cache admin Analytics enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached order-derived Analytics reads.' }],
-  ['cache.workers_admin_inventory_enabled', { label: 'Workers Cache admin Inventory enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached order-derived inventory summary reads.' }],
+  ['cache.workers_admin_inventory_enabled', { label: 'Workers Cache admin Inventory enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached coordinator-backed inventory summary reads.' }],
   ['cache.workers_admin_downloads_enabled', { label: 'Workers Cache admin Downloads enabled', type: 'boolean', layoutGroup: 'performance', help: 'Controls cached R2-backed download readiness reads.' }],
   ['debug.console_logging_enabled', { label: 'Console logging enabled', type: 'boolean', layoutGroup: 'debug' }],
   ['debug.verbose_console_logging', { label: 'Verbose console logging', type: 'boolean', layoutGroup: 'debug' }]

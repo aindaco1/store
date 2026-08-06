@@ -199,10 +199,10 @@ Effective availability combines:
 
 - configured catalog inventory
 - admin baseline override
-- confirmed sold-count projection
+- committed claims in the SKU inventory Durable Object
 - active checkout reservations
 
-The checkout path consults the reservation-aware coordinator before committing scarce SKU quantities.
+The checkout path consults the reservation-aware coordinator before committing scarce SKU quantities. Historical imports remain available to order reporting and payment reconciliation, but they never decrement current availability or seed claimed inventory during recovery.
 
 ## Admin Publishing Workflow
 

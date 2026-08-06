@@ -5,6 +5,7 @@ import { STORE_INVENTORY_RECONCILIATION_ACKNOWLEDGEMENT } from '../../worker/src
 
 class MockKVNamespace {
   store = new Map<string, string>();
+  listPrefixes: string[] = [];
 
   async get(key: string, options?: { type?: string }) {
     const value = this.store.get(key);
@@ -21,6 +22,7 @@ class MockKVNamespace {
   }
 
   async list({ prefix = '' }: { prefix?: string } = {}) {
+    this.listPrefixes.push(prefix);
     return {
       keys: Array.from(this.store.keys()).filter((key) => key.startsWith(prefix)).map((name) => ({ name })),
       list_complete: true
@@ -119,7 +121,96 @@ async function reconcileRequest(env: any, ctx: any, session: any, body: Record<s
   }), env, ctx);
 }
 
+async function inventoryCoordinatorRequest(env: any, path: string, body: Record<string, unknown>) {
+  const id = env.STORE_INVENTORY_COORDINATOR.idFromName('store');
+  return env.STORE_INVENTORY_COORDINATOR.get(id).fetch(`https://store-inventory-coordinator${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope: 'store', ...body })
+  });
+}
+
 describe('reviewed Store inventory recovery endpoint', () => {
+  it('projects coordinator availability without scanning historical imported orders', async () => {
+    const env = buildEnvironment();
+    const ctx = buildContext();
+    const session = await adminSession(env, ctx, 'maker@example.com');
+    const inventory = { 'mug-1': { limit: 5, claimed: 0 } };
+
+    const reserved = await inventoryCoordinatorRequest(env, '/reserve-selection', {
+      inventory,
+      reservationId: 'store-order-native-live',
+      nextCounts: { 'mug-1': 1 }
+    });
+    expect(reserved.status).toBe(200);
+    const confirmed = await inventoryCoordinatorRequest(env, '/confirm-reservation', {
+      inventory,
+      reservationId: 'store-order-native-live'
+    });
+    expect(confirmed.status).toBe(200);
+
+    await env.STORE_STATE.put('orders:store-order-snipcart-history', JSON.stringify({
+      orderToken: 'store-order-snipcart-history',
+      status: 'confirmed',
+      source: 'snipcart',
+      checkoutProvider: 'snipcart',
+      importedAt: '2026-07-01T12:00:00.000Z',
+      orderDraft: {
+        status: 'confirmed',
+        items: [{ sku: 'mug-1', quantity: 2 }]
+      },
+      payment: { required: true, provider: 'snipcart', status: 'succeeded' }
+    }));
+    await env.STORE_STATE.put('orders:store-order-native-live', JSON.stringify({
+      orderToken: 'store-order-native-live',
+      status: 'confirmed',
+      orderDraft: {
+        status: 'confirmed',
+        items: [{ sku: 'mug-1', quantity: 1 }]
+      },
+      payment: { required: false, provider: null, status: 'not_required' }
+    }));
+
+    for (const route of ['products', 'inventory']) {
+      const response = await worker.fetch(new Request(`${env.WORKER_BASE}/admin/store/${route}`, {
+        headers: {
+          Cookie: session.cookie,
+          Origin: env.SITE_BASE,
+          'CF-Connecting-IP': '127.0.0.20'
+        }
+      }), env, ctx);
+      const body = await response.json();
+      expect(response.status, JSON.stringify(body)).toBe(200);
+      expect(response.headers.get('cache-control')).toContain('private');
+      expect(response.headers.get('cache-control')).toContain('no-store');
+      expect(body.availability).toMatchObject({ status: 'ready' });
+      expect(body.rows.find((row: any) => row.sku === 'mug-1')).toMatchObject({
+        inventory: 5,
+        coordinatorLimit: 5,
+        claimed: 1,
+        reserved: 0,
+        available: 4,
+        remaining: 4,
+        availabilityStatus: 'ready',
+        baselineInSync: true
+      });
+    }
+
+    expect(env.STORE_STATE.listPrefixes).not.toContain('orders:');
+
+    const planned = await reconcileRequest(env, ctx, session, { action: 'plan' });
+    const plan = await planned.json();
+    expect(planned.status, JSON.stringify(plan)).toBe(200);
+    expect(plan.reconciliation).toMatchObject({
+      matches: true,
+      totals: {
+        currentClaimed: 1,
+        expectedClaimed: 1,
+        differingSkus: 0
+      }
+    });
+  });
+
   it('requires distinct authenticated super-admins and exact execution interlocks', async () => {
     const env = buildEnvironment();
     const ctx = buildContext();

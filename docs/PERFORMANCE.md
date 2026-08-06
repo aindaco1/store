@@ -5,7 +5,7 @@ Store performance depends on static public pages, lazy cart loading, generated m
 ## Current Baseline
 
 - Public pages remain statically rendered and cart runtime loading remains lazy.
-- Store order-derived reads share `admin-store-orders:index:v2`, including a deterministic non-PII watermark. Orders, Analytics, inventory sold counts, Film summaries, dashboard totals, and exports no longer require parallel order namespace scans.
+- Store order-derived reads share `admin-store-orders:index:v2`, including a deterministic non-PII watermark. Orders, Analytics, Film summaries, dashboard totals, and exports no longer require parallel order namespace scans. Live inventory availability is not order-derived; Products and Inventory reuse one SKU coordinator projection helper and perform no order scan.
 - Admin Orders can use Cloudflare Workers Cache through `CachedAdminStoreReads`; Analytics, inventory, and download readiness use the same policy entrypoint but remain off by default pending real-edge evidence.
 - Admin login no longer requests and discards `/admin/dashboard/summary`.
 - Order Success adds totals and fulfillment details without adding new public bundle dependencies.
@@ -45,7 +45,7 @@ npm run test:cache-policy
 
 - Cart validation uses the generated catalog snapshot.
 - Checkout writes compact order drafts.
-- Inventory reads use SKU-level projections and overrides.
+- Inventory reads use SKU-level coordinator projections and overrides. Each explicit Products or Inventory refresh makes one coordinator request, regardless of catalog size.
 - Admin order/product/download/inventory views are explicit reads, not background polling.
 - Scheduled work is limited to bounded heartbeat writes, opted-in abandoned-checkout reminders, due event reminders, and recent error/observability summaries.
 - Queue-state markers avoid scanning reminder prefixes when cron has no known pending work.
@@ -60,7 +60,7 @@ The `CachedAdminStoreReads` policy registry owns canonical paths/query fields, n
 | --- | --- | --- | --- |
 | `/admin/store/orders` | `max-age=15`, no stale serving | disabled after failed benefit gate | order-index KV read or cold order list/get scan |
 | `/admin/store/analytics` | `max-age=60, stale-while-revalidate=120` | disabled | order snapshot and referral-label KV reads |
-| `/admin/store/inventory` | `max-age=15`, no stale serving | disabled | order snapshot/list/get work |
+| `/admin/store/inventory` | `max-age=15`, no stale serving | disabled | one inventory coordinator snapshot request |
 | `/admin/store/downloads` | `max-age=30`, no stale serving | disabled | R2 list/readiness work |
 
 The gateway authenticates every request, strips credentials/CSRF, and passes only props version, route, normalized role, scope key, and Store access scope. Inner responses are public-cacheable; outer browser responses remain `private, no-store`.
@@ -72,7 +72,7 @@ Orders keys accept only safe filter/page/locale fields plus validated ISO `since
 Performance expectations:
 
 - every `ctx.exports.fetch()` is an additional billed Workers request, including a cache hit; the benefit is avoided inner CPU and backend reads, not a lower request count
-- order mutations invalidate Orders, Analytics, and order-derived inventory; inventory, download-library, and referral mutations invalidate their dependent policies
+- order mutations invalidate Orders and Analytics; inventory, product, download-library, and referral mutations invalidate their dependent policies
 - the materialized v2 order index uses a seven-day safety TTL because every order-changing path explicitly invalidates it; this avoids a measured periodic full-order rescan while retaining bounded recovery from a missed invalidation
 - a required index rebuild lists order keys once and reads values through memory-bounded [Workers KV bulk reads](https://developers.cloudflare.com/kv/api/read-key-value-pairs/) of at most 100 keys; the production 417-order shape therefore uses five external KV read operations instead of 417 sequential operations, while `kvReadsExpected` remains per-key because Cloudflare bills a bulk read per key
 - a controlled production invalidation reduced the cold Orders rebuild from `53,109 ms` to `1,658 ms` (96.9 percent); the steady-state no-change repeat was a `5 ms` `HIT` with zero order-data KV reads/lists
