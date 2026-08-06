@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '7ed3d9b0220b88126235a3b7edfd507f8846f56d';
+const expectedCommit = '499e6c1994d79be6049ef204fefd728f22b8093e';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.29.0',
+  '@dustwave/platform-workspace': '0.30.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
-  '@dustwave/design-core': '0.1.0',
+  '@dustwave/design-core': '0.2.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.2.0',
@@ -72,6 +72,9 @@ describe('shared platform pin', () => {
       'packages/design-core/styles/_base.scss',
       'packages/design-core/styles/_buttons.scss',
       'packages/design-core/styles/_content-blocks.scss',
+      'packages/design-core/styles/_forms.scss',
+      'packages/design-core/styles/_layout.scss',
+      'packages/design-core/styles/_mixins.scss',
       'packages/design-core/styles/_modal.scss',
       'packages/design-core/styles/_utilities.scss',
       'packages/inventory-core/src/index.js',
@@ -120,6 +123,9 @@ describe('shared platform pin', () => {
       '_base.scss',
       '_buttons.scss',
       '_content-blocks.scss',
+      '_forms.scss',
+      '_layout.scss',
+      '_mixins.scss',
       '_modal.scss',
       '_utilities.scss'
     ];
@@ -130,6 +136,20 @@ describe('shared platform pin', () => {
     expect(localDuplicates.filter((name) =>
       existsSync(`${repositoryRoot}/assets/partials/${name}`)
     )).toEqual([]);
+  });
+
+  it('injects the reviewed Store compile-time layout policy', () => {
+    const mainStyles = readFileSync(`${repositoryRoot}/assets/main.scss`, 'utf8');
+    const adminStyles = readFileSync(`${repositoryRoot}/assets/admin.scss`, 'utf8');
+
+    expect(mainStyles).toContain('$dustwave-fit-layout-gutter-mode: width;');
+    expect(mainStyles).toContain('$dustwave-brand-title-animation-name: store-brand-shimmer;');
+    expect(mainStyles).toContain('$dustwave-brand-title-xsm-font-size: clamp(22px, 7vw, 30px);');
+    expect(mainStyles).toContain('@import "mixins";');
+    expect(mainStyles).toContain('@import "layout";');
+    expect(mainStyles).toContain('@import "forms";');
+    expect(adminStyles).toContain('$dustwave-fit-layout-gutter-mode: width;');
+    expect(adminStyles).toContain('@import "mixins";');
   });
 
   it('keeps the Jekyll shipping-country snapshot byte-identical to Platform', () => {
