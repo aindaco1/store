@@ -651,6 +651,18 @@ async function configureSecrets() {
     return;
   }
 
+  if (options.dryRun) {
+    logStep('Configure Cloudflare Worker secrets');
+    logInfo(`[dry-run] collect and set secret names only: ${WORKER_SECRETS.map(({ name }) => name).join(', ')}`);
+    if (options.skipGithub) {
+      logInfo('GitHub secret setup skipped');
+      return;
+    }
+    logStep('Configure GitHub repository secrets');
+    logInfo(`[dry-run] collect and set secret names only: ${GITHUB_SECRETS.map(({ name }) => name).join(', ')}`);
+    return;
+  }
+
   logStep('Configure Cloudflare Worker secrets');
   const workerValues = await collectSecretValues(WORKER_SECRETS);
   for (const [name, value] of Object.entries(workerValues)) {

@@ -31,7 +31,7 @@ describe('site asset minification', () => {
     expect(isMinifiableAssetPath('_site/assets/vendor/library.js')).toBe(false);
   });
 
-  it('minifies JavaScript without rewriting global names', async () => {
+  it('minifies local identifiers without rewriting global names', async () => {
     const source = `
       window.StoreExample = window.StoreExample || {};
       function verboseGlobalName(value) {
@@ -44,7 +44,8 @@ describe('site asset minification', () => {
 
     expect(minified.length).toBeLessThan(source.length);
     expect(minified).toContain('window.StoreExample');
-    expect(minified).toContain('function verboseGlobalName(value)');
+    expect(minified).toContain('function verboseGlobalName(');
+    expect(minified).not.toContain('function verboseGlobalName(value)');
     expect(minified).not.toContain('\n      ');
   });
 

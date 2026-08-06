@@ -96,7 +96,7 @@ async function minifyAssetSourceOnce(source, repoPath) {
       target: 'es2018',
       minifySyntax: true,
       minifyWhitespace: true,
-      minifyIdentifiers: false,
+      minifyIdentifiers: true,
       legalComments: 'none'
     });
     return result.code.trimEnd();
