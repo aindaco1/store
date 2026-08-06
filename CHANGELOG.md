@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.1.1 - Unreleased
+## v1.1.1 - 2026-08-06
 
 ### Public inventory accuracy
 
