@@ -161,6 +161,7 @@ Inventory truth for scarce Store SKUs is coordinated by `STORE_INVENTORY_COORDIN
 - Admin baseline writes are scoped admin mutations and audited.
 - Super-admin audit CSV export is read-only, authenticated, and limited to recent KV-backed admin mutation events.
 - Public/catalog inventory displays are projections and should not be treated as authoritative checkout inputs.
+- `GET /api/store/inventory` publishes only SKU keys already present in the public catalog and non-negative confirmed availability from `store-inventory:v1:store`. It excludes limits, claims, reservations, product metadata, orders, customers, and admin state; failures are `no-store`, while ready projections use a fixed-key 15-second public cache without stale serving. Checkout still performs the reservation-aware authoritative check.
 
 ## Digital Downloads
 

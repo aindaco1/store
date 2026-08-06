@@ -2,10 +2,38 @@ import { describe, expect, it } from 'vitest';
 
 import {
   aggregateStoreInventoryAvailability,
+  buildPublicStoreInventoryProjection,
   buildStoreInventoryAvailability
 } from '../../worker/src/store-inventory-projection.js';
 
 describe('Store inventory availability projection', () => {
+  it('publishes only confirmed availability from the derived projection', () => {
+    expect(buildPublicStoreInventoryProjection({
+      'mug-1': {
+        limit: 5,
+        claimed: 1,
+        productId: 'mug-1',
+        name: 'DUST WAVE Mug'
+      },
+      'sold-out': { limit: 1, claimed: 4 },
+      'private-sku': { limit: 3, claimed: 0 },
+      malformed: { limit: 'unknown', claimed: 0 }
+    }, new Set(['mug-1', 'sold-out', 'malformed']))).toEqual({
+      ok: true,
+      status: 'ready',
+      inventory: {
+        'mug-1': { available: 4 },
+        'sold-out': { available: 0 }
+      }
+    });
+
+    expect(buildPublicStoreInventoryProjection(null)).toEqual({
+      ok: false,
+      status: 'unavailable',
+      inventory: {}
+    });
+  });
+
   it('uses committed claims and active reservations from the coordinator', () => {
     expect(buildStoreInventoryAvailability({
       sku: 'mug-1',

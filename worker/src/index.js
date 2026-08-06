@@ -2,6 +2,7 @@
  * Store Worker
  *
  * Routes:
+ *   GET  /api/store/inventory   - Read the public confirmed-inventory projection
  *   POST /api/cart/validate      - Validate a first-party Store cart
  *   POST /api/checkout/intent    - Create a Store Stripe Checkout intent
  *   GET  /api/orders/:token      - Read Store order details
@@ -98,6 +99,7 @@ import {
 } from './admin-store-read-model.js';
 import {
   aggregateStoreInventoryAvailability,
+  buildPublicStoreInventoryProjection,
   buildStoreInventoryAvailability
 } from './store-inventory-projection.js';
 import {
@@ -2094,6 +2096,70 @@ async function handleGetAddOnInventory(env) {
 }
 
 const STORE_INVENTORY_SCOPE = 'store';
+const STORE_INVENTORY_PROJECTION_KEY = `store-inventory:v1:${STORE_INVENTORY_SCOPE}`;
+const PUBLIC_STORE_INVENTORY_CACHE_CONTROL = 'public, max-age=15, s-maxage=15';
+
+function getPublicStoreInventoryCacheRequest(request) {
+  const url = new URL(request.url);
+  url.search = '';
+  return new Request(url.toString(), { method: 'GET' });
+}
+
+function getPublicStoreInventorySkus(env) {
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  const skus = new Set();
+  for (const product of catalog.products || []) {
+    const status = String(product?.status || 'active').trim().toLowerCase();
+    if (product?.public === false || product?.type === 'archive' || !['active', 'sold_out'].includes(status)) continue;
+    if (product?.inventory_tracking !== true) continue;
+
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    if (variants.length > 0) {
+      for (const variant of variants) {
+        const sku = String(variant?.sku || product?.sku || product?.id || '').trim();
+        if (sku) skus.add(sku);
+      }
+      continue;
+    }
+
+    const sku = String(product?.sku || product?.id || '').trim();
+    if (sku) skus.add(sku);
+  }
+  return skus;
+}
+
+async function handleGetPublicStoreInventory(request, env, ctx = null) {
+  if (!env?.STORE_STATE?.get) {
+    return jsonResponse(buildPublicStoreInventoryProjection(null), 503, env, true, {
+      'Cache-Control': 'no-store'
+    });
+  }
+
+  try {
+    const edgeCache = globalThis.caches?.default || null;
+    const cacheRequest = edgeCache ? getPublicStoreInventoryCacheRequest(request) : null;
+    const cachedResponse = cacheRequest
+      ? await edgeCache.match(cacheRequest).catch(() => null)
+      : null;
+    if (cachedResponse) return cachedResponse;
+
+    const projection = await env.STORE_STATE.get(STORE_INVENTORY_PROJECTION_KEY, { type: 'json' });
+    const snapshot = buildPublicStoreInventoryProjection(projection, getPublicStoreInventorySkus(env));
+    const response = jsonResponse(snapshot, snapshot.ok ? 200 : 503, env, true, {
+      'Cache-Control': snapshot.ok ? PUBLIC_STORE_INVENTORY_CACHE_CONTROL : 'no-store'
+    });
+    if (snapshot.ok && edgeCache && cacheRequest) {
+      const cacheWrite = edgeCache.put(cacheRequest, response.clone()).catch(() => {});
+      if (ctx?.waitUntil) ctx.waitUntil(cacheWrite);
+      else await cacheWrite;
+    }
+    return response;
+  } catch (_error) {
+    return jsonResponse(buildPublicStoreInventoryProjection(null), 503, env, true, {
+      'Cache-Control': 'no-store'
+    });
+  }
+}
 
 function hasStoreInventoryCoordinator(env) {
   return !!env?.STORE_INVENTORY_COORDINATOR;
@@ -3313,6 +3379,10 @@ export default {
         });
         if (!rl.allowed) return rl.response;
         return withObservedOperation(env, ctx, 'store_cart_validate', () => handleStoreCartValidate(request, env));
+      }
+
+      if (path === '/api/store/inventory' && method === 'GET') {
+        return handleGetPublicStoreInventory(request, env, ctx);
       }
 
       if ((path === '/api/checkout/intent' || path === '/checkout/intent') && method === 'POST') {

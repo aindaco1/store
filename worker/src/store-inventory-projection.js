@@ -16,6 +16,38 @@ function unavailableAvailability() {
   };
 }
 
+export function buildPublicStoreInventoryProjection(projection, allowedSkus = null) {
+  if (!projection || typeof projection !== 'object' || Array.isArray(projection)) {
+    return {
+      ok: false,
+      status: 'unavailable',
+      inventory: {}
+    };
+  }
+
+  const inventory = {};
+  for (const [rawSku, entry] of Object.entries(projection)) {
+    const sku = String(rawSku || '').trim();
+    if (!sku || !entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (allowedSkus instanceof Set && !allowedSkus.has(sku)) continue;
+
+    const rawLimit = Number(entry.limit);
+    const rawClaimed = Number(entry.claimed);
+    if (!Number.isFinite(rawLimit) || rawLimit < 0 || !Number.isFinite(rawClaimed) || rawClaimed < 0) continue;
+    const limit = nonNegativeInteger(rawLimit);
+    const claimed = nonNegativeInteger(rawClaimed);
+    inventory[sku] = {
+      available: Math.max(0, limit - claimed)
+    };
+  }
+
+  return {
+    ok: true,
+    status: 'ready',
+    inventory
+  };
+}
+
 export function buildStoreInventoryAvailability({
   sku = '',
   baseline = null,

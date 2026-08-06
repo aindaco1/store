@@ -297,6 +297,8 @@ Default Store routes:
 - `/api/products.json`
 - `/api/add-ons.json`
 
+Inventory-tracked home and product pages make one non-blocking read from the Worker route `GET /api/store/inventory`. The route sanitizes the existing Durable Object-synced `store-inventory:v1:store` KV projection to per-SKU confirmed availability, uses a short public cache, and does not poll or call the coordinator. The static catalog count remains the no-JavaScript/network-failure fallback; cart validation and checkout remain authoritative and include active reservations.
+
 Public document prefetch is intentionally narrow:
 
 - allowed: home, Terms, and product detail pages, including localized public equivalents
