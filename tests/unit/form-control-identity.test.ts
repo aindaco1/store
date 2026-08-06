@@ -3,6 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 describe('Store form control identity helper', () => {
   beforeEach(() => {
     vi.resetModules();
+    document.head.innerHTML = `
+      <script
+        data-dustwave-form-control-identity="true"
+        data-form-control-id-prefix="store-form-control"
+        data-identity-dataset-keys="storeMarketingCopy,storeAnalyticsExport,action,itemId,scrollTarget">
+      </script>
+    `;
     document.body.innerHTML = `
       <button type="button" data-action="save">Save</button>
       <input type="text" aria-label="Search">
@@ -13,13 +20,14 @@ describe('Store form control identity helper', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    document.head.innerHTML = '';
     document.body.innerHTML = '';
-    delete (window as any).StoreFormControlIdentity;
+    delete (window as any).DustWaveFormControlIdentity;
   });
 
   it('adds ids to nameless first-party controls without changing named controls', async () => {
-    await import('../../assets/js/form-control-identity.js');
-    (window as any).StoreFormControlIdentity.start(document);
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/form-control-identity-browser.js');
+    (window as any).DustWaveFormControlIdentity.start(document);
 
     const button = document.querySelector('button[data-action="save"]') as HTMLButtonElement;
     const input = document.querySelector('input[aria-label="Search"]') as HTMLInputElement;
@@ -36,8 +44,8 @@ describe('Store form control identity helper', () => {
   });
 
   it('observes controls inserted after startup', async () => {
-    await import('../../assets/js/form-control-identity.js');
-    (window as any).StoreFormControlIdentity.start(document);
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/form-control-identity-browser.js');
+    (window as any).DustWaveFormControlIdentity.start(document);
 
     const late = document.createElement('button');
     late.type = 'button';

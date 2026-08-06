@@ -77,10 +77,10 @@ describe('Store SEO templates', () => {
     expect(imageFilters).toContain('def local_responsive_image_srcset');
     expect(cartRuntimeHead).toContain('<link rel="preconnect" href="https://use.typekit.net" crossorigin>');
     expect(cartRuntimeHead).toContain('data-deferred-stylesheet="true"');
-    expect(cartRuntimeHead).toContain('/assets/js/deferred-stylesheets.js');
+    expect(cartRuntimeHead).toContain('/shared/dust-wave-platform/packages/site-shell/src/deferred-stylesheets-browser.js');
     expect(cartRuntimeHead).not.toContain('fonts.googleapis.com');
     expect(cartRuntimeFoot).toContain('/assets/js/store-config.js?v={{ asset_version }}');
-    expect(cartRuntimeFoot).toContain('/assets/js/form-control-identity.js?v={{ asset_version }}');
+    expect(cartRuntimeFoot).toContain('{% include form-control-identity-script.html asset_version=asset_version %}');
     expect(cartRuntimeFoot).toContain('/assets/js/cart-runtime-loader.js?v={{ asset_version }}');
     expect(cartRuntimeFoot).toContain('data-store-cart-root="true"');
     expect(cartRuntimeFoot).toContain('data-store-cart-runtime-loader="true"');
@@ -206,7 +206,7 @@ describe('Store SEO templates', () => {
       ['assets', 'js', 'store-config.js'],
       ['assets', 'js', 'logger.js'],
       ['assets', 'js', 'video-first-frame-poster.js'],
-      ['assets', 'js', 'form-control-identity.js'],
+      ['shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'form-control-identity-browser.js'],
       [
         'shared',
         'dust-wave-platform',
