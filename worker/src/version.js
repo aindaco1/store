@@ -1,2 +1,2 @@
-export const WORKER_VERSION = '1.1.12';
+export const WORKER_VERSION = '1.1.13';
 export const WORKER_USER_AGENT = `store-worker/${WORKER_VERSION}`;

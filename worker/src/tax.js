@@ -4,10 +4,15 @@ import { calculateManualTax } from '../../shared/dust-wave-platform/packages/tax
 import { normalizeDestinationCountry, normalizeDestinationPostalCode } from './destination-validation.js';
 import { getSalesTaxRate, getShippingOriginCountry } from './provider-config.js';
 import { NM_GRT_STARTER_LOCATIONS } from '../../shared/dust-wave-platform/packages/tax-core/src/nm-grt-starter.js';
+import {
+  buildZipTaxAddress,
+  lookupNewMexicoGrt,
+  lookupZipTax,
+  normalizeTaxProviderSource,
+  parseNewMexicoStreetAddress
+} from '../../shared/dust-wave-platform/packages/tax-core/src/provider.js';
 
 const TAX_PROVIDERS = ['flat', 'offline_rules', 'external', 'zip_tax', 'nm_grt'];
-const DEFAULT_ZIP_TAX_API_BASE = 'https://api.zip-tax.com';
-const DEFAULT_NM_GRT_API_BASE = 'https://grt.edacnm.org';
 const US_STATE_ZIP_RANGES = [
   ['AL', 35000, 36999],
   ['AK', 99500, 99999],
@@ -71,28 +76,6 @@ const US_STATE_ZIP_RANGES = [
   ['PR', 600, 999],
   ['VI', 800, 899]
 ];
-const STREET_SUFFIX_MAP = new Map([
-  ['ALLEY', 'ALY'],
-  ['AVENUE', 'AVE'],
-  ['AVE', 'AVE'],
-  ['BOULEVARD', 'BLVD'],
-  ['BLVD', 'BLVD'],
-  ['CIRCLE', 'CIR'],
-  ['COURT', 'CT'],
-  ['DRIVE', 'DR'],
-  ['DR', 'DR'],
-  ['HIGHWAY', 'HWY'],
-  ['LANE', 'LN'],
-  ['PLACE', 'PL'],
-  ['ROAD', 'RD'],
-  ['RD', 'RD'],
-  ['STREET', 'ST'],
-  ['ST', 'ST'],
-  ['TERRACE', 'TER'],
-  ['TRAIL', 'TRL'],
-  ['WAY', 'WAY']
-]);
-const STREET_DIRECTIONS = new Set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW']);
 
 export function getTaxProvider(env = {}) {
   const configured = String(env.TAX_PROVIDER || 'flat').trim().toLowerCase();
@@ -320,28 +303,11 @@ async function quoteZipTax(env = {}, {
     throw new Error('ZIP_TAX_API_KEY is required when TAX_PROVIDER=zip_tax');
   }
 
-  const apiBase = String(env.ZIP_TAX_API_BASE || DEFAULT_ZIP_TAX_API_BASE).trim().replace(/\/+$/, '');
-  const address = buildZipTaxAddress(normalizedDestination);
-  const response = await fetch(
-    `${apiBase}/request/v60?address=${encodeURIComponent(address)}&format=json&addressDetailExtended=true`,
-    {
-      method: 'GET',
-      headers: {
-        'X-API-KEY': apiKey
-      }
-    }
-  );
-
-  const payload = await response.json().catch(() => ({}));
-  const responseCode = Number(payload?.metadata?.response?.code || 0);
-  if (!response.ok || responseCode !== 100) {
-    const message = String(
-      payload?.metadata?.response?.message ||
-      payload?.message ||
-      'Tax lookup failed'
-    ).trim();
-    throw new Error(message || 'Tax lookup failed');
-  }
+  const payload = await lookupZipTax({
+    apiKey,
+    address: buildZipTaxAddress(normalizedDestination),
+    ...(env.ZIP_TAX_API_BASE ? { apiBase: env.ZIP_TAX_API_BASE } : {})
+  });
 
   const salesSummary = Array.isArray(payload?.taxSummaries)
     ? payload.taxSummaries.find((summary) => String(summary?.taxType || '').trim().toUpperCase() === 'SALES_TAX')
@@ -404,7 +370,7 @@ async function quoteNewMexicoGrossReceiptsTax(env = {}, {
     : { ...normalizedDestination, state: 'NM' };
 
   const starterMatch = findNmStarterLocation(nmDestination);
-  const parsedStreet = parseStreetAddress(nmDestination?.line1 || '');
+  const parsedStreet = parseNewMexicoStreetAddress(nmDestination?.line1 || '');
   if (parsedStreet && nmDestination.city && nmDestination.postalCode) {
     try {
       return await quoteNmGrtApi(env, {
@@ -449,29 +415,13 @@ async function quoteNmGrtApi(env = {}, {
   parsedStreet,
   starterMatch = null
 } = {}) {
-  const apiBase = String(env.NM_GRT_API_BASE || DEFAULT_NM_GRT_API_BASE).trim().replace(/\/+$/, '');
-  const params = new URLSearchParams({
-    street_number: parsedStreet.streetNumber,
-    street_name: parsedStreet.streetName,
+  const result = await lookupNewMexicoGrt({
+    street: parsedStreet,
     city: destination.city,
-    zipcode: destination.postalCode
+    postalCode: destination.postalCode,
+    county: starterMatch?.county || '',
+    ...(env.NM_GRT_API_BASE ? { apiBase: env.NM_GRT_API_BASE } : {})
   });
-  if (parsedStreet.preDirection) params.set('pre_direction', parsedStreet.preDirection);
-  if (parsedStreet.streetSuffix) params.set('street_suffix', parsedStreet.streetSuffix);
-  if (parsedStreet.postDirection) params.set('street_post_directional', parsedStreet.postDirection);
-  if (starterMatch?.county) params.set('county', starterMatch.county);
-
-  const response = await fetch(`${apiBase}/api/by_address?${params.toString()}`, {
-    method: 'GET',
-    headers: {
-      'Accept': 'application/json'
-    }
-  });
-  const payload = await response.json().catch(() => ({}));
-  const result = Array.isArray(payload?.results) ? payload.results[0] : null;
-  if (!response.ok || !result || result.success !== true) {
-    throw new Error('New Mexico GRT lookup failed');
-  }
 
   const effectiveRate = Math.max(0, Number(result.tax_rate) || 0) / 100;
   const taxableSubtotalCents = Math.max(0, Number(subtotalCents) || 0);
@@ -479,7 +429,7 @@ async function quoteNmGrtApi(env = {}, {
 
   return {
     provider: 'nm_grt',
-    source: `nm_grt_api_${normalizeProviderSource(result.source || 'free_api')}`,
+    source: `nm_grt_api_${normalizeTaxProviderSource(result.source || 'free_api')}`,
     taxCents,
     effectiveRate,
     taxableSubtotalCents,
@@ -579,18 +529,6 @@ function buildZipTaxJurisdiction(payload, destination) {
   };
 }
 
-function buildZipTaxAddress(destination) {
-  const parts = [
-    destination?.line1,
-    destination?.line2,
-    destination?.city,
-    destination?.state,
-    destination?.postalCode,
-    destination?.country
-  ].filter(Boolean);
-  return parts.join(', ');
-}
-
 function normalizeJurisdictionDestination(destination) {
   if (!destination || typeof destination !== 'object') {
     return null;
@@ -660,56 +598,4 @@ function normalizeNmCityName(value) {
     .toUpperCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '');
-}
-
-function parseStreetAddress(line1) {
-  const trimmed = String(line1 || '').trim();
-  const match = trimmed.match(/^(\d+)\s+(.+)$/);
-  if (!match) return null;
-
-  const streetNumber = match[1];
-  const tokens = match[2].trim().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return null;
-
-  let preDirection = '';
-  let postDirection = '';
-  let streetSuffix = '';
-
-  if (tokens.length > 1 && STREET_DIRECTIONS.has(tokens[0].toUpperCase())) {
-    preDirection = tokens.shift().toUpperCase();
-  }
-  if (tokens.length > 1 && STREET_DIRECTIONS.has(tokens[tokens.length - 1].toUpperCase())) {
-    postDirection = tokens.pop().toUpperCase();
-  }
-  if (tokens.length > 1) {
-    const suffixCandidate = normalizeStreetSuffix(tokens[tokens.length - 1]);
-    if (suffixCandidate) {
-      streetSuffix = suffixCandidate;
-      tokens.pop();
-    }
-  }
-
-  const streetName = tokens.join(' ').trim();
-  if (!streetName) return null;
-
-  return {
-    streetNumber,
-    preDirection,
-    streetName,
-    streetSuffix,
-    postDirection
-  };
-}
-
-function normalizeStreetSuffix(value) {
-  const normalized = String(value || '').trim().toUpperCase().replace(/\./g, '');
-  return STREET_SUFFIX_MAP.get(normalized) || '';
-}
-
-function normalizeProviderSource(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '') || 'free_api';
 }
