@@ -4,13 +4,14 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '3a526defd21d692292c73652966a044167f881d7';
+const expectedCommit = '3b8bdacc224bda625103718ba0fa8489517ff993';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.17.0',
+  '@dustwave/platform-workspace': '0.18.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
   '@dustwave/media-core': '0.3.0',
   '@dustwave/release-core': '0.1.0',
+  '@dustwave/shipping-core': '0.1.0',
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.2.0',
   '@dustwave/timed-text': '0.5.0',
@@ -42,6 +43,7 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/packages/build-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
       'shared/dust-wave-platform/packages/release-core/package.json',
+      'shared/dust-wave-platform/packages/shipping-core/package.json',
       'shared/dust-wave-platform/packages/site-shell/package.json',
       'shared/dust-wave-platform/packages/tax-core/package.json',
       'shared/dust-wave-platform/packages/timed-text/package.json',
@@ -77,6 +79,7 @@ describe('shared platform pin', () => {
       'packages/release-core/src/kv-backup-records.js',
       'packages/release-core/src/provider-evidence.js',
       'packages/release-core/src/wrangler-config.js',
+      'packages/shipping-core/src/index.js',
       'scripts/scan-tracked-secrets.mjs'
     ];
 

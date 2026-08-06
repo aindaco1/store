@@ -12,39 +12,34 @@ import {
   isUspsEnabled
 } from './provider-config.js';
 import { normalizeDestinationCountry, normalizeDestinationPostalCode } from './destination-validation.js';
+import {
+  SHIPPING_OPTION_STANDARD,
+  buildFallbackShippingQuote as buildCoreFallbackShippingQuote,
+  buildFreeShippingQuote as buildCoreFreeShippingQuote,
+  buildManualDomesticRateQuote,
+  buildStandardOnlyShippingOptions,
+  getAddOnShippingProfile,
+  getAvailableShippingOptions as getCoreAvailableShippingOptions,
+  getSelectedShippingOptionDetails,
+  getSupportItemShippingProfile,
+  getTierShippingProfile,
+  isShippingMetadataError,
+  resolveSelectedShippingOption,
+  summarizePhysicalSelectionWithoutMetadata,
+  summarizeShipmentSelection
+} from '../../shared/dust-wave-platform/packages/shipping-core/src/index.js';
 
-const DEFAULT_DIMENSION_INCHES = 1;
-const SHIPPING_OPTION_STANDARD = 'standard';
-const SHIPPING_OPTION_SIGNATURE_REQUIRED = 'signature_required';
-const SHIPPING_OPTION_ADULT_SIGNATURE_REQUIRED = 'adult_signature_required';
-const USPS_SIGNATURE_REQUIRED_FEE_CENTS = 395;
-const USPS_ADULT_SIGNATURE_REQUIRED_FEE_CENTS = 970;
 const USPS_DOMESTIC_MAIL_CLASSES = ['USPS_GROUND_ADVANTAGE', 'PRIORITY_MAIL'];
 const USPS_INTERNATIONAL_MAIL_CLASSES = [
   'FIRST-CLASS_PACKAGE_INTERNATIONAL_SERVICE',
   'PRIORITY_MAIL_INTERNATIONAL'
 ];
-const MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT = 'FIRST_CLASS_FLAT';
-const FIRST_CLASS_FLAT_MIN_LENGTH_IN = 11.5;
-const FIRST_CLASS_FLAT_MAX_LENGTH_IN = 15;
-const FIRST_CLASS_FLAT_MIN_WIDTH_IN = 6.125;
-const FIRST_CLASS_FLAT_MAX_WIDTH_IN = 12;
-const FIRST_CLASS_FLAT_MAX_HEIGHT_IN = 0.75;
-const FIRST_CLASS_FLAT_MAX_WEIGHT_OZ = 13;
-const FIRST_CLASS_FLAT_RATE_TABLE_CENTS = {
-  1: 163,
-  2: 190,
-  3: 217,
-  4: 244,
-  5: 272,
-  6: 300,
-  7: 328,
-  8: 356,
-  9: 384,
-  10: 414,
-  11: 444,
-  12: 474,
-  13: 504
+export {
+  getAddOnShippingProfile,
+  getSelectedShippingOptionDetails,
+  getSupportItemShippingProfile,
+  getTierShippingProfile,
+  resolveSelectedShippingOption
 };
 let cachedUspsToken = null;
 let cachedUspsQuoteResults = new Map();
@@ -83,437 +78,26 @@ export function normalizeShippingDestination(address = {}) {
   };
 }
 
-export function getTierShippingProfile(tier = {}) {
-  if (tier?.category !== 'physical') {
-    return { valid: true, shipping: null };
-  }
-
-  return normalizeShippingProfile(
-    tier?.shipping,
-    `Physical tier "${tier?.id || 'unknown'}"`
-  );
-}
-
-export function getSupportItemShippingProfile(supportItem = {}) {
-  if (supportItem?.category !== 'physical') {
-    return { valid: true, shipping: null };
-  }
-
-  return normalizeShippingProfile(
-    supportItem?.shipping,
-    `Physical support item "${supportItem?.id || 'unknown'}"`
-  );
-}
-
-export function getAddOnShippingProfile(addOn = {}) {
-  if (addOn?.category !== 'physical') {
-    return { valid: true, shipping: null };
-  }
-
-  return normalizeShippingProfile(
-    addOn?.shipping,
-    `Physical add-on "${addOn?.productId || addOn?.name || 'unknown'}"`
-  );
-}
-
-function normalizeShippingProfile(shipping, label) {
-  if (!shipping || typeof shipping !== 'object') {
-    return { valid: false, error: `${label} is missing shipping metadata` };
-  }
-
-  const weightOz = Number(shipping.weight_oz);
-  const lengthIn = Number(shipping.length_in);
-  const widthIn = Number(shipping.width_in);
-  const heightIn = Number(shipping.height_in);
-  const packagingWeightOz = Number(shipping.packaging_weight_oz);
-  const stackHeightIn = Number(shipping.stack_height_in);
-  const uspsDomesticProfile = normalizeUspsDomesticProfile(shipping.usps_domestic);
-  const manualDomesticRate = normalizeManualDomesticRate(shipping.manual_domestic_rate || shipping.manualDomesticRate);
-
-  if (!(Number.isFinite(weightOz) && weightOz > 0)) {
-    return { valid: false, error: `${label} is missing a valid weight` };
-  }
-
-  const normalizedHeightIn = Number.isFinite(heightIn) && heightIn > 0 ? heightIn : DEFAULT_DIMENSION_INCHES;
-
-  return {
-    valid: true,
-    shipping: {
-      weightOz,
-      lengthIn: Number.isFinite(lengthIn) && lengthIn > 0 ? lengthIn : DEFAULT_DIMENSION_INCHES,
-      widthIn: Number.isFinite(widthIn) && widthIn > 0 ? widthIn : DEFAULT_DIMENSION_INCHES,
-      heightIn: normalizedHeightIn,
-      packagingWeightOz: Number.isFinite(packagingWeightOz) && packagingWeightOz > 0 ? packagingWeightOz : 0,
-      stackHeightIn: Number.isFinite(stackHeightIn) && stackHeightIn > 0 ? stackHeightIn : normalizedHeightIn,
-      uspsDomesticProfile,
-      manualDomesticRate
-    }
-  };
-}
-
-function normalizeUspsDomesticProfile(profile) {
-  if (!profile || typeof profile !== 'object') {
-    return null;
-  }
-
-  const processingCategory = normalizeOptionalString(profile.processing_category || profile.processingCategory);
-  const destinationEntryFacilityType = normalizeOptionalString(
-    profile.destination_entry_facility_type || profile.destinationEntryFacilityType
-  );
-  const rateIndicator = normalizeOptionalString(profile.rate_indicator || profile.rateIndicator);
-  const priceType = normalizeOptionalString(profile.price_type || profile.priceType);
-  const mailClasses = Array.isArray(profile.mail_classes || profile.mailClasses)
-    ? (profile.mail_classes || profile.mailClasses)
-        .map((value) => normalizeOptionalString(value))
-        .filter(Boolean)
-    : [];
-
-  if (!processingCategory && !destinationEntryFacilityType && !rateIndicator && !priceType && mailClasses.length <= 0) {
-    return null;
-  }
-
-  return {
-    ...(processingCategory ? { processingCategory } : {}),
-    ...(destinationEntryFacilityType ? { destinationEntryFacilityType } : {}),
-    ...(rateIndicator ? { rateIndicator } : {}),
-    ...(priceType ? { priceType } : {}),
-    ...(mailClasses.length > 0 ? { mailClasses } : {})
-  };
-}
-
-function normalizeManualDomesticRate(value) {
-  const normalized = normalizeOptionalString(value).toUpperCase();
-  if (!normalized) {
-    return null;
-  }
-
-  if (normalized === MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
-    return normalized;
-  }
-
-  return null;
-}
-
-function normalizeOptionalString(value) {
-  const normalized = String(value || '').trim();
-  return normalized ? normalized : '';
-}
-
 export function summarizeStoreShipmentSelection(
   tierSelection = { selectedTiers: [] },
   supportItems = [],
   storeConfig = null,
   bundleAddOns = []
 ) {
-  const shipment = {
-    hasPhysical: false,
-    physicalTierCount: 0,
-    physicalSupportItemCount: 0,
-    physicalAddOnCount: 0,
-    physicalUnitCount: 0,
-    weightOz: 0,
-    lengthIn: 0,
-    widthIn: 0,
-    heightIn: 0,
-    tierIds: [],
-    supportItemIds: [],
-    addOnIds: [],
-    uspsDomesticProfile: undefined,
-    manualDomesticRate: undefined
-  };
-
-  for (const selected of tierSelection?.selectedTiers || []) {
-    const tier = selected?.tier;
-    if (tier?.category !== 'physical') {
-      continue;
-    }
-
-    const qty = Number(selected?.qty || 0);
-    if (!Number.isInteger(qty) || qty <= 0) {
-      return { valid: false, error: `Invalid quantity for tier "${tier?.id || 'unknown'}"` };
-    }
-
-    const profile = getTierShippingProfile(tier);
-    if (!profile.valid) {
-      return profile;
-    }
-
-    shipment.hasPhysical = true;
-    shipment.physicalTierCount += 1;
-    shipment.physicalUnitCount += qty;
-    shipment.weightOz += (profile.shipping.weightOz * qty) + profile.shipping.packagingWeightOz;
-    shipment.lengthIn = Math.max(shipment.lengthIn, profile.shipping.lengthIn);
-    shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
-    shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, qty - 1));
-    shipment.tierIds.push(tier.id);
-    mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
-    mergeShipmentManualDomesticRate(shipment, profile.shipping.manualDomesticRate);
-  }
-
-  const supportItemDefinitions = new Map((storeConfig?.support_items || []).map((item) => [item.id, item]));
-  for (const selected of supportItems || []) {
-    const supportItemId = typeof selected?.id === 'string' ? selected.id : '';
-    const amount = Number(selected?.amount || 0);
-    if (!supportItemId || !Number.isInteger(amount) || amount <= 0) {
-      return { valid: false, error: `Invalid amount for support item "${supportItemId || 'unknown'}"` };
-    }
-
-    const supportItem = supportItemDefinitions.get(supportItemId);
-    if (!supportItem) {
-      return { valid: false, error: `Support item "${supportItemId}" not found` };
-    }
-    if (supportItem.category !== 'physical') {
-      continue;
-    }
-
-    const profile = getSupportItemShippingProfile(supportItem);
-    if (!profile.valid) {
-      return profile;
-    }
-
-    shipment.hasPhysical = true;
-    shipment.physicalSupportItemCount += 1;
-    shipment.physicalUnitCount += 1;
-    shipment.weightOz += profile.shipping.weightOz + profile.shipping.packagingWeightOz;
-    shipment.lengthIn = Math.max(shipment.lengthIn, profile.shipping.lengthIn);
-    shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
-    shipment.heightIn += profile.shipping.heightIn;
-    shipment.supportItemIds.push(supportItemId);
-    mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
-    mergeShipmentManualDomesticRate(shipment, profile.shipping.manualDomesticRate);
-  }
-
-  for (const selected of bundleAddOns || []) {
-    const productId = typeof selected?.productId === 'string' ? selected.productId : '';
-    const quantity = Number(selected?.quantity || 0);
-    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-      return { valid: false, error: `Invalid quantity for add-on "${productId || 'unknown'}"` };
-    }
-    if (selected?.category !== 'physical') {
-      continue;
-    }
-
-    const profile = getAddOnShippingProfile(selected);
-    if (!profile.valid) {
-      return profile;
-    }
-
-    shipment.hasPhysical = true;
-    shipment.physicalAddOnCount += 1;
-    shipment.physicalUnitCount += quantity;
-    shipment.weightOz += (profile.shipping.weightOz * quantity) + profile.shipping.packagingWeightOz;
-    shipment.lengthIn = Math.max(shipment.lengthIn, profile.shipping.lengthIn);
-    shipment.widthIn = Math.max(shipment.widthIn, profile.shipping.widthIn);
-    shipment.heightIn += profile.shipping.heightIn + (profile.shipping.stackHeightIn * Math.max(0, quantity - 1));
-    shipment.addOnIds.push(productId);
-    mergeShipmentUspsDomesticProfile(shipment, profile.shipping.uspsDomesticProfile);
-    mergeShipmentManualDomesticRate(shipment, profile.shipping.manualDomesticRate);
-  }
-
-  if (!shipment.uspsDomesticProfile) {
-    delete shipment.uspsDomesticProfile;
-  }
-  if (!shipment.manualDomesticRate) {
-    delete shipment.manualDomesticRate;
-  }
-
-  return { valid: true, shipment };
-}
-
-function mergeShipmentUspsDomesticProfile(shipment, profile) {
-  if (!shipment || shipment.uspsDomesticProfile === null) {
-    return;
-  }
-
-  const normalizedProfile = profile && typeof profile === 'object' ? profile : null;
-  if (shipment.uspsDomesticProfile === undefined) {
-    shipment.uspsDomesticProfile = normalizedProfile;
-    return;
-  }
-
-  const currentKey = shipment.uspsDomesticProfile ? JSON.stringify(shipment.uspsDomesticProfile) : '';
-  const nextKey = normalizedProfile ? JSON.stringify(normalizedProfile) : '';
-  if (currentKey !== nextKey) {
-    shipment.uspsDomesticProfile = null;
-  }
-}
-
-function mergeShipmentManualDomesticRate(shipment, manualDomesticRate) {
-  if (!shipment || shipment.manualDomesticRate === null) {
-    return;
-  }
-
-  const normalized = normalizeManualDomesticRate(manualDomesticRate);
-  if (shipment.manualDomesticRate === undefined) {
-    shipment.manualDomesticRate = normalized;
-    return;
-  }
-
-  if (shipment.manualDomesticRate !== normalized) {
-    shipment.manualDomesticRate = null;
-  }
-}
-
-function summarizePhysicalSelectionWithoutMetadata(
-  tierSelection = { selectedTiers: [] },
-  supportItems = [],
-  storeConfig = null,
-  bundleAddOns = []
-) {
-  const shipment = {
-    hasPhysical: false,
-    physicalTierCount: 0,
-    physicalSupportItemCount: 0,
-    physicalAddOnCount: 0,
-    physicalUnitCount: 0,
-    weightOz: 0,
-    lengthIn: 0,
-    widthIn: 0,
-    heightIn: 0,
-    tierIds: [],
-    supportItemIds: [],
-    addOnIds: [],
-    metadataIncomplete: true
-  };
-
-  for (const selected of tierSelection?.selectedTiers || []) {
-    const tier = selected?.tier;
-    if (tier?.category !== 'physical') continue;
-
-    const qty = Number(selected?.qty || 0);
-    if (!Number.isInteger(qty) || qty <= 0) {
-      return { valid: false, error: `Invalid quantity for tier "${tier?.id || 'unknown'}"` };
-    }
-
-    shipment.hasPhysical = true;
-    shipment.physicalTierCount += 1;
-    shipment.physicalUnitCount += qty;
-    shipment.tierIds.push(tier.id);
-  }
-
-  const supportItemDefinitions = new Map((storeConfig?.support_items || []).map((item) => [item.id, item]));
-  for (const selected of supportItems || []) {
-    const supportItemId = typeof selected?.id === 'string' ? selected.id : '';
-    const amount = Number(selected?.amount || 0);
-    if (!supportItemId || !Number.isInteger(amount) || amount <= 0) {
-      return { valid: false, error: `Invalid amount for support item "${supportItemId || 'unknown'}"` };
-    }
-
-    const supportItem = supportItemDefinitions.get(supportItemId);
-    if (!supportItem) {
-      return { valid: false, error: `Support item "${supportItemId}" not found` };
-    }
-    if (supportItem.category !== 'physical') continue;
-
-    shipment.hasPhysical = true;
-    shipment.physicalSupportItemCount += 1;
-    shipment.physicalUnitCount += 1;
-    shipment.supportItemIds.push(supportItemId);
-  }
-
-  for (const selected of bundleAddOns || []) {
-    const productId = typeof selected?.productId === 'string' ? selected.productId : '';
-    const quantity = Number(selected?.quantity || 0);
-    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-      return { valid: false, error: `Invalid quantity for add-on "${productId || 'unknown'}"` };
-    }
-    if (selected?.category !== 'physical') continue;
-
-    shipment.hasPhysical = true;
-    shipment.physicalAddOnCount += 1;
-    shipment.physicalUnitCount += quantity;
-    shipment.addOnIds.push(productId);
-  }
-
-  return { valid: true, shipment };
-}
-
-function isShippingMetadataError(error) {
-  const message = String(error || '');
-  return message.includes('missing shipping metadata') || message.includes('missing a valid weight');
+  return summarizeShipmentSelection(tierSelection, supportItems, storeConfig, bundleAddOns);
 }
 
 export function buildFallbackShippingQuote(env, destination, shipment) {
-  const domestic = destination.country === getShippingOriginCountry(env);
-  return {
-    shippingCents: shipment.hasPhysical
-      ? getShippingFallbackFeeCents(env)
-      : 0,
-    source: shipment.hasPhysical ? 'fallback_flat_rate' : 'none',
-    carrier: shipment.hasPhysical ? 'fallback' : null,
-    service: shipment.hasPhysical
-      ? (domestic ? 'domestic_ground_fallback' : 'international_ground_fallback')
-      : null,
-    domestic
-  };
-}
-
-function qualifiesForManualDomesticRate(shipment, rateId) {
-  if (!shipment?.hasPhysical) {
-    return false;
-  }
-
-  if (rateId !== MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
-    return false;
-  }
-
-  const weightOz = Number(shipment.weightOz || 0);
-  const lengthIn = Number(shipment.lengthIn || 0);
-  const widthIn = Number(shipment.widthIn || 0);
-  const heightIn = Number(shipment.heightIn || 0);
-  return Number.isFinite(weightOz) &&
-    weightOz > 0 &&
-    weightOz <= FIRST_CLASS_FLAT_MAX_WEIGHT_OZ &&
-    Number.isFinite(lengthIn) &&
-    lengthIn >= FIRST_CLASS_FLAT_MIN_LENGTH_IN &&
-    lengthIn <= FIRST_CLASS_FLAT_MAX_LENGTH_IN &&
-    Number.isFinite(widthIn) &&
-    widthIn >= FIRST_CLASS_FLAT_MIN_WIDTH_IN &&
-    widthIn <= FIRST_CLASS_FLAT_MAX_WIDTH_IN &&
-    Number.isFinite(heightIn) &&
-    heightIn > 0 &&
-    heightIn <= FIRST_CLASS_FLAT_MAX_HEIGHT_IN;
-}
-
-function buildManualDomesticRateQuote(destination, shipment) {
-  const rateId = normalizeManualDomesticRate(shipment?.manualDomesticRate);
-  if (!rateId || destination?.country !== 'US' || !qualifiesForManualDomesticRate(shipment, rateId)) {
-    return { valid: false, error: 'Manual domestic rate unavailable' };
-  }
-
-  if (rateId === MANUAL_DOMESTIC_RATE_FIRST_CLASS_FLAT) {
-    const billableWeightOz = Math.min(
-      FIRST_CLASS_FLAT_MAX_WEIGHT_OZ,
-      Math.max(1, Math.ceil(Number(shipment.weightOz || 0)))
-    );
-    const shippingCents = FIRST_CLASS_FLAT_RATE_TABLE_CENTS[billableWeightOz];
-    if (!Number.isFinite(shippingCents)) {
-      return { valid: false, error: 'Manual domestic flat rate unavailable' };
-    }
-
-    return {
-      valid: true,
-      quote: {
-        shippingCents,
-        source: 'manual_rate_table',
-        carrier: 'usps_manual',
-        service: 'first_class_flat',
-        domestic: true
-      }
-    };
-  }
-
-  return { valid: false, error: 'Manual domestic rate unavailable' };
+  return buildCoreFallbackShippingQuote({
+    originCountry: getShippingOriginCountry(env),
+    fallbackFeeCents: getShippingFallbackFeeCents(env)
+  }, destination, shipment);
 }
 
 export function buildFreeShippingQuote(env, destination, shipment) {
-  return {
-    shippingCents: 0,
-    source: shipment.hasPhysical ? 'free_shipping' : 'none',
-    carrier: null,
-    service: shipment.hasPhysical ? 'free_shipping' : null,
-    domestic: destination.country === getShippingOriginCountry(env)
-  };
+  return buildCoreFreeShippingQuote({
+    originCountry: getShippingOriginCountry(env)
+  }, destination, shipment);
 }
 
 export function getAvailableShippingOptions(
@@ -522,83 +106,10 @@ export function getAvailableShippingOptions(
   shipment = { hasPhysical: false },
   baseShippingCents = 0
 ) {
-  if (!shipment?.hasPhysical) {
-    return [];
-  }
-
-  const domestic = destination.country === getShippingOriginCountry(env);
-  const freeShipping = getFreeShippingDefault(env);
-  const optionIds = new Set([SHIPPING_OPTION_STANDARD]);
-
-  if (!freeShipping && domestic) {
-    optionIds.add(SHIPPING_OPTION_SIGNATURE_REQUIRED);
-    optionIds.add(SHIPPING_OPTION_ADULT_SIGNATURE_REQUIRED);
-  }
-
-  return Array.from(optionIds).map((id) => ({
-    id,
-    label: getShippingOptionLabel(id),
-    domesticOnly: id !== SHIPPING_OPTION_STANDARD,
-    priceDeltaCents: getShippingOptionDeltaCents(id),
-    shippingCents: Math.max(0, Number(baseShippingCents) || 0) + getShippingOptionDeltaCents(id)
-  }));
-}
-
-export function resolveSelectedShippingOption(availableOptions = [], selectedOption, defaultOption = SHIPPING_OPTION_STANDARD) {
-  const requested = String(selectedOption || '').trim().toLowerCase();
-  if (requested && availableOptions.some((option) => option?.id === requested)) {
-    return requested;
-  }
-
-  const normalizedDefault = String(defaultOption || SHIPPING_OPTION_STANDARD).trim().toLowerCase();
-  if (availableOptions.some((option) => option?.id === normalizedDefault)) {
-    return normalizedDefault;
-  }
-
-  return availableOptions[0]?.id || SHIPPING_OPTION_STANDARD;
-}
-
-export function getSelectedShippingOptionDetails(availableOptions = [], selectedOption, defaultOption = SHIPPING_OPTION_STANDARD) {
-  const resolvedId = resolveSelectedShippingOption(availableOptions, selectedOption, defaultOption);
-  return availableOptions.find((option) => option?.id === resolvedId) || null;
-}
-
-function getShippingOptionLabel(id) {
-  switch (id) {
-    case SHIPPING_OPTION_SIGNATURE_REQUIRED:
-      return 'Signature required';
-    case SHIPPING_OPTION_ADULT_SIGNATURE_REQUIRED:
-      return 'Adult signature required';
-    case SHIPPING_OPTION_STANDARD:
-    default:
-      return 'Standard';
-  }
-}
-
-function getShippingOptionDeltaCents(id) {
-  switch (id) {
-    case SHIPPING_OPTION_SIGNATURE_REQUIRED:
-      return USPS_SIGNATURE_REQUIRED_FEE_CENTS;
-    case SHIPPING_OPTION_ADULT_SIGNATURE_REQUIRED:
-      return USPS_ADULT_SIGNATURE_REQUIRED_FEE_CENTS;
-    case SHIPPING_OPTION_STANDARD:
-    default:
-      return 0;
-  }
-}
-
-function buildStandardOnlyShippingOptions(shipment, shippingCents) {
-  if (!shipment?.hasPhysical) {
-    return [];
-  }
-
-  return [{
-    id: SHIPPING_OPTION_STANDARD,
-    label: getShippingOptionLabel(SHIPPING_OPTION_STANDARD),
-    domesticOnly: false,
-    priceDeltaCents: 0,
-    shippingCents: Math.max(0, Number(shippingCents || 0))
-  }];
+  return getCoreAvailableShippingOptions({
+    originCountry: getShippingOriginCountry(env),
+    freeShipping: getFreeShippingDefault(env)
+  }, destination, shipment, baseShippingCents);
 }
 
 export async function quoteStoreShipment(

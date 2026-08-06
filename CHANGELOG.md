@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.8 - 2026-08-06
+
+### Shared deterministic shipping mechanics
+
+- Advanced the immutable Platform pin to `v0.18.0`
+  (`3b8bdacc224bda625103718ba0fa8489517ff993`) and adopted
+  `@dustwave/shipping-core` `0.1.0`.
+- Replaced 524 lines of duplicate item-profile, mixed-shipment aggregation,
+  missing-metadata, fallback/free/manual quote, and shipping-option mechanics
+  with thin Store policy adapters.
+- Added an independent pre-move consumer contract for mixed tier,
+  support-item, and add-on shipments plus option fallback behavior.
+- Bounded selection, catalog, mail-class, and option arrays before shared
+  loops while preserving the current USPS First-Class flat table and normal
+  quote results.
+- Store retains product and free-shipping policy, destination validation, USPS
+  credentials and transport, OAuth/cache/backoff/retry, checkout, fulfillment,
+  storage, deployment, and rollback.
+
 ## v1.1.7 - 2026-08-06
 
 ### Shared session security mechanics
