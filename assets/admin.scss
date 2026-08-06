@@ -3,5 +3,8 @@
 
 // Admin-only styles are isolated from the public storefront performance path.
 @import "partials/variables";
-@import "partials/mixins";
+$dustwave-fit-layout-gutter-mode: width;
+$dustwave-fit-layout-wide-inline-gutter: clamp(32px, 8vw, 128px);
+$dustwave-fit-layout-xsm-inline-gutter: $space-md;
+@import "mixins";
 @import "partials/admin";

@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.20 - 2026-08-06
+
+### Policy-injected shared design foundations
+
+- Advanced the immutable Platform pin to `v0.30.0`
+  (`499e6c1994d79be6049ef204fefd728f22b8093e`) and adopted Design Core `0.2.0`.
+- Removed Store's local form, layout, and mixin partials. Store now injects its
+  width-based centered gutter plus brand-title spacing, animation identity,
+  mobile type scale, and line width before importing neutral shared Sass.
+- Characterized generated output before and after migration: `main.css`
+  remained `686ccbf364f8d883e23c3e6d523e56ea9184fe0847b783d2b17cb8ba869f0ab6`
+  and `admin.css` remained
+  `de6ca932f679d01c3c1f6305e08055ed21eb1bbe3a665d6ac571cb2410ae6a58`
+  byte-for-byte.
+- Added pin and compile-time policy regressions. The extraction adds no browser
+  request or runtime code; Store retains tokens, import order, templates,
+  content, CSS budgets, deployment, safe localhost defaults, and independent
+  rollback.
+
 ## v1.1.19 - 2026-08-06
 
 ### Shared Site Shell browser primitives
