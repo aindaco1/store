@@ -4,15 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '98533957456eed4bb2eae6f474b9072a419b64bc';
+const expectedCommit = '514c00932d5fb2fa05ee6f7cebb7ea44d9426d78';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.21.0',
+  '@dustwave/platform-workspace': '0.22.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.1.0',
-  '@dustwave/shipping-core': '0.1.0',
+  '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.2.0',
   '@dustwave/timed-text': '0.5.0',
@@ -85,11 +85,21 @@ describe('shared platform pin', () => {
       'packages/release-core/src/provider-evidence.js',
       'packages/release-core/src/wrangler-config.js',
       'packages/shipping-core/src/index.js',
+      'packages/shipping-core/src/usps.js',
+      'packages/shipping-core/data/shipping-countries.yml',
       'scripts/scan-tracked-secrets.mjs'
     ];
 
     expect(consumedPaths.filter((path) => !existsSync(`${platformRoot}/${path}`)))
       .toEqual([]);
+  });
+
+  it('keeps the Jekyll shipping-country snapshot byte-identical to Platform', () => {
+    expect(readFileSync(`${repositoryRoot}/_data/shipping_countries.yml`, 'utf8'))
+      .toBe(readFileSync(
+        `${platformRoot}/packages/shipping-core/data/shipping-countries.yml`,
+        'utf8'
+      ));
   });
 
   it('runs shared Node tooling with its exact reviewed dependencies', () => {
