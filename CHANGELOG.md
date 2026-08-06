@@ -1,6 +1,25 @@
 # Changelog
 
-## v1.1.0 - Unreleased
+## v1.1.1 - Unreleased
+
+### Shared platform alignment
+
+- Advanced the exact `dust-wave-platform` gitlink to workspace `0.11.5`,
+  including `@dustwave/admin-shell` `0.10.2` and `@dustwave/worker-core`
+  `0.3.6`, without moving Store's catalog, checkout, order, inventory,
+  fulfillment, storage, or deployment authority.
+- Added an executable consumer contract for the immutable gitlink, canonical
+  submodule remote, package versions, and every raw shared module Store serves
+  or imports so an incomplete platform update fails before deployment.
+- Enabled safe local-identifier minification in generated JavaScript while
+  preserving global names, bringing the real production build back under its
+  existing JavaScript budgets, and wired that budget audit into pre-merge.
+- Made deployment setup dry-runs non-interactive around secret planning, so
+  provider values are neither requested nor passed to a CLI during rehearsal.
+- Preserved Store's independently reversible release identity across the site,
+  Worker, lockfiles, provider User-Agent, and release documentation.
+
+## v1.1.0 - 2026-08-05
 
 ### Shared platform foundation
 

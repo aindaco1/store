@@ -241,6 +241,10 @@ verify_build_artifacts() {
     echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
+  if ! node ./scripts/audit-performance-budgets.mjs >/dev/null; then
+    echo "Generated CSS/JS assets exceed the committed performance budgets"
+    return 1
+  fi
   if ! grep -Eq 'meta name="robots" content="noindex,nofollow,noarchive"' _site/es/admin/index.html; then
     echo "Spanish admin page is missing noindex robots metadata"
     return 1
@@ -437,9 +441,17 @@ run_phase "4. Syntax checks" bash -lc '
   node --check worker/src/tier-inventory-do.js
   node --check worker/src/catalog.js
   node --check worker/src/orders.js
+  node --check scripts/minify-site-assets.mjs
+  node --check scripts/audit-performance-budgets.mjs
+  node --check scripts/setup-deploy.mjs
 '
 
 run_phase "5. Focused Store regression suites" npx vitest run \
+  tests/unit/platform-pin.test.ts \
+  tests/unit/release-version.test.ts \
+  tests/unit/site-asset-minification.test.ts \
+  tests/unit/performance-gates.test.ts \
+  tests/unit/setup-deploy-script.test.ts \
   tests/unit/product-content-security.test.ts \
   tests/unit/store-catalog.test.ts \
   tests/unit/add-on-utils.test.ts \

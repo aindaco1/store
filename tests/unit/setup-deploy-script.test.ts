@@ -198,6 +198,24 @@ describe('setup-deploy script', () => {
     expect(readTempFile(temp, 'worker/wrangler.toml')).toBe(before);
   });
 
+  it('keeps dry-run secret planning non-interactive and never reads or writes values', () => {
+    const temp = createTempSetupRepo();
+    const result = runSetup(temp, [
+      '--mode=production',
+      '--dry-run',
+      '--skip-auth',
+      '--skip-readiness',
+      '--skip-kv'
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('[dry-run] collect and set secret names only: STRIPE_SECRET_KEY');
+    expect(result.stdout).toContain('[dry-run] collect and set secret names only: CLOUDFLARE_API_TOKEN');
+    expect(result.stdout).not.toContain('[required]:');
+    expect(commandLog(temp)).not.toContain('secret put');
+    expect(commandLog(temp)).not.toContain('secret set');
+  });
+
   it('writes generated local secrets in non-interactive local mode without adding blank provider secrets', () => {
     const temp = createTempSetupRepo();
     const result = runSetup(temp, ['--mode=local', '--non-interactive']);
