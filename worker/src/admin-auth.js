@@ -2,6 +2,14 @@ import { getAllowedOrigin, isValidEmail, SECURITY_HEADERS } from './validation.j
 import { sendAdminLoginEmail } from './email.js';
 import { DEFAULT_SITE_BASE } from './provider-config.js';
 import { getTurnstileSecret, shouldBypassTurnstile, verifyTurnstile } from './turnstile.js';
+import {
+  getCookie,
+  hmacSha256,
+  normalizeEmail,
+  randomToken,
+  sha256Hex,
+  timingSafeEqual
+} from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 
 export const ADMIN_SESSION_COOKIE = 'store_admin_session';
 export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
@@ -31,10 +39,6 @@ function privateAdminJsonResponse(data, status = 200, env = null, extraHeaders =
       ...SECURITY_HEADERS
     }
   });
-}
-
-function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
 }
 
 function normalizeLang(lang) {
@@ -136,40 +140,7 @@ function getAdminSecret(env) {
   return env?.ADMIN_SESSION_SECRET || env?.MAGIC_LINK_SECRET || env?.ADMIN_SECRET || '';
 }
 
-async function sha256Hex(value) {
-  const data = new TextEncoder().encode(String(value || ''));
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function randomToken(byteLength = 32) {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return base64urlEncode(bytes);
-}
-
-function base64urlEncode(bytes) {
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function hmacSign(secret, data) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
-  return base64urlEncode(new Uint8Array(signature));
-}
+const hmacSign = (secret, data) => hmacSha256(data, secret);
 
 async function signLoginToken(env, nonce, email, ttlSeconds = ADMIN_LOGIN_TTL_SECONDS) {
   const payload = {
@@ -188,12 +159,7 @@ async function verifyLoginToken(env, token) {
   const [payloadB64, signature] = String(token || '').split('.');
   if (!payloadB64 || !signature) return null;
   const expected = await hmacSign(getAdminSecret(env), payloadB64);
-  if (signature.length !== expected.length) return null;
-  let result = 0;
-  for (let index = 0; index < signature.length; index += 1) {
-    result |= signature.charCodeAt(index) ^ expected.charCodeAt(index);
-  }
-  if (result !== 0) return null;
+  if (!timingSafeEqual(signature, expected)) return null;
 
   try {
     const normalized = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
@@ -207,30 +173,8 @@ async function verifyLoginToken(env, token) {
   }
 }
 
-function getCookie(request, name) {
-  const cookieHeader = request.headers.get('Cookie') || '';
-  for (const part of cookieHeader.split(';')) {
-    const [rawName, ...rawValue] = part.trim().split('=');
-    if (rawName === name) {
-      return decodeURIComponent(rawValue.join('=') || '');
-    }
-  }
-  return '';
-}
-
 function getAdminCsrfHeader(request) {
   return String(request.headers.get('x-store-admin-csrf') || '').trim();
-}
-
-function timingSafeEqual(a, b) {
-  const left = String(a || '');
-  const right = String(b || '');
-  if (!left || !right || left.length !== right.length) return false;
-  let result = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    result |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-  return result === 0;
 }
 
 function getAdminSiteOrigin(env) {

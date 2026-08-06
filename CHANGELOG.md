@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1.5 - 2026-08-06
+
+### Shared cryptographic primitives
+
+- Replaced Store's characterized SHA-256, HMAC-SHA-256, high-entropy token,
+  cookie parsing, email normalization, and constant-work string-comparison
+  copies with the immutable `@dustwave/worker-core` `0.6.0` implementation
+  already pinned through Platform `v0.15.0`.
+- Kept login-token shape, Store's short-lived order-notification login policy,
+  session and CSRF records, admin scopes, routes, KV storage, credentials,
+  release, and rollback in Store; a one-line HMAC adapter preserves the
+  existing argument order.
+- Added consumer contracts for the exact digest, URL-safe signature and token
+  shapes, encoded cookies, normalized email, constant-work equality, and
+  rejection of undersized tokens, alongside the existing login replay,
+  expiry, CSRF/origin, session-review, and redacted-history coverage.
+
 ## v1.1.4 - 2026-08-06
 
 ### Provider-originated Stripe test coverage
