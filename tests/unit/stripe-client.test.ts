@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_STRIPE_API_VERSION, StripeApiError, createStripeClient } from '../../worker/src/stripe.js';
+import { WORKER_USER_AGENT } from '../../worker/src/version.js';
 
 describe('Stripe Worker client integrity', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -16,6 +17,7 @@ describe('Stripe Worker client integrity', () => {
     const [, init] = fetchMock.mock.calls[0];
     const headers = new Headers(init?.headers);
     expect(headers.get('Stripe-Version')).toBe(DEFAULT_STRIPE_API_VERSION);
+    expect(headers.get('User-Agent')).toBe(WORKER_USER_AGENT);
     expect(headers.get('Idempotency-Key')).toBe('store-order:order-1');
     expect(String(init?.body)).toContain('metadata%5BorderId%5D=order-1');
     expect(observations).toEqual([expect.objectContaining({
@@ -42,5 +44,13 @@ describe('Stripe Worker client integrity', () => {
     const stripe = createStripeClient('sk_test_secret');
     await expect(stripe.customers.create({ email: 'customer@example.com' }, { idempotencyKey: 'customer:order-1' }))
       .rejects.toMatchObject({ name: 'StripeApiError', type: 'network_error', retryable: true, objectId: '' });
+  });
+
+  it('fails missing credentials and object IDs before provider work', () => {
+    expect(() => createStripeClient('')).toThrow('Stripe API key is required');
+    const fetchMock = vi.fn();
+    const stripe = createStripeClient('sk_test_secret', { fetchImplementation: fetchMock });
+    expect(() => stripe.paymentIntents.retrieve('')).toThrow('A Stripe object ID is required');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

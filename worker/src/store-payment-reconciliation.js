@@ -1,3 +1,4 @@
+import { randomToken } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import { ADMIN_STORE_ORDER_INDEX_KEY } from './admin-store-read-model.js';
 import { createStoreStripeClient, reconciliationKey, storeReconciliationBreak } from './payment-integrity.js';
 
@@ -125,7 +126,7 @@ export async function reconcileIndexedStorePayments(env = {}, options = {}) {
 
   const batchSize = boundedInteger(options.batchSize ?? env.PAYMENT_RECONCILIATION_BATCH_SIZE, STORE_PAYMENT_RECONCILIATION_DEFAULT_BATCH_SIZE, 1, 100);
   const selected = indexedOrders.slice(priorCursor, priorCursor + batchSize);
-  const leaseId = globalThis.crypto?.randomUUID?.() || `${nowMs}-${Math.random().toString(36).slice(2)}`;
+  const leaseId = randomToken(24);
   await writeState(env.STORE_STATE, {
     ...previousState,
     version: 1,

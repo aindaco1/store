@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.1.3 - 2026-08-06
+
+### Shared Platform consolidation
+
+- Advanced the exact `dust-wave-platform` gitlink to immutable `v0.15.0`
+  (`2e79a8d70cb6d30805ea141e53d32f9387441756`), including
+  `@dustwave/worker-core` `0.6.0` and `@dustwave/release-core` `0.1.0`.
+- Replaced Store's characterized Worker CORS/security response, timezone/date,
+  and Stripe transport copies with thin Store policy adapters. Store keeps its
+  private origin, Stripe API version and provider identity, catalog, checkout,
+  order/inventory truth, fulfillment, credentials, and deployment authority.
+- Replaced exact Wrangler inventory, KV backup transformation, checksum,
+  command-result, and provider-evidence copies with pinned Platform primitives;
+  Store continues to own every command, provider call, environment ID, release
+  gate, rollout, and rollback.
+- Removed insecure `Math.random()` fallbacks from payment-event and
+  reconciliation lease identifiers. Both now use Platform's characterized
+  Web Crypto token primitive and fail closed if secure randomness is absent.
+- Expanded consumer tests for private-origin fallback, full JSON security
+  headers, daylight-saving boundaries, Stripe provider identity, missing
+  credentials/object IDs, secure-random failure, and the exact Platform pin.
+
 ## v1.1.2 - 2026-08-06
 
 ### Shared exact-duplicate extraction
