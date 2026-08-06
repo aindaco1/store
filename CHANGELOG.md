@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.1.12 - 2026-08-06
+
+### Shared bounded GitHub transport
+
+- Advanced the immutable Platform pin to `v0.23.0`
+  (`a0006c3e0c3f8ab814387491753989956adbbe94`) and Worker Core `0.11.0`.
+- Replaced Store's duplicate workflow, Contents API, and atomic multi-file
+  commit client with a thin adapter while preserving optimistic product-file
+  conflict guidance and all existing publishing behavior.
+- Requests now reject redirects, time out, bound paths, refs, workflow inputs,
+  content, and provider responses; batch publication rejects duplicate paths
+  and stale SHA evidence and never force-updates a branch. Store retains
+  repository defaults, product schemas, messages, logging, authorization,
+  effects, deployment, and independent rollback.
+
 ## v1.1.11 - 2026-08-06
 
 ### Shared USPS transport and country registry

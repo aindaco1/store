@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '514c00932d5fb2fa05ee6f7cebb7ea44d9426d78';
+const expectedCommit = 'a0006c3e0c3f8ab814387491753989956adbbe94';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.22.0',
+  '@dustwave/platform-workspace': '0.23.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
   '@dustwave/inventory-core': '0.1.0',
@@ -16,7 +16,7 @@ const expectedVersions = {
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.2.0',
   '@dustwave/timed-text': '0.5.0',
-  '@dustwave/worker-core': '0.10.0'
+  '@dustwave/worker-core': '0.11.0'
 };
 
 function readJson(relativePath: string) {
@@ -73,6 +73,7 @@ describe('shared platform pin', () => {
       'packages/tax-core/src/nm-grt-starter.js',
       'packages/worker-core/src/date-time.js',
       'packages/worker-core/src/http.js',
+      'packages/worker-core/src/github.js',
       'packages/worker-core/src/logger.js',
       'packages/worker-core/src/resend.js',
       'packages/worker-core/src/session-security.js',
