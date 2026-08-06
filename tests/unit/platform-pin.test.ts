@@ -4,14 +4,16 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '7c5d4e8b44b25b9a649920c5a56d120ca29fc06f';
+const expectedCommit = '09cc3cf1a35950fd410c652de390d44e71dd6fee';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.11.5',
+  '@dustwave/platform-workspace': '0.12.0',
   '@dustwave/admin-shell': '0.10.2',
+  '@dustwave/build-core': '0.1.0',
   '@dustwave/media-core': '0.3.0',
-  '@dustwave/tax-core': '0.1.0',
+  '@dustwave/site-shell': '0.1.0',
+  '@dustwave/tax-core': '0.2.0',
   '@dustwave/timed-text': '0.5.0',
-  '@dustwave/worker-core': '0.3.6'
+  '@dustwave/worker-core': '0.4.0'
 };
 
 function readJson(relativePath: string) {
@@ -36,7 +38,9 @@ describe('shared platform pin', () => {
     const manifests = [
       'shared/dust-wave-platform/package.json',
       'shared/dust-wave-platform/packages/admin-shell/package.json',
+      'shared/dust-wave-platform/packages/build-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
+      'shared/dust-wave-platform/packages/site-shell/package.json',
       'shared/dust-wave-platform/packages/tax-core/package.json',
       'shared/dust-wave-platform/packages/timed-text/package.json',
       'shared/dust-wave-platform/packages/worker-core/package.json'
@@ -53,12 +57,28 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/turnstile-browser.js',
       'packages/admin-shell/src/vendor/qrcode-generator.js',
       'packages/admin-shell/src/credentialed-download.js',
+      'packages/build-core/bin/minify-site-assets.mjs',
+      'packages/build-core/src/site-assets.js',
+      'packages/site-shell/src/a11y-live-browser.js',
+      'packages/site-shell/src/header-nav-browser.js',
       'packages/tax-core/src/index.js',
+      'packages/tax-core/src/nm-grt-starter.js',
       'packages/worker-core/src/turnstile.js',
+      'packages/worker-core/src/timezones.js',
       'scripts/scan-tracked-secrets.mjs'
     ];
 
     expect(consumedPaths.filter((path) => !existsSync(`${platformRoot}/${path}`)))
       .toEqual([]);
+  });
+
+  it('runs build-core with its exact reviewed esbuild release', () => {
+    const rootLock = readJson('package-lock.json');
+    const buildCore = readJson(
+      'shared/dust-wave-platform/packages/build-core/package.json'
+    );
+
+    expect(rootLock.packages['node_modules/esbuild'].version)
+      .toBe(buildCore.dependencies.esbuild);
   });
 });

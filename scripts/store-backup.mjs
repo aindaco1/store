@@ -380,7 +380,9 @@ function captureBuildEvidence(manifest, outputDir, options) {
     stderrFile: path.join(buildDir, 'jekyll-build.stderr.log')
   });
   captureCommand(manifest, 'isolated built-asset minification', 'node', [
-    './scripts/minify-site-assets.mjs', '--write', `--site-dir=${siteDir}`
+    './shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs',
+    '--write',
+    `--site-dir=${siteDir}`
   ], {
     ...options,
     cwd: ROOT,

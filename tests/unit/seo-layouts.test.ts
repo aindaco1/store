@@ -65,8 +65,8 @@ describe('Store SEO templates', () => {
     expect(header).toContain("translation_key='terms'");
     expect(header).not.toContain("translation_key='about'");
     expect(header).not.toContain("translation_key='campaigns_index'");
-    expect(header).toContain('<script data-cfasync="false" src="/assets/js/header-nav.js" defer></script>');
-    expect(header).toContain('<script data-cfasync="false" src="/assets/js/a11y-live.js" defer></script>');
+    expect(header).toContain('/shared/dust-wave-platform/packages/site-shell/src/header-nav-browser.js?v={{ asset_version }}');
+    expect(header).toContain('/shared/dust-wave-platform/packages/site-shell/src/a11y-live-browser.js?v={{ asset_version }}');
     expect(footer).toContain('responsive-image.html src=footer_logo_path');
     expect(responsiveImage).toContain('local_image_dimensions');
     expect(responsiveImage).toContain('local_responsive_image_srcset');
@@ -201,8 +201,8 @@ describe('Store SEO templates', () => {
 
   it('keeps first-party admin scripts free of dynamic string evaluation', () => {
     const adminRuntime = [
-      ['assets', 'js', 'header-nav.js'],
-      ['assets', 'js', 'a11y-live.js'],
+      ['shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'header-nav-browser.js'],
+      ['shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'a11y-live-browser.js'],
       ['assets', 'js', 'store-config.js'],
       ['assets', 'js', 'logger.js'],
       ['assets', 'js', 'video-first-frame-poster.js'],

@@ -17,7 +17,7 @@ describe('a11y live announcer', () => {
   });
 
   it('announces pending live text and clears it', async () => {
-    await import('../../assets/js/a11y-live.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/a11y-live-browser.js');
 
     const region = document.getElementById('aria-live-region') as HTMLElement;
     const announcer = document.querySelector('[data-live-announce]') as HTMLElement | null;

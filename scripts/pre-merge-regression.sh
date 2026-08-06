@@ -185,7 +185,7 @@ minify_site_assets() {
     echo "Node is required to minify generated site assets"
     return 1
   fi
-  node ./scripts/minify-site-assets.mjs --write >/dev/null
+  npm run --silent assets:minify >/dev/null
 }
 
 verify_build_artifacts() {
@@ -237,7 +237,7 @@ verify_build_artifacts() {
     echo "Admin page is missing noindex robots metadata"
     return 1
   fi
-  if ! node ./scripts/minify-site-assets.mjs --check >/dev/null; then
+  if ! npm run --silent assets:minify:check >/dev/null; then
     echo "Generated CSS/JS assets still have minification savings"
     return 1
   fi
@@ -441,7 +441,7 @@ run_phase "4. Syntax checks" bash -lc '
   node --check worker/src/tier-inventory-do.js
   node --check worker/src/catalog.js
   node --check worker/src/orders.js
-  node --check scripts/minify-site-assets.mjs
+  node --check shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs
   node --check scripts/audit-performance-budgets.mjs
   node --check scripts/setup-deploy.mjs
 '
