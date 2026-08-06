@@ -5,6 +5,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 ## Current State
 
 - Current release branch candidate: `v1.1.1`. It advances Store to the immutable `dust-wave-platform` `0.11.5` workspace while preserving Store's deployment, data, and business-rule boundaries. Store continues to characterize and consume shared destination normalization, integer-cent manual-rate math, Turnstile, and admin-shell primitives while retaining provider lookup, catalog taxability, checkout, order truth, and independent rollback locally.
+- Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
 - The published `v1.0.9` tag remains immutable and is the prior production baseline.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
@@ -86,6 +87,7 @@ npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
 - `_data/media-optimization-manifest.json` and `worker/src/media-catalog.js` - rebuildable repository media metadata and shared classification/budget rules.
 - `worker/src/admin-store-read-model.js`, `worker/src/workers-cache-policy.js`, and `worker/src/workers-cache-telemetry.js` - shared order snapshot, cache policy, and privacy-safe telemetry contracts.
 - `worker/src/generated/catalog-snapshot.js` - generated Worker catalog snapshot.
+- `assets/js/store-product-options.js` and `worker/src/store-inventory-projection.js` - public product-control synchronization and the sanitized confirmed-availability projection.
 - `worker/src/tier-inventory-do.js` - reservation-aware SKU inventory coordinator.
 - `worker/src/coupons.js` - coupon normalization, storage, and discount application.
 - `worker/src/local-repo-service.mjs` - local admin publish sidecar for dev.

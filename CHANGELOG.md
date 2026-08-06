@@ -2,6 +2,17 @@
 
 ## v1.1.1 - Unreleased
 
+### Public inventory accuracy
+
+- Updated inventory-tracked home and product pages from confirmed live
+  availability once per navigation, so completed orders appear without waiting
+  for a static catalog rebuild. Static counts remain the no-JavaScript or
+  network-failure fallback, while cart validation and checkout continue to
+  enforce reservation-aware inventory authoritatively.
+- Added a 15-second browser and edge-cached public projection that exposes only
+  public SKU availability, plus endpoint, projection, browser, and responsive
+  regression coverage for multiple cards, variants, and sold-out states.
+
 ### Shared platform alignment
 
 - Advanced the exact `dust-wave-platform` gitlink to workspace `0.11.5`,

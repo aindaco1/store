@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release candidate: `v1.0.9`. The published `v1.0.8` tag remains immutable. The `v1.0.9` package adds the applicable Pool `v1.1.2` crawl, policy-disclosure, admin-performance, and recovery-workflow hardening; deployment and provider evidence remain explicit release-closure gates.
+Current release candidate: `v1.1.1`. The published `v1.0.9` tag remains immutable. The `v1.1.1` line advances the pinned shared-platform boundary and refreshes inventory-tracked public pages from confirmed live availability without moving catalog, checkout, inventory, storage, or deployment authority out of Store.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 
@@ -17,6 +17,7 @@ The current repository is production-ready from a code-path perspective: public 
 - KV stores order, admin, inventory override, coupon, lookup, reminder, audit, rate-limit, and observability state.
 - R2 stores production digital downloads and reusable download-library files.
 - Durable Objects serialize SKU inventory reservations and commit/release transitions.
+- `GET /api/store/inventory` exposes a sanitized, briefly cached confirmed-availability projection to inventory-tracked public pages. Static counts remain the failure fallback, and reservation-aware checkout remains authoritative.
 - GitHub-backed writes publish `_config.yml`, `_products/*.md`, and product/media assets in production; local dev can use the local repo sidecar instead.
 
 ## Current Catalog

@@ -34,6 +34,7 @@ Local defaults:
 
 ## Public API
 
+- `GET /api/store/inventory`: return only confirmed `available` counts for public, inventory-tracked SKUs from the existing derived projection. The response uses a fixed-key 15-second public cache, never exposes limits, claims, reservations, product/customer/order/admin data, and does not replace authoritative checkout validation.
 - `POST /api/cart/validate`: validate a Store cart against the generated catalog and optional coupon code.
 - `POST /api/checkout/intent`: create an order draft and Stripe PaymentIntent, or confirm a no-payment order.
 - `GET /api/orders/:token`: return token-scoped order summary and fulfillment actions.
