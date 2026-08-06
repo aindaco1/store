@@ -62,6 +62,9 @@ describe('workflow security posture', () => {
     expect(deploy).toContain('workflow_dispatch:');
     expect(deploy).not.toMatch(/\n\s+push:\s*\n/);
     expect(deploy).not.toContain("github.event_name == 'push'");
+    expect(deploy).toContain("description: 'Reviewed release branch, tag, or commit'");
+    expect(deploy).toContain("default: 'main'");
+    expect(deploy.match(/ref: \$\{\{ inputs\.ref \}\}/g)).toHaveLength(2);
     expect(deploy).toContain('npx wrangler deploy -c wrangler.toml --env=""');
     expect(deploy).toContain('actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5');
     expect(deploy).toContain('group: "production-operations"');
