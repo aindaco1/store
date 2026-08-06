@@ -4,15 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '06a9453ed2f310f5acca1a1f864fdce4a45d5f56';
+const expectedCommit = '5836ced5129ce3eddb09a035601de23ec58a5737';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.27.0',
+  '@dustwave/platform-workspace': '0.28.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
   '@dustwave/design-core': '0.1.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
-  '@dustwave/release-core': '0.1.0',
+  '@dustwave/release-core': '0.2.0',
   '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.3.0',
@@ -93,9 +93,12 @@ describe('shared platform pin', () => {
       'packages/worker-core/src/turnstile.js',
       'packages/worker-core/src/timezones.js',
       'packages/release-core/src/command-result.js',
+      'packages/release-core/src/cache-policy.js',
+      'packages/release-core/src/cloudflare-admin-response-rule.js',
       'packages/release-core/src/file-integrity.js',
       'packages/release-core/src/kv-backup-records.js',
       'packages/release-core/src/provider-evidence.js',
+      'packages/release-core/src/screen-reader-evidence.js',
       'packages/release-core/src/wrangler-config.js',
       'packages/shipping-core/src/index.js',
       'packages/shipping-core/src/usps.js',
