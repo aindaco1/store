@@ -1,12 +1,6 @@
 import { expect } from '@playwright/test';
+import { expectNoHorizontalOverflow as expectSharedNoHorizontalOverflow } from '../../../shared/dust-wave-platform/packages/test-core/src/index.js';
 
-export async function expectNoHorizontalOverflow(page: any) {
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const root = document.scrollingElement || document.documentElement;
-        return Math.ceil(root.scrollWidth - window.innerWidth);
-      })
-    )
-    .toBeLessThanOrEqual(1);
+export function expectNoHorizontalOverflow(page: any) {
+  return expectSharedNoHorizontalOverflow(page, { expectTarget: expect });
 }

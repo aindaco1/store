@@ -1,6 +1,6 @@
 {
   "name": "store",
-  "version": "1.1.4",
+  "version": "1.1.16",
   "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
   "main": "index.js",
   "directories": {
@@ -65,6 +65,8 @@
     "test:security:podman": "./scripts/podman-stack-run.sh npx vitest run --config vitest.security.config.mts",
     "test:security:host": "vitest run --config vitest.security.config.mts",
     "test:usps": "node ./scripts/usps-smoke.mjs",
+    "shipping-countries:check": "node ./shared/dust-wave-platform/packages/shipping-core/bin/sync-shipping-countries.mjs ./_data/shipping_countries.yml",
+    "shipping-countries:sync": "node ./shared/dust-wave-platform/packages/shipping-core/bin/sync-shipping-countries.mjs ./_data/shipping_countries.yml --write",
     "seed:local-orders": "node ./scripts/seed-local-orders.mjs",
     "assets:minify": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --write",
     "assets:minify:check": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --check",

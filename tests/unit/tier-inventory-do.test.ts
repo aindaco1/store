@@ -389,4 +389,39 @@ describe('StoreInventoryCoordinator', () => {
       updatedAt: expect.any(String)
     });
   });
+
+  it('refreshes catalog metadata while preserving stored claimed counts', async () => {
+    const state = new MockDurableObjectState();
+    await state.storage.put('state', {
+      inventory: { mug: { limit: 5, claimed: 1, label: 'Old mug' } },
+      reservations: {},
+      updatedAt: '2026-08-06T12:00:00.000Z'
+    });
+    const coordinator = new StoreInventoryCoordinator(
+      state as never,
+      { STORE_STATE: new MockKVNamespace() } as never
+    );
+
+    const response = await coordinator.fetch(new Request('https://store-inventory/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scope: 'catalog',
+        inventory: {
+          mug: { limit: 4, claimed: 0, label: 'Current mug' },
+          shirt: { limit: 3, claimed: 0 }
+        }
+      })
+    }));
+
+    expect(await response.json()).toEqual({
+      success: true,
+      inventory: {
+        mug: { limit: 4, claimed: 1, label: 'Current mug' },
+        shirt: { limit: 3, claimed: 0 }
+      },
+      reservedCounts: {},
+      updatedAt: '2026-08-06T12:00:00.000Z'
+    });
+  });
 });

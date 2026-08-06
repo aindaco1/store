@@ -112,6 +112,13 @@ describe('admin auth links', () => {
     });
     const token = new URL(loginUrl).searchParams.get('admin_login') || '';
 
+    const malformedResponse = await handleAdminAuthExchange(
+      new Request('https://shop.dustwave.xyz/admin/auth/exchange', { method: 'POST' }),
+      env,
+      { token: `${token}.suffix` }
+    );
+    expect(malformedResponse.status).toBe(401);
+
     const firstResponse = await handleAdminAuthExchange(
       new Request('https://shop.dustwave.xyz/admin/auth/exchange', { method: 'POST' }),
       env,
@@ -119,7 +126,13 @@ describe('admin auth links', () => {
     );
 
     expect(firstResponse.status).toBe(200);
-    expect(firstResponse.headers.get('Set-Cookie')).toContain('Max-Age=1800');
+    const sessionCookie = firstResponse.headers.get('Set-Cookie') || '';
+    expect(sessionCookie).toContain('store_admin_session=');
+    expect(sessionCookie).toContain('Path=/admin');
+    expect(sessionCookie).toContain('HttpOnly');
+    expect(sessionCookie).toContain('SameSite=Lax');
+    expect(sessionCookie).toContain('Max-Age=1800');
+    expect(sessionCookie).toContain('Secure');
     expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'))).toHaveLength(0);
     const sessionKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-session:'));
     expect(sessionKeys).toHaveLength(1);

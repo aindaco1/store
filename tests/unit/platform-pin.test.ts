@@ -4,17 +4,21 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '2e79a8d70cb6d30805ea141e53d32f9387441756';
+const expectedCommit = '06a9453ed2f310f5acca1a1f864fdce4a45d5f56';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.15.0',
+  '@dustwave/platform-workspace': '0.27.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
-  '@dustwave/media-core': '0.3.0',
+  '@dustwave/design-core': '0.1.0',
+  '@dustwave/inventory-core': '0.1.0',
+  '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.1.0',
+  '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.1.0',
-  '@dustwave/tax-core': '0.2.0',
+  '@dustwave/tax-core': '0.3.0',
+  '@dustwave/test-core': '0.1.0',
   '@dustwave/timed-text': '0.5.0',
-  '@dustwave/worker-core': '0.6.0'
+  '@dustwave/worker-core': '0.12.0'
 };
 
 function readJson(relativePath: string) {
@@ -40,10 +44,14 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/package.json',
       'shared/dust-wave-platform/packages/admin-shell/package.json',
       'shared/dust-wave-platform/packages/build-core/package.json',
+      'shared/dust-wave-platform/packages/design-core/package.json',
+      'shared/dust-wave-platform/packages/inventory-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
       'shared/dust-wave-platform/packages/release-core/package.json',
+      'shared/dust-wave-platform/packages/shipping-core/package.json',
       'shared/dust-wave-platform/packages/site-shell/package.json',
       'shared/dust-wave-platform/packages/tax-core/package.json',
+      'shared/dust-wave-platform/packages/test-core/package.json',
       'shared/dust-wave-platform/packages/timed-text/package.json',
       'shared/dust-wave-platform/packages/worker-core/package.json'
     ].map(readJson);
@@ -61,12 +69,26 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/credentialed-download.js',
       'packages/build-core/bin/minify-site-assets.mjs',
       'packages/build-core/src/site-assets.js',
+      'packages/design-core/styles/_base.scss',
+      'packages/design-core/styles/_buttons.scss',
+      'packages/design-core/styles/_content-blocks.scss',
+      'packages/design-core/styles/_modal.scss',
+      'packages/design-core/styles/_utilities.scss',
+      'packages/inventory-core/src/index.js',
+      'packages/media-core/src/site-catalog.js',
       'packages/site-shell/src/a11y-live-browser.js',
       'packages/site-shell/src/header-nav-browser.js',
       'packages/tax-core/src/index.js',
       'packages/tax-core/src/nm-grt-starter.js',
+      'packages/tax-core/src/provider.js',
+      'packages/test-core/src/index.js',
       'packages/worker-core/src/date-time.js',
       'packages/worker-core/src/http.js',
+      'packages/worker-core/src/github.js',
+      'packages/worker-core/src/logger.js',
+      'packages/worker-core/src/outbox.js',
+      'packages/worker-core/src/resend.js',
+      'packages/worker-core/src/session-security.js',
       'packages/worker-core/src/stripe.js',
       'packages/worker-core/src/turnstile.js',
       'packages/worker-core/src/timezones.js',
@@ -75,11 +97,40 @@ describe('shared platform pin', () => {
       'packages/release-core/src/kv-backup-records.js',
       'packages/release-core/src/provider-evidence.js',
       'packages/release-core/src/wrangler-config.js',
+      'packages/shipping-core/src/index.js',
+      'packages/shipping-core/src/usps.js',
+      'packages/shipping-core/data/shipping-countries.yml',
       'scripts/scan-tracked-secrets.mjs'
     ];
 
     expect(consumedPaths.filter((path) => !existsSync(`${platformRoot}/${path}`)))
       .toEqual([]);
+  });
+
+  it('resolves shared Sass without retaining local duplicate partials', () => {
+    const config = readFileSync(`${repositoryRoot}/_config.yml`, 'utf8');
+    const localDuplicates = [
+      '_base.scss',
+      '_buttons.scss',
+      '_content-blocks.scss',
+      '_modal.scss',
+      '_utilities.scss'
+    ];
+
+    expect(config).toContain(
+      'shared/dust-wave-platform/packages/design-core/styles'
+    );
+    expect(localDuplicates.filter((name) =>
+      existsSync(`${repositoryRoot}/assets/partials/${name}`)
+    )).toEqual([]);
+  });
+
+  it('keeps the Jekyll shipping-country snapshot byte-identical to Platform', () => {
+    expect(readFileSync(`${repositoryRoot}/_data/shipping_countries.yml`, 'utf8'))
+      .toBe(readFileSync(
+        `${platformRoot}/packages/shipping-core/data/shipping-countries.yml`,
+        'utf8'
+      ));
   });
 
   it('runs shared Node tooling with its exact reviewed dependencies', () => {

@@ -1,5 +1,199 @@
 # Changelog
 
+## v1.1.16 - 2026-08-06
+
+### Shared compile-time design components
+
+- Advanced the immutable Platform pin to `v0.27.0`
+  (`06a9453ed2f310f5acca1a1f864fdce4a45d5f56`) and adopted Design Core `0.1.0`.
+- Removed five byte-identical local Sass partials and resolved their base,
+  button, content-block, modal, and utility components from the pinned Platform
+  load path with byte-equivalent generated CSS.
+- The package adds no browser JavaScript or request-time cost. Store retains
+  tokens, mixins, import order, templates, focus and responsive policy,
+  content, CSS budgets, Jekyll integration, deployment, and rollback. Liquid
+  includes and Ruby plugins remain local by explicit architecture decision.
+
+## v1.1.15 - 2026-08-06
+
+### Shared test setup and mobile viewport helper
+
+- Advanced the immutable Platform pin to `v0.26.0`
+  (`3063aae3cb1cf80e2f8bc5f9b1e40c814dff47b2`) and adopted Test Core `0.1.0`.
+- Replaced the exact duplicate browser Storage setup and horizontal-overflow
+  helper with tiny Vitest and Playwright adapters; Platform gains no runner or
+  browser-automation dependency.
+- Store retains fixtures, URLs, viewports, responsive/product expectations,
+  CI, deployment, and rollback. Independent accessibility and media contract
+  tests remain local, and Playwright test discovery covers 34 cases.
+
+## v1.1.14 - 2026-08-06
+
+### Shared durable-outbox mechanics
+
+- Advanced the immutable Platform pin to `v0.25.0`
+  (`4f1c7c042456da1a86116c24c7d346dfaddb21b4`) and Worker Core `0.12.0`.
+- Replaced duplicate canonical job IDs, bounded record/queue creation,
+  due/lease/expiry classification, retry delay, redacted error evidence,
+  email/tag normalization, and Resend event mechanics with shared primitives.
+- Store retains KV operations, template rendering, suppression, provider sends
+  and scheduling, order mutations, credentials, deployment, and independent
+  rollback. Existing render-retry, frozen-payload, and idempotency tests pass.
+
+## v1.1.13 - 2026-08-06
+
+### Shared bounded tax-provider transport
+
+- Advanced the immutable Platform pin to `v0.24.0`
+  (`16ccc75209f1b07044299a60c0ff26520fe70607`) and Tax Core `0.3.0`.
+- Replaced Store's duplicate Zip-Tax and New Mexico GRT fetch, address-build,
+  street-parse, and source-normalization code with shared bounded transport.
+- Provider URLs require HTTPS, redirects are rejected, timeouts abort, and
+  request/response data is bounded without returning credentials or raw
+  network errors. Store retains provider/fallback selection, product
+  taxability, quote calculation, checkout effects, deployment, and rollback.
+
+## v1.1.12 - 2026-08-06
+
+### Shared bounded GitHub transport
+
+- Advanced the immutable Platform pin to `v0.23.0`
+  (`a0006c3e0c3f8ab814387491753989956adbbe94`) and Worker Core `0.11.0`.
+- Replaced Store's duplicate workflow, Contents API, and atomic multi-file
+  commit client with a thin adapter while preserving optimistic product-file
+  conflict guidance and all existing publishing behavior.
+- Requests now reject redirects, time out, bound paths, refs, workflow inputs,
+  content, and provider responses; batch publication rejects duplicate paths
+  and stale SHA evidence and never force-updates a branch. Store retains
+  repository defaults, product schemas, messages, logging, authorization,
+  effects, deployment, and independent rollback.
+
+## v1.1.11 - 2026-08-06
+
+### Shared USPS transport and country registry
+
+- Advanced the immutable Platform pin to `v0.22.0`
+  (`514c00932d5fb2fa05ee6f7cebb7ea44d9426d78`) and Shipping Core `0.2.0`.
+- Replaced Store's duplicate USPS OAuth, rate-search, timeout, token/quote
+  cache, and provider-cooldown implementation with a thin configuration
+  adapter.
+- Made Platform's 95-country YAML the canonical source and added explicit
+  check/write sync commands plus a byte-equality pin regression for Store's
+  Jekyll snapshot.
+- Provider credentials remain request-only; mail-class/token/cache state is
+  bounded; timeout, 401 refresh, 429/5xx cooldown, fallback, and full shipping
+  behavior remain covered. Store retains address eligibility, product rates,
+  checkout/fulfillment effects, storage, routes, deployment, and rollback.
+
+## v1.1.10 - 2026-08-06
+
+### Shared inventory state mechanics
+
+- Advanced the immutable Platform pin to `v0.21.0`
+  (`98533957456eed4bb2eae6f474b9072a419b64bc`), adopted
+  `@dustwave/inventory-core` `0.1.0`, and Worker Core `0.10.0`.
+- Replaced Store's duplicate count-map, snapshot-cloning, reservation expiry,
+  reserved-count, and catalog-bootstrap merge helpers with shared pure
+  mechanics while preserving claimed counts when current product metadata is
+  refreshed.
+- Added an independent pre-move regression for Store's merge policy. The full
+  coordinator contract continues to cover atomic selection changes, competing
+  claims, reservation confirmation/release, expiry cleanup, and rebuilds.
+- Store retains all Durable Object transactions, KV writes, catalog/SKU
+  labels, checkout and order transitions, TTL selection, routes, deployment,
+  and independent rollback.
+
+## v1.1.9 - 2026-08-06
+
+### Shared logging and media-catalog mechanics
+
+- Advanced the immutable Platform pin to `v0.19.0`
+  (`1bfbdd403fc9efafb8d261dd846cedb9d52ed444`), Worker Core `0.9.0`, and
+  Media Core `0.4.0`.
+- Replaced Store's duplicate scoped-console implementation and site-media
+  catalog mechanics with thin product-policy adapters while preserving the
+  existing product/runtime prefixes, severity policy, manifest and broken-
+  reference shape, placement budgets, derivative paths, and public behavior.
+- Added independent media characterization before migration and fail-closed
+  traversal coverage. Shared labels, scopes, error fields, media paths, and
+  known-path sets are now bounded.
+- Store retains environment/config parsing, logging policy and destinations,
+  product/add-on/default scope and slug policy, content, filesystem access,
+  transforms, admin routes, storage, deployment, and rollback.
+
+## v1.1.8 - 2026-08-06
+
+### Shared deterministic shipping mechanics
+
+- Advanced the immutable Platform pin to `v0.18.0`
+  (`3b8bdacc224bda625103718ba0fa8489517ff993`) and adopted
+  `@dustwave/shipping-core` `0.1.0`.
+- Replaced 524 lines of duplicate item-profile, mixed-shipment aggregation,
+  missing-metadata, fallback/free/manual quote, and shipping-option mechanics
+  with thin Store policy adapters.
+- Added an independent pre-move consumer contract for mixed tier,
+  support-item, and add-on shipments plus option fallback behavior.
+- Bounded selection, catalog, mail-class, and option arrays before shared
+  loops while preserving the current USPS First-Class flat table and normal
+  quote results.
+- Store retains product and free-shipping policy, destination validation, USPS
+  credentials and transport, OAuth/cache/backoff/retry, checkout, fulfillment,
+  storage, deployment, and rollback.
+
+## v1.1.7 - 2026-08-06
+
+### Shared session security mechanics
+
+- Advanced the immutable Platform pin to `v0.17.0`
+  (`3a526defd21d692292c73652966a044167f881d7`) and Worker Core `0.8.0`.
+- Replaced Store's characterized login-token encoding/verification,
+  session-cookie serialization/clearing, and same-origin request checks with
+  bounded shared primitives through thin Store policy adapters.
+- Preserved the exact secure admin cookie, current missing-origin-header and
+  local unconfigured-origin behavior, normal TTLs, the five-minute order-email
+  login and 30-minute notification session, one-time nonce consumption, and
+  independent rollback.
+- Added rejection coverage for extra token segments and retained existing
+  login replay, CSRF/origin, session-review, redacted-history, role/scope, and
+  notification-link coverage.
+- Store continues to own secret selection, login/session records, roles and
+  scopes, CSRF tokens and header names, routes, storage, email, credentials,
+  deployment, and rollback.
+
+## v1.1.6 - 2026-08-06
+
+### Shared Resend security and retry mechanics
+
+- Advanced the immutable Platform pin to `v0.16.0`
+  (`d075c3e1a29134d3ba6e4631b76dc63212347d14`) and Worker Core `0.7.0`.
+- Replaced Store's characterized Resend/Svix HMAC verification copy with the
+  bounded shared raw-body verifier, retaining Store's response adapter and all
+  event parsing, journal, delivery, and suppression effects locally.
+- Replaced Store's duplicate Resend error class and retryable/ambiguous status
+  rules with shared pure mechanics. Store still decides attempt budgets,
+  idempotency windows, backoff scheduling, terminal evidence, and whether any
+  retry occurs.
+- Added pre-migration coverage for multiple signature candidates, stale events,
+  malformed secrets, body mismatches, 429 retry timing, and permanent-bounce
+  suppression. Oversized event IDs and fractional timestamps now fail closed.
+
+## v1.1.5 - 2026-08-06
+
+### Shared cryptographic primitives
+
+- Replaced Store's characterized SHA-256, HMAC-SHA-256, high-entropy token,
+  cookie parsing, email normalization, and constant-work string-comparison
+  copies with the immutable `@dustwave/worker-core` `0.6.0` implementation
+  already pinned through Platform `v0.15.0`.
+- Kept login-token shape, Store's short-lived order-notification login policy,
+  session and CSRF records, admin scopes, routes, KV storage, credentials,
+  release, and rollback in Store; a one-line HMAC adapter preserves the
+  existing argument order.
+- Added consumer contracts for the exact digest, URL-safe signature and token
+  shapes, encoded cookies, normalized email, constant-work equality, and
+  rejection of undersized tokens, alongside the existing login replay,
+  expiry, CSRF/origin, session-review, and redacted-history coverage.
+
 ## v1.1.4 - 2026-08-06
 
 ### Provider-originated Stripe test coverage
