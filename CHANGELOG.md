@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.1.16 - 2026-08-06
+
+### Shared compile-time design components
+
+- Advanced the immutable Platform pin to `v0.27.0`
+  (`06a9453ed2f310f5acca1a1f864fdce4a45d5f56`) and adopted Design Core `0.1.0`.
+- Removed five byte-identical local Sass partials and resolved their base,
+  button, content-block, modal, and utility components from the pinned Platform
+  load path with byte-equivalent generated CSS.
+- The package adds no browser JavaScript or request-time cost. Store retains
+  tokens, mixins, import order, templates, focus and responsive policy,
+  content, CSS budgets, Jekyll integration, deployment, and rollback. Liquid
+  includes and Ruby plugins remain local by explicit architecture decision.
+
 ## v1.1.15 - 2026-08-06
 
 ### Shared test setup and mobile viewport helper

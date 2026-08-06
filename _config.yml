@@ -38,8 +38,8 @@ exclude:
   - Containerfile.playwright.dev
 platform:
   name: Shop
-  version: 1.1.15
-  release_label: v1.1.15
+  version: 1.1.16
+  release_label: v1.1.16
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>
@@ -291,6 +291,8 @@ design:
   surface_tint_strong: rgba(16, 18, 21, 0.07)
 sass:
   sass_dir: assets/partials
+  load_paths:
+    - shared/dust-wave-platform/packages/design-core/styles
   style: compressed
 collections:
   products:

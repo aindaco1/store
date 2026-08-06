@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '3063aae3cb1cf80e2f8bc5f9b1e40c814dff47b2';
+const expectedCommit = '06a9453ed2f310f5acca1a1f864fdce4a45d5f56';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.26.0',
+  '@dustwave/platform-workspace': '0.27.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
+  '@dustwave/design-core': '0.1.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.1.0',
@@ -43,6 +44,7 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/package.json',
       'shared/dust-wave-platform/packages/admin-shell/package.json',
       'shared/dust-wave-platform/packages/build-core/package.json',
+      'shared/dust-wave-platform/packages/design-core/package.json',
       'shared/dust-wave-platform/packages/inventory-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
       'shared/dust-wave-platform/packages/release-core/package.json',
@@ -67,6 +69,11 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/credentialed-download.js',
       'packages/build-core/bin/minify-site-assets.mjs',
       'packages/build-core/src/site-assets.js',
+      'packages/design-core/styles/_base.scss',
+      'packages/design-core/styles/_buttons.scss',
+      'packages/design-core/styles/_content-blocks.scss',
+      'packages/design-core/styles/_modal.scss',
+      'packages/design-core/styles/_utilities.scss',
       'packages/inventory-core/src/index.js',
       'packages/media-core/src/site-catalog.js',
       'packages/site-shell/src/a11y-live-browser.js',
@@ -98,6 +105,24 @@ describe('shared platform pin', () => {
 
     expect(consumedPaths.filter((path) => !existsSync(`${platformRoot}/${path}`)))
       .toEqual([]);
+  });
+
+  it('resolves shared Sass without retaining local duplicate partials', () => {
+    const config = readFileSync(`${repositoryRoot}/_config.yml`, 'utf8');
+    const localDuplicates = [
+      '_base.scss',
+      '_buttons.scss',
+      '_content-blocks.scss',
+      '_modal.scss',
+      '_utilities.scss'
+    ];
+
+    expect(config).toContain(
+      'shared/dust-wave-platform/packages/design-core/styles'
+    );
+    expect(localDuplicates.filter((name) =>
+      existsSync(`${repositoryRoot}/assets/partials/${name}`)
+    )).toEqual([]);
   });
 
   it('keeps the Jekyll shipping-country snapshot byte-identical to Platform', () => {

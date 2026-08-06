@@ -16,21 +16,21 @@
 @import "partials/mixins";
 
 // Import partials - base & layout
-@import "partials/base";
+@import "base";
 @import "partials/layout";
 
 // Import partials - components
-@import "partials/buttons";
+@import "buttons";
 @import "partials/forms";
-@import "partials/modal";
+@import "modal";
 
 // Import partials - page-specific
 @import "partials/storefront";
 @import "partials/admin-product-preview";
 
 // Import partials - content & utilities
-@import "partials/content-blocks";
-@import "partials/utilities";
+@import "content-blocks";
+@import "utilities";
 @import "partials/accessibility";
 @import "partials/cart-ui";
 
