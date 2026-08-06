@@ -158,6 +158,19 @@ Production endpoint:
 https://checkout.dustwave.xyz/webhooks/stripe
 ```
 
+Persistent test-mode endpoint:
+
+```text
+https://store-worker-staging.jogo.workers.dev/webhooks/stripe
+```
+
+The test endpoint targets the isolated `store-worker-staging` Cloudflare
+environment. It has separate KV and R2 resources, no custom production route,
+no cron, test-only Stripe credentials, disabled reconciliation and USPS calls,
+and rendered-email dry runs instead of Resend delivery. Do not point a Stripe
+test endpoint at `checkout.dustwave.xyz` or reuse its signing secret in live
+mode.
+
 Required events:
 
 - `payment_intent.succeeded`
@@ -168,6 +181,20 @@ Copy each endpoint signing secret into the matching Worker secret:
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_WEBHOOK_SECRET_LIVE`
 - `STRIPE_WEBHOOK_SECRET_TEST`
+
+For the persistent test endpoint, write `STRIPE_SECRET_KEY_TEST`,
+`STRIPE_PUBLISHABLE_KEY_TEST`, and `STRIPE_WEBHOOK_SECRET_TEST` to the staging
+environment only:
+
+```bash
+cd worker
+npx wrangler secret put STRIPE_SECRET_KEY_TEST --env staging
+npx wrangler secret put STRIPE_PUBLISHABLE_KEY_TEST --env staging
+npx wrangler secret put STRIPE_WEBHOOK_SECRET_TEST --env staging
+```
+
+Use unique staging-only signing secrets for checkout/order access. Never copy
+production admin, Resend, USPS, Turnstile, or GitHub credentials into staging.
 
 For local work, prefer:
 
@@ -463,11 +490,12 @@ There is no Store recovery route that bypasses Stripe webhook settlement. Store 
 
 After checkout, fulfillment, or payment changes:
 
-- Run `npm run release:providers` for read-only provider checks. It can use authenticated `gh`, `wrangler`, and `stripe` CLIs to prove GitHub deploy secret names, Cloudflare KV/R2 resources, and live Stripe webhook endpoints without printing secrets.
+- Run `npm run release:providers` for read-only provider checks. It can use authenticated `gh`, `wrangler`, and `stripe` CLIs to prove GitHub deploy secret names, Cloudflare KV/R2 resources, and the mode-specific live and staging Stripe webhook endpoints without printing secrets.
 - Run `npm run release:payment-smoke` for payment contract checks. Local/test variables are read from `worker/.dev.vars` by default; pass `--no-dev-vars` only for clean-shell CI probes. For non-production direct signed-webhook settlement, run `PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook` against a Worker that has `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`; the direct matrix covers paid digital, paid physical, paid ticket, free RSVP, and failed-payment paths and verifies customer/admin order emails render without calling Resend. For local/non-production test-mode PaymentIntent creation against explicit URLs, set `PAYMENT_SMOKE_ALLOW_MUTATION=1`, `PAYMENT_SMOKE_WORKER_URL`, `PAYMENT_SMOKE_SITE_URL`, and `STRIPE_SECRET_KEY_TEST`; add `PAYMENT_SMOKE_CONFIRM=1` only when the non-production webhook endpoint is expected to settle the order.
 - Confirm `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` point at the intended environment.
 - Confirm Stripe publishable/secret keys match the selected app mode.
 - Confirm the Stripe webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` in production.
+- Confirm the test-mode Stripe webhook endpoint targets `https://store-worker-staging.jogo.workers.dev/webhooks/stripe` and the staging Worker only.
 - Confirm the webhook subscribes to `payment_intent.succeeded` and `payment_intent.payment_failed`.
 - Review webhook observability.
 - Export Store reconciliation CSV from **Settings -> Store readiness**.

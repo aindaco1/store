@@ -6,8 +6,6 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-ruby ./scripts/sync-worker-config.rb >/dev/null
-
 USE_PODMAN=false
 PODMAN_STARTED_BY_SCRIPT=false
 DEV_PID=""
@@ -28,10 +26,16 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-WORKER_HEADERS=(
-  -H "CF-Connecting-IP: ${REQUEST_IP}"
-  -H "X-Forwarded-For: ${REQUEST_IP}"
-)
+WORKER_HEADERS=()
+case "$WORKER_URL" in
+  http://127.0.0.1:*|https://127.0.0.1:*|http://localhost:*|https://localhost:*)
+    ruby ./scripts/sync-worker-config.rb >/dev/null
+    WORKER_HEADERS=(
+      -H "CF-Connecting-IP: ${REQUEST_IP}"
+      -H "X-Forwarded-For: ${REQUEST_IP}"
+    )
+    ;;
+esac
 
 pass() { echo -e "${GREEN}✓${NC} $1"; }
 fail() { echo -e "${RED}✗${NC} $1"; exit 1; }

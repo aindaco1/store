@@ -163,6 +163,16 @@ async function fetchJson(url, { headers = {}, method = 'GET', body = null } = {}
   }
 }
 
+function localSyntheticClientHeaders(workerUrl) {
+  try {
+    const host = new URL(workerUrl).hostname;
+    if (host === '127.0.0.1' || host === 'localhost' || host === '::1') {
+      return { 'CF-Connecting-IP': '127.0.0.55' };
+    }
+  } catch {}
+  return {};
+}
+
 function stripeAuthHeader(key) {
   return `Basic ${Buffer.from(`${key}:`).toString('base64')}`;
 }
@@ -432,7 +442,7 @@ async function runFreeScenario(workerUrl, siteUrl, scenario) {
     headers: {
       'Content-Type': 'application/json',
       Origin: siteUrl,
-      'CF-Connecting-IP': '127.0.0.55'
+      ...localSyntheticClientHeaders(workerUrl)
     },
     body: JSON.stringify(paymentSmokePayload(scenario))
   });
@@ -451,7 +461,7 @@ async function runPaidScenario(workerUrl, siteUrl, stripeKey, scenario) {
     headers: {
       'Content-Type': 'application/json',
       Origin: siteUrl,
-      'CF-Connecting-IP': '127.0.0.55'
+      ...localSyntheticClientHeaders(workerUrl)
     },
     body: JSON.stringify(paymentSmokePayload(scenario))
   });

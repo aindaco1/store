@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.1.4 - 2026-08-06
+
+### Provider-originated Stripe test coverage
+
+- Added a persistent `store-worker-staging` Cloudflare environment with an
+  isolated Durable Object namespace, KV namespaces, R2 bucket, and Analytics
+  dataset; it has no custom route or cron and cannot mutate production Store
+  state.
+- Scoped staging to Stripe test mode, disabled USPS, reconciliation, runtime
+  analytics, Worker cache, repository writes, and Resend delivery, and retained
+  rendered-email evidence through explicit dry-run flags.
+- Added posture tests that reject production routes/storage/provider side
+  effects or committed Stripe credentials, plus a clean Wrangler dry-run gate.
+- Updated provider evidence to verify test-mode webhooks against the dedicated
+  staging URL instead of the production Worker, while retaining separate live
+  endpoint verification.
+- Limited synthetic `CF-Connecting-IP` headers to localhost smoke targets so
+  deployed Cloudflare checks use the edge-provided client address and are not
+  rejected as spoofed requests.
+- Documented staging-only secret handling, provider-originated settlement
+  rehearsal, production isolation, and independent rollback.
+
 ## v1.1.3 - 2026-08-06
 
 ### Shared Platform consolidation
