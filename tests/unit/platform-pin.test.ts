@@ -4,18 +4,19 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '1bfbdd403fc9efafb8d261dd846cedb9d52ed444';
+const expectedCommit = '98533957456eed4bb2eae6f474b9072a419b64bc';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.19.0',
+  '@dustwave/platform-workspace': '0.21.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
+  '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.1.0',
   '@dustwave/shipping-core': '0.1.0',
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.2.0',
   '@dustwave/timed-text': '0.5.0',
-  '@dustwave/worker-core': '0.9.0'
+  '@dustwave/worker-core': '0.10.0'
 };
 
 function readJson(relativePath: string) {
@@ -41,6 +42,7 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/package.json',
       'shared/dust-wave-platform/packages/admin-shell/package.json',
       'shared/dust-wave-platform/packages/build-core/package.json',
+      'shared/dust-wave-platform/packages/inventory-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
       'shared/dust-wave-platform/packages/release-core/package.json',
       'shared/dust-wave-platform/packages/shipping-core/package.json',
@@ -63,6 +65,7 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/credentialed-download.js',
       'packages/build-core/bin/minify-site-assets.mjs',
       'packages/build-core/src/site-assets.js',
+      'packages/inventory-core/src/index.js',
       'packages/media-core/src/site-catalog.js',
       'packages/site-shell/src/a11y-live-browser.js',
       'packages/site-shell/src/header-nav-browser.js',

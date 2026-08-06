@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1.10 - 2026-08-06
+
+### Shared inventory state mechanics
+
+- Advanced the immutable Platform pin to `v0.21.0`
+  (`98533957456eed4bb2eae6f474b9072a419b64bc`), adopted
+  `@dustwave/inventory-core` `0.1.0`, and Worker Core `0.10.0`.
+- Replaced Store's duplicate count-map, snapshot-cloning, reservation expiry,
+  reserved-count, and catalog-bootstrap merge helpers with shared pure
+  mechanics while preserving claimed counts when current product metadata is
+  refreshed.
+- Added an independent pre-move regression for Store's merge policy. The full
+  coordinator contract continues to cover atomic selection changes, competing
+  claims, reservation confirmation/release, expiry cleanup, and rebuilds.
+- Store retains all Durable Object transactions, KV writes, catalog/SKU
+  labels, checkout and order transitions, TTL selection, routes, deployment,
+  and independent rollback.
+
 ## v1.1.9 - 2026-08-06
 
 ### Shared logging and media-catalog mechanics
