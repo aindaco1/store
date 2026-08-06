@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.1.20`. The preceding `v1.1.19` release remains independently reversible. Store pins Platform v0.30.0 and delegates shared forms plus policy-injected layout/mixins to Design Core through Store-owned compile-time variables. Tokens, gutter and brand-title geometry, production origins, credentials, templates, deployment, and rollback authority remain in Store. Provider evidence uses explicit production origins even when the checked-in Wrangler configuration retains safe localhost defaults.
+Current release: `v1.1.21`. The preceding `v1.1.20` release remains independently reversible. Store pins Platform v0.31.0 and uses Build Core's explicit generated-root policy to minify `_site/assets` plus generated copies of pinned Site Shell browser scripts. Source assets, budgets, production origins, credentials, templates, deployment, and rollback authority remain in Store. Provider evidence uses explicit production origins even when the checked-in Wrangler configuration retains safe localhost defaults.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 

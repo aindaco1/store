@@ -13,8 +13,13 @@ Store performance depends on static public pages, lazy cart loading, generated m
 - Spanish public shells share the English page includes and runtime message payloads; they do not duplicate product rendering or add locale-specific bundles.
 - Admin dashboard tab restoration reads and writes one small sanitized `localStorage` object only when an admin tab or Settings section changes; it does not add network calls or polling.
 - Active-session and audit-review rendering lives in `admin-settings-review.js`, loaded only when a super admin opens either Settings section. It reuses the dashboard's request/format/i18n helpers and does not duplicate authentication or state ownership.
-- Generated assets minify local JavaScript identifiers while preserving public
-  global names, and are verified with `npm run assets:minify:check` after build.
+- Generated assets and pinned Site Shell copies minify local JavaScript
+  identifiers while preserving public global names. Build Core accepts only the
+  two explicit traversal-safe roots, and `npm run assets:minify:check` verifies
+  them after each build.
+- The six generated Site Shell scripts total 9,531 raw bytes after Build Core
+  minification (15,573 before; 6,042 bytes or 38.8% removed) without adding a
+  request or eager runtime.
 - `config/performance-budgets.json` now owns generated JS/CSS, Lighthouse category/Web Vital/resource, dashboard timing, Worker-route, and cache-policy budgets.
 - The pre-merge production build enforces the generated JS/CSS budgets after
   minification so the documented ceilings cannot drift from deployed assets.
