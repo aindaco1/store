@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.18 - 2026-08-06
+
+### Shared release-evidence runtime
+
+- Advanced the immutable Platform pin to `v0.28.0`
+  (`5836ced5129ce3eddb09a035601de23ec58a5737`) and adopted Release Core `0.2.0`.
+- Replaced Store's duplicate cache-policy audit, Cloudflare admin response-rule
+  client, and assisted screen-reader evidence implementation with thin,
+  import-safe policy adapters.
+- Release Core now bounds origins, paths, rule metadata, command inputs, and
+  diagnostic output; rejects redirects; avoids shell command interpolation;
+  and excludes credentials, customer data, and response bodies from evidence.
+  Store retains its production targets, route policy, expected phrases,
+  provider credentials, release decisions, deployment, and independent
+  one-commit rollback.
+- Added consumer adapter regressions for Store-owned origins and policy plus
+  the existing Cloudflare, cache, performance, pin, and release-version
+  coverage. The checked-in local Wrangler origins remain unchanged.
+
 ## v1.1.17 - 2026-08-06
 
 ### Production-target provider evidence
