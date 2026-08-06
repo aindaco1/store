@@ -42,6 +42,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 - [x] Inventory and scarcity protection
   - `STORE_INVENTORY_COORDINATOR` Durable Objects serialize positive-count SKU reservations, commits, releases, and availability snapshots.
   - Admin inventory baselines and overrides live in KV, while derived projections keep public/admin reads cheap.
+  - Inventory-tracked home and product pages refresh confirmed availability once per navigation from a sanitized, 15-second cached projection. Static counts remain the no-JavaScript or network-failure fallback, and checkout revalidates reservation-aware availability.
   - Failed or canceled payments release reservations.
 - [x] Shipping and tax
   - Checkout supports USPS-backed shipping quotes, deployment fallback behavior, delivery options, configured shipping origin, and product shipping presets.
