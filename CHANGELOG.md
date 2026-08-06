@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.1.21 - 2026-08-06
+
+### Allowlisted shared-browser asset minification
+
+- Advanced the immutable Platform pin to `v0.31.0`
+  (`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579`) and adopted Build Core `0.2.0`.
+- Extended the generated-asset build step to minify only `_site/assets` and the
+  generated copies of the pinned Site Shell sources through explicit,
+  traversal-safe roots.
+- Added consumer characterization for root selection, untouched Worker source,
+  multi-root output, and the exact write/check commands used by local and Pages
+  builds.
+- The six generated Site Shell scripts fall from 15,573 to 9,531 bytes, saving
+  6,042 raw bytes (38.8%); post-write check mode reports zero further savings
+  across all 24 selected generated assets.
+- This changes no route, request count, global identity, cart, checkout,
+  inventory, or fulfillment behavior. Store retains budgets, orchestration,
+  deployment authority, and independent one-commit rollback.
+
 ## v1.1.20 - 2026-08-06
 
 ### Policy-injected shared design foundations

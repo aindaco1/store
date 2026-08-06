@@ -6,6 +6,14 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = process.cwd();
 
 describe('package test scripts', () => {
+  it('minifies only explicitly selected generated site roots', () => {
+    const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+    const command = 'node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --asset-dir assets --asset-dir shared/dust-wave-platform/packages/site-shell/src';
+
+    expect(packageJson.scripts['assets:minify']).toBe(`${command} --write`);
+    expect(packageJson.scripts['assets:minify:check']).toBe(`${command} --check`);
+  });
+
   it('keeps the coverage command reproducible from declared dependencies', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
 

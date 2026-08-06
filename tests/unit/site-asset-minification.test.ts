@@ -23,12 +23,27 @@ afterEach(async () => {
 });
 
 describe('site asset minification', () => {
+  const generatedAssetDirectories = [
+    'assets',
+    'shared/dust-wave-platform/packages/site-shell/src'
+  ];
+
   it('targets generated CSS and JS assets only', () => {
     expect(isMinifiableAssetPath('_site/assets/main.css')).toBe(true);
     expect(isMinifiableAssetPath('_site/assets/js/cart-provider.js')).toBe(true);
     expect(isMinifiableAssetPath('_site/assets/js/cart-provider.js.map')).toBe(false);
     expect(isMinifiableAssetPath('_site/index.html')).toBe(false);
     expect(isMinifiableAssetPath('_site/assets/vendor/library.js')).toBe(false);
+    expect(isMinifiableAssetPath(
+      '_site/shared/dust-wave-platform/packages/site-shell/src/header-nav-browser.js',
+      '_site',
+      generatedAssetDirectories
+    )).toBe(true);
+    expect(isMinifiableAssetPath(
+      '_site/shared/dust-wave-platform/packages/worker-core/src/http.js',
+      '_site',
+      generatedAssetDirectories
+    )).toBe(false);
   });
 
   it('minifies local identifiers without rewriting global names', async () => {
@@ -54,25 +69,38 @@ describe('site asset minification', () => {
     const siteDir = path.join(tempDir, '_site');
     await fs.mkdir(path.join(siteDir, 'assets/js'), { recursive: true });
     await fs.mkdir(path.join(siteDir, 'assets/vendor'), { recursive: true });
+    const sharedDirectory = path.join(
+      siteDir,
+      'shared/dust-wave-platform/packages/site-shell/src'
+    );
+    await fs.mkdir(sharedDirectory, { recursive: true });
 
     const jsPath = path.join(siteDir, 'assets/js/app.js');
     const cssPath = path.join(siteDir, 'assets/main.css');
     const vendorPath = path.join(siteDir, 'assets/vendor/library.js');
+    const sharedPath = path.join(sharedDirectory, 'header-nav-browser.js');
     const htmlPath = path.join(siteDir, 'index.html');
 
     await fs.writeFile(jsPath, 'window.StoreApp = window.StoreApp || {};\nwindow.StoreApp.ready = true;\n');
     await fs.writeFile(cssPath, '.example {\n  color: #ffffff;\n  margin: 0px;\n}\n');
     await fs.writeFile(vendorPath, 'function vendorName() {\n  return true;\n}\n');
+    await fs.writeFile(sharedPath, 'window.StoreShell = window.StoreShell || {};\nwindow.StoreShell.ready = true;\n');
     await fs.writeFile(htmlPath, '<script>window.inline = true;</script>\n');
 
-    const summary = await minifySiteAssets({ siteDir, write: true });
+    const summary = await minifySiteAssets({
+      siteDir,
+      assetDirectories: generatedAssetDirectories,
+      write: true
+    });
 
-    expect(summary.filesChecked).toBe(2);
-    expect(summary.minifiedCount).toBe(2);
+    expect(summary.assetDirectories).toEqual(generatedAssetDirectories);
+    expect(summary.filesChecked).toBe(3);
+    expect(summary.minifiedCount).toBe(3);
     expect(summary.bytesSaved).toBeGreaterThan(0);
     await expect(fs.readFile(jsPath, 'utf8')).resolves.not.toContain('\n');
     await expect(fs.readFile(cssPath, 'utf8')).resolves.toContain('#fff');
     await expect(fs.readFile(vendorPath, 'utf8')).resolves.toContain('\n');
+    await expect(fs.readFile(sharedPath, 'utf8')).resolves.not.toContain('\n');
     await expect(fs.readFile(htmlPath, 'utf8')).resolves.toContain('<script>window.inline = true;</script>');
   });
 });
