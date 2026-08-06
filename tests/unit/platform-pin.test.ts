@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '4f1c7c042456da1a86116c24c7d346dfaddb21b4';
+const expectedCommit = '3063aae3cb1cf80e2f8bc5f9b1e40c814dff47b2';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.25.0',
+  '@dustwave/platform-workspace': '0.26.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
   '@dustwave/inventory-core': '0.1.0',
@@ -15,6 +15,7 @@ const expectedVersions = {
   '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.3.0',
+  '@dustwave/test-core': '0.1.0',
   '@dustwave/timed-text': '0.5.0',
   '@dustwave/worker-core': '0.12.0'
 };
@@ -48,6 +49,7 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/packages/shipping-core/package.json',
       'shared/dust-wave-platform/packages/site-shell/package.json',
       'shared/dust-wave-platform/packages/tax-core/package.json',
+      'shared/dust-wave-platform/packages/test-core/package.json',
       'shared/dust-wave-platform/packages/timed-text/package.json',
       'shared/dust-wave-platform/packages/worker-core/package.json'
     ].map(readJson);
@@ -72,6 +74,7 @@ describe('shared platform pin', () => {
       'packages/tax-core/src/index.js',
       'packages/tax-core/src/nm-grt-starter.js',
       'packages/tax-core/src/provider.js',
+      'packages/test-core/src/index.js',
       'packages/worker-core/src/date-time.js',
       'packages/worker-core/src/http.js',
       'packages/worker-core/src/github.js',

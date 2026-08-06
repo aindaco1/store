@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.15 - 2026-08-06
+
+### Shared test setup and mobile viewport helper
+
+- Advanced the immutable Platform pin to `v0.26.0`
+  (`3063aae3cb1cf80e2f8bc5f9b1e40c814dff47b2`) and adopted Test Core `0.1.0`.
+- Replaced the exact duplicate browser Storage setup and horizontal-overflow
+  helper with tiny Vitest and Playwright adapters; Platform gains no runner or
+  browser-automation dependency.
+- Store retains fixtures, URLs, viewports, responsive/product expectations,
+  CI, deployment, and rollback. Independent accessibility and media contract
+  tests remain local, and Playwright test discovery covers 34 cases.
+
 ## v1.1.14 - 2026-08-06
 
 ### Shared durable-outbox mechanics
