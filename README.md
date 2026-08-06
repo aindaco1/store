@@ -4,7 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Current release: `v1.1.13`. Store pins Platform `v0.24.0` and consumes its bounded Zip-Tax/New Mexico lookup transport through a thin product tax adapter. Store retains provider and fallback selection, product taxability, quote calculation, credentials, checkout effects, deployment, and one-commit rollback authority.
+- Current release: `v1.1.14`. Store pins Platform `v0.25.0` and consumes its bounded durable-outbox mechanics through a thin order email adapter. Store retains KV ownership, templates, suppression, provider sends, order effects, credentials, deployment, and one-commit rollback authority.
 - Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
 - The preceding `v1.1.8` release remains independently reversible.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.

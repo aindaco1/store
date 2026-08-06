@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.14 - 2026-08-06
+
+### Shared durable-outbox mechanics
+
+- Advanced the immutable Platform pin to `v0.25.0`
+  (`4f1c7c042456da1a86116c24c7d346dfaddb21b4`) and Worker Core `0.12.0`.
+- Replaced duplicate canonical job IDs, bounded record/queue creation,
+  due/lease/expiry classification, retry delay, redacted error evidence,
+  email/tag normalization, and Resend event mechanics with shared primitives.
+- Store retains KV operations, template rendering, suppression, provider sends
+  and scheduling, order mutations, credentials, deployment, and independent
+  rollback. Existing render-retry, frozen-payload, and idempotency tests pass.
+
 ## v1.1.13 - 2026-08-06
 
 ### Shared bounded tax-provider transport
