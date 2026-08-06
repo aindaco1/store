@@ -4,11 +4,21 @@ describe('cart icon provider integration', () => {
   beforeEach(() => {
     vi.resetModules();
     localStorage.clear();
+    document.head.innerHTML = `
+      <script
+        data-dustwave-cart-icon="true"
+        data-cart-cache-key="store_cart_cache"
+        data-cart-provider-global="StoreCartProvider"
+        data-cart-provider-ready-event="storecart.provider.ready"
+        data-cart-ready-event="storecart.ready">
+      </script>
+    `;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
+    document.head.innerHTML = '';
     delete (window as any).StoreCartProvider;
     document.body.innerHTML = '';
   });
@@ -66,7 +76,7 @@ describe('cart icon provider integration', () => {
       }
     };
 
-    await import('../../assets/js/cart-icon.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/cart-icon-browser.js');
 
     const priceEl = document.querySelector('.site-header__cart-price');
     const countEl = document.querySelector('.site-header__cart-count');
@@ -153,7 +163,7 @@ describe('cart icon provider integration', () => {
       }
     };
 
-    await import('../../assets/js/cart-icon.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/cart-icon-browser.js');
 
     const priceEl = document.querySelector('.site-header__cart-price');
     const button = document.getElementById('header-cart-btn') as HTMLButtonElement | null;
@@ -214,7 +224,7 @@ describe('cart icon provider integration', () => {
       }
     };
 
-    await import('../../assets/js/cart-icon.js');
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/cart-icon-browser.js');
 
     expect(document.querySelector('.site-header__cart-price')?.textContent).toBe('$8.00');
     expect(document.querySelector('.site-header__cart-count')?.textContent).toBe('2');

@@ -1,0 +1,12 @@
+{%- if include.asset_version -%}
+  {%- assign form_control_asset_version = include.asset_version -%}
+{%- else -%}
+  {%- assign form_control_asset_version = site.time | date: '%s' -%}
+{%- endif -%}
+<script
+  data-cfasync="false"
+  src="/shared/dust-wave-platform/packages/site-shell/src/form-control-identity-browser.js?v={{ form_control_asset_version }}"
+  data-dustwave-form-control-identity="true"
+  data-form-control-id-prefix="store-form-control"
+  data-identity-dataset-keys="storeMarketingCopy,storeAnalyticsExport,action,itemId,scrollTarget"
+  defer></script>

@@ -8,6 +8,10 @@
       "assets/js/admin-dashboard.js": 320000,
       "assets/js/admin-settings-review.js": 30000,
       "assets/js/cart-provider.js": 245000,
+      "shared/dust-wave-platform/packages/site-shell/src/cart-icon-browser.js": 7000,
+      "shared/dust-wave-platform/packages/site-shell/src/deferred-stylesheets-browser.js": 1000,
+      "shared/dust-wave-platform/packages/site-shell/src/form-control-identity-browser.js": 5000,
+      "shared/dust-wave-platform/packages/site-shell/src/shipping-option-utils-browser.js": 6000,
       "assets/main.css": 100000,
       "assets/admin.css": 115000
     }

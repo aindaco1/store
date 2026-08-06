@@ -50,7 +50,7 @@ function installRuntimeScriptHarness(providerClick = vi.fn()) {
           (window as any).StoreAddOnUtils = {};
           break;
         case 'shipping-option-utils':
-          (window as any).StoreShippingOptionUtils = {};
+          (window as any).DustWaveShippingOptionUtils = {};
           break;
         case 'stripe-checkout-sidecar':
           (window as any).StoreStripeCheckoutSidecar = {};
@@ -107,7 +107,7 @@ describe('cart runtime loader', () => {
     delete (window as any).StoreCartRuntime;
     delete (window as any).StoreCartProvider;
     delete (window as any).StoreAddOnUtils;
-    delete (window as any).StoreShippingOptionUtils;
+    delete (window as any).DustWaveShippingOptionUtils;
     delete (window as any).StoreStripeCheckoutSidecar;
     delete (window as any).__StoreCartRuntimeCartUiLoaded;
     delete (window as any).__StoreBuyButtonsLoaded;
@@ -122,7 +122,7 @@ describe('cart runtime loader', () => {
     delete (window as any).StoreCartRuntime;
     delete (window as any).StoreCartProvider;
     delete (window as any).StoreAddOnUtils;
-    delete (window as any).StoreShippingOptionUtils;
+    delete (window as any).DustWaveShippingOptionUtils;
     delete (window as any).StoreStripeCheckoutSidecar;
     delete (window as any).__StoreCartRuntimeCartUiLoaded;
     delete (window as any).__StoreBuyButtonsLoaded;
@@ -144,6 +144,11 @@ describe('cart runtime loader', () => {
     const scriptVersions = Array.from(document.querySelectorAll<HTMLScriptElement>('script[data-store-cart-runtime-script]'))
       .map((script) => new URL(script.src).searchParams.get('v'));
     expect(scriptVersions).toEqual(runtimeScriptKeys.map(() => '456'));
+    expect(new URL(document.querySelector<HTMLScriptElement>(
+      'script[data-store-cart-runtime-script="shipping-option-utils"]'
+    )?.src || '').pathname).toBe(
+      '/shared/dust-wave-platform/packages/site-shell/src/shipping-option-utils-browser.js'
+    );
     expect(document.querySelectorAll<HTMLScriptElement>('script[data-store-cart-runtime-script]')).toHaveLength(runtimeScriptKeys.length);
   });
 

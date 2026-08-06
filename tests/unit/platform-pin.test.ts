@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '5836ced5129ce3eddb09a035601de23ec58a5737';
+const expectedCommit = '7ed3d9b0220b88126235a3b7edfd507f8846f56d';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.28.0',
+  '@dustwave/platform-workspace': '0.29.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
   '@dustwave/design-core': '0.1.0',
@@ -14,7 +14,7 @@ const expectedVersions = {
   '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.2.0',
   '@dustwave/shipping-core': '0.2.0',
-  '@dustwave/site-shell': '0.1.0',
+  '@dustwave/site-shell': '0.2.0',
   '@dustwave/tax-core': '0.3.0',
   '@dustwave/test-core': '0.1.0',
   '@dustwave/timed-text': '0.5.0',
@@ -77,7 +77,11 @@ describe('shared platform pin', () => {
       'packages/inventory-core/src/index.js',
       'packages/media-core/src/site-catalog.js',
       'packages/site-shell/src/a11y-live-browser.js',
+      'packages/site-shell/src/cart-icon-browser.js',
+      'packages/site-shell/src/deferred-stylesheets-browser.js',
+      'packages/site-shell/src/form-control-identity-browser.js',
       'packages/site-shell/src/header-nav-browser.js',
+      'packages/site-shell/src/shipping-option-utils-browser.js',
       'packages/tax-core/src/index.js',
       'packages/tax-core/src/nm-grt-starter.js',
       'packages/tax-core/src/provider.js',

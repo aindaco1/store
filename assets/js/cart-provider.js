@@ -99,7 +99,7 @@
     ['WY', 'Wyoming'],
     ['DC', 'District of Columbia']
   ];
-  const shippingOptionUtils = window.StoreShippingOptionUtils || {
+  const shippingOptionUtils = window.DustWaveShippingOptionUtils || {
     normalizeSelection: function(availableOptions, selectedOption, defaultOption) {
       const options = Array.isArray(availableOptions) ? availableOptions : [];
       const requested = String(selectedOption || '').trim().toLowerCase();

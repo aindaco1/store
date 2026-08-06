@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1.19 - 2026-08-06
+
+### Shared Site Shell browser primitives
+
+- Advanced the immutable Platform pin to `v0.29.0`
+  (`7ed3d9b0220b88126235a3b7edfd507f8846f56d`) and adopted Site Shell `0.2.0`.
+- Removed Store's duplicate cart-icon, deferred-stylesheet, form-control identity,
+  and shipping-option browser implementations. Thin Liquid policy includes keep
+  Store's cache key, provider and event names, accessible labels, control-ID
+  prefix and dataset priority local.
+- Preserved lazy cart loading and versioned shared URLs, so the extraction adds
+  no eager cart-runtime requests and keeps independent submodule rollback.
+- Added consumer characterization for shipping choices, cart totals and labels,
+  dynamically inserted controls, stylesheet deferral, runtime loading, exact
+  package versions, every consumed shared source path, and explicit size budgets
+  for each deployed Site Shell browser primitive. Checked-in Wrangler origins
+  remain the safe localhost defaults.
+
 ## v1.1.18 - 2026-08-06
 
 ### Shared release-evidence runtime

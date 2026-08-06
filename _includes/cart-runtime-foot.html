@@ -34,7 +34,7 @@
   data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"
   data-stripe-publishable-key="{{ site.checkout.stripe_publishable_key | default: '' }}"></script>
 <script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
-<script data-cfasync="false" src="/assets/js/form-control-identity.js?v={{ asset_version }}" defer></script>
+{% include form-control-identity-script.html asset_version=asset_version %}
 {%- comment -%}Keep checkout domains discoverable without opening Stripe connections before cart intent.{%- endcomment -%}
 <link rel="dns-prefetch" href="//js.stripe.com">
 <link rel="dns-prefetch" href="//api.stripe.com">
