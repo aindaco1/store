@@ -4,18 +4,18 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '3b8bdacc224bda625103718ba0fa8489517ff993';
+const expectedCommit = '1bfbdd403fc9efafb8d261dd846cedb9d52ed444';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.18.0',
+  '@dustwave/platform-workspace': '0.19.0',
   '@dustwave/admin-shell': '0.10.2',
   '@dustwave/build-core': '0.1.0',
-  '@dustwave/media-core': '0.3.0',
+  '@dustwave/media-core': '0.4.0',
   '@dustwave/release-core': '0.1.0',
   '@dustwave/shipping-core': '0.1.0',
   '@dustwave/site-shell': '0.1.0',
   '@dustwave/tax-core': '0.2.0',
   '@dustwave/timed-text': '0.5.0',
-  '@dustwave/worker-core': '0.8.0'
+  '@dustwave/worker-core': '0.9.0'
 };
 
 function readJson(relativePath: string) {
@@ -63,12 +63,14 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/credentialed-download.js',
       'packages/build-core/bin/minify-site-assets.mjs',
       'packages/build-core/src/site-assets.js',
+      'packages/media-core/src/site-catalog.js',
       'packages/site-shell/src/a11y-live-browser.js',
       'packages/site-shell/src/header-nav-browser.js',
       'packages/tax-core/src/index.js',
       'packages/tax-core/src/nm-grt-starter.js',
       'packages/worker-core/src/date-time.js',
       'packages/worker-core/src/http.js',
+      'packages/worker-core/src/logger.js',
       'packages/worker-core/src/resend.js',
       'packages/worker-core/src/session-security.js',
       'packages/worker-core/src/stripe.js',

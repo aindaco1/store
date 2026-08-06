@@ -34,6 +34,8 @@ describe('shared media catalog mechanics contract', () => {
       'assets/images/defaults/cover.jpeg',
       'assets/images/defaults/cover.gif'
     ]);
+    expect(normalizeMediaRepoPath('assets/images/../private/file.jpg')).toBe('');
+    expect(classifyMediaPath('assets/images/../private/file.jpg')).toBeNull();
   });
 
   it('classifies source/derived media and plans deterministic derivatives', () => {
