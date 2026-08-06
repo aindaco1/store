@@ -263,35 +263,16 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
   return results;
 }
 
-function base64ToBytes(value) {
-  const binary = atob(String(value || ''));
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-function constantTimeEqual(left, right) {
-  if (left.length !== right.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  return mismatch === 0;
-}
-
 export async function verifyResendWebhook(rawBody, headers, secret, now = new Date()) {
-  const id = String(headers?.id || '');
-  const timestamp = String(headers?.timestamp || '');
-  const signatureHeader = String(headers?.signature || '');
-  if (!id || !timestamp || !signatureHeader || !secret) return { valid: false, error: 'missing_signature' };
-  const timestampSeconds = Number(timestamp);
-  if (!Number.isFinite(timestampSeconds) || Math.abs(now.getTime() / 1000 - timestampSeconds) > 5 * 60) return { valid: false, error: 'timestamp_outside_tolerance' };
-  const secretValue = String(secret).startsWith('whsec_') ? String(secret).slice(6) : String(secret);
-  let secretBytes;
-  try { secretBytes = base64ToBytes(secretValue); } catch { return { valid: false, error: 'invalid_secret' }; }
-  const key = await crypto.subtle.importKey('raw', secretBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${id}.${timestamp}.${rawBody}`));
-  let binary = '';
-  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
-  const expected = btoa(binary);
-  const candidates = signatureHeader.split(' ').map((part) => part.trim()).filter(Boolean).map((part) => part.startsWith('v1,') ? part.slice(3) : '').filter(Boolean);
-  return { valid: candidates.some((candidate) => constantTimeEqual(candidate, expected)), id };
+  const result = await verifySharedResendWebhook(rawBody, headers, secret, { now });
+  if (result.valid) return { valid: true, id: result.id };
+  if (result.error === 'invalid_signature') return { valid: false, id: result.id };
+  return {
+    valid: false,
+    error: result.error === 'invalid_timestamp'
+      ? 'timestamp_outside_tolerance'
+      : result.error
+  };
 }
 
 function webhookTags(data = {}) {
@@ -333,3 +314,6 @@ export async function processResendWebhook(env, event, svixId) {
   await env.STORE_STATE.put(markerKey, JSON.stringify({ type, providerId, processedAt: new Date().toISOString() }), { expirationTtl: RESEND_WEBHOOK_MARKER_TTL_SECONDS });
   return { processed: true, type, jobId, suppressed: shouldSuppress };
 }
+import {
+  verifyResendWebhook as verifySharedResendWebhook
+} from '../../shared/dust-wave-platform/packages/worker-core/src/resend.js';

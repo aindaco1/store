@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1.6 - 2026-08-06
+
+### Shared Resend security and retry mechanics
+
+- Advanced the immutable Platform pin to `v0.16.0`
+  (`d075c3e1a29134d3ba6e4631b76dc63212347d14`) and Worker Core `0.7.0`.
+- Replaced Store's characterized Resend/Svix HMAC verification copy with the
+  bounded shared raw-body verifier, retaining Store's response adapter and all
+  event parsing, journal, delivery, and suppression effects locally.
+- Replaced Store's duplicate Resend error class and retryable/ambiguous status
+  rules with shared pure mechanics. Store still decides attempt budgets,
+  idempotency windows, backoff scheduling, terminal evidence, and whether any
+  retry occurs.
+- Added pre-migration coverage for multiple signature candidates, stale events,
+  malformed secrets, body mismatches, 429 retry timing, and permanent-bounce
+  suppression. Oversized event IDs and fractional timestamps now fail closed.
+
 ## v1.1.5 - 2026-08-06
 
 ### Shared cryptographic primitives

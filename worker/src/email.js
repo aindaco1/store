@@ -27,6 +27,10 @@ import {
 } from './i18n.js';
 import { getScopedConsole } from './logger.js';
 import { WORKER_USER_AGENT } from './version.js';
+import {
+  classifyResendFailure,
+  ResendApiError
+} from '../../shared/dust-wave-platform/packages/worker-core/src/resend.js';
 
 const FALLBACK_SITE_BASE = DEFAULT_SITE_BASE || 'https://shop.dustwave.xyz';
 const SAFE_LINK_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
@@ -394,17 +398,7 @@ function buildResendPayload(env, payload) {
   };
 }
 
-export class ResendApiError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'ResendApiError';
-    this.type = String(details.type || 'resend_api_error');
-    this.statusCode = Number(details.statusCode || 0) || 0;
-    this.retryAfterSeconds = Number(details.retryAfterSeconds || 0) || 0;
-    this.retryable = details.retryable === true;
-    this.ambiguous = details.ambiguous === true;
-  }
-}
+export { ResendApiError };
 
 export async function sendPreparedResendEmail(env, preparedPayload, {
   idempotencyKey = '',
@@ -434,23 +428,22 @@ export async function sendPreparedResendEmail(env, preparedPayload, {
       body: JSON.stringify(preparedPayload)
     });
   } catch {
+    const failure = classifyResendFailure(0);
     throw new ResendApiError(`${failureLabel}: provider response was not received`, {
       type: 'network_error',
-      retryable: true,
-      ambiguous: true
+      ...failure
     });
   }
 
   if (!response.ok) {
     const detail = await parseResendError(response);
     console.error(`${errorLabel}:`, response.status, detail);
-    const retryAfterSeconds = Number.parseInt(String(response.headers?.get?.('retry-after') || '0'), 10) || 0;
+    const failure = classifyResendFailure(response.status, {
+      retryAfter: response.headers?.get?.('retry-after') || ''
+    });
     throw new ResendApiError(`${failureLabel}: ${response.status}${detail ? ` (${detail})` : ''}`, {
       type: `resend_http_${response.status}`,
-      statusCode: response.status,
-      retryAfterSeconds,
-      retryable: response.status === 409 || response.status === 429 || response.status >= 500,
-      ambiguous: response.status >= 500
+      ...failure
     });
   }
 
