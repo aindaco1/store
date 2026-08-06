@@ -1485,6 +1485,10 @@ function storeDownloadFilesPayload() {
 function storeProductsPayload() {
   return {
     scope: 'store',
+    availability: {
+      status: 'ready',
+      updatedAt: '2026-06-11T12:00:00.000Z'
+    },
     catalog: {
       version: 1,
       source: '_products',
@@ -1518,8 +1522,13 @@ function storeProductsPayload() {
       inventoryTracking: true,
       configuredInventory: 12,
       inventory: 12,
-      sold: 0,
+      coordinatorLimit: 12,
+      claimed: 0,
+      reserved: 0,
+      available: 12,
       remaining: 12,
+      availabilityStatus: 'ready',
+      baselineInSync: true,
       hasOverride: false,
       shippingPreset: 'poster'
     }, {
@@ -1563,7 +1572,13 @@ function storeProductsPayload() {
       inventoryTracking: true,
       configuredInventory: 0,
       inventory: 0,
+      coordinatorLimit: 0,
+      claimed: 0,
+      reserved: 0,
+      available: 0,
       remaining: 0,
+      availabilityStatus: 'ready',
+      baselineInSync: true,
       hasOverride: false,
       variantCount: 2,
       shippingPreset: 'ticket'
@@ -1584,7 +1599,13 @@ function storeProductsPayload() {
       inventoryTracking: true,
       configuredInventory: 0,
       inventory: 0,
+      coordinatorLimit: 0,
+      claimed: 0,
+      reserved: 0,
+      available: 0,
       remaining: 0,
+      availabilityStatus: 'ready',
+      baselineInSync: true,
       hasOverride: false,
       shippingPreset: 'ticket'
     }],
@@ -2264,6 +2285,11 @@ test.describe('Admin Dashboard', () => {
     await expect(productsResults).toContainText('DUST WAVE Free RSVP');
     await expect(page.locator('#admin-store-products-summary .admin-store-products__card')).toHaveCount(3);
     await expect(page.locator('#admin-store-products-summary')).not.toContainText('Rows');
+    await expect(page.locator('#admin-store-products-refresh')).toBeVisible();
+    const storeProductsBeforeRefresh = calls.storeProducts.length;
+    await page.locator('#admin-store-products-refresh').click();
+    await expect.poll(() => calls.storeProducts.length).toBeGreaterThan(storeProductsBeforeRefresh);
+    await expect(page.locator('#admin-store-products-status')).toContainText('Inventory availability refreshed.');
     await expect(productsResults.getByText('Set status', { exact: true })).toHaveCount(0);
     await expect(productsResults.getByRole('button', { name: 'Clear' })).toHaveCount(0);
     await expect(productsResults.locator('thead')).not.toContainText('Order');
@@ -2455,10 +2481,17 @@ test.describe('Admin Dashboard', () => {
     });
     await expect(page.locator('#admin-store-products-status')).toContainText('Product published. Deploy started.');
     const productInventoryControls = posterRow.locator('[data-store-product-inventory-controls]');
-    await expect(productInventoryControls).toContainText('Current 12');
-    await expect(productInventoryControls).toContainText('Remaining 12');
+    await expect(productInventoryControls).toContainText('Available 12');
+    await expect(productInventoryControls).toContainText('Baseline 12');
+    await expect(productInventoryControls).toContainText('Claimed 0');
+    await expect(productInventoryControls).toContainText('Reserved 0');
+    const storeProductsBeforeBlockedRefresh = calls.storeProducts.length;
+    await productInventoryControls.locator('[data-store-product-inventory-input]').fill('13');
+    await page.locator('#admin-store-products-refresh').click();
+    expect(calls.storeProducts).toHaveLength(storeProductsBeforeBlockedRefresh);
+    await expect(page.locator('#admin-store-products-status')).toContainText('Save or cancel product changes before refreshing inventory.');
     await productInventoryControls.locator('[data-store-product-inventory-input]').fill('14');
-    await productInventoryControls.getByRole('button', { name: 'Set', exact: true }).click();
+    await productInventoryControls.getByRole('button', { name: 'Set baseline', exact: true }).click();
     await expect.poll(() => calls.storeInventoryWrites.length).toBe(1);
     expect(calls.storeInventoryWrites[0]).toMatchObject({
       action: 'set',
@@ -3030,6 +3063,11 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-admin-audit-results]')).toContainText('1 eventos coincidentes.');
     await expect(page.getByRole('button', { name: 'Aplicar filtros' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Exportar CSV filtrado' })).toBeVisible();
+
+    await selectAdminSection(page, 'Productos');
+    await expect.poll(() => calls.storeProducts.length).toBe(1);
+    await expect(page.getByRole('button', { name: 'Actualizar inventario' })).toBeVisible();
+    await expect(page.locator('#admin-store-products-results')).toContainText('Disponible 12');
 
     const tabs = page.locator('[data-admin-tabs] > .admin-tabs__list');
     await expect(tabs).toBeVisible();

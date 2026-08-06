@@ -173,6 +173,21 @@ admin:
   export_attendees: Export attendees
   refresh_orders: Refresh orders
   orders_unchanged: No order changes since the last refresh.
+  refresh_inventory: Refresh inventory
+  inventory_refreshing: Refreshing inventory availability...
+  inventory_refreshed: Inventory availability refreshed.
+  inventory_refresh_blocked: Save or cancel product changes before refreshing inventory.
+  inventory_available: Available
+  inventory_unavailable: Availability unavailable
+  inventory_unlimited: Unlimited
+  inventory_baseline: Baseline
+  inventory_claimed: Claimed
+  inventory_reserved: Reserved
+  inventory_coordinator_limit: Coordinator limit
+  inventory_override: Override
+  inventory_set_baseline: Set baseline
+  inventory_reset_baseline: Reset baseline
+  inventory_baseline_aria: "Inventory baseline for %{label}"
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
   store_coupons_intro: Create, edit, and delete Store coupon codes for cart-wide or product-specific discounts.

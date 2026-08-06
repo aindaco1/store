@@ -497,7 +497,21 @@
         adminLoginSending: 'Sending login link...',
         adminSessionsLoading: 'Loading admin sessions...',
         adminAuditLoading: 'Loading audit events...',
-        ordersUnchanged: 'No order changes since the last refresh.'
+        ordersUnchanged: 'No order changes since the last refresh.',
+        inventoryRefreshing: 'Refreshing inventory availability...',
+        inventoryRefreshed: 'Inventory availability refreshed.',
+        inventoryRefreshBlocked: 'Save or cancel product changes before refreshing inventory.',
+        inventoryAvailable: 'Available',
+        inventoryUnavailable: 'Availability unavailable',
+        inventoryUnlimited: 'Unlimited',
+        inventoryBaseline: 'Baseline',
+        inventoryClaimed: 'Claimed',
+        inventoryReserved: 'Reserved',
+        inventoryCoordinatorLimit: 'Coordinator limit',
+        inventoryOverride: 'Override',
+        inventorySetBaseline: 'Set baseline',
+        inventoryResetBaseline: 'Reset baseline',
+        inventoryBaselineAria: 'Inventory baseline for %{label}'
       },
       es: {
         about: 'Acerca de',
@@ -519,7 +533,21 @@
         adminLoginSending: 'Enviando enlace de inicio de sesion...',
         adminSessionsLoading: 'Cargando sesiones de administracion...',
         adminAuditLoading: 'Cargando eventos de auditoria...',
-        ordersUnchanged: 'No hay cambios en los pedidos desde la ultima actualizacion.'
+        ordersUnchanged: 'No hay cambios en los pedidos desde la ultima actualizacion.',
+        inventoryRefreshing: 'Actualizando la disponibilidad del inventario...',
+        inventoryRefreshed: 'Disponibilidad del inventario actualizada.',
+        inventoryRefreshBlocked: 'Guarda o cancela los cambios del producto antes de actualizar el inventario.',
+        inventoryAvailable: 'Disponible',
+        inventoryUnavailable: 'Disponibilidad no disponible',
+        inventoryUnlimited: 'Ilimitado',
+        inventoryBaseline: 'Base',
+        inventoryClaimed: 'Confirmado',
+        inventoryReserved: 'Reservado',
+        inventoryCoordinatorLimit: 'Limite del coordinador',
+        inventoryOverride: 'Anulacion',
+        inventorySetBaseline: 'Establecer base',
+        inventoryResetBaseline: 'Restablecer base',
+        inventoryBaselineAria: 'Base de inventario para %{label}'
       }
     };
     if (runtimeAdminMessages[key]) return interpolateAdminText(runtimeAdminMessages[key], replacements);
@@ -4833,8 +4861,33 @@
   }
 
   function storeInventoryValueLabel(value) {
-    if (value === null || value === undefined || value === '') return 'Unlimited';
+    if (value === null || value === undefined || value === '') return localizedAdminText('inventoryUnlimited');
     return formatNumber(Number(value || 0));
+  }
+
+  function appendStoreInventoryAvailability(summary, row) {
+    var status = String(row.availabilityStatus || 'unavailable');
+    if (status === 'unlimited') {
+      summary.appendChild(createElement('strong', '', localizedAdminText('inventoryUnlimited')));
+      return;
+    }
+    if (row.available === null || row.available === undefined || status === 'unavailable') {
+      summary.appendChild(createElement('strong', '', localizedAdminText('inventoryUnavailable')));
+    } else {
+      summary.appendChild(createElement('strong', '', localizedAdminText('inventoryAvailable') + ' ' + storeInventoryValueLabel(row.available)));
+    }
+    [
+      ['inventoryBaseline', row.inventory ?? row.configuredInventory],
+      ['inventoryClaimed', row.claimed],
+      ['inventoryReserved', row.reserved]
+    ].forEach(function(pair) {
+      if (pair[1] !== undefined && pair[1] !== null) {
+        summary.appendChild(createElement('span', '', localizedAdminText(pair[0]) + ' ' + storeInventoryValueLabel(pair[1])));
+      }
+    });
+    if (status === 'drift' && row.coordinatorLimit !== undefined && row.coordinatorLimit !== null) {
+      summary.appendChild(createElement('span', 'admin-store-products__inventory-flag', localizedAdminText('inventoryCoordinatorLimit') + ' ' + storeInventoryValueLabel(row.coordinatorLimit)));
+    }
   }
 
   function renderStoreProductInventoryCell(row) {
@@ -4848,11 +4901,11 @@
       var variantSummary = createElement('div', 'admin-store-products__inventory-summary admin-store-products__inventory-summary--stacked');
       var count = Number(row.variantCount || 0);
       variantSummary.appendChild(createElement('strong', '', count + ' variant' + (count === 1 ? '' : 's')));
-      variantSummary.appendChild(createElement('span', '', 'Inventory ' + storeInventoryValueLabel(row.inventory ?? row.configuredInventory ?? '')));
+      appendStoreInventoryAvailability(variantSummary, row);
       if (row.hasOverride) {
         var overrideLabel = Number(row.variantOverrideCount || 0) > 0
-          ? Number(row.variantOverrideCount || 0) + ' override' + (Number(row.variantOverrideCount || 0) === 1 ? '' : 's')
-          : 'Override';
+          ? Number(row.variantOverrideCount || 0) + ' ' + localizedAdminText('inventoryOverride').toLowerCase() + (Number(row.variantOverrideCount || 0) === 1 ? '' : 's')
+          : localizedAdminText('inventoryOverride');
         variantSummary.appendChild(createElement('span', 'admin-store-products__inventory-flag', overrideLabel));
       }
       cell.appendChild(variantSummary);
@@ -4866,17 +4919,8 @@
     var currentInventory = row.inventory ?? row.configuredInventory ?? '';
 
     var summary = createElement('div', 'admin-store-products__inventory-summary');
-    summary.appendChild(createElement('strong', '', 'Current ' + storeInventoryValueLabel(currentInventory)));
-    [
-      ['Configured', row.configuredInventory],
-      ['Sold', row.sold],
-      ['Remaining', row.remaining]
-    ].forEach(function(pair) {
-      if (pair[1] !== undefined) {
-        summary.appendChild(createElement('span', '', pair[0] + ' ' + storeInventoryValueLabel(pair[1])));
-      }
-    });
-    if (row.hasOverride) summary.appendChild(createElement('span', 'admin-store-products__inventory-flag', 'Override'));
+    appendStoreInventoryAvailability(summary, row);
+    if (row.hasOverride) summary.appendChild(createElement('span', 'admin-store-products__inventory-flag', localizedAdminText('inventoryOverride')));
 
     var adjust = createElement('div', 'admin-store-products__inventory-adjust');
     var input = document.createElement('input');
@@ -4886,12 +4930,15 @@
     input.value = currentInventory === null || currentInventory === undefined ? '' : String(currentInventory);
     input.className = 'admin-settings__input admin-store-products__inventory-input';
     input.dataset.storeProductInventoryInput = 'true';
-    input.setAttribute('aria-label', 'Inventory for ' + (row.label || row.productId || 'product'));
+    input.dataset.storeProductInventorySavedValue = input.value;
+    input.setAttribute('aria-label', localizedAdminText('inventoryBaselineAria', {
+      label: row.label || row.productId || 'product'
+    }));
     adjust.appendChild(input);
 
     [
-      ['set', 'Set'],
-      ['reset', 'Reset']
+      ['set', localizedAdminText('inventorySetBaseline')],
+      ['reset', localizedAdminText('inventoryResetBaseline')]
     ].forEach(function(pair) {
       var button = createElement('button', 'btn btn--secondary btn--small', pair[1]);
       button.type = 'button';
@@ -7818,21 +7865,44 @@
     updateStoreProductEditorDirtyState(form);
   }
 
-  function loadStoreProducts() {
+  function loadStoreProducts(options) {
+    var opts = options || {};
     var status = $('#admin-store-products-status');
-    setStatus(status, 'Loading Store products...');
+    setStatus(status, opts.loadingMessage || 'Loading Store products...');
     return requestJson('/admin/store/products').then(function(data) {
       storeProductsLoaded = true;
       renderStoreProducts(data);
-      setStatus(status, '');
+      setStatus(status, opts.successMessage || '');
+      return data;
     }).catch(function(error) {
       setStatus(status, formatError(error), true);
+      return null;
     });
   }
 
   function setupStoreProductsEvents() {
     var root = $('#admin-store-products-results');
     if (!root) return;
+    var refresh = $('#admin-store-products-refresh');
+    if (refresh) {
+      refresh.addEventListener('click', function() {
+        var hasDirtyEditor = $all('[data-store-product-editor]', root).some(storeProductEditorHasUnsavedChanges);
+        var hasDirtyInventory = $all('[data-store-product-inventory-input]', root).some(function(input) {
+          return input.value !== String(input.dataset.storeProductInventorySavedValue || '');
+        });
+        if (storeProductsOrderIsDirty() || hasDirtyEditor || hasDirtyInventory) {
+          setStatus($('#admin-store-products-status'), localizedAdminText('inventoryRefreshBlocked'), true);
+          return;
+        }
+        refresh.disabled = true;
+        loadStoreProducts({
+          loadingMessage: localizedAdminText('inventoryRefreshing'),
+          successMessage: localizedAdminText('inventoryRefreshed')
+        }).finally(function() {
+          refresh.disabled = false;
+        });
+      });
+    }
     root.addEventListener('change', function(event) {
       var productSelect = event.target.closest('[data-store-product-select]');
       if (productSelect) {

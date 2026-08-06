@@ -79,7 +79,14 @@ describe('admin Store order read model', () => {
     const counts = buildStoreInventorySoldCountsFromOrders([
       order(),
       order({ orderToken: 'store-order-beta', items: [{ sku: 'poster', quantity: 3 }, { sku: 'shirt', quantity: 1 }] }),
-      order({ orderToken: 'store-order-draft', status: 'draft', items: [{ sku: 'poster', quantity: 100 }] })
+      order({ orderToken: 'store-order-draft', status: 'draft', items: [{ sku: 'poster', quantity: 100 }] }),
+      order({
+        orderToken: 'store-order-snipcart-history',
+        source: 'snipcart',
+        checkoutProvider: 'snipcart',
+        importedAt: '2026-07-01T12:00:00.000Z',
+        items: [{ sku: 'poster', quantity: 100 }]
+      })
     ]);
 
     expect(counts).toEqual({
