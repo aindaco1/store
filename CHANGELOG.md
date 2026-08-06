@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.17 - 2026-08-06
+
+### Production-target provider evidence
+
+- Made shell/CI site and Worker origins take precedence over the checked-in
+  localhost Wrangler defaults during read-only release-provider verification.
+- Pinned both production origins in the provider-evidence workflow while
+  preserving the isolated staging target for Stripe test-mode webhooks.
+- Added regression coverage for target precedence, trimming, production
+  fallbacks, test/live separation, and the workflow contract. Store runtime,
+  credentials, checkout behavior, and deployment authority are unchanged.
+
 ## v1.1.16 - 2026-08-06
 
 ### Shared compile-time design components

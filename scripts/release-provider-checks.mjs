@@ -9,6 +9,7 @@ import {
   providerEvidenceShouldFail
 } from '../shared/dust-wave-platform/packages/release-core/src/provider-evidence.js';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
+import { resolveProviderTargets } from './lib/provider-targets.mjs';
 import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -430,9 +431,13 @@ async function main() {
   const stagingVars = wranglerContent ? parseTomlVars(wranglerContent, '[env.staging.vars]') : {};
   const kvNamespaces = wranglerContent ? parseTomlBlocks(wranglerContent, 'kv_namespaces') : [];
   const r2Buckets = wranglerContent ? parseTomlBlocks(wranglerContent, 'r2_buckets') : [];
-  const siteBase = vars.SITE_BASE || 'https://shop.dustwave.xyz';
-  const workerBase = vars.WORKER_BASE || 'https://checkout.dustwave.xyz';
-  const testWorkerBase = envValue('STRIPE_TEST_WEBHOOK_BASE') || stagingVars.WORKER_BASE || workerBase;
+  const { siteBase, workerBase, testWorkerBase } = resolveProviderTargets({
+    siteBaseOverride: envValue('SITE_BASE'),
+    workerBaseOverride: envValue('WORKER_BASE'),
+    stripeTestWebhookBase: envValue('STRIPE_TEST_WEBHOOK_BASE'),
+    vars,
+    stagingVars
+  });
   const siteHost = hostFromUrl(siteBase);
   const workerHost = hostFromUrl(workerBase);
 
