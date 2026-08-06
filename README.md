@@ -4,9 +4,9 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Current release branch candidate: `v1.1.1`. It advances Store to the immutable `dust-wave-platform` `0.11.5` workspace while preserving Store's deployment, data, and business-rule boundaries. Store continues to characterize and consume shared destination normalization, integer-cent manual-rate math, Turnstile, and admin-shell primitives while retaining provider lookup, catalog taxability, checkout, order truth, and independent rollback locally.
+- Current release: `v1.1.1`. It advances Store to the immutable `dust-wave-platform` `0.11.5` workspace while preserving Store's deployment, data, and business-rule boundaries. Store continues to characterize and consume shared destination normalization, integer-cent manual-rate math, Turnstile, and admin-shell primitives while retaining provider lookup, catalog taxability, checkout, order truth, and independent rollback locally.
 - Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
-- The published `v1.0.9` tag remains immutable and is the prior production baseline.
+- The published `v1.0.9` tag remains immutable and is the previous release.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.

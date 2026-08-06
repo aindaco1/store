@@ -39,4 +39,20 @@ describe('release version contract', () => {
       expect(source).not.toMatch(/store-worker\/\d/);
     }
   });
+
+  it('keeps the current release documentation aligned with the runtime version', () => {
+    const changelog = readFileSync(`${repositoryRoot}/CHANGELOG.md`, 'utf8');
+    const readme = readFileSync(`${repositoryRoot}/README.md`, 'utf8');
+    const overview = readFileSync(
+      `${repositoryRoot}/docs/PROJECT_OVERVIEW.md`,
+      'utf8'
+    );
+
+    expect(changelog).toMatch(
+      new RegExp(`^## v${WORKER_VERSION} - \\d{4}-\\d{2}-\\d{2}$`, 'm')
+    );
+    expect(changelog).not.toContain(`## v${WORKER_VERSION} - Unreleased`);
+    expect(readme).toContain(`Current release: \`v${WORKER_VERSION}\``);
+    expect(overview).toContain(`Current release: \`v${WORKER_VERSION}\``);
+  });
 });
