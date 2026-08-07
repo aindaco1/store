@@ -6,6 +6,14 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = process.cwd();
 
 describe('package test scripts', () => {
+  it('pins explicit Jekyll template check and write commands', () => {
+    const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+    const command = 'node ./shared/dust-wave-jekyll-template/bin/sync-consumer.mjs --consumer-root .';
+
+    expect(packageJson.scripts['jekyll-template:check']).toBe(`${command} --check`);
+    expect(packageJson.scripts['jekyll-template:sync']).toBe(`${command} --write`);
+  });
+
   it('minifies only explicitly selected generated site roots', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     const command = 'node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --asset-dir assets --asset-dir shared/dust-wave-platform/packages/site-shell/src';

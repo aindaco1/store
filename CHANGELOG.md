@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.1.22 - 2026-08-06
+
+### Separately versioned Jekyll golden-project contract
+
+- Pinned `dust-wave-jekyll-template` `v0.1.0`
+  (`351281a5aec60fa85653a3d23391e66fb860aae6`) as an independent source-upgrade
+  submodule alongside Platform v0.31.0.
+- Bound 15 exact Liquid includes and two exact Ruby plugins to one manifest,
+  digest, and explicit check/write CLI while preserving Store's byte-identical
+  checked-in runtime copies.
+- Added pin, version, digest, drift-command, and generated-output exclusion
+  regressions. The complete release gate now fails before build on template
+  drift and fails after build if the source-upgrade submodule is published.
+- The template adds no browser request, deployed byte, route, Worker code,
+  cart, checkout, inventory, fulfillment, or credential. Store retains routes,
+  data, localization, content, configuration, deployment authority, and
+  independent one-commit rollback.
+
 ## v1.1.21 - 2026-08-06
 
 ### Allowlisted shared-browser asset minification

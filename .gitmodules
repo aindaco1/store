@@ -1,3 +1,6 @@
 [submodule "shared/dust-wave-platform"]
 	path = shared/dust-wave-platform
 	url = https://github.com/aindaco1/dust-wave-platform.git
+[submodule "shared/dust-wave-jekyll-template"]
+	path = shared/dust-wave-jekyll-template
+	url = https://github.com/aindaco1/dust-wave-jekyll-template.git

@@ -87,6 +87,7 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Isolated provider-originated payment testing** — A persistent test-mode Stripe webhook targets a no-route/no-cron staging Worker with separate storage, staging-only signing secrets, disabled production providers, and rendered-email dry runs.
 - [x] **Manual production deployment** — A reviewed workflow deploys the static site and Worker, purges relevant caches, and verifies production response and crawl behavior; merges and tags do not deploy automatically.
 - [x] **Pinned shared platform** — Store consumes characterized framework-neutral primitives from an immutable `dust-wave-platform` gitlink and exact package versions while retaining independent data, business rules, deployment, and rollback authority.
+- [x] **Versioned Jekyll golden-project integration** — Seventeen shared Liquid includes and Ruby plugins have one separately versioned, digest-bound template source with explicit check/sync tooling; Store retains checked-in copies and excludes the upgrade submodule from public output.
 - [x] **Docs as code** — Architecture, customization, payment, dashboard, security, performance, testing, workflows, backup, ethical risk, and release evidence stay versioned beside implementation.
 
 ## Future Features
