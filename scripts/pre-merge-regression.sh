@@ -189,6 +189,10 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
+  if [[ -e _site/shared/dust-wave-jekyll-template ]]; then
+    echo "The source-upgrade Jekyll template leaked into the generated site"
+    return 1
+  fi
   if ! grep -Eq '\.store-first-party-cart__panel' _site/assets/main.css; then
     echo "main.css is missing expected first-party cart UI styles"
     return 1
@@ -425,6 +429,8 @@ prefer_current_node_path || true
 stabilize_podman_connection
 
 run_phase "1. Secret audit" npm run test:secrets
+
+run_phase "1b. Jekyll template drift" npm run jekyll-template:check
 
 run_phase "2. Product content audit" npm run test:content-security
 

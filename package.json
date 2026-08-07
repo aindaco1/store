@@ -1,6 +1,6 @@
 {
   "name": "store",
-  "version": "1.1.21",
+  "version": "1.1.22",
   "description": "Store is Dust Wave's static-first commerce layer for creators and small organizations.",
   "main": "index.js",
   "directories": {
@@ -70,6 +70,8 @@
     "seed:local-orders": "node ./scripts/seed-local-orders.mjs",
     "assets:minify": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --asset-dir assets --asset-dir shared/dust-wave-platform/packages/site-shell/src --write",
     "assets:minify:check": "node ./shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs --asset-dir assets --asset-dir shared/dust-wave-platform/packages/site-shell/src --check",
+    "jekyll-template:check": "node ./shared/dust-wave-jekyll-template/bin/sync-consumer.mjs --consumer-root . --check",
+    "jekyll-template:sync": "node ./shared/dust-wave-jekyll-template/bin/sync-consumer.mjs --consumer-root . --write",
     "media:optimize": "node ./scripts/optimize-media.mjs --write",
     "media:optimize:check": "node ./scripts/optimize-media.mjs --check",
     "media:manifest": "node ./scripts/optimize-media.mjs --write --manifest-only",

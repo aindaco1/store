@@ -36,10 +36,11 @@ exclude:
   - out-of-stock
   - Containerfile.dev
   - Containerfile.playwright.dev
+  - shared/dust-wave-jekyll-template
 platform:
   name: Shop
-  version: 1.1.21
-  release_label: v1.1.21
+  version: 1.1.22
+  release_label: v1.1.22
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>

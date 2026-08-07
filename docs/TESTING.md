@@ -4,6 +4,12 @@ The `v1.0.8` gate added deterministic repository media evidence, DRY add-on pric
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
+`npm run jekyll-template:check` verifies that the 17 locally built Jekyll
+integration files still match the exact pinned golden-project template. The
+pre-merge gate runs this check before builds and also rejects the template
+submodule from generated site output. `npm run jekyll-template:sync` is an
+explicit upgrade-branch operation, not a build step.
+
 ## Quick Commands
 
 ```bash
