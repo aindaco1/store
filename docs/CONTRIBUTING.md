@@ -7,7 +7,7 @@ Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, a
 Host flow:
 
 ```bash
-npm install
+npm ci
 bundle install
 ./scripts/dev.sh
 ```

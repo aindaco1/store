@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -67,6 +68,19 @@ describe('package test scripts', () => {
     expect(preMergeScript).toContain('run_phase "10. Podman E2E suite" npm run test:e2e:headless');
     expect(preMergeScript).not.toContain('run_phase "9a. Host Store Worker smoke"');
     expect(preMergeScript).not.toContain('run_phase "10. Headless E2E suite"');
+  });
+
+  it('restores the checked-in Worker config after pre-merge synchronization', () => {
+    const workerConfigPath = join(repoRoot, 'worker/wrangler.toml');
+    const before = readFileSync(workerConfigPath, 'utf8');
+
+    execFileSync(
+      'bash',
+      ['scripts/pre-merge-regression.sh', '__sync_worker_config_restore_check'],
+      { cwd: repoRoot, stdio: 'pipe' }
+    );
+
+    expect(readFileSync(workerConfigPath, 'utf8')).toBe(before);
   });
 
   it('fails closed before generated-asset checks when either Jekyll build path fails', () => {

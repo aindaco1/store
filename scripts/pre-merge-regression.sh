@@ -3,12 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-ruby ./scripts/sync-worker-config.rb >/dev/null
-
 WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
 ORIGINAL_DEV_VARS_BACKUP=""
+ORIGINAL_WORKER_CONFIG_BACKUP=""
 TEMP_JEKYLL_CONFIG=""
 TEMP_JEKYLL_CONFIG_DIR=""
 LOG_DIR="$(mktemp -d /tmp/store-premerge-logs.XXXXXX)"
@@ -325,9 +324,25 @@ cleanup() {
   if [[ -n "${ORIGINAL_DEV_VARS_BACKUP}" && -f "${ORIGINAL_DEV_VARS_BACKUP}" ]]; then
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
+  if [[ -n "${ORIGINAL_WORKER_CONFIG_BACKUP}" && -f "${ORIGINAL_WORKER_CONFIG_BACKUP}" ]]; then
+    cp -p "${ORIGINAL_WORKER_CONFIG_BACKUP}" worker/wrangler.toml
+    rm -f "${ORIGINAL_WORKER_CONFIG_BACKUP}"
+  fi
 }
 
 trap cleanup EXIT
+
+if [[ ! -f worker/wrangler.toml ]]; then
+  echo "worker/wrangler.toml is required for pre-merge validation" >&2
+  exit 1
+fi
+ORIGINAL_WORKER_CONFIG_BACKUP="$(mktemp /tmp/store-premerge-wrangler.XXXXXX)"
+cp -p worker/wrangler.toml "${ORIGINAL_WORKER_CONFIG_BACKUP}"
+ruby ./scripts/sync-worker-config.rb >/dev/null
+
+if [[ "${1:-}" = "__sync_worker_config_restore_check" ]]; then
+  exit 0
+fi
 
 if [[ "${1:-}" = "__podman_build_check" ]]; then
   build_with_podman_jekyll
@@ -453,6 +468,7 @@ run_phase "4. Syntax checks" bash -lc '
 '
 
 run_phase "5. Focused Store regression suites" npx vitest run \
+  tests/unit/package-scripts.test.ts \
   tests/unit/platform-pin.test.ts \
   tests/unit/release-version.test.ts \
   tests/unit/site-asset-minification.test.ts \

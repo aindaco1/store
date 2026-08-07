@@ -18,6 +18,17 @@
   data, localization, content, configuration, deployment authority, and
   independent one-commit rollback.
 
+### Post-release maintenance and documentation
+
+- Made pre-merge Worker-config synchronization transactional: the release gate
+  now restores the tracked localhost-safe `worker/wrangler.toml` byte-for-byte
+  on success or failure, with a focused automated regression in the early
+  Store suite.
+- Reconciled the root, Worker, testing, project, roadmap, and release
+  documentation with Store `v1.1.22`, Platform `v0.31.0`, Jekyll Template
+  `v0.1.0`, exact pins, consumer-owned deployment boundaries, and independent
+  rollback.
+
 ## v1.1.21 - 2026-08-06
 
 ### Allowlisted shared-browser asset minification

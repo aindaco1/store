@@ -1,6 +1,6 @@
 # Testing
 
-The `v1.0.8` gate added deterministic repository media evidence, DRY add-on pricing, resumable Stripe processing and reconciliation, durable email delivery evidence, and explicit release-closure checks for cache and protected recovery operations. The `v1.0.9` gate adds XML/text sitemap parity, deployed crawl verification, final-sale policy disclosure, a localized lazy admin review bundle, and a protected-recovery dependency regression guard.
+The current gate covers deterministic repository media evidence, DRY add-on pricing, resumable Stripe processing and reconciliation, durable email delivery evidence, cache and protected-recovery closure, XML/text sitemap parity, deployed crawl verification, final-sale policy disclosure, localized admin review, and protected-recovery dependency posture.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
 
@@ -9,6 +9,23 @@ integration files still match the exact pinned golden-project template. The
 pre-merge gate runs this check before builds and also rejects the template
 submodule from generated site output. `npm run jekyll-template:sync` is an
 explicit upgrade-branch operation, not a build step.
+
+Store `v1.1.22` records Platform `v0.31.0` and Jekyll Template `v0.1.0` as exact
+gitlinks. After cloning, switching branches, or reviewing a shared dependency
+upgrade, initialize the recorded commits and run the narrow pin/drift contract
+before broader tests:
+
+```bash
+git submodule update --init --recursive
+npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.test.ts
+npm run jekyll-template:check
+```
+
+`npm run test:premerge` temporarily synchronizes Worker configuration for its
+release-shaped checks and restores the tracked `worker/wrangler.toml`
+byte-for-byte on success or failure. A focused unit regression exercises that
+setup/cleanup path. The checked-in top-level defaults must remain the localhost
+site at port `4002`, Worker at port `8989`, and matching localhost CORS origin.
 
 ## Quick Commands
 

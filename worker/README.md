@@ -2,6 +2,20 @@
 
 Cloudflare Worker API for Store checkout, fulfillment, admin operations, shipping, tax, Stripe webhooks, email delivery, inventory reservations, coupons, reminders, observability, and signed downloads.
 
+## Shared Platform Boundary
+
+Store `v1.1.22` pins Dust Wave Platform `v0.31.0` at exact commit
+`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579`. The Worker consumes the pinned
+`worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
+packages for characterized, runtime-neutral mechanics. Store retains every
+route, request schema, catalog/order model, Durable Object and KV policy,
+credential, Stripe/Resend/Cloudflare policy, side effect, deployment, and
+rollback decision.
+
+The separately pinned Dust Wave Jekyll Template is compile-time source-upgrade
+tooling only. It is never imported by this Worker and is excluded from the
+generated public site.
+
 ## Local Development
 
 Preferred full-stack launch from the repo root:

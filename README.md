@@ -6,7 +6,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 - Current release: `v1.1.22`. Store pins Platform `v0.31.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`. Seventeen shared Jekyll integration files now have one digest-bound golden-project source and an explicit drift/sync workflow, while Store retains its routes, data, localization, content, configuration, build, deployment authority, and one-commit rollback. Stripe test-webhook validation remains isolated to staging.
 - Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
-- The preceding `v1.1.19` release remains independently reversible.
+- The preceding `v1.1.21` release remains independently reversible.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -23,13 +23,34 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Production hardening includes centralized asset/Lighthouse/cache budgets, sampled Worker p50/p95/p99 diagnostics, full readiness posture, super-admin session review/revocation, searchable redacted audit records, signed-download soft locks, scheduled configuration drift issues, and source-hashed localization review packets.
 - Default operations posture is USPS shipping, New Mexico GRT tax, Stripe payments, Resend email, Cloudflare KV/R2/Durable Objects, GitHub-backed publishing in production, and local sidecar writes in dev.
 
+## Shared Foundations and Ownership
+
+Store `v1.1.22` pins Dust Wave Platform `v0.31.0` at exact commit
+`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579` and Dust Wave Jekyll Template
+`v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
+Platform supplies characterized Worker, admin, browser, design, build, release,
+shipping, tax, inventory, media, and test primitives. The Jekyll Template owns
+17 manifest-bound source-upgrade files whose runtime copies remain checked in.
+
+Store still owns its catalog and order models, routes, storage, content,
+localization, templates, credentials, provider policy, builds, deployment, and
+rollback. Neither shared repository follows a moving branch at build time. To
+verify the recorded pins and generated/source copies:
+
+```bash
+git submodule update --init --recursive
+npm ci
+npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.test.ts
+npm run jekyll-template:check
+```
+
 ## Local Development
 
 Host flow:
 
 ```bash
 git submodule update --init --recursive
-npm install
+npm ci
 bundle install
 ./scripts/dev.sh
 ```
