@@ -88,6 +88,7 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Manual production deployment** — A reviewed workflow deploys the static site and Worker, purges relevant caches, and verifies production response and crawl behavior; merges and tags do not deploy automatically.
 - [x] **Pinned shared platform** — Store consumes characterized framework-neutral primitives from an immutable `dust-wave-platform` gitlink and exact package versions while retaining independent data, business rules, deployment, and rollback authority.
 - [x] **Versioned Jekyll golden-project integration** — Seventeen shared Liquid includes and Ruby plugins have one separately versioned, digest-bound template source with explicit check/sync tooling; Store retains checked-in copies and excludes the upgrade submodule from public output.
+- [x] **Transactional pre-merge configuration** — The merge gate may derive production-shaped Worker configuration for validation, but always restores the checked-in localhost-safe defaults on success or failure and verifies that behavior automatically.
 - [x] **Docs as code** — Architecture, customization, payment, dashboard, security, performance, testing, workflows, backup, ethical risk, and release evidence stay versioned beside implementation.
 
 ## Future Features
