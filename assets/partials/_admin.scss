@@ -3719,6 +3719,25 @@ textarea.admin-settings__input--readonly {
     content: attr(data-label);
   }
 
+  .admin-store-orders__attendance-table tbody tr > td.admin-store-orders__attendance-details::before {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .admin-store-orders__attendance-details > .admin-store-orders__attendance-value,
+  .admin-store-orders__attendance-details > .admin-store-orders__meta {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .admin-store-orders__attendance-details > .admin-store-orders__attendance-value {
+    grid-row: 1;
+  }
+
+  .admin-store-orders__attendance-details > .admin-store-orders__meta {
+    grid-row: 2;
+  }
+
   .admin-store-orders__actions > * {
     grid-column: 2;
     justify-self: start;
@@ -4807,6 +4826,17 @@ textarea.admin-settings__input--readonly {
 }
 
 @media (max-width: 560px) {
+  .admin-store-orders__attendance-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .admin-store-orders__attendance-summary {
+    margin: 0 0 2px;
+    max-width: 100%;
+  }
+
   .admin-store-orders__download-control {
     grid-template-columns: minmax(0, 1fr);
   }
