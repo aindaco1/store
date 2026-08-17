@@ -3187,6 +3187,16 @@ test.describe('Admin Dashboard', () => {
     })).toBe(true);
 
     const attendance = page.locator('#admin-store-orders-attendance');
+    await expect.poll(() => attendance.locator('.admin-store-orders__attendance-header').evaluate((header: HTMLElement) => {
+      const title = header.querySelector<HTMLElement>('.admin-store-orders__attendance-title');
+      const summary = header.querySelector<HTMLElement>('.admin-store-orders__attendance-summary');
+      if (!title || !summary) return false;
+      const titleBounds = title.getBoundingClientRect();
+      const summaryBounds = summary.getBoundingClientRect();
+      return title.scrollWidth <= title.clientWidth + 1 &&
+        summary.scrollWidth <= summary.clientWidth + 1 &&
+        titleBounds.bottom <= summaryBounds.top + 1;
+    })).toBe(true);
     await expect.poll(() => attendance.locator('.admin-store-orders__attendance-table').evaluate((table: HTMLElement) => {
       return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
     })).toBe(true);
@@ -3196,6 +3206,15 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => attendance.locator('tbody > tr').first().evaluate((row: HTMLElement) => {
       return Array.from(row.querySelectorAll('td')).map((cell) => (cell as HTMLElement).dataset.label || '');
     })).toEqual(['Event', 'Venue', 'Orders', 'Checked in', 'Rate']);
+    await expect.poll(() => attendance.locator('tbody > tr').first().locator('td:has(.admin-store-orders__meta)').evaluateAll((cells: HTMLElement[]) => cells.every((cell) => {
+      const metadata = cell.querySelector<HTMLElement>('.admin-store-orders__meta');
+      const tracks = getComputedStyle(cell).gridTemplateColumns.match(/[\d.]+px/g) || [];
+      const valueTrackWidth = Number.parseFloat(tracks.at(-1) || '0');
+      const bounds = cell.getBoundingClientRect();
+      return Boolean(metadata) &&
+        metadata.getBoundingClientRect().left >= bounds.left + (bounds.width * 0.25) &&
+        valueTrackWidth >= bounds.width * 0.35;
+    }))).toBe(true);
 
     const ticketRow = ordersResults.locator('tbody > tr').filter({ hasText: TICKET_ORDER_TOKEN });
     await ticketRow.getByRole('button', { name: 'Check in' }).click();

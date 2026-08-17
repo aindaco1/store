@@ -3614,12 +3614,16 @@
     var tbody = document.createElement('tbody');
     events.forEach(function(event) {
       var tr = document.createElement('tr');
-      var eventCell = createLabeledTableCell('Event');
-      eventCell.appendChild(document.createTextNode([event.itemName, event.variantLabel].filter(Boolean).join(' - ')));
+      var eventCell = createLabeledTableCell('Event', null, 'admin-store-orders__attendance-details');
+      eventCell.appendChild(createElement(
+        'span',
+        'admin-store-orders__attendance-value',
+        [event.itemName, event.variantLabel].filter(Boolean).join(' - ')
+      ));
       if (event.eventStartsAt) eventCell.appendChild(createElement('span', 'admin-store-orders__meta', formatDate(event.eventStartsAt)));
       tr.appendChild(eventCell);
-      var venueCell = createLabeledTableCell('Venue');
-      venueCell.appendChild(document.createTextNode(event.eventVenue || ''));
+      var venueCell = createLabeledTableCell('Venue', null, 'admin-store-orders__attendance-details');
+      venueCell.appendChild(createElement('span', 'admin-store-orders__attendance-value', event.eventVenue || ''));
       if (event.eventAddress) venueCell.appendChild(createElement('span', 'admin-store-orders__meta', event.eventAddress));
       tr.appendChild(venueCell);
       tr.appendChild(createLabeledTableCell('Orders', String(event.orderCount || 0)));
