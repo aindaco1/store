@@ -5026,7 +5026,7 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-orders__import-controls {
-    grid-template-columns: auto minmax(4rem, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .admin-store-orders__file-button,
@@ -5034,6 +5034,22 @@ textarea.admin-settings__input--readonly {
     min-width: 0;
     padding-left: 10px;
     padding-right: 10px;
+  }
+
+  .admin-store-orders__file-button {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+  }
+
+  .admin-store-orders__import-controls > button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-store-orders__file-name {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .admin-store-marketing__form {

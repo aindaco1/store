@@ -3163,6 +3163,24 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-store-orders-attendance')).toContainText('Attendance');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
 
+    const importControls = page.locator('.admin-store-orders__import-controls');
+    await expect.poll(() => importControls.evaluate((controls: HTMLElement) => {
+      const chooseButton = controls.querySelector<HTMLElement>('.admin-store-orders__file-button');
+      const filename = controls.querySelector<HTMLElement>('.admin-store-orders__file-name');
+      const importButton = controls.querySelector<HTMLElement>('button');
+      if (!chooseButton || !filename || !importButton) return false;
+      const chooseBounds = chooseButton.getBoundingClientRect();
+      const filenameBounds = filename.getBoundingClientRect();
+      const importBounds = importButton.getBoundingClientRect();
+      return Math.abs(chooseBounds.top - importBounds.top) <= 1 &&
+        chooseBounds.right <= importBounds.left &&
+        filenameBounds.top >= Math.max(chooseBounds.bottom, importBounds.bottom) &&
+        filenameBounds.left <= chooseBounds.left + 1 &&
+        filenameBounds.right >= importBounds.right - 1 &&
+        chooseButton.scrollWidth <= chooseButton.clientWidth + 1 &&
+        importButton.scrollWidth <= importButton.clientWidth + 1;
+    })).toBe(true);
+
     await expect.poll(() => ordersResults.locator('.admin-store-orders__table').evaluate((table: HTMLElement) => {
       return getComputedStyle(table).display === 'block' && table.scrollWidth <= table.clientWidth + 2;
     })).toBe(true);
