@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.2.0 - 2026-08-18
+
+### RSVP registration essentials
+
+- Added an opt-in, versioned `event_details.registration` contract for RSVP
+  deadlines, party-size limits, contact and attendee names, and bounded party-
+  or attendee-scoped custom questions. One shared Worker normalizer now governs
+  checkout validation and dashboard publishing.
+- Extended the cart with accessible registration controls while keeping guest
+  names and responses out of persistent browser storage. The Worker re-resolves
+  current repository product data, rejects unknown choices and closed windows,
+  and stores canonical historical question and response snapshots with orders.
+- Added private roster and response views, attendee search, per-attendee
+  check-in with legacy item-level compatibility, partial attendance totals, and
+  one-row-per-attendee CSV export. Customer confirmations show their submitted
+  roster; transactional email includes names but omits custom responses.
+- Added English and Spanish runtime copy, repository/admin configuration docs,
+  order-data inventory and backup guidance, ethical-risk review, and focused
+  contracts for schema bounds, tamper rejection, product publication, browser
+  storage privacy, confirmation rendering, email, check-in, and export.
+- Preserved every physical, digital, ticket, service, and unconfigured RSVP
+  path by activating the feature only for RSVP products with an explicit
+  registration block. The release build remains within existing JavaScript and
+  CSS performance budgets without raising thresholds.
+
 ## v1.1.22 - 2026-08-06
 
 ### Separately versioned Jekyll golden-project contract

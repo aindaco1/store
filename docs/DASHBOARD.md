@@ -196,10 +196,10 @@ Current behavior:
 
 - Filter by order status, fulfillment type, ticket check-in state, or search query.
 - Export fulfillment CSV.
-- Export attendee CSV for ticket/RSVP products.
+- Export attendee CSV for ticket/RSVP products. Configured registrations expand to one row per named attendee with canonical party/attendee responses; legacy orders remain one row per item.
 - Import historical Snipcart CSV exports into production Store order storage.
 - View order totals and fulfillment rows.
-- Mark ticket/RSVP rows checked in or unchecked. Single-action check-in controls use the same responsive button sizing as other order actions so they fit inside desktop tables and mobile rows.
+- Mark legacy ticket/RSVP rows checked in or unchecked. Named RSVP registrations expose one independently audited check-in control per attendee, and partial check-ins roll up to the existing attendance totals.
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 - Explicitly refresh Orders. When the first-page filter has not changed, the dashboard reuses its in-memory payload and announces that no new orders were found.

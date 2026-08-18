@@ -307,6 +307,16 @@ runtime:
     email_required: Introduce una dirección de correo para continuar.
     email_invalid: Introduce una dirección de correo válida para continuar.
     shipping_address_required: Completa una dirección de envío para continuar.
+    rsvp_details: Datos de la confirmación
+    rsvp_contact: Contacto de la confirmación
+    rsvp_deadline: Responde antes de %{date}.
+    rsvp_choose_option: Elige una opción
+    rsvp_attendee_number: Asistente %{number}
+    rsvp_attendee_name: Nombre del asistente
+    rsvp_contact_name_required: Introduce un nombre de contacto para continuar.
+    rsvp_attendee_name_required: Introduce el nombre de cada asistente.
+    rsvp_required_answer: Responde todas las preguntas obligatorias de la confirmación.
+    rsvp_party_too_large: Esta confirmación admite un máximo de %{count} asistentes.
     close_cart: Cerrar carrito
     your_cart: Tu carrito
     checkout_title: Pagar
@@ -373,6 +383,11 @@ runtime:
     fulfillment_service: Servicio
     fulfillment_physical: Artículo físico
     items: Artículos
+    rsvp_details: Datos de la confirmación
+    attendees: Asistentes
+    attendee_number: Asistente %{number}
+    answer_yes: "Sí"
+    answer_no: "No"
     download_note: Tu descarga permanece disponible desde esta página del pedido.
     unable_load_order: No se pudo cargar el pedido.
     still_processing: El pago sigue procesándose...
@@ -436,6 +451,7 @@ email:
     rsvp_note: Tu RSVP está confirmado.
     shipping_note: Las novedades de envío aparecerán en la página del pedido.
     quantity_label: Cant.
+    attendees_label: Asistentes
     items_heading: Artículos
     shipping_heading: Envío
     customer_heading: Cliente

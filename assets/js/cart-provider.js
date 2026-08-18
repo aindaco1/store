@@ -519,6 +519,9 @@
   let addOnInventoryRequest = null;
   let requestCartAddOnInventoryRerender = null;
   const cartAddOnDrafts = new Map();
+  // RSVP answers intentionally stay in memory until checkout. They can contain
+  // sensitive accessibility or guest information and must not enter cart storage.
+  const eventRegistrationDrafts = new Map();
 
   function getRuntimeConfig() {
     return window.STORE_CONFIG || window.StoreConfig || {};
@@ -948,6 +951,16 @@
   }
 
   function resolveDisplayedTaxState(state, options) {
+    const subtotalCents = Math.max(0, Number(options?.subtotalCents) || 0);
+    if (subtotalCents <= 0) {
+      return {
+        hasTaxDestination: false,
+        taxReady: true,
+        taxCents: 0,
+        taxLabel: getRuntimeMessage('cart.taxLabel', 'Tax'),
+        taxDisplayValue: ''
+      };
+    }
     const billingDestination = normalizeTaxDestination(getCurrentBillingAddress(state));
     const shippingDraft = resolveDisplayedShippingDraft(options);
     const shippingDestination = normalizeTaxDestination({
@@ -995,7 +1008,10 @@
 
   function cartRequiresCustomCheckoutTaxLocation(state) {
     const items = state?.cart?.items?.items || [];
-    return getCheckoutUiMode() === 'custom' && !cartHasPhysicalItems(items);
+    const pricing = buildFirstPartyPricing(state);
+    return getCheckoutUiMode() === 'custom' &&
+      !cartHasPhysicalItems(items) &&
+      pricing.discountedSubtotalCents > 0;
   }
 
   function escapeAttribute(value) {
@@ -1415,7 +1431,381 @@
   }
 
   function getItemQuantityCap(item) {
-    return Number.isFinite(item?.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : Infinity;
+    const inventoryCap = Number.isFinite(item?.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : Infinity;
+    const registrationCap = getEventRegistrationConfig(item)?.maxPartySize || Infinity;
+    return Math.min(inventoryCap, registrationCap);
+  }
+
+  function normalizeEventRegistrationQuestion(rawQuestion) {
+    if (!rawQuestion || typeof rawQuestion !== 'object' || Array.isArray(rawQuestion)) return null;
+    const id = String(rawQuestion.id || '').trim().toLowerCase();
+    const label = String(rawQuestion.label || '').trim().slice(0, 160);
+    const type = String(rawQuestion.type || 'text').trim().toLowerCase().replace(/-/g, '_');
+    const scope = String(rawQuestion.scope || 'party').trim().toLowerCase();
+    const supportedTypes = ['text', 'textarea', 'single_select', 'multi_select', 'checkbox'];
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(id) || !label || !supportedTypes.includes(type)) return null;
+    const options = Array.isArray(rawQuestion.options)
+      ? rawQuestion.options.slice(0, 20).map((option) => ({
+          value: String(option && typeof option === 'object' ? option.value : option || '').trim().slice(0, 120),
+          label: String(option && typeof option === 'object' ? (option.label ?? option.value) : option || '').trim().slice(0, 120)
+        })).filter((option) => option.value && option.label)
+      : [];
+    return {
+      id,
+      label,
+      type,
+      scope: scope === 'attendee' ? 'attendee' : 'party',
+      required: rawQuestion.required === true,
+      maxLength: Math.max(1, Math.min(2000, Number(rawQuestion.max_length ?? rawQuestion.maxLength) || (type === 'textarea' ? 1000 : 160))),
+      options
+    };
+  }
+
+  function getEventRegistrationConfig(item) {
+    if (String(getCartItemFieldValue(item, '_product_type') || '').trim().toLowerCase() !== 'rsvp') return null;
+    const raw = item?.eventRegistration;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const maxPartySize = Math.max(1, Math.min(20, Number(raw.max_party_size ?? raw.maxPartySize) || 20));
+    return {
+      opensAt: String(raw.opens_at ?? raw.opensAt ?? '').trim(),
+      closesAt: String(raw.closes_at ?? raw.closesAt ?? '').trim(),
+      maxPartySize,
+      requireContactName: (raw.require_contact_name ?? raw.requireContactName) !== false,
+      requireAttendeeNames: (raw.require_attendee_names ?? raw.requireAttendeeNames) !== false,
+      questions: (Array.isArray(raw.questions) ? raw.questions : [])
+        .slice(0, 12)
+        .map(normalizeEventRegistrationQuestion)
+        .filter(Boolean)
+    };
+  }
+
+  function getEventRegistrationDraftKey(item) {
+    return String(item?.uniqueId || item?.id || getStoreCartItemProductId(item) || '').trim();
+  }
+
+  function ensureEventRegistrationDraft(item) {
+    const key = getEventRegistrationDraftKey(item);
+    if (!key) return null;
+    const quantity = Math.max(1, Math.min(20, Number(item?.quantity || 1)));
+    const current = eventRegistrationDrafts.get(key) || { answers: {}, attendees: [] };
+    const attendees = Array.from({ length: quantity }, (_unused, index) => {
+      const attendee = current.attendees?.[index] || {};
+      return {
+        name: String(attendee.name || ''),
+        answers: attendee.answers && typeof attendee.answers === 'object' ? { ...attendee.answers } : {}
+      };
+    });
+    const draft = {
+      answers: current.answers && typeof current.answers === 'object' ? { ...current.answers } : {},
+      attendees
+    };
+    eventRegistrationDrafts.set(key, draft);
+    return draft;
+  }
+
+  function pruneEventRegistrationDrafts(items) {
+    const activeKeys = new Set((Array.isArray(items) ? items : [])
+      .filter((item) => getEventRegistrationConfig(item))
+      .map(getEventRegistrationDraftKey)
+      .filter(Boolean));
+    for (const key of eventRegistrationDrafts.keys()) {
+      if (!activeKeys.has(key)) eventRegistrationDrafts.delete(key);
+    }
+  }
+
+  function buildEventRegistrationSubmission(item) {
+    if (!getEventRegistrationConfig(item)) return null;
+    const draft = ensureEventRegistrationDraft(item);
+    if (!draft) return null;
+    return {
+      answers: { ...draft.answers },
+      attendees: draft.attendees.map((attendee) => ({
+        name: String(attendee.name || '').trim(),
+        answers: { ...attendee.answers }
+      }))
+    };
+  }
+
+  function formatEventRegistrationDeadline(value) {
+    const parsed = Date.parse(String(value || ''));
+    if (!Number.isFinite(parsed)) return '';
+    try {
+      return new Intl.DateTimeFormat(getRuntimeLocale(), {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }).format(new Date(parsed));
+    } catch (_error) {
+      return new Date(parsed).toLocaleString();
+    }
+  }
+
+  function renderEventRegistrationQuestion(question, value, context, disabled) {
+    const requiredMark = question.required
+      ? ' <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span>'
+      : '';
+    const attributes = [
+      `data-rsvp-item-key="${escapeAttribute(context.itemKey)}"`,
+      `data-rsvp-question-id="${escapeAttribute(question.id)}"`,
+      `data-rsvp-scope="${escapeAttribute(question.scope)}"`,
+      `data-rsvp-attendee-index="${escapeAttribute(String(context.attendeeIndex ?? ''))}"`,
+      'data-rsvp-registration-answer'
+    ].join(' ');
+    const inputId = `store-rsvp-${context.registrationIndex}-${context.attendeeIndex ?? 'party'}-${question.id}`;
+    const disabledAttribute = disabled ? ' disabled' : '';
+
+    if (question.type === 'checkbox') {
+      return `
+        <label class="store-first-party-cart__checkbox store-first-party-cart__registration-checkbox" for="${escapeAttribute(inputId)}">
+          <input id="${escapeAttribute(inputId)}" type="checkbox" ${attributes}${value === true ? ' checked' : ''}${disabledAttribute}>
+          <span>${escapeHtml(question.label)}${requiredMark}</span>
+        </label>
+      `;
+    }
+
+    if (question.type === 'multi_select') {
+      const selected = new Set(Array.isArray(value) ? value : []);
+      return `
+        <fieldset class="store-first-party-cart__registration-question">
+          <legend class="store-first-party-cart__field-label">${escapeHtml(question.label)}${requiredMark}</legend>
+          <div class="store-first-party-cart__registration-options">
+            ${question.options.map((option, optionIndex) => `
+              <label class="store-first-party-cart__checkbox" for="${escapeAttribute(`${inputId}-${optionIndex}`)}">
+                <input id="${escapeAttribute(`${inputId}-${optionIndex}`)}" type="checkbox" value="${escapeAttribute(option.value)}" data-rsvp-multi-option ${attributes}${selected.has(option.value) ? ' checked' : ''}${disabledAttribute}>
+                <span>${escapeHtml(option.label)}</span>
+              </label>
+            `).join('')}
+          </div>
+        </fieldset>
+      `;
+    }
+
+    if (question.type === 'single_select') {
+      return `
+        <div class="store-first-party-cart__field store-first-party-cart__field--full">
+          <label class="store-first-party-cart__field-label" for="${escapeAttribute(inputId)}">${escapeHtml(question.label)}${requiredMark}</label>
+          <select id="${escapeAttribute(inputId)}" class="store-first-party-cart__input store-first-party-cart__input--select" ${attributes}${disabledAttribute}>
+            <option value="">${escapeHtml(getRuntimeMessage('cart.rsvpChooseOption', 'Choose an option'))}</option>
+            ${question.options.map((option) => `<option value="${escapeAttribute(option.value)}"${String(value || '') === option.value ? ' selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}
+          </select>
+        </div>
+      `;
+    }
+
+    const sharedInputAttributes = `id="${escapeAttribute(inputId)}" class="store-first-party-cart__input" maxlength="${escapeAttribute(String(question.maxLength))}" ${attributes}${disabledAttribute}`;
+    return `
+      <div class="store-first-party-cart__field store-first-party-cart__field--full">
+        <label class="store-first-party-cart__field-label" for="${escapeAttribute(inputId)}">${escapeHtml(question.label)}${requiredMark}</label>
+        ${question.type === 'textarea'
+          ? `<textarea ${sharedInputAttributes} rows="3">${escapeHtml(String(value || ''))}</textarea>`
+          : `<input ${sharedInputAttributes} type="text" value="${escapeAttribute(String(value || ''))}">`}
+      </div>
+    `;
+  }
+
+  function renderEventRegistrationMarkup(items, disabled = false) {
+    const registrations = (Array.isArray(items) ? items : [])
+      .map((item) => ({ item, config: getEventRegistrationConfig(item) }))
+      .filter((entry) => entry.config);
+    pruneEventRegistrationDrafts(items);
+    if (registrations.length === 0) return '';
+
+    return registrations.map(({ item, config }, registrationIndex) => {
+      const draft = ensureEventRegistrationDraft(item);
+      const itemKey = getEventRegistrationDraftKey(item);
+      const partyQuestions = config.questions.filter((question) => question.scope === 'party');
+      const attendeeQuestions = config.questions.filter((question) => question.scope === 'attendee');
+      const deadline = formatEventRegistrationDeadline(config.closesAt);
+      return `
+        <section class="store-first-party-cart__callout store-first-party-cart__registration" data-rsvp-registration data-rsvp-item-key="${escapeAttribute(itemKey)}">
+          <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.rsvpDetails', 'RSVP details'))}: ${escapeHtml(item.name || '')}</p>
+          ${deadline ? `<p class="store-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.rsvpDeadline', 'Respond by %{date}.').replace('%{date}', deadline))}</p>` : ''}
+          ${partyQuestions.length > 0 ? `
+            <div class="store-first-party-cart__registration-questions">
+              ${partyQuestions.map((question) => renderEventRegistrationQuestion(
+                question,
+                draft.answers[question.id],
+                { itemKey, registrationIndex },
+                disabled
+              )).join('')}
+            </div>
+          ` : ''}
+          <div class="store-first-party-cart__registration-attendees">
+            ${draft.attendees.map((attendee, attendeeIndex) => `
+              <fieldset class="store-first-party-cart__registration-attendee">
+                <legend>${escapeHtml(getRuntimeMessage('cart.rsvpAttendeeNumber', 'Attendee %{number}').replace('%{number}', String(attendeeIndex + 1)))}</legend>
+                ${config.requireAttendeeNames ? `
+                  <div class="store-first-party-cart__field store-first-party-cart__field--full">
+                    <label class="store-first-party-cart__field-label" for="store-rsvp-${registrationIndex}-${attendeeIndex}-name">${escapeHtml(getRuntimeMessage('cart.rsvpAttendeeName', 'Attendee name'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                    <input id="store-rsvp-${registrationIndex}-${attendeeIndex}-name" class="store-first-party-cart__input" type="text" maxlength="120" autocomplete="name" value="${escapeAttribute(attendee.name)}" data-rsvp-attendee-name data-rsvp-item-key="${escapeAttribute(itemKey)}" data-rsvp-attendee-index="${attendeeIndex}"${disabled ? ' disabled' : ''}>
+                  </div>
+                ` : ''}
+                ${attendeeQuestions.map((question) => renderEventRegistrationQuestion(
+                  question,
+                  attendee.answers[question.id],
+                  { itemKey, registrationIndex, attendeeIndex },
+                  disabled
+                )).join('')}
+              </fieldset>
+            `).join('')}
+          </div>
+          <p class="store-first-party-cart__field-error" data-rsvp-registration-error role="alert" hidden></p>
+        </section>
+      `;
+    }).join('');
+  }
+
+  function updateEventRegistrationDraftFromField(field) {
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) return false;
+    const itemKey = String(field.dataset.rsvpItemKey || '').trim();
+    if (!itemKey) return false;
+    const draft = eventRegistrationDrafts.get(itemKey);
+    if (!draft) return false;
+    const attendeeIndex = Number(field.dataset.rsvpAttendeeIndex);
+
+    if (field.matches('[data-rsvp-attendee-name]')) {
+      if (!Number.isInteger(attendeeIndex) || !draft.attendees[attendeeIndex]) return false;
+      draft.attendees[attendeeIndex].name = field.value;
+      field.removeAttribute('aria-invalid');
+      return true;
+    }
+
+    if (!field.matches('[data-rsvp-registration-answer]')) return false;
+    const questionId = String(field.dataset.rsvpQuestionId || '').trim();
+    if (!questionId) return false;
+    const answerTarget = field.dataset.rsvpScope === 'attendee'
+      ? draft.attendees[attendeeIndex]?.answers
+      : draft.answers;
+    if (!answerTarget) return false;
+
+    if (field.matches('[data-rsvp-multi-option]')) {
+      const current = new Set(Array.isArray(answerTarget[questionId]) ? answerTarget[questionId] : []);
+      if (field.checked) current.add(field.value);
+      else current.delete(field.value);
+      answerTarget[questionId] = Array.from(current);
+    } else if (field instanceof HTMLInputElement && field.type === 'checkbox') {
+      answerTarget[questionId] = field.checked;
+    } else {
+      answerTarget[questionId] = field.value;
+    }
+    field.removeAttribute('aria-invalid');
+    return true;
+  }
+
+  function validateEventRegistrationDrafts(items, contactName, contactEmail) {
+    const configuredItems = (Array.isArray(items) ? items : [])
+      .map((item) => ({ item, config: getEventRegistrationConfig(item) }))
+      .filter((entry) => entry.config);
+    for (const { item, config } of configuredItems) {
+      const itemKey = getEventRegistrationDraftKey(item);
+      const draft = ensureEventRegistrationDraft(item);
+      if (!String(contactEmail || '').trim()) {
+        return {
+          valid: false,
+          message: getRuntimeMessage('cart.emailRequired', 'Enter an email address to continue.'),
+          itemKey,
+          contactEmail: true
+        };
+      }
+      if (config.requireContactName && !String(contactName || '').trim()) {
+        return {
+          valid: false,
+          message: getRuntimeMessage('cart.rsvpContactNameRequired', 'Enter a contact name to continue.'),
+          itemKey,
+          contactName: true
+        };
+      }
+      if (Number(item.quantity || 1) > config.maxPartySize) {
+        return {
+          valid: false,
+          message: getRuntimeMessage('cart.rsvpPartyTooLarge', 'This RSVP allows at most %{count} attendees.').replace('%{count}', String(config.maxPartySize)),
+          itemKey
+        };
+      }
+
+      for (let attendeeIndex = 0; attendeeIndex < draft.attendees.length; attendeeIndex += 1) {
+        const attendee = draft.attendees[attendeeIndex];
+        if (config.requireAttendeeNames && !String(attendee.name || '').trim()) {
+          return {
+            valid: false,
+            message: getRuntimeMessage('cart.rsvpAttendeeNameRequired', 'Enter a name for each attendee.'),
+            itemKey,
+            attendeeIndex,
+            attendeeName: true
+          };
+        }
+        const requiredQuestion = config.questions.find((question) => {
+          if (!question.required || question.scope !== 'attendee') return false;
+          const value = attendee.answers[question.id];
+          return question.type === 'checkbox' ? value !== true : (Array.isArray(value) ? value.length === 0 : !String(value || '').trim());
+        });
+        if (requiredQuestion) {
+          return {
+            valid: false,
+            message: getRuntimeMessage('cart.rsvpRequiredAnswer', 'Answer all required RSVP questions.'),
+            itemKey,
+            attendeeIndex,
+            questionId: requiredQuestion.id
+          };
+        }
+      }
+
+      const requiredPartyQuestion = config.questions.find((question) => {
+        if (!question.required || question.scope !== 'party') return false;
+        const value = draft.answers[question.id];
+        return question.type === 'checkbox' ? value !== true : (Array.isArray(value) ? value.length === 0 : !String(value || '').trim());
+      });
+      if (requiredPartyQuestion) {
+        return {
+          valid: false,
+          message: getRuntimeMessage('cart.rsvpRequiredAnswer', 'Answer all required RSVP questions.'),
+          itemKey,
+          questionId: requiredPartyQuestion.id
+        };
+      }
+    }
+    return { valid: true };
+  }
+
+  function showEventRegistrationValidationError(result) {
+    const root = getCartRoot();
+    if (!root) return;
+    root.querySelectorAll('[data-rsvp-registration-error]').forEach((node) => {
+      node.textContent = '';
+      node.hidden = true;
+    });
+    root.querySelectorAll('[data-rsvp-registration-answer], [data-rsvp-attendee-name], [data-cart-custom-checkout-name], [data-cart-custom-checkout-email]').forEach((field) => {
+      field.removeAttribute('aria-invalid');
+    });
+    if (result?.valid !== false) return;
+
+    const sections = Array.from(root.querySelectorAll('[data-rsvp-registration]'));
+    const section = sections.find((node) => node.dataset.rsvpItemKey === result.itemKey);
+    const errorNode = section?.querySelector('[data-rsvp-registration-error]');
+    if (errorNode) {
+      errorNode.textContent = result.message;
+      errorNode.hidden = false;
+    }
+    const candidateFields = Array.from(root.querySelectorAll('[data-rsvp-registration-answer], [data-rsvp-attendee-name]'));
+    let target = result.contactEmail
+      ? root.querySelector('[data-cart-custom-checkout-email]')
+      : result.contactName
+        ? root.querySelector('[data-cart-custom-checkout-name]')
+        : candidateFields.find((field) => {
+      if (field.dataset.rsvpItemKey !== result.itemKey) return false;
+      if (result.attendeeName) {
+        return field.matches('[data-rsvp-attendee-name]') && Number(field.dataset.rsvpAttendeeIndex) === result.attendeeIndex;
+      }
+      if (result.questionId) {
+        return field.dataset.rsvpQuestionId === result.questionId &&
+          (result.attendeeIndex === undefined || Number(field.dataset.rsvpAttendeeIndex) === result.attendeeIndex);
+      }
+      return true;
+        });
+    if (target instanceof HTMLElement) {
+      target.setAttribute('aria-invalid', 'true');
+      target.focus();
+      target.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    }
   }
 
   function shouldMergeCartItem(existingItem, nextItem) {
@@ -1445,6 +1835,17 @@
 
   function hasInteractiveCustomFields(button) {
     return getButtonCustomFieldDefinitions(button).some((field) => field.type !== 'hidden');
+  }
+
+  function getButtonEventRegistration(button) {
+    const raw = String(button?.getAttribute?.('data-event-registration') || '').trim();
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (_error) {
+      return null;
+    }
   }
 
   function buildButtonShippingMetadata(button) {
@@ -1516,6 +1917,10 @@
     if (shipping) {
       item.shipping = shipping;
     }
+    const eventRegistration = getButtonEventRegistration(button);
+    if (eventRegistration) {
+      item.eventRegistration = eventRegistration;
+    }
 
     return item;
   }
@@ -1548,6 +1953,10 @@
     const shipping = buildButtonShippingMetadata(button);
     if (shipping) {
       item.shipping = shipping;
+    }
+    const eventRegistration = getButtonEventRegistration(button);
+    if (eventRegistration) {
+      item.eventRegistration = eventRegistration;
     }
 
     return item;
@@ -1770,8 +2179,8 @@
     const taxState = resolveDisplayedTaxState(state, {
       ...options,
       shippingDraft,
-          subtotalCents: pricing.discountedSubtotalCents,
-          taxQuote: options?.taxQuote || null
+      subtotalCents: pricing.discountedSubtotalCents,
+      taxQuote: options?.taxQuote || null
     });
     if (!isCustomCheckoutEstimateActive(state, options)) {
       return {
@@ -2589,6 +2998,9 @@
     const sku = String(product.sku || productId).trim();
     const fulfillmentType = String(product.fulfillment_type || product.category || getCartItemFieldValue(item, '_product_type') || 'physical').trim();
     const isNonShippable = ['digital', 'ticket', 'rsvp', 'service'].includes(fulfillmentType.toLowerCase());
+    const eventRegistration = fulfillmentType.toLowerCase() === 'rsvp' && product.event_registration && typeof product.event_registration === 'object'
+      ? product.event_registration
+      : null;
     const catalogShipping = product.shipping && typeof product.shipping === 'object' ? product.shipping : null;
     const price = typeof addOnUtils.resolveUnitPrice === 'function'
       ? addOnUtils.resolveUnitPrice(product, variant)
@@ -2622,6 +3034,7 @@
       imageUrl: item?.imageUrl || item?.image || product.image_url || product.image || '',
       shippable: !isNonShippable,
       shipping: !isNonShippable && catalogShipping ? catalogShipping : item?.shipping,
+      eventRegistration,
       customFields
     };
   }
@@ -3042,6 +3455,7 @@
       const customFields = Array.isArray(item?.customFields) ? item.customFields : [];
       const variantId = getStoreCartItemVariantId(item);
       const productId = getStoreCartItemProductId(item);
+      const registration = buildEventRegistrationSubmission(item);
       return {
         id: String(item?.id || ''),
         productId,
@@ -3052,7 +3466,8 @@
         quantity: Math.max(1, Number(item?.quantity || 1)),
         url: String(item?.url || ''),
         image: String(item?.imageUrl || item?.image || ''),
-        customFields
+        customFields,
+        ...(registration ? { registration } : {})
       };
     });
 
@@ -3489,6 +3904,25 @@
       const isCustomCheckout = wantsCustomCheckout && checkoutUiState.mode === 'custom';
       const customCheckout = checkoutUiState.customCheckout || {};
       const hasCustomCheckoutSession = Boolean(customCheckout?.sessionId || customCheckout?.clientSecret);
+      const requiresRegistrationContactName = items.some((item) => getEventRegistrationConfig(item)?.requireContactName);
+      const eventRegistrationMarkup = isCheckoutPreview
+        ? renderEventRegistrationMarkup(items, hasCustomCheckoutSession)
+        : '';
+      const registrationContactMarkup = isCheckoutPreview && requiresRegistrationContactName && !wantsCustomCheckout ? `
+        <div class="store-first-party-cart__callout">
+          <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.rsvpContact', 'RSVP contact'))}</p>
+          <div class="store-first-party-cart__shipping-grid">
+            <div class="store-first-party-cart__field store-first-party-cart__field--full">
+              <label class="store-first-party-cart__field-label" for="store-rsvp-contact-name">${escapeHtml(getRuntimeMessage('cart.fullName', 'Full name'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+              <input id="store-rsvp-contact-name" class="store-first-party-cart__input" type="text" maxlength="120" autocomplete="name" value="${escapeAttribute(String(state?.customer?.name || ''))}" data-cart-custom-checkout-name>
+            </div>
+            <div class="store-first-party-cart__field store-first-party-cart__field--full">
+              <label class="store-first-party-cart__field-label" for="store-rsvp-contact-email">${escapeHtml(getRuntimeMessage('cart.emailAddress', 'Email address'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+              <input id="store-rsvp-contact-email" class="store-first-party-cart__input" type="email" inputmode="email" autocomplete="email" value="${escapeAttribute(getPersistedCustomCheckoutEmailDraft())}" data-cart-custom-checkout-email>
+            </div>
+          </div>
+        </div>
+      ` : '';
       const taxLocationDraft = normalizeTaxDestination(getStoredBillingAddress(state));
       const requiresDetailedTaxLocation = taxDestinationNeedsDetailedStreetAddress(taxLocationDraft);
       const isDeferredCustomCheckoutStart = shouldDeferPhysicalCustomCheckoutStart(state, {
@@ -3500,7 +3934,7 @@
       const hasReadyTaxLocation = Boolean(readReadyTaxDestination(state));
       const showCustomCheckoutConfirmButton = wantsCustomCheckout &&
         !isDeferredCustomCheckoutStart &&
-        (hasCustomCheckoutSession || (isCustomCheckout && !requiresTaxLocation));
+        hasCustomCheckoutSession;
       const returnPolicyUrl = getCurrentLang().toLowerCase().startsWith('es')
         ? '/es/terms/#returns-refunds'
         : '/terms/#returns-refunds';
@@ -3581,6 +4015,23 @@
           <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
             <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.contact', 'Contact'))}</p>
             <div class="store-first-party-cart__stripe-shell">
+              ${requiresRegistrationContactName ? `
+                <div class="store-first-party-cart__field store-first-party-cart__field--compact">
+                  <label class="store-first-party-cart__field-label" for="store-custom-checkout-name">${escapeHtml(getRuntimeMessage('cart.fullName', 'Full name'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
+                  <input
+                    id="store-custom-checkout-name"
+                    name="checkout-name"
+                    class="store-first-party-cart__input"
+                    type="text"
+                    maxlength="120"
+                    autocomplete="name"
+                    autocapitalize="words"
+                    value="${escapeAttribute(String(state?.customer?.name || ''))}"
+                    data-cart-custom-checkout-name
+                    ${hasCustomCheckoutSession ? 'disabled' : ''}
+                  >
+                </div>
+              ` : ''}
               <div class="store-first-party-cart__field store-first-party-cart__field--compact" data-cart-custom-checkout-email-fallback>
                 <label class="store-first-party-cart__field-label" for="store-custom-checkout-email">${escapeHtml(getRuntimeMessage('cart.emailAddress', 'Email address'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                   <input
@@ -3599,7 +4050,7 @@
               </div>
             </div>
           </div>
-          ${!hasCustomCheckoutSession ? `
+          ${requiresTaxLocation && !hasCustomCheckoutSession ? `
             <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
               <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.taxLocation', 'Tax location'))}</p>
               <div class="store-first-party-cart__stripe-shell">
@@ -3776,6 +4227,8 @@
               </div>
             </div>
           </div>
+          ${registrationContactMarkup}
+          ${eventRegistrationMarkup}
           ${customCheckoutMarkup}
           ${checkoutErrorMarkup}
         </section>
@@ -4184,6 +4637,7 @@
 
     function clearStoreCartAfterOrder() {
       persistedAbandonedCheckoutConsentDraft = false;
+      eventRegistrationDrafts.clear();
       updateCartState((state) => {
         const totals = calculateCartTotals([], 0, '');
         return {
@@ -5610,6 +6064,13 @@
         state?.cart?.email ||
         ''
       ).trim();
+      const contactNameField = getCartRoot()?.querySelector('[data-cart-custom-checkout-name]');
+      const contactNameValue = String(
+        shippingDraft?.name ||
+        (contactNameField instanceof HTMLInputElement ? contactNameField.value : '') ||
+        state?.customer?.name ||
+        ''
+      ).trim();
 
       if (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) {
         const message = getRuntimeMessage('cart.shippingAddressRequired', 'Enter a complete shipping address to continue.');
@@ -5633,6 +6094,18 @@
         focusCustomCheckoutTaxField();
         return;
       }
+
+      const registrationValidation = validateEventRegistrationDrafts(
+        state?.cart?.items?.items || [],
+        contactNameValue,
+        emailValue
+      );
+      if (!registrationValidation.valid) {
+        setCheckoutUiError(registrationValidation.message);
+        showEventRegistrationValidationError(registrationValidation);
+        return;
+      }
+      showEventRegistrationValidationError({ valid: true });
 
       setCheckoutUiState({
         status: 'submitting',
@@ -5682,6 +6155,12 @@
             email: emailValue
           };
         }
+      }
+      if (contactNameValue && payloadResult.kind === 'store') {
+        payloadResult.payload.customer = {
+          ...(payloadResult.payload.customer || {}),
+          name: contactNameValue
+        };
       }
       payloadResult.payload.abandonedCartConsent = readAbandonedCheckoutConsentDraft();
 
@@ -6046,6 +6525,12 @@
       }
 
       document._storeFirstPartyCartInputHandler = function handleFirstPartyCartInput(event) {
+        const registrationField = event.target?.closest?.('[data-rsvp-registration-answer], [data-rsvp-attendee-name]');
+        if (registrationField && updateEventRegistrationDraftFromField(registrationField)) {
+          setCheckoutUiError('');
+          return;
+        }
+
         const tipField = event.target?.closest?.('[data-cart-tip]');
         if (tipField) {
           suppressDrawerRerender = true;
@@ -6130,6 +6615,12 @@
       };
 
       document._storeFirstPartyCartChangeHandler = function handleFirstPartyCartChange(event) {
+        const registrationField = event.target?.closest?.('[data-rsvp-registration-answer], [data-rsvp-attendee-name]');
+        if (registrationField && updateEventRegistrationDraftFromField(registrationField)) {
+          setCheckoutUiError('');
+          return;
+        }
+
         const tipField = event.target?.closest?.('[data-cart-tip]');
         if (tipField) {
           suppressDrawerRerender = false;

@@ -4,6 +4,7 @@ import {
   findStoreProduct,
   validateStoreOrderDraft
 } from '../../worker/src/catalog.js';
+import { normalizeEventRegistrationConfig } from '../../worker/src/event-registration.js';
 
 describe('Store catalog snapshot and validation', () => {
   it('generates a canonical Worker snapshot from repo products', () => {
@@ -41,6 +42,20 @@ describe('Store catalog snapshot and validation', () => {
 
     expect(filmFatale?.event_details?.address).toBe('3405 Central Ave NE\nAlbuquerque, NM 87106');
     expect(filmFatale?.event_details?.address).not.toMatch(/Bernalillo County|United States|Nob Hill|The Guild Cinema/);
+  });
+
+  it('keeps every published RSVP registration config valid and RSVP-scoped', () => {
+    const configuredProducts = STORE_CATALOG_SNAPSHOT.products.filter((product) => (
+      product?.event_details?.registration
+    ));
+
+    expect(configuredProducts.length).toBeGreaterThan(0);
+    for (const product of configuredProducts) {
+      expect(product.fulfillment_type).toBe('rsvp');
+      const normalized = normalizeEventRegistrationConfig(product.event_details);
+      expect(normalized.configured).toBe(true);
+      expect(normalized.errors, `Invalid RSVP registration config for ${product.id}`).toEqual([]);
+    }
   });
 
   it('keeps archived products visible to admin catalog data but unavailable for checkout', () => {

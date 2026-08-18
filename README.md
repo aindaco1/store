@@ -4,9 +4,9 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Current release: `v1.1.22`. Store pins Platform `v0.31.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`. Seventeen shared Jekyll integration files now have one digest-bound golden-project source and an explicit drift/sync workflow, while Store retains its routes, data, localization, content, configuration, build, deployment authority, and one-commit rollback. Stripe test-webhook validation remains isolated to staging.
+- Current release: `v1.2.0`. RSVP products can opt into registration windows, party limits, named attendees, scoped custom questions, private response review, attendee-level check-in, and attendee CSV export without changing other product or fulfillment paths. Store continues to pin Platform `v0.31.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`.
 - Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
-- The preceding `v1.1.21` release remains independently reversible.
+- The preceding `v1.1.22` release remains independently reversible.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -14,7 +14,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 - Current public catalog grouping uses `category: dustwave` and `category: fronteras` as collection-compatible legacy values; the taxonomy include derives product-type categories such as apparel, prints, stickers, downloads, event access, media, and objects.
 - Browser cart runtime is Store-owned: `store-add-item`, `STORE_CONFIG`, `StoreCartProvider`, `StoreCartRuntime`, `window.Store`, and `storecart.*` events.
 - Worker checkout validates carts through `/api/cart/validate`, creates paid/free order drafts through `/api/checkout/intent`, reserves positive-count SKU inventory through a Durable Object, and settles paid orders only from signed Stripe webhooks.
-- Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, check-in links, Resend receipts, abandoned-checkout reminders, and event reminders.
+- Fulfillment includes `/order-success/`, customer order lookup links, signed R2-backed downloads, ticket/RSVP QR SVGs, calendar files, named RSVP attendees and custom questions, attendee-level check-in, Resend receipts, abandoned-checkout reminders, and event reminders.
 - Public Spanish shells exist for home, Terms, Orders, and Order Success; product titles/descriptions stay creator-authored unless a product defines localized overrides.
 - Admin at `/admin/` and `/es/admin/` manages settings, users/scopes, readiness, plan usage, products, product media, coupons, reusable download files, orders, historical Snipcart imports, download access revoke/refresh, ticket check-in, analytics, referrals, and reminder suppression.
 - Authenticated admin Orders uses a shared versioned order read model, no-change watermarks, and an explicitly invalidated seven-day materialized index. Orders, Analytics, inventory, and download readiness support the reviewed `CachedAdminStoreReads` Workers Cache entrypoint but default off after the production Orders comparison failed its latency-benefit gate. Deployment-scoped weighted telemetry, disabled/enabled comparison gates, a scoped nightly probe, kill switches, and the incident runbook support measured rollout.
@@ -25,7 +25,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Shared Foundations and Ownership
 
-Store `v1.1.22` pins Dust Wave Platform `v0.31.0` at exact commit
+Store `v1.2.0` pins Dust Wave Platform `v0.31.0` at exact commit
 `5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579` and Dust Wave Jekyll Template
 `v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
 Platform supplies characterized Worker, admin, browser, design, build, release,

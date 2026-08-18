@@ -34,7 +34,7 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Durable order state** — Store persists order drafts and confirmed orders, then renders token-scoped Order Success pages and fulfillment state in English and Spanish.
 - [x] **Private customer lookup** — Generic lookup responses avoid account-existence leaks and deliver short-lived one-time links only when matching orders exist.
 - [x] **Physical fulfillment** — Orders retain shipping details, item state, and exportable fulfillment context for operator review.
-- [x] **Tickets and RSVPs** — Confirmed items can provide ticket and QR SVGs, calendar files, signed check-in links, attendee search, attendance totals, and CSV exports.
+- [x] **Tickets and RSVPs** — Confirmed items can provide ticket and QR SVGs, calendar files, signed check-in links, attendee search, attendance totals, and CSV exports. RSVP products may additionally opt into deadlines, party limits, named attendees, scoped custom questions, private response review, and attendee-level check-in without changing other fulfillment types.
 - [x] **Digital downloads** — Confirmed purchases receive durable entitlements with short-lived signed delivery, private/no-store responses, reusable R2-backed files, and item-level revoke or refresh controls.
 - [x] **Transactional email** — Store sends localized customer confirmations and super-admin notifications through Resend while keeping Stripe receipt email disabled for first-party orders.
 - [x] **Durable email delivery** — Order confirmations, event reminders, and consented abandoned-cart messages use a bounded outbox with idempotency, leases, backoff, delivery evidence, and suppression; provider failure does not roll back order or fulfillment truth.
@@ -95,6 +95,10 @@ This file is a current capability inventory and forward plan, not release histor
 
 Keep these scoped to Store's goals and data model. Share implementation patterns with Pool where the underlying problem is the same, but do not import Pool-only concepts such as campaigns, pledges, Manage Pledge, embeds, creator diaries, votes, or supporter blasts. Prefer extending existing Store docs, email rendering, admin controls, setup tooling, Worker observability, and release scripts before adding parallel systems.
 
+- [ ] RSVP self-service and capacity-aware waitlist
+  - Add token-scoped attendee update and cancellation without exposing order records or creating a general customer account system. Changes must preserve the confirmed order's historical prices, audit the bounded mutation, and never create or retry a payment.
+  - Release finite RSVP capacity only through the existing serialized inventory lifecycle. Waitlist promotion must be explicit, idempotent, time-bounded, and safe across retries; it must not oversell or silently convert a waitlisted guest into a confirmed attendee.
+  - Keep transactional update, cancellation, promotion, and expiry email separate from order truth, with durable retries and suppression. Add admin visibility, privacy/retention documentation, localization, accessibility, abuse limits, and full failure/recovery tests before enabling the feature.
 - [ ] Guided setup TUI wrapper
   - Build a thin terminal UI around the existing `scripts/setup-deploy.mjs` setup core instead of creating a separate desktop app or duplicating provider logic.
   - Keep the script-first contract intact: every TUI action should map to an existing setup mode or a small extension of that mode, and CI/non-interactive users should still be able to call the underlying CLI directly.

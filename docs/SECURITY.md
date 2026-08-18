@@ -65,7 +65,7 @@ GitHub Actions supply-chain rules:
 
 | Key Pattern | Binding | Data | Sensitivity |
 | --- | --- | --- | --- |
-| `orders:{token}` | KV | Order draft/settlement/fulfillment state | High |
+| `orders:{token}` | KV | Order draft/settlement/fulfillment state, including opt-in RSVP attendee names and custom responses | High |
 | `store-order-email:{emailHash}` | KV | Order lookup index by customer email hash | Medium |
 | `store-order-lookup:{jti}` | KV | Short-lived one-time order lookup nonce | Medium |
 | `store-inventory-overrides:v1` | KV | Admin-entered SKU baseline overrides | Medium |

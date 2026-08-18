@@ -244,6 +244,7 @@ describe('Store email integration', () => {
               ticket_note: 'Abre la página del pedido para ver tu boleto.',
               rsvp_note: 'Tu RSVP está confirmado.',
               quantity_label: 'Cant.',
+              attendees_label: 'Asistentes',
               body: 'Gracias por tu pedido.',
               cta: 'Ver pedido'
             },
@@ -273,7 +274,10 @@ describe('Store email integration', () => {
           name: 'Opening RSVP',
           quantity: 1,
           subtotalCents: 0,
-          fulfillmentType: 'rsvp'
+          fulfillmentType: 'rsvp',
+          registration: {
+            attendees: [{ id: 'attendee-1', name: 'Adriana Invitada', answers: [] }]
+          }
         }]
       }
     });
@@ -285,6 +289,7 @@ describe('Store email integration', () => {
     expect(payload.html).toContain('Boleto');
     expect(payload.html).toContain('para ver tu boleto.');
     expect(payload.html).toContain('Tu RSVP está confirmado.');
+    expect(payload.html).toContain('Asistentes: Adriana Invitada');
     expect(payload.html).toContain('https://shop.test/es/order-success/?orderToken=store-order-demo123');
   });
 

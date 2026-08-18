@@ -461,6 +461,7 @@ run_phase "4. Syntax checks" bash -lc '
   node scripts/optimize-media.mjs --check --manifest-only >/dev/null
   node --check worker/src/tier-inventory-do.js
   node --check worker/src/catalog.js
+  node --check worker/src/event-registration.js
   node --check worker/src/orders.js
   node --check shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs
   node --check scripts/audit-performance-budgets.mjs
@@ -493,7 +494,7 @@ run_phase "6. Full unit suite" npm run test:unit
 
 USE_PODMAN_JEKYLL=false
 if prepare_host_jekyll; then
-  run_phase "7. Store build artifact checks" bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'
+  run_phase "7. Store build artifact checks" scripts/pre-merge-regression.sh __host_or_podman_build_check
 else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true

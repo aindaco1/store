@@ -641,6 +641,48 @@ body.store-cart-open {
   color: #9f1239;
 }
 
+.store-first-party-cart__registration {
+  display: grid;
+  gap: 14px;
+}
+
+.store-first-party-cart__registration-questions,
+.store-first-party-cart__registration-attendees {
+  display: grid;
+  gap: 12px;
+}
+
+.store-first-party-cart__registration-attendee,
+.store-first-party-cart__registration-question {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid $border--soft;
+}
+
+.store-first-party-cart__registration-attendee > legend {
+  padding: 0 8px 0 0;
+  @include type-label;
+  color: $color--primary;
+}
+
+.store-first-party-cart__registration-attendee .store-first-party-cart__field {
+  margin-top: 0;
+}
+
+.store-first-party-cart__registration-options {
+  display: grid;
+  gap: 8px;
+}
+
+.store-first-party-cart__registration textarea.store-first-party-cart__input {
+  min-height: 96px;
+  resize: vertical;
+}
+
 .store-first-party-cart__coupon {
   display: grid;
   gap: 8px;

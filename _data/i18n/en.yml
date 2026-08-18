@@ -307,6 +307,16 @@ runtime:
     email_required: Enter an email address to continue.
     email_invalid: Enter a valid email address to continue.
     shipping_address_required: Enter a complete shipping address to continue.
+    rsvp_details: RSVP details
+    rsvp_contact: RSVP contact
+    rsvp_deadline: Respond by %{date}.
+    rsvp_choose_option: Choose an option
+    rsvp_attendee_number: Attendee %{number}
+    rsvp_attendee_name: Attendee name
+    rsvp_contact_name_required: Enter a contact name to continue.
+    rsvp_attendee_name_required: Enter a name for each attendee.
+    rsvp_required_answer: Answer all required RSVP questions.
+    rsvp_party_too_large: This RSVP allows at most %{count} attendees.
     close_cart: Close cart
     your_cart: Your cart
     checkout_title: Checkout
@@ -373,6 +383,11 @@ runtime:
     fulfillment_service: Service
     fulfillment_physical: Physical item
     items: Items
+    rsvp_details: RSVP details
+    attendees: Attendees
+    attendee_number: Attendee %{number}
+    answer_yes: "Yes"
+    answer_no: "No"
     download_note: Your download stays available from this order page.
     unable_load_order: Unable to load order.
     still_processing: Still processing payment...
@@ -436,6 +451,7 @@ email:
     rsvp_note: Your RSVP is confirmed.
     shipping_note: Shipping updates will appear on your order page.
     quantity_label: Qty
+    attendees_label: Attendees
     items_heading: Items
     shipping_heading: Shipping
     customer_heading: Customer

@@ -23,7 +23,7 @@ The Store owner/operator approved these objectives, the four-hour active-sales s
 
 ## Data Classes
 
-- **Authoritative:** `orders:`, inventory overrides, coupons, admin users, saved referrals, reminder suppressions, and `STORE_DOWNLOADS` objects.
+- **Authoritative:** `orders:` (including opt-in RSVP attendee names and custom responses), inventory overrides, coupons, admin users, saved referrals, reminder suppressions, and `STORE_DOWNLOADS` objects.
 - **Idempotency/control:** `stripe-event:`, `email-delivery:v1:`, `email-suppression:v1:`, `resend-webhook:v1:`, customer/admin email sent markers, abandoned-cart sent markers, and event-reminder sent markers. Restore these before unpausing webhooks/email jobs to prevent duplicate side effects.
 - **Derived/rebuildable:** `admin-store-orders:index:v2`, `store-payment-reconciliation-state:v1`, inventory projections, email lookup indexes, queue summaries, health rows, and address lookup cache. Do not restore these as authoritative records.
 - **Incident evidence:** `processor-event:v1:`, `reconciliation-break:v1:`, admin audit, and selected observability/purge-failure records. Restore only when payment/incident retention requires it.

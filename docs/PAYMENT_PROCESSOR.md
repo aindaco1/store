@@ -254,7 +254,7 @@ The Worker rebuilds the order from trusted inputs:
 - inventory metadata and reservation availability
 - Turnstile requirements for higher-risk order shapes
 
-The resulting order draft stores cent values and an `orderHash`. The draft is persisted under `orders:<orderToken>`. For scarce inventory, the Worker reserves positive-count SKUs through `STORE_INVENTORY_COORDINATOR` before confirming a free order or creating a paid PaymentIntent.
+The resulting order draft stores cent values and an `orderHash`. For an RSVP with `event_details.registration`, it also stores the Worker-canonicalized contact, attendee roster, and historical question/answer snapshots after enforcing the current repository definition, deadline, party size, and allowed choices. The draft is persisted under `orders:<orderToken>`. For scarce inventory, the Worker reserves positive-count SKUs through `STORE_INVENTORY_COORDINATOR` before confirming a free order or creating a paid PaymentIntent.
 
 ### 3. Free Order Confirmation
 

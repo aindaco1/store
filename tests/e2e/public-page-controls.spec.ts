@@ -339,6 +339,81 @@ test.describe('Store Public Page Controls', () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test('collects direct-link RSVP attendee details without persisting responses in browser storage', async ({ page }) => {
+    let checkoutBody: Record<string, any> | null = null;
+    await page.route('**/api/store/inventory**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+          'access-control-allow-origin': SITE_BASE
+        },
+        body: JSON.stringify({
+          ok: true,
+          status: 'ready',
+          inventory: {
+            'rsvp-1': { available: 4 }
+          }
+        })
+      });
+    });
+    await page.route('**/api/checkout/intent', async (route) => {
+      checkoutBody = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({
+        status: 422,
+        headers: {
+          'content-type': 'application/json',
+          'access-control-allow-origin': SITE_BASE,
+          'access-control-allow-credentials': 'true'
+        },
+        body: JSON.stringify({ error: 'Captured RSVP browser test payload' })
+      });
+    });
+
+    await gotoDomReady(page, '/products/dust-wave-free-rsvp/');
+    const card = page.locator('.storefront__product-detail > .store-product-card').first();
+    await card.locator('[data-store-quantity-step="1"]').click();
+    await expect(card.locator('[data-store-quantity]')).toHaveValue('2');
+    await card.locator('button.store-add-item').click();
+
+    const cart = page.locator(CART_ROOT);
+    await expect(cart).toBeVisible();
+    await cart.getByRole('button', { name: 'Checkout' }).click();
+    await expect(cart.getByText('RSVP details: DUST WAVE Free RSVP')).toBeVisible();
+    await expect(cart.getByText(/Respond by/)).toBeVisible();
+    await expect(cart.getByLabel('Attendee name')).toHaveCount(2);
+
+    await cart.getByLabel('Full name').fill('Casey Host');
+    await cart.getByLabel('Email address').fill('casey@example.com');
+    await cart.getByLabel('Accessibility needs or accommodations').fill('Step-free access');
+    await cart.getByLabel('Attendee name').nth(0).fill('Alex Guest');
+    await cart.getByLabel('Attendee name').nth(1).fill('Sam Guest');
+    await cart.getByLabel('Age group').nth(0).selectOption('18_plus');
+    await cart.getByLabel('Age group').nth(1).selectOption('under_18');
+    await cart.getByRole('button', { name: 'Continue to payment' }).click();
+
+    await expect.poll(() => checkoutBody).not.toBeNull();
+    expect(checkoutBody).toMatchObject({
+      customer: { name: 'Casey Host', email: 'casey@example.com' },
+      items: [{
+        productId: 'rsvp-1',
+        quantity: 2,
+        registration: {
+          answers: { accessibility_needs: 'Step-free access' },
+          attendees: [
+            { name: 'Alex Guest', answers: { age_group: '18_plus' } },
+            { name: 'Sam Guest', answers: { age_group: 'under_18' } }
+          ]
+        }
+      }]
+    });
+    expect(await page.evaluate(() => JSON.stringify({
+      local: { ...localStorage },
+      session: { ...sessionStorage }
+    }))).not.toMatch(/Alex Guest|Sam Guest|Step-free access/);
+    await expectNoHorizontalOverflow(page);
+  });
+
   test('order lookup sends a generic email response and renders token results', async ({ page }) => {
     const lookupCalls: any[] = [];
     await page.route('**/api/orders/lookup**', async (route: any) => {

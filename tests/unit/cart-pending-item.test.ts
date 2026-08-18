@@ -304,6 +304,9 @@ describe('first-party pending cart handoff', () => {
         }
       ]
     });
+    await readyApi.api.cart.update({
+      billingAddress: { country: 'US', postal_code: '10001', state: 'NY' }
+    });
     await readyApi.api.theme.cart.open();
     await readyApi.api.theme.cart.navigate('/cart');
 
@@ -634,5 +637,143 @@ describe('first-party pending cart handoff', () => {
     expect(root?.querySelector('[data-cart-summary-tip-amount]')?.textContent).toBe('$1.25');
     expect(root?.querySelector('[data-cart-summary-tax]')?.textContent).toBe('$1.91');
     expect(root?.querySelector('[data-cart-summary-total]')?.textContent).toBe('$37.71');
+  });
+
+  it('collects opt-in RSVP responses in memory and submits them with the canonical cart item', async () => {
+    localStorage.removeItem('pendingCartItem');
+    let checkoutBody: any = null;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/tax/quote')) {
+        return new Response(JSON.stringify({
+          taxCents: 0,
+          taxDetails: {
+            effectiveRate: 0,
+            destination: { country: 'US', state: 'NY', postalCode: '10001' }
+          }
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.endsWith('/api/checkout/intent')) {
+        checkoutBody = JSON.parse(String(init?.body || '{}'));
+        return new Response(JSON.stringify({ error: 'Captured RSVP test payload' }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ products: {} }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    (window as any).STORE_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: 'https://worker.test',
+      platformName: 'Dust Wave Shop',
+      addOns: {
+        enabled: false,
+        products: [{
+          id: 'rsvp-1',
+          sku: 'rsvp-1',
+          name: 'Community Screening',
+          price: 0,
+          category: 'rsvp',
+          fulfillment_type: 'rsvp',
+          inventory_tracking: true,
+          event_registration: {
+            closes_at: '2026-12-17T23:59:00-07:00',
+            max_party_size: 4,
+            require_contact_name: true,
+            require_attendee_names: true,
+            questions: [{
+              id: 'accessibility_needs',
+              label: 'Accessibility needs',
+              type: 'textarea',
+              scope: 'party',
+              required: false,
+              max_length: 500
+            }, {
+              id: 'age_group',
+              label: 'Age group',
+              type: 'single_select',
+              scope: 'attendee',
+              required: true,
+              options: [
+                { value: 'under_18', label: 'Under 18' },
+                { value: '18_plus', label: '18 or older' }
+              ]
+            }],
+          },
+          variants: []
+        }]
+      }
+    };
+
+    await import('../../assets/js/cart-provider.js');
+    const readyApi = await (window as any).StoreCartProvider.whenReady();
+    await readyApi.api.cart.items.add({
+      id: 'rsvp-1',
+      name: 'Community Screening',
+      price: 0,
+      quantity: 2,
+      maxQuantity: 10,
+      shippable: false,
+      customFields: [
+        { name: '_product_id', type: 'hidden', value: 'rsvp-1' },
+        { name: '_product_type', type: 'hidden', value: 'rsvp' },
+        { name: '_sku', type: 'hidden', value: 'rsvp-1' }
+      ]
+    });
+    await readyApi.api.theme.cart.open();
+    await readyApi.api.theme.cart.navigate('/checkout');
+
+    const root = document.querySelector('[data-store-cart-root]') as HTMLElement;
+    expect(root.querySelectorAll('[data-rsvp-attendee-name]')).toHaveLength(2);
+    expect((window as any).StoreCartProvider.store.getState().cart.items.items[0].maxQuantity).toBe(10);
+    expect((root.querySelector('[data-rsvp-registration]') as HTMLElement | null)?.textContent).toContain('Respond by');
+    expect(root.querySelector('[data-cart-tax-destination-field]')).toBeNull();
+    expect(root.querySelector('[data-cart-checkout-summary-tax]')?.textContent).toBe('$0.00');
+
+    const setValue = (selector: string, value: string, eventName = 'input') => {
+      const field = root.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+      if (!field) throw new Error('Missing RSVP field: ' + selector);
+      field.value = value;
+      field.dispatchEvent(new Event(eventName, { bubbles: true }));
+    };
+    setValue('[data-cart-custom-checkout-name]', 'Casey Host');
+    setValue('[data-cart-custom-checkout-email]', 'casey@example.com');
+    setValue('[data-rsvp-registration-answer][data-rsvp-scope="party"]', 'Step-free access');
+    setValue('[data-rsvp-attendee-name][data-rsvp-attendee-index="0"]', 'Alex Guest');
+    setValue('[data-rsvp-attendee-name][data-rsvp-attendee-index="1"]', 'Sam Guest');
+    setValue('[data-rsvp-registration-answer][data-rsvp-attendee-index="0"]', '18_plus', 'change');
+    setValue('[data-rsvp-registration-answer][data-rsvp-attendee-index="1"]', 'under_18', 'change');
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+    const start = root.querySelector('[data-cart-start-checkout]') as HTMLButtonElement | null;
+    expect(start?.disabled).toBe(false);
+    start!.click();
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(checkoutBody).toMatchObject({
+      customer: { name: 'Casey Host', email: 'casey@example.com' },
+      items: [{
+        productId: 'rsvp-1',
+        quantity: 2,
+        registration: {
+          answers: { accessibility_needs: 'Step-free access' },
+          attendees: [
+            { name: 'Alex Guest', answers: { age_group: '18_plus' } },
+            { name: 'Sam Guest', answers: { age_group: 'under_18' } }
+          ]
+        }
+      }]
+    });
+    expect(localStorage.getItem('store_first_party_cart_state')).not.toContain('Alex Guest');
+    expect(localStorage.getItem('store_first_party_cart_state')).not.toContain('Step-free access');
   });
 });

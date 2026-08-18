@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.1.22`. The preceding `v1.1.21` release remains independently reversible. Store pins Platform v0.31.0 and the separate Jekyll Template v0.1.0. The template provides one digest-bound source-upgrade contract for 17 exact Liquid/Ruby integration files; Store retains local build copies, Jekyll configuration, routes, data, localization, content, production origins, credentials, deployment, and rollback authority. Provider evidence uses explicit production origins even when the checked-in Wrangler configuration retains safe localhost defaults.
+Current release: `v1.2.0`. The preceding `v1.1.22` release remains independently reversible. RSVP products can opt into versioned repository-backed registration while physical, digital, ticket, service, and unconfigured RSVP paths retain their existing behavior. Store pins Platform v0.31.0 and the separate Jekyll Template v0.1.0; Store retains local build copies, configuration, content, production origins, credentials, deployment, and rollback authority.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent checkout, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 
@@ -36,7 +36,7 @@ Current product front matter still uses `category: dustwave` and `category: fron
 Store succeeds the old DUST WAVE Snipcart shop while keeping the repo-backed catalog source.
 
 - `_products/*.md` remain the editable product catalog.
-- `identifier` is the Store product ID; explicit `sku`, `fulfillment_type`, `status`, `shipping_preset`, `tax_category`, `inventory_tracking`, and `inventory` fields now drive checkout validation.
+- `identifier` is the Store product ID; explicit `sku`, `fulfillment_type`, `status`, `shipping_preset`, `tax_category`, `inventory_tracking`, and `inventory` fields now drive checkout validation. RSVP products may opt into named attendees, deadlines, party limits, and custom questions through the existing repository-backed `event_details.registration` block documented in [RSVP.md](RSVP.md).
 - Shirt sizes and other options use explicit variants with their own SKU, price, and inventory values.
 - Public buttons use `store-add-item`; Snipcart `data-item-*` markup is not part of the Store runtime.
 - Pages CMS and archive/unarchive workflows are replaced by the Store admin dashboard and product status publishing.

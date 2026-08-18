@@ -3715,20 +3715,73 @@
     return quantity > 1 ? label + ' - Qty ' + formatNumber(quantity) : label;
   }
 
-  function appendStoreOrderCheckInControl(parent, row) {
-    var button = createElement('button', 'btn btn--secondary', row.checkedIn ? 'Undo check-in' : 'Check in');
+  function appendStoreOrderCheckInControl(parent, row, attendee) {
+    var checkIn = attendee?.checkIn || row;
+    var button = createElement('button', 'btn btn--secondary', checkIn.checkedIn ? 'Undo check-in' : 'Check in');
     button.type = 'button';
     button.dataset.orderToken = row.orderToken || '';
     button.dataset.itemId = row.itemId || '';
+    if (attendee?.id) button.dataset.attendeeId = attendee.id;
     button.dataset.storeOrderAction = 'check-in';
-    button.dataset.checkedIn = row.checkedIn ? 'false' : 'true';
-    button.dataset.quantity = String(row.quantity || 1);
+    button.dataset.checkedIn = checkIn.checkedIn ? 'false' : 'true';
+    button.dataset.quantity = String(attendee ? 1 : (row.quantity || 1));
+    if (attendee?.name) {
+      button.setAttribute('aria-label', (checkIn.checkedIn ? 'Undo check-in for ' : 'Check in ') + attendee.name);
+    }
     parent.appendChild(button);
+  }
+
+  function appendStoreOrderAttendeeCheckInControls(parent, row) {
+    var attendees = Array.isArray(row?.registration?.attendees) ? row.registration.attendees : [];
+    if (!attendees.length) {
+      appendStoreOrderCheckInControl(parent, row, null);
+      return;
+    }
+    var partyAnswers = Array.isArray(row?.registration?.answers) ? row.registration.answers : [];
+    if (partyAnswers.length) {
+      var partyDetails = document.createElement('details');
+      partyDetails.appendChild(createElement('summary', 'admin-store-orders__action-note', 'Registration responses'));
+      var partyResponseList = document.createElement('ul');
+      partyAnswers.forEach(function(answer) {
+        var presentedValue = answer?.displayValue ?? answer?.value;
+        var value = Array.isArray(presentedValue) ? presentedValue.join(', ') : String(presentedValue ?? '');
+        partyResponseList.appendChild(createElement('li', 'admin-store-orders__action-note', [answer?.label || answer?.id || 'Response', value].filter(Boolean).join(': ')));
+      });
+      partyDetails.appendChild(partyResponseList);
+      parent.appendChild(partyDetails);
+    }
+    var list = createElement('div', 'admin-store-orders__action-list');
+    attendees.forEach(function(attendee, index) {
+      var item = createElement('div', 'admin-store-orders__action-item');
+      item.appendChild(createElement(
+        'span',
+        'admin-store-orders__action-item-label',
+        attendee.name || ('Attendee ' + String(index + 1))
+      ));
+      var answers = Array.isArray(attendee.answers) ? attendee.answers : [];
+      if (answers.length) {
+        var details = document.createElement('details');
+        details.appendChild(createElement('summary', 'admin-store-orders__action-note', 'Responses'));
+        var responseList = document.createElement('ul');
+        answers.forEach(function(answer) {
+          var presentedValue = answer?.displayValue ?? answer?.value;
+          var value = Array.isArray(presentedValue) ? presentedValue.join(', ') : String(presentedValue ?? '');
+          responseList.appendChild(createElement('li', 'admin-store-orders__action-note', [answer?.label || answer?.id || 'Response', value].filter(Boolean).join(': ')));
+        });
+        details.appendChild(responseList);
+        item.appendChild(details);
+      }
+      var controls = createElement('div', 'admin-store-orders__action-item-controls');
+      appendStoreOrderCheckInControl(controls, row, attendee);
+      item.appendChild(controls);
+      list.appendChild(item);
+    });
+    parent.appendChild(list);
   }
 
   function appendStoreOrderFulfillmentAction(parent, row) {
     if (row.checkInAvailable) {
-      appendStoreOrderCheckInControl(parent, row);
+      appendStoreOrderAttendeeCheckInControls(parent, row);
       return;
     }
     appendStoreOrderDownloadAccessControls(parent, row);
@@ -4227,6 +4280,7 @@
           body: {
             orderToken: button.dataset.orderToken,
             itemId: button.dataset.itemId,
+            attendeeId: button.dataset.attendeeId || '',
             checkedIn: button.dataset.checkedIn === 'true',
             quantity: Number(button.dataset.quantity || 1)
           }
@@ -4514,6 +4568,13 @@
     eventVenue: 'Public venue name shown on event products, confirmations, and tickets.',
     eventAddress: 'Optional event address shown on the product page and embedded in calendar files.',
     eventIcs: 'Adds an iCalendar file link to event order confirmations when a start time is set.',
+    rsvpRegistrationEnabled: 'Collects canonical contact, attendee, and question responses for this RSVP. Other fulfillment types are unaffected.',
+    rsvpRegistrationOpensAt: 'Optional date and time when RSVP submissions begin.',
+    rsvpRegistrationClosesAt: 'Optional RSVP deadline. The Worker rejects late submissions even if a stale page is open.',
+    rsvpMaxPartySize: 'Maximum attendees a buyer may include in one RSVP, from 1 to 20.',
+    rsvpRequireContactName: 'Requires the person submitting the RSVP to provide a contact name.',
+    rsvpRequireAttendeeNames: 'Requires a separate name for every RSVP spot.',
+    rsvpQuestions: 'JSON array of up to 12 questions. Types: text, textarea, single_select, multi_select, checkbox. Scope: party or attendee.',
     image: 'Primary product image used on public product cards, cart rows, receipts, and previews.',
     preview: 'Live product-card preview generated from the current editor values.',
     seoDescription: 'Search and social summary for this product. Keep it specific and under 320 characters.',
@@ -7301,6 +7362,19 @@
     eventDetails.appendChild(productField('Ends at', 'eventEndsAt', product.eventEndsAt || product.eventDetails?.endsAt || '', 'datetime-local'));
     eventDetails.appendChild(productField('Venue', 'eventVenue', product.eventVenue || product.eventDetails?.venue || '', 'text'));
     eventDetails.appendChild(createStoreProductEventAddressField(product));
+    eventDetails.appendChild(productField('RSVP registration', 'rsvpRegistrationEnabled', product.rsvpRegistrationEnabled ? 'true' : 'false', 'select', {
+      options: [['false', 'No'], ['true', 'Yes']]
+    }));
+    eventDetails.appendChild(productField('Registration opens', 'rsvpRegistrationOpensAt', product.rsvpRegistrationOpensAt || '', 'datetime-local'));
+    eventDetails.appendChild(productField('RSVP deadline', 'rsvpRegistrationClosesAt', product.rsvpRegistrationClosesAt || '', 'datetime-local'));
+    eventDetails.appendChild(productField('Maximum party size', 'rsvpMaxPartySize', product.rsvpMaxPartySize || 20, 'number', { step: '1', min: '1', max: '20' }));
+    eventDetails.appendChild(productField('Require contact name', 'rsvpRequireContactName', product.rsvpRequireContactName === false ? 'false' : 'true', 'select', {
+      options: [['true', 'Yes'], ['false', 'No']]
+    }));
+    eventDetails.appendChild(productField('Require attendee names', 'rsvpRequireAttendeeNames', product.rsvpRequireAttendeeNames === false ? 'false' : 'true', 'select', {
+      options: [['true', 'Yes'], ['false', 'No']]
+    }));
+    eventDetails.appendChild(productField('RSVP questions (JSON)', 'rsvpQuestions', JSON.stringify(product.rsvpQuestions || [], null, 2), 'textarea', { rows: 10 }));
     mediaDescription.appendChild(createStoreProductImageField(product));
     mediaDescription.appendChild(createStoreProductSeoDescriptionField(product));
     mediaDescription.appendChild(createStoreProductDescriptionEditor(product));
@@ -7345,6 +7419,9 @@
         syncStoreProductFulfillmentDependentFields(form);
       }
       if (event.target && event.target.dataset && event.target.dataset.storeProductField === 'inventoryTracking') {
+        syncStoreProductFulfillmentDependentFields(form);
+      }
+      if (event.target && event.target.dataset && event.target.dataset.storeProductField === 'rsvpRegistrationEnabled') {
         syncStoreProductFulfillmentDependentFields(form);
       }
       if (event.target && event.target.dataset && event.target.dataset.storeProductVariantsEnabled) {
@@ -7429,6 +7506,9 @@
     var physical = isPhysicalFulfillment(fulfillmentType);
     var digital = isDigitalFulfillment(fulfillmentType);
     var eventProduct = isEventFulfillment(fulfillmentType);
+    var rsvpProduct = String(fulfillmentType || '').toLowerCase() === 'rsvp';
+    var registrationEnabled = $('[data-store-product-field="rsvpRegistrationEnabled"]', form);
+    var registrationFieldsVisible = rsvpProduct && registrationEnabled && registrationEnabled.value === 'true';
     var variantsEnabled = $('[data-store-product-variants-enabled]', form);
     var variantBased = variantsEnabled && variantsEnabled.value === 'true';
     var inventoryTracking = $('[data-store-product-field="inventoryTracking"]', form);
@@ -7442,6 +7522,13 @@
     setStoreProductFieldVisible(form, 'eventVenue', eventProduct);
     setStoreProductFieldVisible(form, 'eventAddress', eventProduct);
     setStoreProductFieldVisible(form, 'eventIcs', eventProduct);
+    setStoreProductFieldVisible(form, 'rsvpRegistrationEnabled', rsvpProduct);
+    setStoreProductFieldVisible(form, 'rsvpRegistrationOpensAt', registrationFieldsVisible);
+    setStoreProductFieldVisible(form, 'rsvpRegistrationClosesAt', registrationFieldsVisible);
+    setStoreProductFieldVisible(form, 'rsvpMaxPartySize', registrationFieldsVisible);
+    setStoreProductFieldVisible(form, 'rsvpRequireContactName', registrationFieldsVisible);
+    setStoreProductFieldVisible(form, 'rsvpRequireAttendeeNames', registrationFieldsVisible);
+    setStoreProductFieldVisible(form, 'rsvpQuestions', registrationFieldsVisible);
     syncStoreProductVariantInventoryVisible(form, tracksInventory);
     syncStoreProductVariantDownloadVisible(form, digital && variantBased);
     syncStoreProductEditorSections(form);
@@ -7479,6 +7566,7 @@
       }
       if (opts.step) input.step = opts.step;
       if (opts.min) input.min = opts.min;
+      if (opts.max) input.max = opts.max;
     }
     if (opts.required) input.required = true;
     if (opts.maxLength) input.maxLength = opts.maxLength;
@@ -7791,10 +7879,10 @@
       if (input.disabled) return;
       var key = input.dataset.storeProductField;
       if (key === 'price') fields[key] = Number(input.value || 0);
-      else if (key === 'inventory') fields[key] = input.value === '' ? '' : Number(input.value);
+      else if (key === 'inventory' || key === 'rsvpMaxPartySize') fields[key] = input.value === '' ? '' : Number(input.value);
       else if (key === 'inventoryTracking') fields[key] = input.value === 'true';
-      else if (key === 'eventIcs') fields[key] = input.value === 'true';
-      else if (key === 'eventStartsAt' || key === 'eventEndsAt') fields[key] = storeProductDateTimePublishValue(input);
+      else if (key === 'eventIcs' || key === 'rsvpRegistrationEnabled' || key === 'rsvpRequireContactName' || key === 'rsvpRequireAttendeeNames') fields[key] = input.value === 'true';
+      else if (key === 'eventStartsAt' || key === 'eventEndsAt' || key === 'rsvpRegistrationOpensAt' || key === 'rsvpRegistrationClosesAt') fields[key] = storeProductDateTimePublishValue(input);
       else if (key === 'downloadFileKey') {
         fields[key] = input.value;
         fields.downloadFilename = input.options && input.selectedIndex >= 0

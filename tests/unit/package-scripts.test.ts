@@ -88,6 +88,8 @@ describe('package test scripts', () => {
 
     expect(preMergeScript).toContain('bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1');
     expect(preMergeScript).toContain('minify_site_assets || return 1');
+    expect(preMergeScript).toContain('run_phase "7. Store build artifact checks" scripts/pre-merge-regression.sh __host_or_podman_build_check');
+    expect(preMergeScript).not.toContain("bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'");
     expect(preMergeScript).toContain('sitemap.txt is missing from the built site');
   });
 
@@ -135,5 +137,12 @@ describe('package test scripts', () => {
     expect(podmanDev).toContain('if [ -n "${STRIPE_LISTEN_PID:-}" ]; then');
     expect(podmanDev).toContain('kill "$STRIPE_LISTEN_PID"');
     expect(podmanDev).not.toContain('kill "${STRIPE_LISTEN_PID:-0}"');
+  });
+
+  it('lets host test harnesses disable Stripe forwarding without provider access', () => {
+    const hostDev = readFileSync(join(repoRoot, 'scripts/dev.sh'), 'utf8');
+
+    expect(hostDev).toContain('SKIP_STRIPE="${SKIP_STRIPE:-false}"');
+    expect(hostDev).not.toContain('SKIP_STRIPE=false');
   });
 });

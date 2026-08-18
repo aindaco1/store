@@ -1708,6 +1708,21 @@ function storeProductsPayload() {
       shippingPreset: 'ticket',
       inventoryTracking: true,
       inventory: 0,
+      rsvpRegistrationEnabled: true,
+      rsvpRegistrationOpensAt: '2026-08-01T06:00:00.000Z',
+      rsvpRegistrationClosesAt: '2026-12-18T06:59:00.000Z',
+      rsvpMaxPartySize: 4,
+      rsvpRequireContactName: true,
+      rsvpRequireAttendeeNames: true,
+      rsvpQuestions: [{
+        id: 'accessibility_needs',
+        label: 'Accessibility needs or accommodations',
+        type: 'textarea',
+        scope: 'party',
+        required: false,
+        maxLength: 500,
+        options: []
+      }],
       variants: []
     }],
     writeBudget: { readOnly: true, kvWritesExpected: 0 }
@@ -2449,6 +2464,10 @@ test.describe('Admin Dashboard', () => {
     await expect(rsvpEditor).toBeVisible();
     await expect(rsvpEditor.locator('[data-store-product-field="image"]')).toHaveValue('/assets/images/calendar-2026.png');
     await expect(rsvpEditor.locator('.admin-store-products__image-preview img')).toHaveAttribute('src', /calendar-2026\.png$/);
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpRegistrationEnabled"]')).toHaveValue('true');
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpMaxPartySize"]')).toHaveValue('4');
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpQuestions"]')).toHaveValue(/accessibility_needs/);
+    await expect(rsvpEditor.locator('[data-store-product-field-wrapper="rsvpQuestions"]')).toBeVisible();
     await expect.poll(async () => rsvpEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.src)).toBe(`${SITE_BASE}/assets/images/calendar-2026.png`);
     await expect.poll(async () => rsvpEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
     await rsvpEditor.getByRole('button', { name: 'Cancel' }).click();
@@ -2458,6 +2477,7 @@ test.describe('Admin Dashboard', () => {
     await expect(ticketEditor).toBeVisible();
     await expect(productsResults.locator('.admin-store-products__editor-row')).toHaveAttribute('data-store-product-editor-row', 'ticket-1');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
+    await expect(ticketEditor.locator('[data-store-product-field-wrapper="rsvpRegistrationEnabled"]')).toBeHidden();
     await expect(ticketEditor.locator('[data-store-product-variant]')).toHaveCount(2);
     await expect(ticketEditor.locator('[data-store-product-variant="general-admission"] [data-store-variant-field="label"]')).toHaveValue('General Admission');
     await expect(ticketEditor.locator('[data-store-product-variant="supporter-ticket"] [data-store-variant-field="price"]')).toHaveValue('20');

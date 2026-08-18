@@ -1,4 +1,5 @@
 import STORE_CATALOG_SNAPSHOT from './generated/catalog-snapshot.js';
+import { validateEventRegistrationSubmission } from './event-registration.js';
 import { isValidAmount } from './validation.js';
 
 const ACTIVE_STATUSES = new Set(['active', 'available', 'live']);
@@ -186,6 +187,27 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
   const shippable = !NON_SHIPPABLE_TYPES.has(fulfillmentType);
   const inventoryQuantity = normalizeInventory(variant?.inventory ?? product.inventory);
   const inventoryTracking = product.inventory_tracking === true;
+  const eventRegistration = validateEventRegistrationSubmission({
+    eventDetails: product.event_details || null,
+    fulfillmentType,
+    quantity,
+    submission: rawItem?.registration || rawItem?.rsvpRegistration || rawItem?.rsvp_registration || null,
+    enforceSubmission: options.enforceEventRegistration === true,
+    nowMs: options.nowMs
+  });
+
+  errors.push(...eventRegistration.errors.map((entry) => ({
+    ...entry,
+    index,
+    productId: product.id,
+    variantId: variant?.id || ''
+  })));
+  warnings.push(...eventRegistration.warnings.map((entry) => ({
+    ...entry,
+    index,
+    productId: product.id,
+    variantId: variant?.id || ''
+  })));
 
   if (inventoryTracking && inventoryQuantity <= 0) {
     const issue = buildValidationIssue(
@@ -240,6 +262,8 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
         quantity: inventoryQuantity
       },
       eventDetails: product.event_details || null,
+      eventRegistration: eventRegistration.configured ? eventRegistration.config : null,
+      registration: eventRegistration.registration,
       download: product.download || null,
       turnstileRequired: product.turnstile_required === true
     },
