@@ -293,6 +293,7 @@ runtime:
     decrease_quantity: Decrease quantity
     increase_quantity: Increase quantity
     continue_to_payment: Continue to payment
+    complete_order: Complete order
     processing_payment: Processing payment...
     finishing_order: Finishing order...
     pay_now: Pay now

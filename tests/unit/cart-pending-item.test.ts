@@ -55,6 +55,7 @@ describe('first-party pending cart handoff', () => {
     delete (window as any).StoreConfig;
     delete (window as any).StoreCartProvider;
     delete (window as any).Store;
+    delete (window as any).StoreStripeCheckoutSidecar;
     delete (window as any).__StoreCartRuntimeCartUiLoaded;
     delete (globalThis as any).requestAnimationFrame;
     document.body.innerHTML = '';
@@ -642,6 +643,8 @@ describe('first-party pending cart handoff', () => {
   it('collects opt-in RSVP responses in memory and submits them with the canonical cart item', async () => {
     localStorage.removeItem('pendingCartItem');
     let checkoutBody: any = null;
+    const ensureStripeJs = vi.fn(() => Promise.resolve());
+    (window as any).StoreStripeCheckoutSidecar = { ensureStripeJs };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith('/tax/quote')) {
@@ -753,6 +756,8 @@ describe('first-party pending cart handoff', () => {
     expect((root.querySelector('[data-rsvp-registration]') as HTMLElement | null)?.textContent).toContain('Respond by');
     expect(root.querySelector('[data-cart-tax-destination-field]')).toBeNull();
     expect(root.querySelector('[data-cart-checkout-summary-tax]')?.textContent).toBe('$0.00');
+    expect(root.querySelector('[data-cart-custom-checkout-region="payment"]')).toBeNull();
+    expect(root.querySelector('[data-cart-start-checkout]')?.textContent).toBe('Complete order');
 
     const setValue = (selector: string, value: string, eventName = 'input') => {
       const field = root.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
@@ -796,6 +801,7 @@ describe('first-party pending cart handoff', () => {
     expect(localStorage.getItem('store_first_party_cart_state')).toContain('eventRegistration');
     expect(localStorage.getItem('store_first_party_cart_state')).toContain('maxPartySize');
     expect(root.textContent).toContain('Complete the RSVP attendee information to continue.');
+    expect(ensureStripeJs).not.toHaveBeenCalled();
   });
 
   it('repairs stale direct-link RSVP carts from the current product button without storing guest responses', async () => {

@@ -390,6 +390,8 @@ test.describe('Store Public Page Controls', () => {
     await expect(cart.getByText('RSVP details: DUST WAVE Free RSVP')).toBeVisible();
     await expect(cart.getByText(/Respond by/)).toBeVisible();
     await expect(cart.getByLabel('Attendee name')).toHaveCount(2);
+    await expect(cart.getByText('Payment method', { exact: true })).toHaveCount(0);
+    await expect(cart.getByRole('button', { name: 'Complete order' })).toBeVisible();
 
     await cart.getByLabel('Full name').fill('Casey Host');
     await cart.getByLabel('Email address').fill('casey@example.com');
@@ -398,7 +400,7 @@ test.describe('Store Public Page Controls', () => {
     await cart.getByLabel('Attendee name').nth(1).fill('Sam Guest');
     await cart.getByLabel('Age group').nth(0).selectOption('18_plus');
     await cart.getByLabel('Age group').nth(1).selectOption('under_18');
-    await cart.getByRole('button', { name: 'Continue to payment' }).click();
+    await cart.getByRole('button', { name: 'Complete order' }).click();
 
     await expect.poll(() => checkoutBody).not.toBeNull();
     expect(checkoutBody).toMatchObject({

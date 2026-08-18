@@ -14,7 +14,8 @@
   and stores canonical historical question and response snapshots with orders.
   Checkout places Contact before RSVP details and uses the same base panel
   surface for both. Free carts omit the tip control and submit a zero tip
-  percentage while paid and mixed carts retain the existing tip behavior.
+  percentage, payment-method UI, and Stripe prewarming while paid and mixed
+  carts retain the existing tip and payment behavior.
 - Added private roster and response views, attendee search, per-attendee
   check-in with legacy item-level compatibility, partial attendance totals, and
   one-row-per-attendee CSV export. Customer confirmations show their submitted

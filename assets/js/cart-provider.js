@@ -2173,6 +2173,10 @@
       getMaxPlatformTipPercent() > 0;
   }
 
+  function checkoutPricingRequiresPayment(pricing = {}) {
+    return Math.max(0, Number(pricing.totalCents) || 0) > 0;
+  }
+
   function isCustomCheckoutEstimateActive(state, options) {
     const route = options?.currentRoute;
     if (route !== CHECKOUT_VIEW_ROUTE && route !== CART_VIEW_ROUTE) return false;
@@ -3632,18 +3636,30 @@
 
     function getDisplayedCartSummary() {
       const state = store.getState();
-      const pricing = getDisplayedFirstPartyPricing(state, {
-        currentRoute,
-        checkoutMode: checkoutUiState.mode,
-        shippingQuote: checkoutUiState.customCheckout?.shippingQuote,
-        taxQuote: checkoutUiState.customCheckout?.taxQuote
-      });
+      const pricing = getCurrentDisplayedFirstPartyPricing(state);
 
       return {
         count: Number(state?.cart?.items?.count || 0),
         total: pricing.totalCents / 100,
         totalCents: pricing.totalCents
       };
+    }
+
+    function getCurrentDisplayedFirstPartyPricing(state = store.getState()) {
+      return getDisplayedFirstPartyPricing(state, {
+        currentRoute,
+        checkoutMode: checkoutUiState.mode,
+        shippingQuote: checkoutUiState.customCheckout?.shippingQuote,
+        taxQuote: checkoutUiState.customCheckout?.taxQuote
+      });
+    }
+
+    function doesCurrentCheckoutRequirePayment(pricing = getCurrentDisplayedFirstPartyPricing()) {
+      const hasWorkerPaymentSession = Boolean(
+        checkoutUiState.customCheckout?.paymentIntentId ||
+        checkoutUiState.customCheckout?.clientSecret
+      );
+      return hasWorkerPaymentSession || checkoutPricingRequiresPayment(pricing);
     }
 
     function emitCartSummaryUpdated() {
@@ -3923,12 +3939,8 @@
       const total = Number(state.cart.total || 0);
       const isCheckoutPreview = currentRoute === CHECKOUT_VIEW_ROUTE;
       const isFirstPartyCheckoutEnabled = getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER;
-      const pricing = getDisplayedFirstPartyPricing(state, {
-        currentRoute,
-        checkoutMode: checkoutUiState.mode,
-        shippingQuote: checkoutUiState.customCheckout?.shippingQuote,
-        taxQuote: checkoutUiState.customCheckout?.taxQuote
-      });
+      const pricing = getCurrentDisplayedFirstPartyPricing(state);
+      const checkoutRequiresPayment = doesCurrentCheckoutRequirePayment(pricing);
       const hasPhysicalItems = cartHasPhysicalItems(items);
       const checkoutLineItems = buildCheckoutLineItems(items);
       const wantsCustomCheckout = isCheckoutPreview &&
@@ -4123,13 +4135,15 @@
             </div>
           ` : ''}
         `}
-        <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
-          <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}</p>
-          <div class="store-first-party-cart__stripe-shell">
-            <div class="store-first-party-cart__stripe-region store-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment"></div>
+        ${checkoutRequiresPayment ? `
+          <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
+            <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}</p>
+            <div class="store-first-party-cart__stripe-shell">
+              <div class="store-first-party-cart__stripe-region store-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment"></div>
+            </div>
+            <p class="store-first-party-cart__note store-first-party-cart__note--payment-consent">${escapeHtml(getRuntimeMessage('cart.storePaymentConsent', 'Your payment is processed securely by Stripe.'))}</p>
           </div>
-          <p class="store-first-party-cart__note store-first-party-cart__note--payment-consent">${escapeHtml(getRuntimeMessage('cart.storePaymentConsent', 'Your payment is processed securely by Stripe.'))}</p>
-        </div>
+        ` : ''}
       ` : `
         <div class="store-first-party-cart__callout">
           <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.nextStep', 'Next step'))}</p>
@@ -4294,9 +4308,13 @@
                 data-cart-start-checkout
                 ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' || (isDeferredCustomCheckoutStart && !isCustomCheckoutShippingDraftComplete(customCheckout?.shippingDraft)) || (requiresTaxLocation && !hasReadyTaxLocation) ? 'disabled' : ''}
               >${checkoutUiState.status === 'submitting'
-                ? escapeHtml(getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...'))
+                ? escapeHtml(checkoutRequiresPayment
+                  ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
+                  : getRuntimeMessage('cart.finishingOrder', 'Finishing order...'))
                 : (isFirstPartyCheckoutEnabled
-                  ? escapeHtml(getRuntimeMessage('cart.continueToPayment', 'Continue to payment'))
+                  ? escapeHtml(checkoutRequiresPayment
+                    ? getRuntimeMessage('cart.continueToPayment', 'Continue to payment')
+                    : getRuntimeMessage('cart.completeOrder', 'Complete order'))
                   : 'Legacy checkout only')}</button>
             `}
         </div>
@@ -4610,7 +4628,9 @@
       isCartOpen = true;
       rememberCartReturnFocus(focusTarget);
       cartShouldFocusAfterRender = true;
-      scheduleStripeJsPrewarm();
+      if (doesCurrentCheckoutRequirePayment()) {
+        scheduleStripeJsPrewarm();
+      }
       renderFirstPartyCart();
       refreshCustomCheckoutEstimates();
       if (!wasOpen) {
@@ -4778,6 +4798,8 @@
       const button = root?.querySelector('[data-cart-start-checkout]');
       if (!button) return;
 
+      const checkoutRequiresPayment = doesCurrentCheckoutRequirePayment();
+
       const shouldDeferCustomCheckout = shouldDeferPhysicalCustomCheckoutStart(store.getState(), {
         currentRoute,
         checkoutMode: checkoutUiState.mode,
@@ -4794,8 +4816,12 @@
         (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) ||
         (requiresTaxLocation && !hasReadyTaxLocation);
       button.textContent = checkoutUiState.status === 'submitting'
-        ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
-        : getRuntimeMessage('cart.continueToPayment', 'Continue to payment');
+        ? (checkoutRequiresPayment
+          ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
+          : getRuntimeMessage('cart.finishingOrder', 'Finishing order...'))
+        : (checkoutRequiresPayment
+          ? getRuntimeMessage('cart.continueToPayment', 'Continue to payment')
+          : getRuntimeMessage('cart.completeOrder', 'Complete order'));
     }
 
     function requestCloseFirstPartyCart() {
@@ -6219,7 +6245,9 @@
       }
 
       try {
-        const stripeReadyPromise = canUseCustomCheckoutUi() ? prewarmStripeJs() : null;
+        const stripeReadyPromise = canUseCustomCheckoutUi() && doesCurrentCheckoutRequirePayment()
+          ? prewarmStripeJs()
+          : null;
         const existingOrderId = getActiveCustomCheckoutOrderId();
         if (existingOrderId) {
           await abandonActiveCustomCheckoutIntent(existingOrderId);
@@ -6442,9 +6470,11 @@
         if (continueTrigger) {
           event.preventDefault();
           eventBus.emit('summary.checkout_clicked');
-          const prewarm = prewarmStripeJs();
-          if (prewarm && typeof prewarm.catch === 'function') {
-            void prewarm.catch(() => {});
+          if (doesCurrentCheckoutRequirePayment()) {
+            const prewarm = prewarmStripeJs();
+            if (prewarm && typeof prewarm.catch === 'function') {
+              void prewarm.catch(() => {});
+            }
           }
           cartShouldFocusAfterRender = true;
           apiRoot.api.theme.cart.navigate(CHECKOUT_VIEW_ROUTE);
