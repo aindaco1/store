@@ -3,11 +3,25 @@
 
 require 'yaml'
 require 'json'
+require 'tempfile'
 
 ROOT = File.expand_path('..', __dir__)
 BASE_CONFIG_PATH = File.join(ROOT, '_config.yml')
 LOCAL_CONFIG_PATH = File.join(ROOT, '_config.local.yml')
 WRANGLER_PATH = File.join(ROOT, 'worker', 'wrangler.toml')
+
+def atomic_write(path, content)
+  mode = File.stat(path).mode & 0o777
+  Tempfile.create([".#{File.basename(path)}.", '.tmp'], File.dirname(path)) do |file|
+    file.binmode
+    file.write(content)
+    file.flush
+    file.fsync
+    File.chmod(mode, file.path)
+    file.close
+    File.rename(file.path, path)
+  end
+end
 
 TOP_LEVEL_ORDER = [
   'SITE_BASE',
@@ -544,5 +558,5 @@ if updated == content
   exit 0
 end
 
-File.write(WRANGLER_PATH, updated)
+atomic_write(WRANGLER_PATH, updated)
 puts '✅ Synced worker/wrangler.toml from _config.yml and _config.local.yml'

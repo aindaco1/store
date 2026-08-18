@@ -70,9 +70,11 @@ describe('package test scripts', () => {
     expect(preMergeScript).not.toContain('run_phase "10. Headless E2E suite"');
   });
 
-  it('restores the checked-in Worker config after pre-merge synchronization', () => {
+  it('atomically restores the checked-in Worker config after pre-merge synchronization', () => {
     const workerConfigPath = join(repoRoot, 'worker/wrangler.toml');
     const before = readFileSync(workerConfigPath, 'utf8');
+    const syncWorkerConfig = readFileSync(join(repoRoot, 'scripts/sync-worker-config.rb'), 'utf8');
+    const preMergeScript = readFileSync(join(repoRoot, 'scripts/pre-merge-regression.sh'), 'utf8');
 
     execFileSync(
       'bash',
@@ -81,6 +83,10 @@ describe('package test scripts', () => {
     );
 
     expect(readFileSync(workerConfigPath, 'utf8')).toBe(before);
+    expect(syncWorkerConfig).toContain('Tempfile.create([".#{File.basename(path)}.", \'.tmp\'], File.dirname(path))');
+    expect(syncWorkerConfig).toContain('File.rename(file.path, path)');
+    expect(preMergeScript).toContain('mktemp worker/.wrangler.toml.restore.XXXXXX');
+    expect(preMergeScript).toContain('mv -f "${worker_config_restore}" worker/wrangler.toml');
   });
 
   it('fails closed before generated-asset checks when either Jekyll build path fails', () => {

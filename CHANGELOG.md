@@ -27,6 +27,9 @@
   path by activating the feature only for RSVP products with an explicit
   registration block. The release build remains within existing JavaScript and
   CSS performance budgets without raising thresholds.
+- Kept a running local checkout Worker healthy across configuration sync and
+  pre-merge cleanup by atomically replacing generated and restored Wrangler
+  configuration files.
 
 ## v1.1.22 - 2026-08-06
 

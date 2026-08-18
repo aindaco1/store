@@ -310,6 +310,7 @@ start_worker() {
 }
 
 cleanup() {
+  local worker_config_restore=""
   stop_worker
   if [[ -n "${JEKYLL_PID}" ]]; then
     kill "${JEKYLL_PID}" 2>/dev/null || true
@@ -325,7 +326,9 @@ cleanup() {
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
   if [[ -n "${ORIGINAL_WORKER_CONFIG_BACKUP}" && -f "${ORIGINAL_WORKER_CONFIG_BACKUP}" ]]; then
-    cp -p "${ORIGINAL_WORKER_CONFIG_BACKUP}" worker/wrangler.toml
+    worker_config_restore="$(mktemp worker/.wrangler.toml.restore.XXXXXX)"
+    cp -p "${ORIGINAL_WORKER_CONFIG_BACKUP}" "${worker_config_restore}"
+    mv -f "${worker_config_restore}" worker/wrangler.toml
     rm -f "${ORIGINAL_WORKER_CONFIG_BACKUP}"
   fi
 }
