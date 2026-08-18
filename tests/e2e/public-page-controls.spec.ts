@@ -380,6 +380,13 @@ test.describe('Store Public Page Controls', () => {
     await expect(cart).toBeVisible();
     await expect(cart.locator('[data-cart-tip-box]')).toHaveCount(0);
     await cart.getByRole('button', { name: 'Checkout' }).click();
+    const registrationSection = cart.locator('[data-rsvp-registration]');
+    await expect(registrationSection).toHaveClass(/store-first-party-cart__callout--base/);
+    await expect.poll(() => cart.locator('[data-cart-custom-checkout-name]').evaluate((field) => {
+      const contact = field.closest('.store-first-party-cart__callout');
+      const registration = document.querySelector('[data-rsvp-registration]');
+      return Boolean(contact && registration && (contact.compareDocumentPosition(registration) & Node.DOCUMENT_POSITION_FOLLOWING));
+    })).toBe(true);
     await expect(cart.getByText('RSVP details: DUST WAVE Free RSVP')).toBeVisible();
     await expect(cart.getByText(/Respond by/)).toBeVisible();
     await expect(cart.getByLabel('Attendee name')).toHaveCount(2);

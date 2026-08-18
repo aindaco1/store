@@ -1616,7 +1616,7 @@
       const attendeeQuestions = config.questions.filter((question) => question.scope === 'attendee');
       const deadline = formatEventRegistrationDeadline(config.closesAt);
       return `
-        <section class="store-first-party-cart__callout store-first-party-cart__registration" data-rsvp-registration data-rsvp-item-key="${escapeAttribute(itemKey)}">
+        <section class="store-first-party-cart__callout store-first-party-cart__callout--base store-first-party-cart__registration" data-rsvp-registration data-rsvp-item-key="${escapeAttribute(itemKey)}">
           <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.rsvpDetails', 'RSVP details'))}: ${escapeHtml(item.name || '')}</p>
           ${deadline ? `<p class="store-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.rsvpDeadline', 'Respond by %{date}.').replace('%{date}', deadline))}</p>` : ''}
           ${partyQuestions.length > 0 ? `
@@ -4017,6 +4017,7 @@
               <p id="store-custom-shipping-error" class="store-first-party-cart__field-error" data-cart-custom-shipping-error role="alert" ${customCheckout?.shippingError ? '' : 'hidden'}>${escapeHtml(customCheckout?.shippingError || '')}</p>
             </div>
           </div>
+          ${eventRegistrationMarkup}
         ` : `
           <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
             <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.contact', 'Contact'))}</p>
@@ -4056,6 +4057,7 @@
               </div>
             </div>
           </div>
+          ${eventRegistrationMarkup}
           ${requiresTaxLocation && !hasCustomCheckoutSession ? `
             <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
               <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.taxLocation', 'Tax location'))}</p>
@@ -4234,7 +4236,7 @@
             </div>
           </div>
           ${registrationContactMarkup}
-          ${eventRegistrationMarkup}
+          ${wantsCustomCheckout ? '' : eventRegistrationMarkup}
           ${customCheckoutMarkup}
           ${checkoutErrorMarkup}
         </section>

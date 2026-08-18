@@ -736,7 +736,13 @@ describe('first-party pending cart handoff', () => {
     await readyApi.api.theme.cart.navigate('/checkout');
 
     const root = document.querySelector('[data-store-cart-root]') as HTMLElement;
+    const contactSection = root.querySelector('[data-cart-custom-checkout-name]')?.closest('.store-first-party-cart__callout');
+    const registrationSection = root.querySelector('[data-rsvp-registration]');
     expect(root.querySelectorAll('[data-rsvp-attendee-name]')).toHaveLength(2);
+    expect(contactSection).toBeTruthy();
+    expect(registrationSection).toBeTruthy();
+    expect(registrationSection?.classList.contains('store-first-party-cart__callout--base')).toBe(true);
+    expect(Number(contactSection?.compareDocumentPosition(registrationSection as Node)) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect((window as any).StoreCartProvider.store.getState().cart.items.items[0].maxQuantity).toBe(10);
     expect((root.querySelector('[data-rsvp-registration]') as HTMLElement | null)?.textContent).toContain('Respond by');
     expect(root.querySelector('[data-cart-tax-destination-field]')).toBeNull();

@@ -12,8 +12,9 @@
   names and responses out of persistent browser storage. The Worker re-resolves
   current repository product data, rejects unknown choices and closed windows,
   and stores canonical historical question and response snapshots with orders.
-  Free carts omit the tip control and submit a zero tip percentage while paid
-  and mixed carts retain the existing tip behavior.
+  Checkout places Contact before RSVP details and uses the same base panel
+  surface for both. Free carts omit the tip control and submit a zero tip
+  percentage while paid and mixed carts retain the existing tip behavior.
 - Added private roster and response views, attendee search, per-attendee
   check-in with legacy item-level compatibility, partial attendance totals, and
   one-row-per-attendee CSV export. Customer confirmations show their submitted

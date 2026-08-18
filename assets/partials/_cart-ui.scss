@@ -220,6 +220,7 @@ body.store-cart-open {
   @include panel-stack(14px 16px, 12px, $surface--subtle, panel);
 }
 
+.store-first-party-cart__callout--base,
 .store-first-party-cart__callout--stripe {
   background: $surface--base;
 }
