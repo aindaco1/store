@@ -4,8 +4,8 @@ title: Términos y políticas de la tienda
 lang: es
 translation_key: terms
 permalink: /es/terms/
-description: Consulta las políticas de Dust Wave Shop sobre pedidos, pagos, envíos, no devoluciones, entrega, eventos, descargas, privacidad y uso aceptable.
-last_modified_at: 2026-07-14
+description: Consulta las políticas de Dust Wave Shop sobre pedidos, pagos, envíos, no devoluciones, entrega, registro para eventos, descargas, privacidad y uso aceptable.
+last_modified_at: 2026-08-18
 ---
 {% capture store_name %}{% include platform-display-title.html %}{% endcapture %}
 {% assign store_name = store_name | strip %}
@@ -19,7 +19,7 @@ last_modified_at: 2026-07-14
 
 # Términos y políticas de la tienda
 
-**Vigentes a partir del 14 de julio de 2026.** Estos términos rigen el uso de {{ store_name }}, una tienda en línea operada por {{ operator_name }}. Al usar el sitio o realizar un pedido, aceptas estos términos y cualquier término específico del producto o evento que se muestre antes del pago. Si un término más específico entra en conflicto con estos términos, el término más específico controla para ese producto o evento, salvo que la ley lo prohíba.
+**Vigentes a partir del 18 de agosto de 2026.** Estos términos rigen el uso de {{ store_name }}, una tienda en línea operada por {{ operator_name }}. Al usar el sitio o realizar un pedido, aceptas estos términos y cualquier término específico del producto o evento que se muestre antes del pago. Si un término más específico entra en conflicto con estos términos, el término más específico controla para ese producto o evento, salvo que la ley lo prohíba.
 
 > **Aviso de traducción:** Esta versión en español se proporciona por conveniencia y fue traducida automáticamente. En caso de conflicto, la versión en inglés controla hasta que esta traducción reciba revisión legal y de una persona hablante nativa.
 
@@ -95,6 +95,10 @@ Si no podemos enviar mercancía cobrada o no podemos entregar otro artículo cob
 
 Los boletos y RSVPs son válidos solo para el evento indicado en el pedido. Pueden incluir credenciales QR o de registro vinculadas al pedido. Mantén privados los enlaces de boletos, QR, registro y pedido; compartirlos puede permitir que otra persona use el acceso asociado.
 
+Un evento puede establecer una fecha de apertura o límite de respuesta, un tamaño máximo de grupo y preguntas obligatorias sobre contacto, asistentes, accesibilidad, alimentación, grupo de edad u otros datos específicos del evento. Proporciona información exacta y envía los datos de otra persona solo cuando tengas autorización para hacerlo. Un RSVP sin cargo se confirma únicamente después de que la tienda lo acepte; no requiere un método de pago cuando el total es cero.
+
+Store no ofrece actualmente cambios, sustituciones o cancelaciones de RSVP por autoservicio, listas de espera ni promoción automática desde una lista de espera. Comunícate con [{{ support_email }}](mailto:{{ support_email }}) si es necesario revisar un registro confirmado. Es posible que soporte no pueda realizar el cambio solicitado cuando el evento esté cerrado, haya alcanzado su capacidad, ya haya comenzado o tenga restricciones específicas.
+
 Las cancelaciones solicitadas por el cliente, la inasistencia y los boletos no utilizados siguen sujetos a la política de devoluciones anterior y a cualquier término específico del evento. Si cancelamos un evento, ofreceremos el reembolso u opción de reemplazo aplicable. Si un evento se pospone, cambia de lugar o cambia de manera importante, explicaremos si los boletos existentes siguen siendo válidos y qué opciones de transferencia, reemplazo o reembolso corresponden.
 
 ## 7. Productos digitales y descargas
@@ -111,7 +115,7 @@ Los enlaces de búsqueda de pedidos, detalles de pedidos, descargas, boletos, re
 
 ## 9. Privacidad y datos
 
-Recopilamos la información necesaria para operar el servicio, incluidos datos de contacto, contenido del pedido, precios y estado del pago, información de envío para productos físicos, detalles de boletos o RSVPs, preferencias de recordatorios, información de referencia cuando se proporciona y mensajes de soporte. Stripe gestiona los datos completos de las tarjetas. Cloudflare proporciona la infraestructura del sitio, Worker, seguridad, almacenamiento y operaciones; Resend entrega correo; y los proveedores de envío, impuestos, direcciones, analítica o prevención de abusos reciben datos limitados solo cuando su servicio es necesario y está habilitado.
+Recopilamos la información necesaria para operar el servicio, incluidos datos de contacto, contenido del pedido, precios y estado del pago, información de envío para productos físicos, detalles de boletos o RSVPs como nombres de asistentes y respuestas específicas del evento, preferencias de recordatorios, información de referencia cuando se proporciona y mensajes de soporte. Stripe gestiona los datos completos de las tarjetas. Cloudflare proporciona la infraestructura del sitio, Worker, seguridad, almacenamiento y operaciones; Resend entrega correo; y los proveedores de envío, impuestos, direcciones, analítica o prevención de abusos reciben datos limitados solo cuando su servicio es necesario y está habilitado.
 
 Las personas administradoras autorizadas pueden acceder a información de clientes, asistentes, pedidos, reportes, inventario, descargas y entrega solo dentro de su función y alcance asignados. Las personas superadministradoras pueden acceder a la información necesaria para operar, proteger, conciliar, dar soporte, auditar, respaldar o restaurar la tienda. No vendemos información personal de clientes. Los registros pueden conservarse para entrega, contabilidad, prevención de fraude, seguridad, obligaciones legales, disputas, conciliación de pagos y recuperación ante desastres, y después eliminarse o reducirse cuando ya no sean razonablemente necesarios.
 

@@ -13,9 +13,9 @@
   current repository product data, rejects unknown choices and closed windows,
   and stores canonical historical question and response snapshots with orders.
   Checkout places Contact before RSVP details and uses the same base panel
-  surface for both. Free carts omit the tip control and submit a zero tip
-  percentage, payment-method UI, and Stripe prewarming while paid and mixed
-  carts retain the existing tip and payment behavior.
+  surface for both. Zero-total carts omit tip and payment-method controls,
+  submit a zero tip percentage, use **Complete order**, and skip Stripe
+  prewarming; paid and mixed carts retain the existing tip and payment behavior.
 - Added private roster and response views, attendee search, per-attendee
   check-in with legacy item-level compatibility, partial attendance totals, and
   one-row-per-attendee CSV export. Customer confirmations show their submitted
@@ -35,6 +35,11 @@
   keeping guest names and answers memory-only. Existing direct-link carts can
   repair that schema from the current product page, and checkout now surfaces
   the Worker's specific validation message instead of a generic draft error.
+- Reconciled the README files, RSVP/configuration/payment/dashboard/workflow/
+  testing guides, public English and Spanish order/Terms copy, merge checklists,
+  and release evidence with the shipped behavior. The roadmap now separates
+  completed registration essentials from explicitly unshipped RSVP self-service,
+  invitation, communication, door, series, and analytics work.
 
 ## v1.1.22 - 2026-08-06
 

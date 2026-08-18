@@ -65,8 +65,10 @@ Store checkout is order-based:
 2. Worker validates submitted cart data against the catalog snapshot.
 3. Worker creates an `orders:<orderToken>` draft in `STORE_STATE`.
 4. Paid orders use Stripe PaymentIntents.
-5. Free RSVP-style orders confirm immediately.
+5. Zero-total orders omit tip and payment-method controls, use **Complete order**, and avoid Stripe; configured free RSVP orders confirm immediately after canonical registration and inventory validation.
 6. Stripe webhooks settle paid orders and send Store-owned customer/admin order emails.
+
+Configured RSVP products add repository-backed registration windows, party limits, named attendees, and scoped questions. Guest names and answers remain in memory before submission; the Worker normalizes and stores the historical response snapshot on the protected order. See [RSVP.md](RSVP.md).
 
 ## Inventory
 
@@ -81,7 +83,7 @@ The admin dashboard supports:
 - settings and users
 - Store orders and CSV export
 - historical Snipcart CSV import
-- ticket/RSVP check-in
+- ticket and per-attendee RSVP check-in, attendee export, and private response review
 - product review, preview, reorder, bulk status, and publish
 - product image/media upload
 - coupons

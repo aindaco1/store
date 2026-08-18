@@ -95,10 +95,41 @@ This file is a current capability inventory and forward plan, not release histor
 
 Keep these scoped to Store's goals and data model. Share implementation patterns with Pool where the underlying problem is the same, but do not import Pool-only concepts such as campaigns, pledges, Manage Pledge, embeds, creator diaries, votes, or supporter blasts. Prefer extending existing Store docs, email rendering, admin controls, setup tooling, Worker observability, and release scripts before adding parallel systems.
 
+### RSVP and event operations
+
+These items extend the shipped v1.2.0 registration foundation. They are plans, not current product claims. Keep each feature opt-in, repository-backed where it changes event configuration, server-authoritative where it changes capacity or attendance, localized, accessible, private/no-store, and independently reversible.
+
 - [ ] RSVP self-service and capacity-aware waitlist
   - Add token-scoped attendee update and cancellation without exposing order records or creating a general customer account system. Changes must preserve the confirmed order's historical prices, audit the bounded mutation, and never create or retry a payment.
   - Release finite RSVP capacity only through the existing serialized inventory lifecycle. Waitlist promotion must be explicit, idempotent, time-bounded, and safe across retries; it must not oversell or silently convert a waitlisted guest into a confirmed attendee.
   - Keep transactional update, cancellation, promotion, and expiry email separate from order truth, with durable retries and suppression. Add admin visibility, privacy/retention documentation, localization, accessibility, abuse limits, and full failure/recovery tests before enabling the feature.
+- [ ] Private invitations, household links, and response status
+  - Add optional invite-only events with scoped, expiring household or guest capabilities, explicit per-invite party allowance, and reviewed CSV import. Do not expose a public guest directory or treat possession of an email address as proof of identity.
+  - Support explicit **Attending**, **Not attending**, and optional **Maybe** responses without turning declines into zero-dollar orders or inventory claims. Only confirmed attending quantities consume capacity; every transition must be idempotent and auditable.
+  - Keep invitation delivery transactional and purpose-limited. Importing or inviting a guest does not create marketing consent, and bounced, suppressed, expired, duplicate, and forwarded invitations need clear operator states and safe resend limits.
+- [ ] More expressive registration forms and capacity rules
+  - Add previewable conditional questions, question help text, and operator-defined visibility without allowing arbitrary scripts or HTML. Historical orders must retain the exact version and branch of the form that was answered.
+  - Support bounded per-option capacity for operational choices such as seating blocks, screening times, or meals through the serialized inventory model rather than browser-only counts. A form answer must never bypass total event capacity.
+  - Add aggregate response summaries that hide small sensitive cohorts by default. Keep raw answers restricted to authorized order/event operations and out of email, logs, analytics identifiers, and general contact lists.
+- [ ] Event updates and guest communication
+  - Extend the existing durable email outbox with event-scoped updates for confirmed, canceled, and waitlisted audiences. Every send should state why it was sent, show the exact audience and count before confirmation, preserve suppression, and avoid deceptive urgency.
+  - Separate essential event changes—cancellation, venue/time changes, access instructions—from optional promotional messages. Do not infer promotional consent from an RSVP, ticket purchase, custom answer, or imported invitation.
+  - Add delivery, bounce, complaint, suppression, and retry summaries to the event view without exposing raw provider payloads or turning Store into a general-purpose marketing platform.
+- [ ] Faster and safer door operations
+  - Add an event-scoped camera QR scanner with keyboard/manual fallback, duplicate warnings, reversible check-in, and an intentionally narrow door-staff role that cannot view unrelated orders or custom answers.
+  - Design offline check-in as a bounded, encrypted event manifest plus an auditable conflict queue. Reconnection must merge by attendee identity and monotonic check-in revision rather than last-write-wins, and expired devices must lose access.
+  - Add capacity-checked walk-ins and on-site attendee substitutions only after duplicate detection, authorization, consent, and recovery behavior are defined. Door operations must not silently create a charge or bypass a sold-out event.
+- [ ] Event templates, series, and richer public event pages
+  - Let operators duplicate a reviewed event configuration into a new repository product without copying registrations, orders, tokens, inventory claims, or historical responses. Require new stable product/SKU identity and explicit dates/capacity before publication.
+  - Model recurring or multi-session events as related instances with independent capacity, registration windows, reminders, check-in, and cancellation state. Do not flatten them into one quantity when a guest must choose a specific session.
+  - Expand public event pages with structured schedule, venue/map, organizer contact, accessibility notes, age guidance, what-to-bring information, and truthful availability. Keep private/invite-only events noindex and omit sensitive venue details until the guest is authorized when needed.
+- [ ] RSVP operations analytics
+  - Add event-level registration pace, remaining capacity, cancellation/waitlist movement, form completion, reminder delivery, and check-in totals from canonical Store records.
+  - Use aggregate operational metrics rather than cross-event guest profiles, fingerprinting, or engagement scores. Small sensitive answer groups should be suppressed or coarsened, and raw exports remain deliberate authenticated actions.
+  - Define metric names, time zones, test-order handling, retention, cache bounds, and CSV parity before presenting dashboards as decision-grade.
+
+### Store-wide platform work
+
 - [ ] Guided setup TUI wrapper
   - Build a thin terminal UI around the existing `scripts/setup-deploy.mjs` setup core instead of creating a separate desktop app or duplicating provider logic.
   - Keep the script-first contract intact: every TUI action should map to an existing setup mode or a small extension of that mode, and CI/non-interactive users should still be able to call the underlying CLI directly.

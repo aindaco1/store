@@ -71,7 +71,7 @@ Default Playwright specs:
 - `tests/e2e/public-page-controls.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
 
-These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
+These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, direct-link multi-attendee RSVP registration and storage privacy, zero-total checkout without payment UI, paid-checkout payment UI preservation, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 
@@ -87,6 +87,21 @@ npm run test:unit:coverage
 The coverage command uses the declared `@vitest/coverage-v8` provider and writes text plus local HTML reports. Coverage is diagnostic rather than a release percentage claim: risk-based route, security, Podman, and browser gates remain authoritative, and changes should add focused assertions for touched behavior instead of inflating totals with low-value execution.
 
 `tests/unit/public-store-inventory-endpoint.test.ts`, `tests/unit/store-inventory-projection.test.ts`, and `tests/unit/store-product-options.test.ts` prove that the public inventory route performs one cold projection read behind a fixed-key edge cache, strips limits/claims/product/customer metadata, fails closed without cacheable state, updates all tracked cards and variants from one request, and preserves sold-out controls.
+
+Focused RSVP coverage:
+
+```bash
+npx vitest run \
+  tests/unit/event-registration.test.ts \
+  tests/unit/admin-event-registration.test.ts \
+  tests/unit/admin-rsvp-product.test.ts \
+  tests/unit/cart-pending-item.test.ts
+
+npx playwright test tests/e2e/public-page-controls.spec.ts \
+  --project=chromium --grep "direct-link RSVP"
+```
+
+These contracts cover schema bounds, dashboard normalization, canonical Worker rejection, historical response snapshots, memory-only guest answers, stale-cart schema repair, attendee rendering, zero-total `Complete order` behavior, no Stripe prewarm, and the submitted two-attendee payload. The paid checkout accessibility flow separately asserts that payment controls remain present.
 
 Focused Store runs:
 
@@ -283,18 +298,19 @@ After checkout, fulfillment, email, admin, inventory, or catalog changes:
 6. Export Store audit CSV from **Settings -> Store readiness**.
 7. Export Store reconciliation CSV from **Settings -> Store readiness**.
 8. Export Store orders CSV from admin.
-9. Search for a ticket attendee and export attendee CSV from admin.
-10. Check in a ticket/RSVP order from admin.
-11. Upload or replace a digital download in admin.
-12. Create and delete a reusable download library file.
-13. Revoke and refresh a confirmed digital fulfillment item from admin.
-14. Download a confirmed digital fulfillment item.
-15. Create, apply, and delete a coupon.
-16. Request an order lookup link and consume it.
-17. Verify abandoned-checkout reminder suppression/resume behavior in a controlled test.
-18. Set an inventory baseline and verify checkout respects it.
-19. Replay or send an equivalent Stripe webhook test event for paid settlement.
-20. Confirm failed/canceled payments release reservations.
+9. Complete a configured free RSVP with two attendees; confirm Contact precedes RSVP details, no tip or payment method appears, **Complete order** succeeds without Stripe, and the order page shows the submitted roster.
+10. Search for a named RSVP attendee, review the historical response labels, and export attendee CSV from admin.
+11. Check in one attendee, confirm partial attendance totals, then check in or undo the remaining attendee from admin.
+12. Upload or replace a digital download in admin.
+13. Create and delete a reusable download library file.
+14. Revoke and refresh a confirmed digital fulfillment item from admin.
+15. Download a confirmed digital fulfillment item.
+16. Create, apply, and delete a coupon.
+17. Request an order lookup link and consume it.
+18. Verify abandoned-checkout reminder suppression/resume behavior in a controlled test.
+19. Set an inventory baseline and verify checkout respects it.
+20. Replay or send an equivalent Stripe webhook test event for paid settlement.
+21. Confirm failed/canceled payments release reservations.
 
 ## Production Checklist
 
@@ -318,7 +334,8 @@ Production smoke:
 - Paid physical checkout works with tax and shipping.
 - Paid digital checkout produces a signed download action.
 - Paid ticket checkout produces ticket/check-in actions.
-- Free RSVP checkout confirms without Stripe.
+- Free RSVP checkout collects configured attendee details, omits tip/payment controls at a zero total, and confirms without Stripe.
+- Paid and mixed checkout still renders the payment method and settles through Stripe.
 - Stripe webhooks confirm paid orders.
 - Failed payments release reservations.
 - Admin product publish triggers deploy.

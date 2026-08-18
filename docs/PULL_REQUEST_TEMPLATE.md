@@ -25,7 +25,8 @@
 - [ ] Cart quantity changes still work.
 - [ ] Checkout rejects tampered prices.
 - [ ] Paid order confirmation still settles from Stripe webhook.
-- [ ] Free RSVP confirmation still bypasses Stripe.
+- [ ] Zero-total RSVP confirmation omits tip/payment controls, uses **Complete order**, and bypasses Stripe; paid and mixed carts retain payment UI.
+- [ ] Configured RSVP names/questions remain memory-only before submission and canonical on the confirmed order.
 - [ ] Digital download fulfillment still returns a signed action.
 - [ ] Ticket/RSVP check-in still works from admin.
 - [ ] Coupons still apply/reject correctly when touched.

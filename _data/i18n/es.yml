@@ -356,7 +356,7 @@ runtime:
   order_success:
     eyebrow: Pedido
     page_title: Pedido recibido
-    initial_heading: Tu pago se está finalizando. Los detalles de cumplimiento aparecerán aquí cuando el pedido esté listo.
+    initial_heading: Estamos confirmando tu pedido. Los detalles de cumplimiento aparecerán aquí cuando esté listo.
     return_to_store: Volver a la tienda
     subtotal: Total parcial
     discount: Descuento

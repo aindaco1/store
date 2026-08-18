@@ -108,6 +108,7 @@ Fulfillment-aware fields:
 - Digital products hide inventory controls.
 - Digital products show a File select when Variant Based is No.
 - Digital variant-based products hide the product-level File field and show a File column per variant.
+- RSVP products may enable registration and configure opening/closing timestamps, maximum party size, contact and attendee name requirements, and bounded party- or attendee-scoped questions. Preview and publish use the same Worker normalizer, so an invalid definition cannot be published through the dashboard.
 
 Variants:
 
@@ -200,6 +201,7 @@ Current behavior:
 - Import historical Snipcart CSV exports into production Store order storage.
 - View order totals and fulfillment rows.
 - Mark legacy ticket/RSVP rows checked in or unchecked. Named RSVP registrations expose one independently audited check-in control per attendee, and partial check-ins roll up to the existing attendance totals.
+- Review the historical question labels and answers stored with a configured registration. Product edits affect new checkouts only and do not reinterpret confirmed responses.
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 - Explicitly refresh Orders. When the first-page filter has not changed, the dashboard reuses its in-memory payload and announces that no new orders were found.

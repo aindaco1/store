@@ -356,7 +356,7 @@ runtime:
   order_success:
     eyebrow: Order
     page_title: Order received
-    initial_heading: Your payment is being finalized. Fulfillment details will appear here when the order is ready.
+    initial_heading: We are confirming your order. Fulfillment details will appear here when the order is ready.
     return_to_store: Return to the store
     subtotal: Subtotal
     discount: Discount

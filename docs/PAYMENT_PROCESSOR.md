@@ -214,7 +214,7 @@ When the Stripe CLI is available and authenticated, the dev launcher forwards ev
 
 ### 1. Browser Cart
 
-The static site owns the cart UI and stores cart structure. It may collect customer contact, shipping address, billing tax address, coupon code, tip selection, checkout reminder consent, and cart selections, but it does not decide final totals.
+The static site owns the cart UI and stores cart structure. It may collect customer contact, shipping address, billing tax address, coupon code, tip selection, checkout reminder consent, cart selections, and configured RSVP responses, but it does not decide final totals. Guest names and RSVP answers remain in memory until submission and are not written to local or session storage.
 
 The browser validates with:
 
@@ -231,6 +231,7 @@ POST /api/checkout/intent
 Important checkout fields include:
 
 - `items`
+- per-item `registration` only when the canonical RSVP product defines `event_details.registration`
 - `customer` or `email`
 - `couponCode`
 - `tipPercent`
@@ -266,7 +267,7 @@ When `orderDraft.totals.requiresPayment` is false, the Worker:
 4. Queues customer order email, super-admin order notifications, lookup indexing, and event reminders when applicable.
 5. Returns `nextAction: "order_confirmed"` to the browser.
 
-Free RSVP/free orders do not call Stripe.
+Free RSVP/free orders do not call Stripe. When the displayed checkout total is zero, the browser also omits tip and payment-method controls, labels the action **Complete order**, and does not prewarm Stripe. If the Worker returns a PaymentIntent despite a stale browser estimate, that canonical response restores the payment UI and loads Stripe on demand.
 
 ### 4. Paid PaymentIntent Creation
 
