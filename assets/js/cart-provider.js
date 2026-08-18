@@ -1479,6 +1479,11 @@
     };
   }
 
+  function getPersistableEventRegistration(item) {
+    const config = getEventRegistrationConfig(item);
+    return config ? { ...config } : null;
+  }
+
   function getEventRegistrationDraftKey(item) {
     return String(item?.uniqueId || item?.id || getStoreCartItemProductId(item) || '').trim();
   }
@@ -2993,7 +2998,13 @@
 
   function normalizeStoreCatalogCartItem(item, options = {}) {
     const product = findStoreCatalogProductForCartItem(item);
-    if (!product) return item;
+    const pageButton = findStoreAddButtonForCartItem(item);
+    const pageEventRegistration = getButtonEventRegistration(pageButton);
+    if (!product) {
+      return pageEventRegistration
+        ? { ...item, eventRegistration: pageEventRegistration }
+        : item;
+    }
 
     const parsedId = parseStoreCartItemId(item?.id);
     const variant = resolveStoreCatalogVariantForCartItem(product, item);
@@ -3003,8 +3014,12 @@
     const sku = String(product.sku || productId).trim();
     const fulfillmentType = String(product.fulfillment_type || product.category || getCartItemFieldValue(item, '_product_type') || 'physical').trim();
     const isNonShippable = ['digital', 'ticket', 'rsvp', 'service'].includes(fulfillmentType.toLowerCase());
-    const eventRegistration = fulfillmentType.toLowerCase() === 'rsvp' && product.event_registration && typeof product.event_registration === 'object'
-      ? product.event_registration
+    const eventRegistration = fulfillmentType.toLowerCase() === 'rsvp'
+      ? (
+          (product.event_registration && typeof product.event_registration === 'object' ? product.event_registration : null) ||
+          pageEventRegistration ||
+          (item?.eventRegistration && typeof item.eventRegistration === 'object' ? item.eventRegistration : null)
+        )
       : null;
     const catalogShipping = product.shipping && typeof product.shipping === 'object' ? product.shipping : null;
     const price = typeof addOnUtils.resolveUnitPrice === 'function'
@@ -3042,6 +3057,16 @@
       eventRegistration,
       customFields
     };
+  }
+
+  function findStoreAddButtonForCartItem(item) {
+    const productId = getStoreCartItemProductId(item);
+    if (!productId) return null;
+
+    return Array.from(document.querySelectorAll('.store-add-item[data-item-id]')).find((button) => {
+      const parsedButtonId = parseStoreCartItemId(button.getAttribute('data-item-id'));
+      return parsedButtonId.productId === productId;
+    }) || null;
   }
 
   function buildStoreOrderSuccessPath(orderToken) {
@@ -3091,6 +3116,7 @@
           stackable: item?.stackable === true,
           shippable: item?.shippable === true,
           maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
+          eventRegistration: getPersistableEventRegistration(item) || undefined,
           customFields: Array.isArray(item?.customFields) ? item.customFields : undefined
         }))
       },
@@ -3354,6 +3380,7 @@
           ? item.shipping
           : undefined,
         maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
+        eventRegistration: getPersistableEventRegistration(item) || undefined,
         customFields: Array.isArray(item?.customFields) ? item.customFields : undefined
       }))
     };
@@ -6209,7 +6236,10 @@
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(data.error || `Worker returned ${response.status}`);
+          const validationMessage = Array.isArray(data?.errors)
+            ? String(data.errors.find((entry) => String(entry?.message || '').trim())?.message || '').trim()
+            : '';
+          throw new Error(validationMessage || data.error || `Worker returned ${response.status}`);
         }
 
         if (data?.nextAction === 'order_confirmed' || data?.requiresPayment === false) {

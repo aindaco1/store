@@ -30,6 +30,10 @@
 - Kept a running local checkout Worker healthy across configuration sync and
   pre-merge cleanup by atomically replacing generated and restored Wrangler
   configuration files.
+- Preserved the non-sensitive RSVP form schema across cart recovery while
+  keeping guest names and answers memory-only. Existing direct-link carts can
+  repair that schema from the current product page, and checkout now surfaces
+  the Worker's specific validation message instead of a generic draft error.
 
 ## v1.1.22 - 2026-08-06
 

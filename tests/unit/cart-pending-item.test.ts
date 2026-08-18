@@ -655,7 +655,13 @@ describe('first-party pending cart handoff', () => {
       }
       if (url.endsWith('/api/checkout/intent')) {
         checkoutBody = JSON.parse(String(init?.body || '{}'));
-        return new Response(JSON.stringify({ error: 'Captured RSVP test payload' }), {
+        return new Response(JSON.stringify({
+          error: 'Store order draft is invalid.',
+          errors: [{
+            code: 'registration_required',
+            message: 'Complete the RSVP attendee information to continue.'
+          }]
+        }), {
           status: 422,
           headers: { 'Content-Type': 'application/json' }
         });
@@ -787,5 +793,79 @@ describe('first-party pending cart handoff', () => {
     });
     expect(localStorage.getItem('store_first_party_cart_state')).not.toContain('Alex Guest');
     expect(localStorage.getItem('store_first_party_cart_state')).not.toContain('Step-free access');
+    expect(localStorage.getItem('store_first_party_cart_state')).toContain('eventRegistration');
+    expect(localStorage.getItem('store_first_party_cart_state')).toContain('maxPartySize');
+    expect(root.textContent).toContain('Complete the RSVP attendee information to continue.');
+  });
+
+  it('repairs stale direct-link RSVP carts from the current product button without storing guest responses', async () => {
+    localStorage.removeItem('pendingCartItem');
+    const registration = {
+      closes_at: '2026-12-17T23:59:00-07:00',
+      max_party_size: 4,
+      require_contact_name: true,
+      require_attendee_names: true,
+      questions: [{
+        id: 'age_group',
+        label: 'Age group',
+        type: 'single_select',
+        scope: 'attendee',
+        required: true,
+        options: [
+          { value: 'under_18', label: 'Under 18' },
+          { value: '18_plus', label: '18 or older' }
+        ]
+      }]
+    };
+    document.body.innerHTML = `
+      <div data-store-cart-root="true"></div>
+      <span class="storecart-total-price"></span>
+      <button
+        class="store-add-item"
+        data-item-id="rsvp-1"
+        data-item-name="Community Screening"
+        data-item-price="0"
+        data-item-shippable="false"
+        data-event-registration='${JSON.stringify(registration)}'
+        type="button"
+      >RSVP</button>
+    `;
+    localStorage.setItem('store_first_party_cart_state', JSON.stringify({
+      token: 'storecart_stale_rsvp',
+      items: [{
+        id: 'rsvp-1',
+        uniqueId: 'stale-rsvp-1',
+        name: 'Community Screening',
+        price: 0,
+        quantity: 2,
+        maxQuantity: 4,
+        shippable: false,
+        customFields: [
+          { name: '_product_id', type: 'hidden', value: 'rsvp-1' },
+          { name: '_product_type', type: 'hidden', value: 'rsvp' },
+          { name: '_sku', type: 'hidden', value: 'rsvp-1' }
+        ]
+      }]
+    }));
+    (window as any).STORE_CONFIG = {
+      cartRuntime: 'first_party',
+      checkoutProvider: 'first_party',
+      checkoutUiMode: 'custom',
+      workerBase: 'https://worker.test',
+      platformName: 'Dust Wave Shop',
+      addOns: { enabled: false, products: [] }
+    };
+
+    await import('../../assets/js/cart-provider.js');
+    const readyApi = await (window as any).StoreCartProvider.whenReady();
+    await readyApi.api.theme.cart.open();
+    await readyApi.api.theme.cart.navigate('/checkout');
+
+    const root = document.querySelector('[data-store-cart-root]') as HTMLElement;
+    expect(root.querySelectorAll('[data-rsvp-attendee-name]')).toHaveLength(2);
+    expect(root.textContent).toContain('RSVP details');
+    expect((window as any).StoreCartProvider.store.getState().cart.items.items[0].eventRegistration).toBeTruthy();
+    expect(localStorage.getItem('store_first_party_cart_state')).toContain('eventRegistration');
+    expect(localStorage.getItem('store_first_party_cart_state')).not.toContain('Attendee 1');
   });
 });
