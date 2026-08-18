@@ -378,6 +378,7 @@ test.describe('Store Public Page Controls', () => {
 
     const cart = page.locator(CART_ROOT);
     await expect(cart).toBeVisible();
+    await expect(cart.locator('[data-cart-tip-box]')).toHaveCount(0);
     await cart.getByRole('button', { name: 'Checkout' }).click();
     await expect(cart.getByText('RSVP details: DUST WAVE Free RSVP')).toBeVisible();
     await expect(cart.getByText(/Respond by/)).toBeVisible();

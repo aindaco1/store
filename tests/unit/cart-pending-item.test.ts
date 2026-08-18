@@ -728,6 +728,11 @@ describe('first-party pending cart handoff', () => {
       ]
     });
     await readyApi.api.theme.cart.open();
+    await readyApi.api.theme.cart.navigate('/cart');
+
+    const cartRoot = document.querySelector('[data-store-cart-root]') as HTMLElement;
+    expect(cartRoot.querySelector('[data-cart-tip-box]')).toBeNull();
+
     await readyApi.api.theme.cart.navigate('/checkout');
 
     const root = document.querySelector('[data-store-cart-root]') as HTMLElement;
@@ -760,6 +765,7 @@ describe('first-party pending cart handoff', () => {
     await Promise.resolve();
 
     expect(checkoutBody).toMatchObject({
+      tipPercent: 0,
       customer: { name: 'Casey Host', email: 'casey@example.com' },
       items: [{
         productId: 'rsvp-1',

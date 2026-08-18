@@ -2163,6 +2163,11 @@
     };
   }
 
+  function shouldOfferFirstPartyTip(pricing = {}) {
+    return Math.max(0, Number(pricing.discountedSubtotalCents) || 0) > 0 &&
+      getMaxPlatformTipPercent() > 0;
+  }
+
   function isCustomCheckoutEstimateActive(state, options) {
     const route = options?.currentRoute;
     if (route !== CHECKOUT_VIEW_ROUTE && route !== CART_VIEW_ROUTE) return false;
@@ -3471,9 +3476,10 @@
       };
     });
 
+    const pricing = buildFirstPartyPricing(state);
     const payload = {
       items: checkoutItems,
-      tipPercent: sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent()),
+      tipPercent: shouldOfferFirstPartyTip(pricing) ? pricing.tipPercent : 0,
       preferredLang: getCurrentLang()
     };
     const draft = readFirstPartyCartDraftState();
@@ -4133,7 +4139,7 @@
         <li class="store-first-party-cart__empty">${escapeHtml(getRuntimeMessage('cart.empty', 'Your cart is empty.'))}</li>
       `;
       const cartEstimateMarkup = items.length > 0 ? `
-        <div class="store-first-party-cart__tip-box">
+        ${shouldOfferFirstPartyTip(pricing) ? `<div class="store-first-party-cart__tip-box" data-cart-tip-box>
           <div class="store-first-party-cart__tip-header">
             <label id="store-cart-tip-label" class="store-first-party-cart__tip-label" for="store-cart-tip-input">${escapeHtml(getRuntimeMessage('cart.tipLabel', `Tip ${getPlatformCompanyName()} for platform maintenance.`))}</label>
             <span id="store-cart-tip-amount" data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
@@ -4155,7 +4161,7 @@
             >
             <span class="store-first-party-cart__tip-percent" id="store-cart-tip-percent" data-cart-tip-percent>${pricing.tipPercent}%</span>
           </div>
-        </div>
+        </div>` : ''}
         ${cartRequiresQuotedShipping(items)
           ? renderCartShippingEstimateField(customCheckout?.shippingDraft, persistedCustomCheckoutShippingDraft)
           : ''}
@@ -4331,6 +4337,7 @@
       const tipAmount = root.querySelector('[data-cart-tip-amount]');
       const tipPercent = root.querySelector('[data-cart-tip-percent]');
       const tipInput = root.querySelector('[data-cart-tip]');
+      const tipBox = root.querySelector('[data-cart-tip-box]');
       const tipRow = root.querySelector('[data-cart-summary-tip-row]');
       const tipLabel = root.querySelector('[data-cart-summary-tip-label]');
       const tipSummaryAmount = root.querySelector('[data-cart-summary-tip-amount]');
@@ -4348,6 +4355,7 @@
 
       if (tipAmount) tipAmount.textContent = formatCents(pricing.tipAmountCents);
       if (tipPercent) tipPercent.textContent = `${pricing.tipPercent}%`;
+      if (tipBox) tipBox.hidden = !shouldOfferFirstPartyTip(pricing);
       if (tipInput) {
         tipInput.setAttribute('aria-valuetext', formatTipSliderValueText(pricing.tipPercent, pricing.tipAmountCents));
       }
