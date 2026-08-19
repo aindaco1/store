@@ -524,6 +524,10 @@ existing_dev = parse_env_dev_vars(content)
 top_values = build_mirror_values(base_config, existing_top)
 dev_values = build_mirror_values(dev_config, existing_dev).merge(
   'APP_MODE' => 'test',
+  # Local Wrangler does not run Cron Triggers automatically. Deliver order
+  # confirmations inline so local checkout QA cannot strand them in the
+  # production outbox; production keeps the configured durable outbox.
+  'EMAIL_OUTBOX_ENABLED' => 'false',
   'PAYMENT_RECONCILIATION_ENABLED' => 'false'
 )
 top_values['APP_MODE'] = 'live'

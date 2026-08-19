@@ -89,6 +89,15 @@ describe('package test scripts', () => {
     expect(preMergeScript).toContain('mv -f "${worker_config_restore}" worker/wrangler.toml');
   });
 
+  it('keeps local order email delivery immediate while production uses the durable outbox', () => {
+    const syncWorkerConfig = readFileSync(join(repoRoot, 'scripts/sync-worker-config.rb'), 'utf8');
+    const devOverride = syncWorkerConfig.slice(syncWorkerConfig.indexOf('dev_values ='));
+
+    expect(devOverride).toContain("'APP_MODE' => 'test'");
+    expect(devOverride).toContain("'EMAIL_OUTBOX_ENABLED' => 'false'");
+    expect(devOverride).toContain("'PAYMENT_RECONCILIATION_ENABLED' => 'false'");
+  });
+
   it('fails closed before generated-asset checks when either Jekyll build path fails', () => {
     const preMergeScript = readFileSync(join(repoRoot, 'scripts/pre-merge-regression.sh'), 'utf8');
 

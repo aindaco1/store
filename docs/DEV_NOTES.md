@@ -13,7 +13,7 @@ npm --prefix worker run dev
 - Worker: `http://127.0.0.1:8989`
 - Local repo sidecar: `http://127.0.0.1:8799`
 
-`./scripts/dev.sh` starts all three services, syncs Worker config, configures missing local secrets, and optionally forwards Stripe webhooks when the Stripe CLI is available.
+`./scripts/dev.sh` starts all three services, syncs Worker config, configures missing local secrets, and optionally forwards Stripe webhooks when the Stripe CLI is available. Local order confirmations send in the Worker's background task instead of waiting in the production email outbox, because Wrangler does not invoke Cron Triggers automatically. A configured `RESEND_API_KEY` sends the message; `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` renders and records it without calling Resend.
 
 ## Source Layout
 
@@ -65,8 +65,8 @@ Store checkout is order-based:
 2. Worker validates submitted cart data against the catalog snapshot.
 3. Worker creates an `orders:<orderToken>` draft in `STORE_STATE`.
 4. Paid orders use Stripe PaymentIntents.
-5. Zero-total orders omit tip and payment-method controls, use **Complete order**, and avoid Stripe; configured free RSVP orders confirm immediately after canonical registration and inventory validation.
-6. Stripe webhooks settle paid orders and send Store-owned customer/admin order emails.
+5. Zero-total orders omit tip and payment-method controls, use **Complete order**, and avoid Stripe; configured free RSVP orders confirm immediately after canonical registration and inventory validation, then queue Store-owned customer/admin order emails.
+6. Stripe webhooks settle paid orders and queue the same Store-owned customer/admin order emails.
 
 Configured RSVP products add repository-backed registration windows, party limits, named attendees, and scoped questions. Guest names and answers remain in memory before submission; the Worker normalizes and stores the historical response snapshot on the protected order. See [RSVP.md](RSVP.md).
 

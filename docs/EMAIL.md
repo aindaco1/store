@@ -95,6 +95,8 @@ Cron status and recent errors are visible in **Settings -> Store readiness** and
 
 Production order confirmations, event reminders, and opted-in abandoned-checkout reminders use the shared KV outbox when `EMAIL_OUTBOX_ENABLED=true`. The order or reminder state is committed first; email delivery is an independently retryable side effect.
 
+Local `./scripts/dev.sh` checkout keeps `EMAIL_OUTBOX_ENABLED=false` in the generated `env.dev` settings because Wrangler does not run Cron Triggers automatically. Customer order confirmations therefore send immediately in the Worker's background task when `RESEND_API_KEY` is configured, while the order remains authoritative if delivery fails. Set `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` in `worker/.dev.vars` when local QA should render and record the message without calling Resend. Production continues to use the durable outbox and scheduled retry path.
+
 Each `email-outbox:v1:*` record has a deterministic job ID, a frozen Resend payload/content hash, a stable `store/<job-id>` idempotency key, bounded exponential backoff, and a 10-minute processing lease. Payloads expire after 30 days. Provider acceptance and signed delivery outcomes are minimized into `email-delivery:v1:*` for 400 days. Ambiguous outcomes stop for operator review rather than risking a duplicate send outside Resend's retry window.
 
 Admin sign-in, super-admin order notifications containing five-minute one-time admin links, and customer order-lookup messages containing 15-minute one-time lookup links remain immediate. Delaying those security-sensitive messages behind a background queue would consume a material part of their validity window. Explicit admin test sends also remain immediate.
