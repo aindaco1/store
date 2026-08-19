@@ -188,6 +188,43 @@ admin:
   inventory_set_baseline: Set baseline
   inventory_reset_baseline: Reset baseline
   inventory_baseline_aria: "Inventory baseline for %{label}"
+  rsvp_questions_title: RSVP questions
+  rsvp_questions_intro: Add the questions guests answer during checkout. Stable IDs preserve the meaning of historical responses.
+  rsvp_questions_count: "%{count} of %{max} questions"
+  rsvp_questions_empty: No custom questions yet. Contact and attendee names can still be required above.
+  rsvp_add_question: Add question
+  rsvp_question_number: "Question %{number}"
+  rsvp_question_label: Question
+  rsvp_question_label_placeholder: What do you need to know?
+  rsvp_question_id: Stable ID
+  rsvp_answer_type: Answer type
+  rsvp_answer_text: Short text
+  rsvp_answer_long_text: Long text
+  rsvp_answer_single_choice: Choose one
+  rsvp_answer_multiple_choice: Choose several
+  rsvp_answer_checkbox: Checkbox
+  rsvp_question_audience: Ask once or per attendee
+  rsvp_question_party: Once per registration
+  rsvp_question_attendee: Each attendee
+  rsvp_question_requirement: Requirement
+  rsvp_question_optional: Optional
+  rsvp_question_required: Required
+  rsvp_max_length: Maximum characters
+  rsvp_default_length: Use default
+  rsvp_choices_title: Answer choices
+  rsvp_choices_count: "%{count} of %{max} choices"
+  rsvp_add_choice: Add choice
+  rsvp_choice_label: Choice label
+  rsvp_choice_label_placeholder: Choice shown to guests
+  rsvp_choice_value: Stored value
+  rsvp_move_up: Move up
+  rsvp_move_down: Move down
+  rsvp_remove_question: Remove
+  rsvp_remove_choice: Remove
+  rsvp_move_question_up: "Move question %{number} up"
+  rsvp_move_question_down: "Move question %{number} down"
+  rsvp_remove_question_number: "Remove question %{number}"
+  rsvp_remove_choice_number: "Remove choice %{number}"
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
   store_coupons_intro: Create, edit, and delete Store coupon codes for cart-wide or product-specific discounts.

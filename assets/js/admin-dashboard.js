@@ -4574,7 +4574,7 @@
     rsvpMaxPartySize: 'Maximum attendees a buyer may include in one RSVP, from 1 to 20.',
     rsvpRequireContactName: 'Requires the person submitting the RSVP to provide a contact name.',
     rsvpRequireAttendeeNames: 'Requires a separate name for every RSVP spot.',
-    rsvpQuestions: 'JSON array of up to 12 questions. Types: text, textarea, single_select, multi_select, checkbox. Scope: party or attendee.',
+    rsvpQuestions: 'Add up to 12 questions with guided answer types, audience, requirements, and choices. Store keeps stable IDs for historical responses.',
     image: 'Primary product image used on public product cards, cart rows, receipts, and previews.',
     preview: 'Live product-card preview generated from the current editor values.',
     seoDescription: 'Search and social summary for this product. Keep it specific and under 320 characters.',
@@ -4615,6 +4615,460 @@
       index += 1;
     }
     return candidate;
+  }
+
+  var STORE_PRODUCT_RSVP_MAX_QUESTIONS = 12;
+  var STORE_PRODUCT_RSVP_MAX_OPTIONS = 20;
+
+  function storeProductRsvpMachineValue(value, fallback) {
+    return slugifyStoreProductValue(value, fallback || 'question').replace(/-/g, '_').slice(0, 64);
+  }
+
+  function parseStoreProductRsvpQuestions(value) {
+    if (Array.isArray(value)) return value;
+    try {
+      var parsed = JSON.parse(String(value || '[]'));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+
+  function storeProductRsvpQuestionUsesChoices(type) {
+    return type === 'single_select' || type === 'multi_select';
+  }
+
+  function createStoreProductRsvpControl(labelText, field, value, type, options) {
+    var opts = options || {};
+    var wrapper = createElement('label', 'admin-store-products__rsvp-field' + (opts.wide ? ' admin-store-products__rsvp-field--wide' : ''));
+    var input;
+    if (type === 'select') {
+      input = document.createElement('select');
+      (opts.options || []).forEach(function(pair) {
+        var option = document.createElement('option');
+        option.value = pair[0];
+        option.textContent = pair[1];
+        input.appendChild(option);
+      });
+      input.value = String(value ?? '');
+    } else {
+      input = document.createElement('input');
+      input.type = type || 'text';
+      input.value = String(value ?? '');
+      if (opts.min !== undefined) input.min = String(opts.min);
+      if (opts.max !== undefined) input.max = String(opts.max);
+      if (opts.maxLength !== undefined) input.maxLength = Number(opts.maxLength);
+      if (opts.placeholder) input.placeholder = opts.placeholder;
+    }
+    if (opts.required) input.required = true;
+    input.className = 'admin-settings__input';
+    input.dataset.storeRsvpQuestionField = field;
+    ensureElementId(input, 'store-rsvp-question');
+    wrapper.appendChild(createElement('span', 'admin-store-products__rsvp-field-label', labelText));
+    wrapper.appendChild(input);
+    return wrapper;
+  }
+
+  function uniqueStoreProductRsvpQuestionId(builder, value, currentCard) {
+    var reserved = new Set($all('[data-store-rsvp-question]', builder).filter(function(card) {
+      return card !== currentCard;
+    }).map(function(card) {
+      var input = $('[data-store-rsvp-question-field="id"]', card);
+      return String(input && input.value || '').trim();
+    }).filter(Boolean));
+    var base = storeProductRsvpMachineValue(value, 'question');
+    var candidate = base;
+    var index = 2;
+    while (reserved.has(candidate)) {
+      candidate = base + '_' + index;
+      index += 1;
+    }
+    return candidate;
+  }
+
+  function uniqueStoreProductRsvpOptionValue(card, value, currentRow) {
+    var reserved = new Set($all('[data-store-rsvp-option]', card).filter(function(row) {
+      return row !== currentRow;
+    }).map(function(row) {
+      var input = $('[data-store-rsvp-option-field="value"]', row);
+      return String(input && input.value || '').trim();
+    }).filter(Boolean));
+    var base = storeProductRsvpMachineValue(value, 'option');
+    var candidate = base;
+    var index = 2;
+    while (reserved.has(candidate)) {
+      candidate = base + '_' + index;
+      index += 1;
+    }
+    return candidate;
+  }
+
+  function createStoreProductRsvpOptionRow(card, option, options) {
+    var opts = options || {};
+    var row = createElement('div', 'admin-store-products__rsvp-option');
+    row.dataset.storeRsvpOption = 'true';
+    row.dataset.storeRsvpOptionValueAuto = opts.autoValue ? 'true' : 'false';
+    var labelField = createStoreProductRsvpControl(
+      localizedAdminText('rsvpChoiceLabel'),
+      'label',
+      option && option.label || '',
+      'text',
+      { maxLength: 120, placeholder: localizedAdminText('rsvpChoiceLabelPlaceholder'), required: true }
+    );
+    var labelInput = $('[data-store-rsvp-question-field="label"]', labelField);
+    if (labelInput) {
+      delete labelInput.dataset.storeRsvpQuestionField;
+      labelInput.dataset.storeRsvpOptionField = 'label';
+    }
+    row.appendChild(labelField);
+    var valueField = createStoreProductRsvpControl(
+      localizedAdminText('rsvpChoiceValue'),
+      'value',
+      option && option.value || '',
+      'text',
+      { maxLength: 120, placeholder: 'option_value', required: true }
+    );
+    var valueInput = $('[data-store-rsvp-question-field="value"]', valueField);
+    if (valueInput) {
+      delete valueInput.dataset.storeRsvpQuestionField;
+      valueInput.dataset.storeRsvpOptionField = 'value';
+    }
+    row.appendChild(valueField);
+    var remove = createElement('button', 'btn btn--secondary btn--small', localizedAdminText('rsvpRemoveChoice'));
+    remove.type = 'button';
+    remove.dataset.storeRsvpOptionRemove = 'true';
+    row.appendChild(remove);
+    return row;
+  }
+
+  function appendStoreProductRsvpDefaultOption(card) {
+    var list = $('[data-store-rsvp-options-list]', card);
+    if (!list) return null;
+    var number = list.children.length + 1;
+    var row = createStoreProductRsvpOptionRow(card, {
+      label: '',
+      value: uniqueStoreProductRsvpOptionValue(card, 'option_' + String(number), null)
+    }, { autoValue: true });
+    list.appendChild(row);
+    return row;
+  }
+
+  function ensureStoreProductRsvpChoiceMinimum(card) {
+    var type = $('[data-store-rsvp-question-field="type"]', card);
+    if (!type || !storeProductRsvpQuestionUsesChoices(type.value)) return;
+    while ($all('[data-store-rsvp-option]', card).length < 2) appendStoreProductRsvpDefaultOption(card);
+  }
+
+  function createStoreProductRsvpQuestionCard(builder, question, options) {
+    var opts = options || {};
+    var source = question || {};
+    var card = document.createElement('fieldset');
+    card.className = 'admin-store-products__rsvp-question';
+    card.dataset.storeRsvpQuestion = 'true';
+    card.dataset.storeRsvpQuestionIdAuto = opts.autoId ? 'true' : 'false';
+    card.appendChild(createElement('legend', 'admin-store-products__rsvp-question-title', ''));
+
+    var actions = createElement('div', 'admin-store-products__rsvp-question-actions');
+    [['up', 'rsvpMoveUp'], ['down', 'rsvpMoveDown'], ['remove', 'rsvpRemoveQuestion']].forEach(function(pair) {
+      var button = createElement('button', 'btn btn--secondary btn--small', localizedAdminText(pair[1]));
+      button.type = 'button';
+      button.dataset.storeRsvpQuestionAction = pair[0];
+      actions.appendChild(button);
+    });
+    card.appendChild(actions);
+
+    var fields = createElement('div', 'admin-store-products__rsvp-question-fields');
+    fields.appendChild(createStoreProductRsvpControl(
+      localizedAdminText('rsvpQuestionLabel'),
+      'label',
+      source.label || '',
+      'text',
+      { wide: true, maxLength: 160, placeholder: localizedAdminText('rsvpQuestionLabelPlaceholder'), required: true }
+    ));
+    fields.appendChild(createStoreProductRsvpControl(
+      localizedAdminText('rsvpQuestionId'),
+      'id',
+      source.id || uniqueStoreProductRsvpQuestionId(builder, 'question', card),
+      'text',
+      { maxLength: 64, placeholder: 'question_id', required: true }
+    ));
+    fields.appendChild(createStoreProductRsvpControl(
+      localizedAdminText('rsvpAnswerType'),
+      'type',
+      source.type || 'text',
+      'select',
+      { options: [
+        ['text', localizedAdminText('rsvpAnswerText')],
+        ['textarea', localizedAdminText('rsvpAnswerLongText')],
+        ['single_select', localizedAdminText('rsvpAnswerSingleChoice')],
+        ['multi_select', localizedAdminText('rsvpAnswerMultipleChoice')],
+        ['checkbox', localizedAdminText('rsvpAnswerCheckbox')]
+      ] }
+    ));
+    fields.appendChild(createStoreProductRsvpControl(
+      localizedAdminText('rsvpQuestionAudience'),
+      'scope',
+      source.scope || 'party',
+      'select',
+      { options: [
+        ['party', localizedAdminText('rsvpQuestionParty')],
+        ['attendee', localizedAdminText('rsvpQuestionAttendee')]
+      ] }
+    ));
+    fields.appendChild(createStoreProductRsvpControl(
+      localizedAdminText('rsvpQuestionRequirement'),
+      'required',
+      source.required === true ? 'true' : 'false',
+      'select',
+      { options: [
+        ['false', localizedAdminText('rsvpQuestionOptional')],
+        ['true', localizedAdminText('rsvpQuestionRequired')]
+      ] }
+    ));
+    var maxLength = createStoreProductRsvpControl(
+      localizedAdminText('rsvpMaxLength'),
+      'maxLength',
+      source.maxLength || '',
+      'number',
+      { min: 1, max: 2000, placeholder: localizedAdminText('rsvpDefaultLength') }
+    );
+    maxLength.dataset.storeRsvpMaxLength = 'true';
+    fields.appendChild(maxLength);
+    card.appendChild(fields);
+
+    var choices = createElement('div', 'admin-store-products__rsvp-choices');
+    choices.dataset.storeRsvpChoices = 'true';
+    var choicesHeader = createElement('div', 'admin-store-products__rsvp-choices-header');
+    choicesHeader.appendChild(createElement('h5', 'admin-store-products__rsvp-choices-title', localizedAdminText('rsvpChoicesTitle')));
+    choicesHeader.appendChild(createElement('span', 'admin-app__muted admin-store-products__rsvp-choices-count', ''));
+    var addChoice = createElement('button', 'btn btn--secondary btn--small', localizedAdminText('rsvpAddChoice'));
+    addChoice.type = 'button';
+    addChoice.dataset.storeRsvpOptionAdd = 'true';
+    choicesHeader.appendChild(addChoice);
+    choices.appendChild(choicesHeader);
+    var choicesList = createElement('div', 'admin-store-products__rsvp-options');
+    choicesList.dataset.storeRsvpOptionsList = 'true';
+    (Array.isArray(source.options) ? source.options : []).slice(0, STORE_PRODUCT_RSVP_MAX_OPTIONS).forEach(function(option) {
+      choicesList.appendChild(createStoreProductRsvpOptionRow(card, option, { autoValue: false }));
+    });
+    choices.appendChild(choicesList);
+    card.appendChild(choices);
+    ensureStoreProductRsvpChoiceMinimum(card);
+    return card;
+  }
+
+  function refreshStoreProductRsvpQuestionCard(card, index, total) {
+    var number = index + 1;
+    var legend = $('.admin-store-products__rsvp-question-title', card);
+    if (legend) legend.textContent = localizedAdminText('rsvpQuestionNumber', { number: number });
+    var up = $('[data-store-rsvp-question-action="up"]', card);
+    var down = $('[data-store-rsvp-question-action="down"]', card);
+    var remove = $('[data-store-rsvp-question-action="remove"]', card);
+    if (up) {
+      up.disabled = index === 0;
+      up.setAttribute('aria-label', localizedAdminText('rsvpMoveQuestionUp', { number: number }));
+    }
+    if (down) {
+      down.disabled = index === total - 1;
+      down.setAttribute('aria-label', localizedAdminText('rsvpMoveQuestionDown', { number: number }));
+    }
+    if (remove) remove.setAttribute('aria-label', localizedAdminText('rsvpRemoveQuestionNumber', { number: number }));
+
+    var type = $('[data-store-rsvp-question-field="type"]', card);
+    var usesChoices = Boolean(type && storeProductRsvpQuestionUsesChoices(type.value));
+    var choices = $('[data-store-rsvp-choices]', card);
+    var maxLength = $('[data-store-rsvp-max-length]', card);
+    if (choices) choices.hidden = !usesChoices;
+    if (maxLength) maxLength.hidden = !type || (type.value !== 'text' && type.value !== 'textarea');
+    if (usesChoices) ensureStoreProductRsvpChoiceMinimum(card);
+
+    var optionRows = $all('[data-store-rsvp-option]', card);
+    var addChoice = $('[data-store-rsvp-option-add]', card);
+    var choiceCount = $('.admin-store-products__rsvp-choices-count', card);
+    if (addChoice) addChoice.disabled = optionRows.length >= STORE_PRODUCT_RSVP_MAX_OPTIONS;
+    if (choiceCount) choiceCount.textContent = localizedAdminText('rsvpChoicesCount', {
+      count: optionRows.length,
+      max: STORE_PRODUCT_RSVP_MAX_OPTIONS
+    });
+    optionRows.forEach(function(row, optionIndex) {
+      var button = $('[data-store-rsvp-option-remove]', row);
+      if (!button) return;
+      button.disabled = optionRows.length <= 2;
+      button.setAttribute('aria-label', localizedAdminText('rsvpRemoveChoiceNumber', { number: optionIndex + 1 }));
+    });
+  }
+
+  function storeProductRsvpQuestionsFromBuilder(builder) {
+    return $all('[data-store-rsvp-question]', builder).map(function(card) {
+      var read = function(field) {
+        var input = $('[data-store-rsvp-question-field="' + field + '"]', card);
+        return String(input && input.value || '').trim();
+      };
+      var type = read('type') || 'text';
+      var question = {
+        id: read('id'),
+        label: read('label'),
+        type: type,
+        scope: read('scope') || 'party',
+        required: read('required') === 'true'
+      };
+      var maxLength = Number(read('maxLength'));
+      if ((type === 'text' || type === 'textarea') && Number.isFinite(maxLength) && maxLength > 0) {
+        question.maxLength = maxLength;
+      }
+      if (storeProductRsvpQuestionUsesChoices(type)) {
+        question.options = $all('[data-store-rsvp-option]', card).map(function(row) {
+          var value = $('[data-store-rsvp-option-field="value"]', row);
+          var label = $('[data-store-rsvp-option-field="label"]', row);
+          return {
+            value: String(value && value.value || '').trim(),
+            label: String(label && label.value || '').trim()
+          };
+        });
+      }
+      return question;
+    });
+  }
+
+  function syncStoreProductRsvpQuestions(builder, dispatchChange) {
+    var source = $('[data-store-product-field="rsvpQuestions"]', builder);
+    if (!source) return;
+    source.value = JSON.stringify(storeProductRsvpQuestionsFromBuilder(builder), null, 2);
+    if (dispatchChange) source.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function refreshStoreProductRsvpQuestions(builder) {
+    var cards = $all('[data-store-rsvp-question]', builder);
+    cards.forEach(function(card, index) {
+      refreshStoreProductRsvpQuestionCard(card, index, cards.length);
+    });
+    var count = $('.admin-store-products__rsvp-questions-count', builder);
+    if (count) count.textContent = localizedAdminText('rsvpQuestionsCount', {
+      count: cards.length,
+      max: STORE_PRODUCT_RSVP_MAX_QUESTIONS
+    });
+    var empty = $('[data-store-rsvp-questions-empty]', builder);
+    if (empty) empty.hidden = cards.length > 0;
+    var add = $('[data-store-rsvp-question-add]', builder);
+    if (add) add.disabled = cards.length >= STORE_PRODUCT_RSVP_MAX_QUESTIONS;
+  }
+
+  function createStoreProductRsvpQuestionsBuilder(questions) {
+    var wrapper = createElement('div', 'admin-store-products__field admin-store-products__field--wide admin-store-products__rsvp-builder');
+    wrapper.dataset.storeProductFieldWrapper = 'rsvpQuestions';
+    var source = document.createElement('textarea');
+    source.hidden = true;
+    source.dataset.storeProductField = 'rsvpQuestions';
+    source.value = JSON.stringify(parseStoreProductRsvpQuestions(questions), null, 2);
+    wrapper.appendChild(source);
+
+    var header = createElement('div', 'admin-store-products__rsvp-builder-header');
+    var heading = createElement('div', 'admin-store-products__rsvp-builder-heading');
+    heading.appendChild(createElement('h4', 'admin-store-products__rsvp-builder-title', localizedAdminText('rsvpQuestionsTitle')));
+    var intro = createElement('p', 'admin-app__muted admin-store-products__rsvp-builder-intro', localizedAdminText('rsvpQuestionsIntro'));
+    heading.appendChild(intro);
+    header.appendChild(heading);
+    header.appendChild(createElement('span', 'admin-app__muted admin-store-products__rsvp-questions-count', ''));
+    var add = createElement('button', 'btn btn--secondary btn--small', localizedAdminText('rsvpAddQuestion'));
+    add.type = 'button';
+    add.dataset.storeRsvpQuestionAdd = 'true';
+    header.appendChild(add);
+    wrapper.appendChild(header);
+
+    var list = createElement('div', 'admin-store-products__rsvp-questions');
+    list.dataset.storeRsvpQuestionsList = 'true';
+    parseStoreProductRsvpQuestions(questions).slice(0, STORE_PRODUCT_RSVP_MAX_QUESTIONS).forEach(function(question) {
+      list.appendChild(createStoreProductRsvpQuestionCard(wrapper, question, { autoId: false }));
+    });
+    wrapper.appendChild(list);
+    var empty = createElement('p', 'admin-app__muted admin-store-products__rsvp-empty', localizedAdminText('rsvpQuestionsEmpty'));
+    empty.dataset.storeRsvpQuestionsEmpty = 'true';
+    wrapper.appendChild(empty);
+
+    wrapper.addEventListener('input', function(event) {
+      if (event.target === source) return;
+      var card = event.target.closest('[data-store-rsvp-question]');
+      if (card && event.target.dataset.storeRsvpQuestionField === 'label' && card.dataset.storeRsvpQuestionIdAuto === 'true') {
+        var id = $('[data-store-rsvp-question-field="id"]', card);
+        if (id) id.value = uniqueStoreProductRsvpQuestionId(wrapper, event.target.value, card);
+      } else if (card && event.target.dataset.storeRsvpQuestionField === 'id') {
+        card.dataset.storeRsvpQuestionIdAuto = 'false';
+      }
+      var optionRow = event.target.closest('[data-store-rsvp-option]');
+      if (card && optionRow && event.target.dataset.storeRsvpOptionField === 'label' && optionRow.dataset.storeRsvpOptionValueAuto === 'true') {
+        var optionValue = $('[data-store-rsvp-option-field="value"]', optionRow);
+        if (optionValue) optionValue.value = uniqueStoreProductRsvpOptionValue(card, event.target.value, optionRow);
+      } else if (optionRow && event.target.dataset.storeRsvpOptionField === 'value') {
+        optionRow.dataset.storeRsvpOptionValueAuto = 'false';
+      }
+      syncStoreProductRsvpQuestions(wrapper, true);
+    });
+
+    wrapper.addEventListener('change', function(event) {
+      var card = event.target.closest('[data-store-rsvp-question]');
+      if (card && event.target.dataset.storeRsvpQuestionField === 'type') {
+        ensureStoreProductRsvpChoiceMinimum(card);
+        refreshStoreProductRsvpQuestions(wrapper);
+      }
+      syncStoreProductRsvpQuestions(wrapper, true);
+    });
+
+    wrapper.addEventListener('click', function(event) {
+      var addQuestion = event.target.closest('[data-store-rsvp-question-add]');
+      if (addQuestion) {
+        var cards = $all('[data-store-rsvp-question]', wrapper);
+        if (cards.length >= STORE_PRODUCT_RSVP_MAX_QUESTIONS) return;
+        var nextNumber = cards.length + 1;
+        var card = createStoreProductRsvpQuestionCard(wrapper, {
+          id: uniqueStoreProductRsvpQuestionId(wrapper, 'question_' + String(nextNumber), null),
+          label: '',
+          type: 'text',
+          scope: 'party',
+          required: false
+        }, { autoId: true });
+        list.appendChild(card);
+        refreshStoreProductRsvpQuestions(wrapper);
+        syncStoreProductRsvpQuestions(wrapper, true);
+        $('[data-store-rsvp-question-field="label"]', card)?.focus();
+        return;
+      }
+
+      var questionAction = event.target.closest('[data-store-rsvp-question-action]');
+      if (questionAction) {
+        var questionCard = questionAction.closest('[data-store-rsvp-question]');
+        var action = questionAction.dataset.storeRsvpQuestionAction;
+        if (action === 'remove') questionCard?.remove();
+        if (action === 'up' && questionCard?.previousElementSibling) list.insertBefore(questionCard, questionCard.previousElementSibling);
+        if (action === 'down' && questionCard?.nextElementSibling) list.insertBefore(questionCard.nextElementSibling, questionCard);
+        refreshStoreProductRsvpQuestions(wrapper);
+        syncStoreProductRsvpQuestions(wrapper, true);
+        return;
+      }
+
+      var addOption = event.target.closest('[data-store-rsvp-option-add]');
+      if (addOption) {
+        var optionCard = addOption.closest('[data-store-rsvp-question]');
+        if (!optionCard || $all('[data-store-rsvp-option]', optionCard).length >= STORE_PRODUCT_RSVP_MAX_OPTIONS) return;
+        var optionRow = appendStoreProductRsvpDefaultOption(optionCard);
+        refreshStoreProductRsvpQuestions(wrapper);
+        syncStoreProductRsvpQuestions(wrapper, true);
+        $('[data-store-rsvp-option-field="label"]', optionRow)?.focus();
+        return;
+      }
+
+      var removeOption = event.target.closest('[data-store-rsvp-option-remove]');
+      if (removeOption) {
+        var removeCard = removeOption.closest('[data-store-rsvp-question]');
+        if (!removeCard || $all('[data-store-rsvp-option]', removeCard).length <= 2) return;
+        removeOption.closest('[data-store-rsvp-option]')?.remove();
+        refreshStoreProductRsvpQuestions(wrapper);
+        syncStoreProductRsvpQuestions(wrapper, true);
+      }
+    });
+
+    refreshStoreProductRsvpQuestions(wrapper);
+    syncStoreProductRsvpQuestions(wrapper, false);
+    return wrapper;
   }
 
   function defaultStoreProductShippingPreset() {
@@ -7374,7 +7828,7 @@
     eventDetails.appendChild(productField('Require attendee names', 'rsvpRequireAttendeeNames', product.rsvpRequireAttendeeNames === false ? 'false' : 'true', 'select', {
       options: [['true', 'Yes'], ['false', 'No']]
     }));
-    eventDetails.appendChild(productField('RSVP questions (JSON)', 'rsvpQuestions', JSON.stringify(product.rsvpQuestions || [], null, 2), 'textarea', { rows: 10 }));
+    eventDetails.appendChild(createStoreProductRsvpQuestionsBuilder(product.rsvpQuestions || []));
     mediaDescription.appendChild(createStoreProductImageField(product));
     mediaDescription.appendChild(createStoreProductSeoDescriptionField(product));
     mediaDescription.appendChild(createStoreProductDescriptionEditor(product));

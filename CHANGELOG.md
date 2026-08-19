@@ -8,6 +8,11 @@
   deadlines, party-size limits, contact and attendee names, and bounded party-
   or attendee-scoped custom questions. One shared Worker normalizer now governs
   checkout validation and dashboard publishing.
+- Replaced the RSVP question JSON textarea in Products with a guided, localized
+  question builder for labels, stable IDs, answer types, party/attendee scope,
+  required state, maximum length, and answer choices. The builder serializes to
+  the existing JSON field, so repository front matter and the canonical Worker
+  schema remain unchanged.
 - Extended the cart with accessible registration controls while keeping guest
   names and responses out of persistent browser storage. The Worker re-resolves
   current repository product data, rejects unknown choices and closed windows,
@@ -19,7 +24,10 @@
 - Added private roster and response views, attendee search, per-attendee
   check-in with legacy item-level compatibility, partial attendance totals, and
   one-row-per-attendee CSV export. Customer confirmations show their submitted
-  roster; transactional email includes names but omits custom responses.
+  roster; transactional email includes names but omits custom responses. The
+  desktop Orders table now reserves a bounded response/action column and wraps
+  long roster content without letting response text or check-in buttons escape
+  the table.
 - Added English and Spanish runtime copy, repository/admin configuration docs,
   order-data inventory and backup guidance, ethical-risk review, and focused
   contracts for schema bounds, tamper rejection, product publication, browser

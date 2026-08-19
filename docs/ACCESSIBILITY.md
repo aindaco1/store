@@ -5,9 +5,10 @@ Store accessibility coverage focuses on public product browsing, cart/checkout c
 ## Current Coverage
 
 - Admin async status updates are written as live regions with `role="status"` or `role="alert"`.
-- Store Orders rows have mobile/tablet card layouts and responsive action buttons covered by E2E assertions.
+- Store Orders rows have mobile/tablet card layouts plus a bounded desktop RSVP response/action column covered by E2E overflow and button-containment assertions.
 - Order Success, product controls, localized public/product routes, admin product editing, download creation, long-content fixtures, and compact tablet tabs are covered by automated checks.
 - Configured RSVP checkout uses labeled controls, question fieldsets and legends, required-state messaging, focusable validation targets, and Contact-before-RSVP reading order. Zero-total checkout removes both tip and payment-method controls from the accessibility tree, while paid checkout retains the mounted payment surface.
+- The RSVP Products builder uses native labeled inputs/selects, fieldset/legend question groups, semantic buttons, disabled move/remove limits, visible counts, and localized English/Spanish control names; the internal JSON serialization field is hidden from the accessibility tree.
 - Public Spanish shells for home, Terms, Orders, and Order Success reuse the same structural layout as the English routes; product/user-generated content remains canonical unless a product provides explicit localized copy.
 - iOS Safari auto-link styling is suppressed with `format-detection` metadata and inherited form/button colors so detected addresses, emails, dates, and hamburger controls do not turn blue unexpectedly.
 - `v1.0.6` release evidence keeps the axe, keyboard add-to-cart, focus order, order lookup live status, reduced motion, 200% text scaling, mobile overflow, and optional VoiceOver/Whisper transcript coverage from `v1.0.5`, and covers the super-admin Workers Cache clear status through the admin dashboard E2E path.

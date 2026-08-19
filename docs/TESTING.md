@@ -71,7 +71,7 @@ Default Playwright specs:
 - `tests/e2e/public-page-controls.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
 
-These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, direct-link multi-attendee RSVP registration and storage privacy, zero-total checkout without payment UI, paid-checkout payment UI preservation, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
+These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, direct-link multi-attendee RSVP registration and storage privacy, zero-total checkout without payment UI, paid-checkout payment UI preservation, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, guided RSVP question creation and JSON serialization, desktop RSVP response/action containment, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 
@@ -99,9 +99,12 @@ npx vitest run \
 
 npx playwright test tests/e2e/public-page-controls.spec.ts \
   --project=chromium --grep "direct-link RSVP"
+
+npx playwright test tests/e2e/admin-dashboard.spec.ts \
+  --project=chromium --grep "RSVP responses and actions|builds RSVP questions"
 ```
 
-These contracts cover schema bounds, dashboard normalization, canonical Worker rejection, historical response snapshots, memory-only guest answers, stale-cart schema repair, attendee rendering, zero-total `Complete order` behavior, no Stripe prewarm, and the submitted two-attendee payload. The paid checkout accessibility flow separately asserts that payment controls remain present.
+These contracts cover schema bounds, dashboard normalization, canonical Worker rejection, historical response snapshots, memory-only guest answers, stale-cart schema repair, attendee rendering, zero-total `Complete order` behavior, no Stripe prewarm, the submitted two-attendee payload, guided question serialization, and expanded desktop roster containment. The paid checkout accessibility flow separately asserts that payment controls remain present.
 
 Focused Store runs:
 

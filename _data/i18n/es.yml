@@ -188,6 +188,43 @@ admin:
   inventory_set_baseline: Establecer base
   inventory_reset_baseline: Restablecer base
   inventory_baseline_aria: "Base de inventario para %{label}"
+  rsvp_questions_title: Preguntas del RSVP
+  rsvp_questions_intro: Agrega las preguntas que las personas responden durante el checkout. Los ID estables conservan el significado de las respuestas históricas.
+  rsvp_questions_count: "%{count} de %{max} preguntas"
+  rsvp_questions_empty: Aún no hay preguntas personalizadas. Los nombres de contacto y asistentes todavía pueden ser obligatorios arriba.
+  rsvp_add_question: Agregar pregunta
+  rsvp_question_number: "Pregunta %{number}"
+  rsvp_question_label: Pregunta
+  rsvp_question_label_placeholder: ¿Qué necesitas saber?
+  rsvp_question_id: ID estable
+  rsvp_answer_type: Tipo de respuesta
+  rsvp_answer_text: Texto corto
+  rsvp_answer_long_text: Texto largo
+  rsvp_answer_single_choice: Elegir una opción
+  rsvp_answer_multiple_choice: Elegir varias opciones
+  rsvp_answer_checkbox: Casilla
+  rsvp_question_audience: Preguntar una vez o por asistente
+  rsvp_question_party: Una vez por registro
+  rsvp_question_attendee: Cada asistente
+  rsvp_question_requirement: Requisito
+  rsvp_question_optional: Opcional
+  rsvp_question_required: Obligatoria
+  rsvp_max_length: Máximo de caracteres
+  rsvp_default_length: Usar valor predeterminado
+  rsvp_choices_title: Opciones de respuesta
+  rsvp_choices_count: "%{count} de %{max} opciones"
+  rsvp_add_choice: Agregar opción
+  rsvp_choice_label: Etiqueta de la opción
+  rsvp_choice_label_placeholder: Opción que verán las personas
+  rsvp_choice_value: Valor guardado
+  rsvp_move_up: Subir
+  rsvp_move_down: Bajar
+  rsvp_remove_question: Quitar
+  rsvp_remove_choice: Quitar
+  rsvp_move_question_up: "Subir la pregunta %{number}"
+  rsvp_move_question_down: "Bajar la pregunta %{number}"
+  rsvp_remove_question_number: "Quitar la pregunta %{number}"
+  rsvp_remove_choice_number: "Quitar la opción %{number}"
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
   store_coupons_intro: Crea, edita y elimina códigos de cupón para descuentos de carrito completo o productos específicos.

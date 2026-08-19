@@ -9,6 +9,7 @@ Audience: Store operators and developers configuring, testing, or extending RSVP
 - Optional registration open/close timestamps and a per-registration party limit.
 - Required or optional contact and attendee names.
 - Party- or attendee-scoped text, textarea, single-select, multi-select, and checkbox questions.
+- A localized dashboard question builder that manages stable IDs, answer types, audience, required state, text limits, and choice lists without requiring admins to edit JSON.
 - Server-side validation against the current repository product, including deadline, party size, exact attendee count, required fields, and allowed choices.
 - Historical question and response snapshots on confirmed orders, so later product edits do not rewrite prior registrations.
 - Customer order-page attendee details, private admin response review and search, one-row-per-attendee CSV export, partial attendance totals, and independently audited attendee check-in.
@@ -17,7 +18,7 @@ Audience: Store operators and developers configuring, testing, or extending RSVP
 
 ## Product configuration
 
-Use the dashboard **Products** editor for normal changes, or edit the canonical `_products/*.md` record directly:
+Use the dashboard **Products** editor for normal changes. Its **RSVP questions** builder writes the same bounded registration schema shown below; the serialized JSON bridge is internal and the Worker still performs canonical normalization. Edit the canonical `_products/*.md` record directly only when a repository workflow requires it:
 
 ```yaml
 fulfillment_type: rsvp
@@ -69,7 +70,7 @@ Use stable question IDs after publication. Renaming a label is safe for new orde
 - Checkout places **Contact** before **RSVP details** and sends response values to the Worker. The Worker resolves the current product definition, enforces the open/deadline window and party size, rejects unknown choices, and stores canonical question snapshots with the order.
 - Free RSVPs continue to confirm without Stripe. Paid RSVP configurations, if used, retain the existing PaymentIntent and inventory lifecycle.
 - The private order page shows the submitted attendee roster and responses. Customer email lists attendee names but omits custom answers.
-- Admin Orders supports attendee search, per-attendee check-in, partial attendance totals, response review, and one-row-per-attendee CSV export. Older item-level check-ins remain readable and mutable.
+- Admin Orders supports attendee search, per-attendee check-in, partial attendance totals, response review, and one-row-per-attendee CSV export. Desktop response/action content is constrained to its table column, while tablet/mobile rows use the existing card layout. Older item-level check-ins remain readable and mutable.
 - A direct-linked cart that predates the registration schema can repair the non-sensitive schema from the current product page. Names and answers remain memory-only, and the Worker still performs the authoritative validation.
 
 ## Privacy and operations
@@ -101,6 +102,7 @@ Run focused contracts after RSVP changes:
 npx vitest run tests/unit/event-registration.test.ts tests/unit/admin-event-registration.test.ts tests/unit/admin-rsvp-product.test.ts
 npx vitest run tests/unit/cart-pending-item.test.ts
 npx playwright test tests/e2e/public-page-controls.spec.ts --project=chromium --grep "direct-link RSVP"
+npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium --grep "RSVP responses and actions|builds RSVP questions"
 bundle exec jekyll build --quiet
 ```
 
