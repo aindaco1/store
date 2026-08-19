@@ -3067,12 +3067,21 @@ test.describe('Admin Dashboard', () => {
     const editor = page.locator(`[data-store-product-editor="${RSVP_ITEM_ID}"]`);
     const source = editor.locator('[data-store-product-field="rsvpQuestions"]');
     await expect(source).toBeHidden();
+    const existingQuestion = editor.locator('[data-store-rsvp-question]').first();
+    const existingQuestionLabel = existingQuestion.locator('[data-store-rsvp-question-field="label"]');
+    const existingQuestionId = existingQuestion.locator('[data-store-rsvp-question-field="id"]');
+    await expect(existingQuestionId).toHaveAttribute('readonly', '');
+    await existingQuestionLabel.fill('Accessibility requests');
+    await expect(existingQuestionId).toHaveValue('accessibility_needs');
+    await existingQuestionLabel.fill('Accessibility needs or accommodations');
+
     await editor.getByRole('button', { name: 'Add question' }).click();
     await expect(editor.locator('[data-store-rsvp-question]')).toHaveCount(2);
 
     const question = editor.locator('[data-store-rsvp-question]').last();
     await expect(question.locator('[data-store-rsvp-question-field="label"]')).toHaveAttribute('required', '');
     await expect(question.locator('[data-store-rsvp-question-field="id"]')).toHaveAttribute('required', '');
+    await expect(question.locator('[data-store-rsvp-question-field="id"]')).toHaveAttribute('readonly', '');
     await question.locator('[data-store-rsvp-question-field="label"]').fill('Age group');
     await expect(question.locator('[data-store-rsvp-question-field="id"]')).toHaveValue('age_group');
     await question.locator('[data-store-rsvp-question-field="type"]').selectOption('single_select');
@@ -3083,10 +3092,22 @@ test.describe('Admin Dashboard', () => {
     const choices = question.locator('[data-store-rsvp-option]');
     await expect(choices.nth(0).locator('[data-store-rsvp-option-field="label"]')).toHaveAttribute('required', '');
     await expect(choices.nth(0).locator('[data-store-rsvp-option-field="value"]')).toHaveAttribute('required', '');
+    await expect(choices.nth(0).locator('[data-store-rsvp-option-field="value"]')).toHaveAttribute('readonly', '');
     await choices.nth(0).locator('[data-store-rsvp-option-field="label"]').fill('Under 18');
     await expect(choices.nth(0).locator('[data-store-rsvp-option-field="value"]')).toHaveValue('under_18');
     await choices.nth(1).locator('[data-store-rsvp-option-field="label"]').fill('18 or older');
     await expect(choices.nth(1).locator('[data-store-rsvp-option-field="value"]')).toHaveValue('18_or_older');
+    const describedControls = editor.locator([
+      '[data-store-product-field-wrapper="rsvpQuestions"] [data-store-rsvp-question-field]',
+      '[data-store-product-field-wrapper="rsvpQuestions"] [data-store-rsvp-option-field]'
+    ].join(', '));
+    await expect.poll(() => describedControls.evaluateAll((controls) => controls.every((control) => {
+      const helpId = control.getAttribute('aria-describedby');
+      const tooltip = helpId ? document.getElementById(helpId) : null;
+      return Boolean(tooltip && tooltip.getAttribute('role') === 'tooltip' && tooltip.textContent?.trim());
+    }))).toBe(true);
+    await expect(editor.locator('.admin-store-products__rsvp-builder-title .admin-settings__help-button')).toBeVisible();
+    await expect(question.locator('.admin-store-products__rsvp-choices-title .admin-settings__help-button')).toBeVisible();
     await expectNoAxeViolations(page, '[data-store-product-field-wrapper="rsvpQuestions"]');
 
     await editor.getByRole('button', { name: 'Publish product' }).click();

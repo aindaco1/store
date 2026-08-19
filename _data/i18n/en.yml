@@ -189,34 +189,44 @@ admin:
   inventory_reset_baseline: Reset baseline
   inventory_baseline_aria: "Inventory baseline for %{label}"
   rsvp_questions_title: RSVP questions
-  rsvp_questions_intro: Add the questions guests answer during checkout. Stable IDs preserve the meaning of historical responses.
+  rsvp_questions_intro: Add the questions guests answer during checkout. IDs and stored values are generated automatically and stay stable after publishing.
+  rsvp_questions_help: Questions appear during checkout only when RSVP registration is enabled. Ask only for information needed to run the event.
   rsvp_questions_count: "%{count} of %{max} questions"
   rsvp_questions_empty: No custom questions yet. Contact and attendee names can still be required above.
   rsvp_add_question: Add question
   rsvp_question_number: "Question %{number}"
   rsvp_question_label: Question
   rsvp_question_label_placeholder: What do you need to know?
+  rsvp_question_label_help: The question guests see during checkout. Keep it short, direct, and specific.
   rsvp_question_id: Stable ID
+  rsvp_question_id_help: Generated from the question when it is first created, then preserved so historical responses keep the same meaning.
   rsvp_answer_type: Answer type
+  rsvp_answer_type_help: Choose whether guests enter text, select one or several choices, or confirm a checkbox.
   rsvp_answer_text: Short text
   rsvp_answer_long_text: Long text
   rsvp_answer_single_choice: Choose one
   rsvp_answer_multiple_choice: Choose several
   rsvp_answer_checkbox: Checkbox
   rsvp_question_audience: Ask once or per attendee
+  rsvp_question_audience_help: Ask once for the whole registration or repeat the question for every named attendee.
   rsvp_question_party: Once per registration
   rsvp_question_attendee: Each attendee
   rsvp_question_requirement: Requirement
+  rsvp_question_requirement_help: Required questions must be completed before checkout. Use Optional unless the answer is necessary to run the event.
   rsvp_question_optional: Optional
   rsvp_question_required: Required
   rsvp_max_length: Maximum characters
+  rsvp_max_length_help: Limits text response length. Leave blank to use Store's safe default for the selected answer type.
   rsvp_default_length: Use default
   rsvp_choices_title: Answer choices
+  rsvp_choices_help: Add the options guests can select. Each choice receives an automatic stored value for exports and historical responses.
   rsvp_choices_count: "%{count} of %{max} choices"
   rsvp_add_choice: Add choice
   rsvp_choice_label: Choice label
   rsvp_choice_label_placeholder: Choice shown to guests
+  rsvp_choice_label_help: The answer option guests see during checkout.
   rsvp_choice_value: Stored value
+  rsvp_choice_value_help: Generated from the choice label when it is first created, then preserved so old responses continue to match.
   rsvp_move_up: Move up
   rsvp_move_down: Move down
   rsvp_remove_question: Remove

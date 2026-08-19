@@ -4638,6 +4638,32 @@
     return type === 'single_select' || type === 'multi_select';
   }
 
+  var storeProductRsvpFieldHelpKeys = {
+    label: 'rsvpQuestionLabelHelp',
+    id: 'rsvpQuestionIdHelp',
+    type: 'rsvpAnswerTypeHelp',
+    scope: 'rsvpQuestionAudienceHelp',
+    required: 'rsvpQuestionRequirementHelp',
+    maxLength: 'rsvpMaxLengthHelp',
+    optionLabel: 'rsvpChoiceLabelHelp',
+    optionValue: 'rsvpChoiceValueHelp'
+  };
+
+  function storeProductRsvpFieldHelp(field) {
+    var key = storeProductRsvpFieldHelpKeys[field];
+    return key ? localizedAdminText(key) : '';
+  }
+
+  function storeProductRsvpFieldHelpClass(field) {
+    if (['label', 'id', 'maxLength', 'optionLabel'].indexOf(field) >= 0) {
+      return 'admin-settings__help--edge-start';
+    }
+    if (['required', 'optionValue'].indexOf(field) >= 0) {
+      return 'admin-settings__help--edge-end';
+    }
+    return '';
+  }
+
   function createStoreProductRsvpControl(labelText, field, value, type, options) {
     var opts = options || {};
     var wrapper = createElement('label', 'admin-store-products__rsvp-field' + (opts.wide ? ' admin-store-products__rsvp-field--wide' : ''));
@@ -4661,10 +4687,25 @@
       if (opts.placeholder) input.placeholder = opts.placeholder;
     }
     if (opts.required) input.required = true;
-    input.className = 'admin-settings__input';
+    if (opts.readOnly && type !== 'select') {
+      input.readOnly = true;
+      input.setAttribute('aria-readonly', 'true');
+    }
+    input.className = 'admin-settings__input' + (opts.readOnly ? ' admin-settings__input--readonly' : '');
     input.dataset.storeRsvpQuestionField = field;
     ensureElementId(input, 'store-rsvp-question');
-    wrapper.appendChild(createElement('span', 'admin-store-products__rsvp-field-label', labelText));
+    var label = createElement('span', 'admin-store-products__field-label admin-store-products__rsvp-field-label');
+    label.appendChild(document.createTextNode(labelText));
+    var helpField = opts.helpField || field;
+    var help = createHelp({
+      label: labelText,
+      path: 'store-product-rsvp-' + String(helpField || field),
+      help: opts.help === false ? '' : (opts.help || storeProductRsvpFieldHelp(helpField))
+    }, input, {
+      className: storeProductRsvpFieldHelpClass(helpField)
+    });
+    if (help) label.appendChild(help);
+    wrapper.appendChild(label);
     wrapper.appendChild(input);
     return wrapper;
   }
@@ -4708,12 +4749,19 @@
     var row = createElement('div', 'admin-store-products__rsvp-option');
     row.dataset.storeRsvpOption = 'true';
     row.dataset.storeRsvpOptionValueAuto = opts.autoValue ? 'true' : 'false';
+    var optionLabel = String(option && option.label || '');
+    var optionValue = String(option && option.value || '').trim() || uniqueStoreProductRsvpOptionValue(card, optionLabel, row);
     var labelField = createStoreProductRsvpControl(
       localizedAdminText('rsvpChoiceLabel'),
       'label',
-      option && option.label || '',
+      optionLabel,
       'text',
-      { maxLength: 120, placeholder: localizedAdminText('rsvpChoiceLabelPlaceholder'), required: true }
+      {
+        helpField: 'optionLabel',
+        maxLength: 120,
+        placeholder: localizedAdminText('rsvpChoiceLabelPlaceholder'),
+        required: true
+      }
     );
     var labelInput = $('[data-store-rsvp-question-field="label"]', labelField);
     if (labelInput) {
@@ -4724,9 +4772,15 @@
     var valueField = createStoreProductRsvpControl(
       localizedAdminText('rsvpChoiceValue'),
       'value',
-      option && option.value || '',
+      optionValue,
       'text',
-      { maxLength: 120, placeholder: 'option_value', required: true }
+      {
+        helpField: 'optionValue',
+        maxLength: 120,
+        placeholder: 'option_value',
+        readOnly: true,
+        required: true
+      }
     );
     var valueInput = $('[data-store-rsvp-question-field="value"]', valueField);
     if (valueInput) {
@@ -4762,10 +4816,12 @@
   function createStoreProductRsvpQuestionCard(builder, question, options) {
     var opts = options || {};
     var source = question || {};
+    var sourceId = String(source.id || '').trim();
+    var autoId = opts.autoId === true || !sourceId;
     var card = document.createElement('fieldset');
     card.className = 'admin-store-products__rsvp-question';
     card.dataset.storeRsvpQuestion = 'true';
-    card.dataset.storeRsvpQuestionIdAuto = opts.autoId ? 'true' : 'false';
+    card.dataset.storeRsvpQuestionIdAuto = autoId ? 'true' : 'false';
     card.appendChild(createElement('legend', 'admin-store-products__rsvp-question-title', ''));
 
     var actions = createElement('div', 'admin-store-products__rsvp-question-actions');
@@ -4788,9 +4844,9 @@
     fields.appendChild(createStoreProductRsvpControl(
       localizedAdminText('rsvpQuestionId'),
       'id',
-      source.id || uniqueStoreProductRsvpQuestionId(builder, 'question', card),
+      sourceId || uniqueStoreProductRsvpQuestionId(builder, source.label || 'question', card),
       'text',
-      { maxLength: 64, placeholder: 'question_id', required: true }
+      { maxLength: 64, placeholder: 'question_id', readOnly: true, required: true }
     ));
     fields.appendChild(createStoreProductRsvpControl(
       localizedAdminText('rsvpAnswerType'),
@@ -4839,7 +4895,10 @@
     var choices = createElement('div', 'admin-store-products__rsvp-choices');
     choices.dataset.storeRsvpChoices = 'true';
     var choicesHeader = createElement('div', 'admin-store-products__rsvp-choices-header');
-    choicesHeader.appendChild(createElement('h5', 'admin-store-products__rsvp-choices-title', localizedAdminText('rsvpChoicesTitle')));
+    choicesHeader.appendChild(createHeadingWithHelp('h5', 'admin-store-products__rsvp-choices-title', localizedAdminText('rsvpChoicesTitle'), {
+      path: 'store-product-rsvp-choices',
+      help: localizedAdminText('rsvpChoicesHelp')
+    }));
     choicesHeader.appendChild(createElement('span', 'admin-app__muted admin-store-products__rsvp-choices-count', ''));
     var addChoice = createElement('button', 'btn btn--secondary btn--small', localizedAdminText('rsvpAddChoice'));
     addChoice.type = 'button';
@@ -4849,7 +4908,9 @@
     var choicesList = createElement('div', 'admin-store-products__rsvp-options');
     choicesList.dataset.storeRsvpOptionsList = 'true';
     (Array.isArray(source.options) ? source.options : []).slice(0, STORE_PRODUCT_RSVP_MAX_OPTIONS).forEach(function(option) {
-      choicesList.appendChild(createStoreProductRsvpOptionRow(card, option, { autoValue: false }));
+      choicesList.appendChild(createStoreProductRsvpOptionRow(card, option, {
+        autoValue: !String(option && option.value || '').trim()
+      }));
     });
     choices.appendChild(choicesList);
     card.appendChild(choices);
@@ -4964,7 +5025,10 @@
 
     var header = createElement('div', 'admin-store-products__rsvp-builder-header');
     var heading = createElement('div', 'admin-store-products__rsvp-builder-heading');
-    heading.appendChild(createElement('h4', 'admin-store-products__rsvp-builder-title', localizedAdminText('rsvpQuestionsTitle')));
+    heading.appendChild(createHeadingWithHelp('h4', 'admin-store-products__rsvp-builder-title', localizedAdminText('rsvpQuestionsTitle'), {
+      path: 'store-product-rsvp-questions',
+      help: localizedAdminText('rsvpQuestionsHelp')
+    }));
     var intro = createElement('p', 'admin-app__muted admin-store-products__rsvp-builder-intro', localizedAdminText('rsvpQuestionsIntro'));
     heading.appendChild(intro);
     header.appendChild(heading);
@@ -4991,15 +5055,11 @@
       if (card && event.target.dataset.storeRsvpQuestionField === 'label' && card.dataset.storeRsvpQuestionIdAuto === 'true') {
         var id = $('[data-store-rsvp-question-field="id"]', card);
         if (id) id.value = uniqueStoreProductRsvpQuestionId(wrapper, event.target.value, card);
-      } else if (card && event.target.dataset.storeRsvpQuestionField === 'id') {
-        card.dataset.storeRsvpQuestionIdAuto = 'false';
       }
       var optionRow = event.target.closest('[data-store-rsvp-option]');
       if (card && optionRow && event.target.dataset.storeRsvpOptionField === 'label' && optionRow.dataset.storeRsvpOptionValueAuto === 'true') {
         var optionValue = $('[data-store-rsvp-option-field="value"]', optionRow);
         if (optionValue) optionValue.value = uniqueStoreProductRsvpOptionValue(card, event.target.value, optionRow);
-      } else if (optionRow && event.target.dataset.storeRsvpOptionField === 'value') {
-        optionRow.dataset.storeRsvpOptionValueAuto = 'false';
       }
       syncStoreProductRsvpQuestions(wrapper, true);
     });

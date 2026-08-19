@@ -12,7 +12,10 @@
   question builder for labels, stable IDs, answer types, party/attendee scope,
   required state, maximum length, and answer choices. The builder serializes to
   the existing JSON field, so repository front matter and the canonical Worker
-  schema remain unchanged.
+  schema remain unchanged. New question IDs and choice values derive
+  automatically from their visible labels, remain read-only in the dashboard,
+  and stay unchanged when a published label is edited. Every builder field now
+  includes localized, keyboard-accessible guidance.
 - Extended the cart with accessible registration controls while keeping guest
   names and responses out of persistent browser storage. The Worker re-resolves
   current repository product data, rejects unknown choices and closed windows,

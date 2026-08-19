@@ -2714,8 +2714,8 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-store-products__rsvp-field-label {
-  @include admin-label;
   line-height: 1.25;
+  white-space: normal;
 }
 
 .admin-store-products__rsvp-choices {

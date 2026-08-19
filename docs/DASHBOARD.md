@@ -108,7 +108,7 @@ Fulfillment-aware fields:
 - Digital products hide inventory controls.
 - Digital products show a File select when Variant Based is No.
 - Digital variant-based products hide the product-level File field and show a File column per variant.
-- RSVP products may enable registration and configure opening/closing timestamps, maximum party size, contact and attendee name requirements, and bounded party- or attendee-scoped questions. The guided question builder supports stable IDs, text/long-text/single-choice/multiple-choice/checkbox answers, party or per-attendee scope, required state, text limits, and 2–20 choice rows. It serializes into the existing product field; preview and publish still use the same Worker normalizer, so an invalid definition cannot be published through the dashboard.
+- RSVP products may enable registration and configure opening/closing timestamps, maximum party size, contact and attendee name requirements, and bounded party- or attendee-scoped questions. The guided question builder supports stable IDs, text/long-text/single-choice/multiple-choice/checkbox answers, party or per-attendee scope, required state, text limits, and 2–20 choice rows. Question IDs and choice values derive automatically from labels for new rows, are read-only like generated product and variant identifiers, and remain unchanged when an existing label is edited. Every builder field includes localized keyboard- and pointer-accessible help. The builder serializes into the existing product field; preview and publish still use the same Worker normalizer, so an invalid definition cannot be published through the dashboard.
 
 Variants:
 

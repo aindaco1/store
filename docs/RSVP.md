@@ -9,7 +9,7 @@ Audience: Store operators and developers configuring, testing, or extending RSVP
 - Optional registration open/close timestamps and a per-registration party limit.
 - Required or optional contact and attendee names.
 - Party- or attendee-scoped text, textarea, single-select, multi-select, and checkbox questions.
-- A localized dashboard question builder that manages stable IDs, answer types, audience, required state, text limits, and choice lists without requiring admins to edit JSON.
+- A localized dashboard question builder that generates stable question IDs and stored choice values from visible labels, and manages answer types, audience, required state, text limits, and choice lists without requiring admins to edit JSON.
 - Server-side validation against the current repository product, including deadline, party size, exact attendee count, required fields, and allowed choices.
 - Historical question and response snapshots on confirmed orders, so later product edits do not rewrite prior registrations.
 - Customer order-page attendee details, private admin response review and search, one-row-per-attendee CSV export, partial attendance totals, and independently audited attendee check-in.
@@ -18,7 +18,7 @@ Audience: Store operators and developers configuring, testing, or extending RSVP
 
 ## Product configuration
 
-Use the dashboard **Products** editor for normal changes. Its **RSVP questions** builder writes the same bounded registration schema shown below; the serialized JSON bridge is internal and the Worker still performs canonical normalization. Edit the canonical `_products/*.md` record directly only when a repository workflow requires it:
+Use the dashboard **Products** editor for normal changes. Its **RSVP questions** builder writes the same bounded registration schema shown below; the serialized JSON bridge is internal and the Worker still performs canonical normalization. For new questions and choices, the dashboard derives read-only machine values from the visible labels and resolves duplicates with numeric suffixes. Once published, those values remain unchanged when a label is edited so historical responses keep their meaning. Localized info controls explain every builder field. Edit the canonical `_products/*.md` record directly only when a repository workflow requires it:
 
 ```yaml
 fulfillment_type: rsvp
@@ -61,7 +61,7 @@ Current bounds and defaults:
 - Question IDs use lowercase letters, numbers, dashes, or underscores and are limited to 64 characters. Labels are limited to 160 characters.
 - Names are limited to 120 characters. Text answers default to 160 characters, textarea answers default to 1,000, and an explicit `max_length` is capped at 2,000.
 
-Use stable question IDs after publication. Renaming a label is safe for new orders because confirmed orders retain the historical label; changing or reusing an ID for a different meaning makes cross-order exports ambiguous.
+Use stable question IDs after publication. The dashboard enforces this by preserving generated IDs and stored choice values after publication. Renaming a label is safe for new orders because confirmed orders retain the historical label; changing or reusing an ID directly in repository front matter for a different meaning makes cross-order exports ambiguous.
 
 ## Runtime contract
 

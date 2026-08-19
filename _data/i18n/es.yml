@@ -189,34 +189,44 @@ admin:
   inventory_reset_baseline: Restablecer base
   inventory_baseline_aria: "Base de inventario para %{label}"
   rsvp_questions_title: Preguntas del RSVP
-  rsvp_questions_intro: Agrega las preguntas que las personas responden durante el checkout. Los ID estables conservan el significado de las respuestas históricas.
+  rsvp_questions_intro: Agrega las preguntas que las personas responden durante el checkout. Los ID y valores guardados se generan automáticamente y permanecen estables después de publicar.
+  rsvp_questions_help: Las preguntas aparecen durante el checkout solo cuando el registro RSVP está activado. Pide únicamente la información necesaria para realizar el evento.
   rsvp_questions_count: "%{count} de %{max} preguntas"
   rsvp_questions_empty: Aún no hay preguntas personalizadas. Los nombres de contacto y asistentes todavía pueden ser obligatorios arriba.
   rsvp_add_question: Agregar pregunta
   rsvp_question_number: "Pregunta %{number}"
   rsvp_question_label: Pregunta
   rsvp_question_label_placeholder: ¿Qué necesitas saber?
+  rsvp_question_label_help: La pregunta que las personas ven durante el checkout. Procura que sea breve, directa y específica.
   rsvp_question_id: ID estable
+  rsvp_question_id_help: Se genera a partir de la pregunta cuando se crea y luego se conserva para mantener el significado de las respuestas históricas.
   rsvp_answer_type: Tipo de respuesta
+  rsvp_answer_type_help: Elige si las personas escriben texto, seleccionan una o varias opciones, o confirman una casilla.
   rsvp_answer_text: Texto corto
   rsvp_answer_long_text: Texto largo
   rsvp_answer_single_choice: Elegir una opción
   rsvp_answer_multiple_choice: Elegir varias opciones
   rsvp_answer_checkbox: Casilla
   rsvp_question_audience: Preguntar una vez o por asistente
+  rsvp_question_audience_help: Pregunta una vez para todo el registro o repite la pregunta para cada asistente con nombre.
   rsvp_question_party: Una vez por registro
   rsvp_question_attendee: Cada asistente
   rsvp_question_requirement: Requisito
+  rsvp_question_requirement_help: Las preguntas obligatorias deben completarse antes del checkout. Usa Opcional salvo que la respuesta sea necesaria para realizar el evento.
   rsvp_question_optional: Opcional
   rsvp_question_required: Obligatoria
   rsvp_max_length: Máximo de caracteres
+  rsvp_max_length_help: Limita la longitud de la respuesta de texto. Déjalo en blanco para usar el valor seguro predeterminado según el tipo de respuesta.
   rsvp_default_length: Usar valor predeterminado
   rsvp_choices_title: Opciones de respuesta
+  rsvp_choices_help: Agrega las opciones que las personas pueden seleccionar. Cada opción recibe un valor guardado automático para exportaciones y respuestas históricas.
   rsvp_choices_count: "%{count} de %{max} opciones"
   rsvp_add_choice: Agregar opción
   rsvp_choice_label: Etiqueta de la opción
   rsvp_choice_label_placeholder: Opción que verán las personas
+  rsvp_choice_label_help: La opción de respuesta que las personas ven durante el checkout.
   rsvp_choice_value: Valor guardado
+  rsvp_choice_value_help: Se genera a partir de la etiqueta cuando se crea y luego se conserva para que las respuestas anteriores sigan coincidiendo.
   rsvp_move_up: Subir
   rsvp_move_down: Bajar
   rsvp_remove_question: Quitar
