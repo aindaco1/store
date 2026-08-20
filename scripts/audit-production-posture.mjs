@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { normalizeWranglerInventory } from './lib/wrangler-config.mjs';
+import { normalizeWranglerInventory, parseWranglerConfig } from './lib/wrangler-config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -26,7 +26,7 @@ function explicitHttpsOrigin(value = '') {
   }
 }
 
-export function auditProductionPosture({ config, inventory, secrets = [], providerEvidence = null }) {
+export function auditProductionPosture({ config, inventory, wranglerConfig = {}, secrets = [], providerEvidence = null }) {
   const checks = [];
   const add = (id, status, detail) => checks.push({ id, status, detail });
   const names = secretNames(secrets);
@@ -38,6 +38,11 @@ export function auditProductionPosture({ config, inventory, secrets = [], provid
   }
   const vars = inventory.vars || {};
   add('config:app-mode', String(vars.APP_MODE || '').toLowerCase() === 'live' ? 'ok' : 'action', `APP_MODE=${String(vars.APP_MODE || 'missing')}`);
+  add(
+    'config:preview-urls',
+    wranglerConfig.preview_urls === false ? 'ok' : 'action',
+    wranglerConfig.preview_urls === false ? 'Explicitly disabled' : 'preview_urls must be explicitly false'
+  );
   const siteOrigin = explicitHttpsOrigin(vars.CANONICAL_SITE_BASE || vars.SITE_BASE);
   const workerOrigin = explicitHttpsOrigin(vars.CANONICAL_WORKER_BASE || vars.WORKER_BASE);
   add('config:site-origin', siteOrigin ? 'ok' : 'action', siteOrigin || 'Canonical site origin must be explicit HTTPS');
@@ -96,12 +101,15 @@ function main() {
   const args = process.argv.slice(2);
   const config = readJsonIfPresent(path.resolve(valueArg(args, '--config', path.join(ROOT, 'config', 'production-posture.json'))));
   const wranglerPath = path.resolve(valueArg(args, '--wrangler', path.join(ROOT, 'worker', 'wrangler.toml')));
-  const inventory = normalizeWranglerInventory(fs.readFileSync(wranglerPath, 'utf8'));
+  const wranglerSource = fs.readFileSync(wranglerPath, 'utf8');
+  const inventory = normalizeWranglerInventory(wranglerSource);
+  const wranglerConfig = parseWranglerConfig(wranglerSource);
   const secretsFile = valueArg(args, '--secrets-file', '');
   const providerEvidenceFile = valueArg(args, '--provider-evidence', '');
   const evidence = auditProductionPosture({
     config,
     inventory,
+    wranglerConfig,
     secrets: secretsFile ? readJsonIfPresent(path.resolve(secretsFile)) || [] : [],
     providerEvidence: providerEvidenceFile ? readJsonIfPresent(path.resolve(providerEvidenceFile)) : null
   });
