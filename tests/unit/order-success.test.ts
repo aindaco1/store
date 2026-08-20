@@ -28,7 +28,7 @@ describe('order success status recovery', () => {
     `;
     (window as any).STORE_CONFIG = {
       platform: { workerUrl: 'https://checkout.test' },
-      i18n: {
+        i18n: {
         currentLang: 'es',
         messages: {
           orderSuccess: {
@@ -44,7 +44,9 @@ describe('order success status recovery', () => {
             payment_processing: 'El pago sigue procesándose.',
             retrying_order: 'Reconectando con tu pedido...',
             ready_fulfillment: 'Listo para cumplimiento.',
-            confirmed_heading: 'Tu pedido está confirmado.'
+            confirmed_heading: 'Tu pedido está confirmado.',
+            rsvp_details: 'Datos de la confirmación',
+            attendees: 'Asistentes'
           }
         }
       }
@@ -78,7 +80,23 @@ describe('order success status recovery', () => {
         confirmedAt: '2026-07-30T03:07:01.981Z',
         totals: { subtotalCents: 1500, taxCents: 113, totalCents: 1613, currency: 'USD' },
         payment: { status: 'succeeded', amountCents: 1613, currency: 'USD' },
-        items: []
+        items: [{
+          id: 'rsvp-1',
+          name: 'Opening RSVP',
+          quantity: 2,
+          subtotalCents: 0,
+          currency: 'USD',
+          fulfillmentType: 'rsvp',
+          registration: {
+            version: 1,
+            answers: [{ id: 'accessibility_needs', label: 'Accesibilidad', type: 'textarea', scope: 'party', value: 'Acceso sin escalones' }],
+            attendees: [
+              { id: 'attendee-1', name: 'Adriana Invitada', answers: [] },
+              { id: 'attendee-2', name: 'Samuel Invitado', answers: [] }
+            ]
+          },
+          actions: {}
+        }]
       }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -98,6 +116,8 @@ describe('order success status recovery', () => {
     expect(document.querySelector('[data-store-order-status]')?.textContent).toBe('Listo para cumplimiento.');
     expect(document.querySelector('[data-store-order-summary-heading]')?.textContent).toBe('Tu pedido está confirmado.');
     expect(document.querySelector('[data-store-order-body]')?.textContent).toContain('Pedido confirmado');
+    expect(document.querySelector('[data-store-order-body]')?.textContent).toContain('Adriana Invitada');
+    expect(document.querySelector('[data-store-order-body]')?.textContent).toContain('Acceso sin escalones');
     expect(document.querySelector('[data-store-order-body]')?.textContent).toContain('Total parcial');
   });
 });

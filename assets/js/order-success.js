@@ -184,6 +184,59 @@
     return message('fulfillment_' + normalized, type);
   }
 
+  function formatRegistrationAnswerValue(value) {
+    if (Array.isArray(value)) return value.join(', ');
+    if (value === true) return message('answer_yes', 'Yes');
+    if (value === false) return message('answer_no', 'No');
+    return String(value ?? '').trim();
+  }
+
+  function appendRegistrationAnswers(parent, answers) {
+    var presentAnswers = (Array.isArray(answers) ? answers : []).map(function(answer) {
+      return {
+        label: String(answer?.label || answer?.id || '').trim(),
+        value: formatRegistrationAnswerValue(answer?.displayValue ?? answer?.value)
+      };
+    }).filter(function(answer) {
+      return answer.label && answer.value;
+    });
+    if (!presentAnswers.length) return;
+    var list = document.createElement('dl');
+    list.className = 'store-order__registration-answers';
+    presentAnswers.forEach(function(answer) {
+      var row = document.createElement('div');
+      appendText(row, 'dt', 'store-order__meta', answer.label);
+      appendText(row, 'dd', 'store-order__meta', answer.value);
+      list.append(row);
+    });
+    parent.append(list);
+  }
+
+  function renderRegistration(parent, registration) {
+    if (!registration || typeof registration !== 'object') return;
+    var attendees = Array.isArray(registration.attendees) ? registration.attendees : [];
+    var answers = Array.isArray(registration.answers) ? registration.answers : [];
+    if (!attendees.length && !answers.length) return;
+
+    var section = document.createElement('section');
+    section.className = 'store-order__registration';
+    appendText(section, 'h4', 'store-order__registration-title', message('rsvp_details', 'RSVP details'));
+    appendRegistrationAnswers(section, answers);
+    if (attendees.length) {
+      appendText(section, 'p', 'store-order__meta', message('attendees', 'Attendees'));
+      var attendeeList = document.createElement('ol');
+      attendeeList.className = 'store-order__registration-attendees';
+      attendees.forEach(function(attendee, index) {
+        var entry = document.createElement('li');
+        appendText(entry, 'span', 'store-order__registration-name', attendee?.name || message('attendee_number', 'Attendee %{number}', { number: index + 1 }));
+        appendRegistrationAnswers(entry, attendee?.answers);
+        attendeeList.append(entry);
+      });
+      section.append(attendeeList);
+    }
+    parent.append(section);
+  }
+
   function renderOrder(data) {
     if (!bodyNode) return;
     bodyNode.replaceChildren();
@@ -227,6 +280,7 @@
       if (item.event?.address) {
         appendText(row, 'p', 'store-order__meta', item.event.address);
       }
+      renderRegistration(row, item.registration);
       renderActions(row, item);
       if (item.actions?.download?.available === true) {
         appendText(row, 'p', 'store-order__note', message('download_note', 'Your download stays available from this order page.'));

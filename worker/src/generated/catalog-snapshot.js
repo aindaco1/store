@@ -2844,12 +2844,46 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
         "ends_at": "2026-12-18T21:00:00-07:00",
         "venue": "DUST WAVE",
         "ticket_delivery": "qr",
-        "ics": true
+        "ics": true,
+        "registration": {
+          "opens_at": "2026-08-01T00:00:00-06:00",
+          "closes_at": "2026-12-17T23:59:00-07:00",
+          "max_party_size": 4,
+          "require_contact_name": true,
+          "require_attendee_names": true,
+          "questions": [
+            {
+              "id": "accessibility_needs",
+              "label": "Accessibility needs or accommodations",
+              "type": "textarea",
+              "scope": "party",
+              "required": false,
+              "max_length": 500
+            },
+            {
+              "id": "age_group",
+              "label": "Age group",
+              "type": "single_select",
+              "scope": "attendee",
+              "required": true,
+              "options": [
+                {
+                  "value": "under_18",
+                  "label": "Under 18"
+                },
+                {
+                  "value": "18_plus",
+                  "label": "18 or older"
+                }
+              ]
+            }
+          ]
+        }
       },
       "turnstile_required": true
     }
   ],
-  "source_hash": "a82673ca0f2a7c61a0fe1da80ca8644f920da3bec49799fffc0c7a6a0cc9b043"
+  "source_hash": "53b5b970461bb9590c8751317603b48ac262f9d1c5d7d65f329f6bd03b879a7f"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

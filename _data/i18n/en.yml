@@ -188,6 +188,53 @@ admin:
   inventory_set_baseline: Set baseline
   inventory_reset_baseline: Reset baseline
   inventory_baseline_aria: "Inventory baseline for %{label}"
+  rsvp_questions_title: RSVP questions
+  rsvp_questions_intro: Add the questions guests answer during checkout. IDs and stored values are generated automatically and stay stable after publishing.
+  rsvp_questions_help: Questions appear during checkout only when RSVP registration is enabled. Ask only for information needed to run the event.
+  rsvp_questions_count: "%{count} of %{max} questions"
+  rsvp_questions_empty: No custom questions yet. Contact and attendee names can still be required above.
+  rsvp_add_question: Add question
+  rsvp_question_number: "Question %{number}"
+  rsvp_question_label: Question
+  rsvp_question_label_placeholder: What do you need to know?
+  rsvp_question_label_help: The question guests see during checkout. Keep it short, direct, and specific.
+  rsvp_question_id: Stable ID
+  rsvp_question_id_help: Generated from the question when it is first created, then preserved so historical responses keep the same meaning.
+  rsvp_answer_type: Answer type
+  rsvp_answer_type_help: Choose whether guests enter text, select one or several choices, or confirm a checkbox.
+  rsvp_answer_text: Short text
+  rsvp_answer_long_text: Long text
+  rsvp_answer_single_choice: Choose one
+  rsvp_answer_multiple_choice: Choose several
+  rsvp_answer_checkbox: Checkbox
+  rsvp_question_audience: Ask once or per attendee
+  rsvp_question_audience_help: Ask once for the whole registration or repeat the question for every named attendee.
+  rsvp_question_party: Once per registration
+  rsvp_question_attendee: Each attendee
+  rsvp_question_requirement: Requirement
+  rsvp_question_requirement_help: Required questions must be completed before checkout. Use Optional unless the answer is necessary to run the event.
+  rsvp_question_optional: Optional
+  rsvp_question_required: Required
+  rsvp_max_length: Maximum characters
+  rsvp_max_length_help: Limits text response length. Leave blank to use Store's safe default for the selected answer type.
+  rsvp_default_length: Use default
+  rsvp_choices_title: Answer choices
+  rsvp_choices_help: Add the options guests can select. Each choice receives an automatic stored value for exports and historical responses.
+  rsvp_choices_count: "%{count} of %{max} choices"
+  rsvp_add_choice: Add choice
+  rsvp_choice_label: Choice label
+  rsvp_choice_label_placeholder: Choice shown to guests
+  rsvp_choice_label_help: The answer option guests see during checkout.
+  rsvp_choice_value: Stored value
+  rsvp_choice_value_help: Generated from the choice label when it is first created, then preserved so old responses continue to match.
+  rsvp_move_up: Move up
+  rsvp_move_down: Move down
+  rsvp_remove_question: Remove
+  rsvp_remove_choice: Remove
+  rsvp_move_question_up: "Move question %{number} up"
+  rsvp_move_question_down: "Move question %{number} down"
+  rsvp_remove_question_number: "Remove question %{number}"
+  rsvp_remove_choice_number: "Remove choice %{number}"
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
   store_coupons_intro: Create, edit, and delete Store coupon codes for cart-wide or product-specific discounts.
@@ -293,6 +340,7 @@ runtime:
     decrease_quantity: Decrease quantity
     increase_quantity: Increase quantity
     continue_to_payment: Continue to payment
+    complete_order: Complete order
     processing_payment: Processing payment...
     finishing_order: Finishing order...
     pay_now: Pay now
@@ -307,6 +355,16 @@ runtime:
     email_required: Enter an email address to continue.
     email_invalid: Enter a valid email address to continue.
     shipping_address_required: Enter a complete shipping address to continue.
+    rsvp_details: RSVP details
+    rsvp_contact: RSVP contact
+    rsvp_deadline: Respond by %{date}.
+    rsvp_choose_option: Choose an option
+    rsvp_attendee_number: Attendee %{number}
+    rsvp_attendee_name: Attendee name
+    rsvp_contact_name_required: Enter a contact name to continue.
+    rsvp_attendee_name_required: Enter a name for each attendee.
+    rsvp_required_answer: Answer all required RSVP questions.
+    rsvp_party_too_large: This RSVP allows at most %{count} attendees.
     close_cart: Close cart
     your_cart: Your cart
     checkout_title: Checkout
@@ -345,7 +403,7 @@ runtime:
   order_success:
     eyebrow: Order
     page_title: Order received
-    initial_heading: Your payment is being finalized. Fulfillment details will appear here when the order is ready.
+    initial_heading: We are confirming your order. Fulfillment details will appear here when the order is ready.
     return_to_store: Return to the store
     subtotal: Subtotal
     discount: Discount
@@ -373,6 +431,11 @@ runtime:
     fulfillment_service: Service
     fulfillment_physical: Physical item
     items: Items
+    rsvp_details: RSVP details
+    attendees: Attendees
+    attendee_number: Attendee %{number}
+    answer_yes: "Yes"
+    answer_no: "No"
     download_note: Your download stays available from this order page.
     unable_load_order: Unable to load order.
     still_processing: Still processing payment...
@@ -436,6 +499,7 @@ email:
     rsvp_note: Your RSVP is confirmed.
     shipping_note: Shipping updates will appear on your order page.
     quantity_label: Qty
+    attendees_label: Attendees
     items_heading: Items
     shipping_heading: Shipping
     customer_heading: Customer

@@ -44,6 +44,7 @@ describe('product content security audit', () => {
 
     expect(cardTemplate).toContain('{{ desc_text | truncate: 170 | escape }}');
     expect(cardTemplate).toContain('data-item-description="{{ desc_text | escape }}"');
+    expect(cardTemplate).toContain('data-event-registration="{{ product.event_details.registration | jsonify | escape }}"');
     expect(productLayout).toContain('{{ content | sanitize_markdown_links: site.url }}');
   });
 

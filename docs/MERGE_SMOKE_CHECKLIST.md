@@ -95,7 +95,7 @@ Prepare or identify safe test records before smoke:
 - One paid physical product with tax, shipping, finite inventory, and a product image.
 - One paid digital product backed by a reusable download file.
 - One paid ticket product with attendee and QR/check-in fulfillment.
-- One free RSVP product that confirms without Stripe.
+- One configured free RSVP product with at least two attendees and a scoped question that confirms without Stripe.
 - One coupon covering percent or fixed discounts and at least one rejection case.
 - One admin user with `super_admin` access and one limited Store admin user.
 - Long product, attendee, filename, and fulfillment labels for wrapping/overflow checks.
@@ -178,7 +178,8 @@ Block merge or release when any of these fail:
 - [ ] Run `npm run release:fulfillment-evidence` for signed downloads, download revoke/refresh, ticket/RSVP check-in, and admin CSV export evidence.
 - [ ] Paid digital checkout confirms only after webhook settlement and shows a signed download action.
 - [ ] Paid ticket checkout produces attendee/ticket fulfillment and admin check-in works once.
-- [ ] Free RSVP checkout confirms without Stripe and produces expected attendee/receipt behavior.
+- [ ] Free RSVP checkout places Contact before RSVP details, omits tip/payment controls at `$0.00`, uses **Complete order**, does not load Stripe, and produces expected attendee/receipt behavior.
+- [ ] Paid or mixed checkout still renders payment controls and uses the PaymentIntent path.
 - [ ] Stripe success webhook settles paid orders; failed/canceled payment events release reservations.
 - [ ] Customer order lookup sends a generic request response and consumes only token-scoped links.
 - [ ] Abandoned-checkout and event reminder suppression/resume behavior is correct in a controlled test.

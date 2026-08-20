@@ -188,6 +188,53 @@ admin:
   inventory_set_baseline: Establecer base
   inventory_reset_baseline: Restablecer base
   inventory_baseline_aria: "Base de inventario para %{label}"
+  rsvp_questions_title: Preguntas del RSVP
+  rsvp_questions_intro: Agrega las preguntas que las personas responden durante el checkout. Los ID y valores guardados se generan automáticamente y permanecen estables después de publicar.
+  rsvp_questions_help: Las preguntas aparecen durante el checkout solo cuando el registro RSVP está activado. Pide únicamente la información necesaria para realizar el evento.
+  rsvp_questions_count: "%{count} de %{max} preguntas"
+  rsvp_questions_empty: Aún no hay preguntas personalizadas. Los nombres de contacto y asistentes todavía pueden ser obligatorios arriba.
+  rsvp_add_question: Agregar pregunta
+  rsvp_question_number: "Pregunta %{number}"
+  rsvp_question_label: Pregunta
+  rsvp_question_label_placeholder: ¿Qué necesitas saber?
+  rsvp_question_label_help: La pregunta que las personas ven durante el checkout. Procura que sea breve, directa y específica.
+  rsvp_question_id: ID estable
+  rsvp_question_id_help: Se genera a partir de la pregunta cuando se crea y luego se conserva para mantener el significado de las respuestas históricas.
+  rsvp_answer_type: Tipo de respuesta
+  rsvp_answer_type_help: Elige si las personas escriben texto, seleccionan una o varias opciones, o confirman una casilla.
+  rsvp_answer_text: Texto corto
+  rsvp_answer_long_text: Texto largo
+  rsvp_answer_single_choice: Elegir una opción
+  rsvp_answer_multiple_choice: Elegir varias opciones
+  rsvp_answer_checkbox: Casilla
+  rsvp_question_audience: Preguntar una vez o por asistente
+  rsvp_question_audience_help: Pregunta una vez para todo el registro o repite la pregunta para cada asistente con nombre.
+  rsvp_question_party: Una vez por registro
+  rsvp_question_attendee: Cada asistente
+  rsvp_question_requirement: Requisito
+  rsvp_question_requirement_help: Las preguntas obligatorias deben completarse antes del checkout. Usa Opcional salvo que la respuesta sea necesaria para realizar el evento.
+  rsvp_question_optional: Opcional
+  rsvp_question_required: Obligatoria
+  rsvp_max_length: Máximo de caracteres
+  rsvp_max_length_help: Limita la longitud de la respuesta de texto. Déjalo en blanco para usar el valor seguro predeterminado según el tipo de respuesta.
+  rsvp_default_length: Usar valor predeterminado
+  rsvp_choices_title: Opciones de respuesta
+  rsvp_choices_help: Agrega las opciones que las personas pueden seleccionar. Cada opción recibe un valor guardado automático para exportaciones y respuestas históricas.
+  rsvp_choices_count: "%{count} de %{max} opciones"
+  rsvp_add_choice: Agregar opción
+  rsvp_choice_label: Etiqueta de la opción
+  rsvp_choice_label_placeholder: Opción que verán las personas
+  rsvp_choice_label_help: La opción de respuesta que las personas ven durante el checkout.
+  rsvp_choice_value: Valor guardado
+  rsvp_choice_value_help: Se genera a partir de la etiqueta cuando se crea y luego se conserva para que las respuestas anteriores sigan coincidiendo.
+  rsvp_move_up: Subir
+  rsvp_move_down: Bajar
+  rsvp_remove_question: Quitar
+  rsvp_remove_choice: Quitar
+  rsvp_move_question_up: "Subir la pregunta %{number}"
+  rsvp_move_question_down: "Bajar la pregunta %{number}"
+  rsvp_remove_question_number: "Quitar la pregunta %{number}"
+  rsvp_remove_choice_number: "Quitar la opción %{number}"
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
   store_coupons_intro: Crea, edita y elimina códigos de cupón para descuentos de carrito completo o productos específicos.
@@ -293,6 +340,7 @@ runtime:
     decrease_quantity: Disminuir cantidad
     increase_quantity: Aumentar cantidad
     continue_to_payment: Continuar al pago
+    complete_order: Finalizar pedido
     processing_payment: Procesando pago...
     finishing_order: Finalizando pedido...
     pay_now: Pagar ahora
@@ -307,6 +355,16 @@ runtime:
     email_required: Introduce una dirección de correo para continuar.
     email_invalid: Introduce una dirección de correo válida para continuar.
     shipping_address_required: Completa una dirección de envío para continuar.
+    rsvp_details: Datos de la confirmación
+    rsvp_contact: Contacto de la confirmación
+    rsvp_deadline: Responde antes de %{date}.
+    rsvp_choose_option: Elige una opción
+    rsvp_attendee_number: Asistente %{number}
+    rsvp_attendee_name: Nombre del asistente
+    rsvp_contact_name_required: Introduce un nombre de contacto para continuar.
+    rsvp_attendee_name_required: Introduce el nombre de cada asistente.
+    rsvp_required_answer: Responde todas las preguntas obligatorias de la confirmación.
+    rsvp_party_too_large: Esta confirmación admite un máximo de %{count} asistentes.
     close_cart: Cerrar carrito
     your_cart: Tu carrito
     checkout_title: Pagar
@@ -345,7 +403,7 @@ runtime:
   order_success:
     eyebrow: Pedido
     page_title: Pedido recibido
-    initial_heading: Tu pago se está finalizando. Los detalles de cumplimiento aparecerán aquí cuando el pedido esté listo.
+    initial_heading: Estamos confirmando tu pedido. Los detalles de cumplimiento aparecerán aquí cuando esté listo.
     return_to_store: Volver a la tienda
     subtotal: Total parcial
     discount: Descuento
@@ -373,6 +431,11 @@ runtime:
     fulfillment_service: Servicio
     fulfillment_physical: Artículo físico
     items: Artículos
+    rsvp_details: Datos de la confirmación
+    attendees: Asistentes
+    attendee_number: Asistente %{number}
+    answer_yes: "Sí"
+    answer_no: "No"
     download_note: Tu descarga permanece disponible desde esta página del pedido.
     unable_load_order: No se pudo cargar el pedido.
     still_processing: El pago sigue procesándose...
@@ -436,6 +499,7 @@ email:
     rsvp_note: Tu RSVP está confirmado.
     shipping_note: Las novedades de envío aparecerán en la página del pedido.
     quantity_label: Cant.
+    attendees_label: Asistentes
     items_heading: Artículos
     shipping_heading: Envío
     customer_heading: Cliente

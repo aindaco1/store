@@ -46,6 +46,7 @@ Record the outcome in the PR or release evidence:
    - optional `variants`
    - optional `download.file_key`
    - optional event metadata for ticket/RSVP products
+   - optional `event_details.registration` for RSVP windows, party limits, names, and scoped questions
 3. `scripts/generate-catalog-snapshot.rb` generates the Worker catalog snapshot.
 4. The storefront renders product cards and detail pages from the Jekyll collection.
 5. The Worker validates cart payloads against the generated catalog snapshot.
@@ -59,6 +60,7 @@ Record the outcome in the PR or release evidence:
 5. Shopper-entered coupon codes are carried with the cart intent but validated only by the Worker.
 6. Opted-in checkout reminder consent is stored with the draft when checkout starts.
 7. Heavy cart runtime files lazy-load only after cart state or user intent.
+8. Configured RSVP names and answers remain in memory until checkout submission; only the non-sensitive form schema may be persisted for cart recovery.
 
 ## Coupon Workflow
 
@@ -88,7 +90,7 @@ Record the outcome in the PR or release evidence:
 5. Positive-count SKUs are reserved by the SKU inventory Durable Object.
 6. If the shopper opted into checkout reminders, the Worker queues a delayed reminder record.
 7. Paid orders receive a Stripe PaymentIntent and mount on-site payment UI.
-8. Free RSVP orders confirm immediately.
+8. Zero-total orders omit tip and payment-method controls, skip Stripe loading, and use **Complete order**. Free RSVP orders confirm immediately.
 9. Browser redirects to:
 
    ```text
@@ -151,8 +153,10 @@ On failure, the Worker:
 ### Tickets And RSVPs
 
 - Product front matter carries event metadata.
+- Configured RSVP registration may add open/close timestamps, party limits, contact/attendee names, and party- or attendee-scoped questions. The Worker re-resolves and validates the current definition before confirmation.
 - Confirmed order summaries expose QR/check-in actions.
 - Admin Orders shows attendance totals, grouped event rows, attendee search, and attendee CSV export.
+- Named registrations expose historical response review and one check-in control per attendee; legacy registrations retain item-level check-in compatibility.
 - Ticket/RSVP check-in writes through:
 
   ```text

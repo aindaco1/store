@@ -70,9 +70,11 @@ describe('package test scripts', () => {
     expect(preMergeScript).not.toContain('run_phase "10. Headless E2E suite"');
   });
 
-  it('restores the checked-in Worker config after pre-merge synchronization', () => {
+  it('atomically restores the checked-in Worker config after pre-merge synchronization', () => {
     const workerConfigPath = join(repoRoot, 'worker/wrangler.toml');
     const before = readFileSync(workerConfigPath, 'utf8');
+    const syncWorkerConfig = readFileSync(join(repoRoot, 'scripts/sync-worker-config.rb'), 'utf8');
+    const preMergeScript = readFileSync(join(repoRoot, 'scripts/pre-merge-regression.sh'), 'utf8');
 
     execFileSync(
       'bash',
@@ -81,6 +83,19 @@ describe('package test scripts', () => {
     );
 
     expect(readFileSync(workerConfigPath, 'utf8')).toBe(before);
+    expect(syncWorkerConfig).toContain('Tempfile.create([".#{File.basename(path)}.", \'.tmp\'], File.dirname(path))');
+    expect(syncWorkerConfig).toContain('File.rename(file.path, path)');
+    expect(preMergeScript).toContain('mktemp worker/.wrangler.toml.restore.XXXXXX');
+    expect(preMergeScript).toContain('mv -f "${worker_config_restore}" worker/wrangler.toml');
+  });
+
+  it('keeps local order email delivery immediate while production uses the durable outbox', () => {
+    const syncWorkerConfig = readFileSync(join(repoRoot, 'scripts/sync-worker-config.rb'), 'utf8');
+    const devOverride = syncWorkerConfig.slice(syncWorkerConfig.indexOf('dev_values ='));
+
+    expect(devOverride).toContain("'APP_MODE' => 'test'");
+    expect(devOverride).toContain("'EMAIL_OUTBOX_ENABLED' => 'false'");
+    expect(devOverride).toContain("'PAYMENT_RECONCILIATION_ENABLED' => 'false'");
   });
 
   it('fails closed before generated-asset checks when either Jekyll build path fails', () => {
@@ -88,6 +103,8 @@ describe('package test scripts', () => {
 
     expect(preMergeScript).toContain('bundle exec jekyll build --config "${jekyll_config_files}" --quiet || return 1');
     expect(preMergeScript).toContain('minify_site_assets || return 1');
+    expect(preMergeScript).toContain('run_phase "7. Store build artifact checks" scripts/pre-merge-regression.sh __host_or_podman_build_check');
+    expect(preMergeScript).not.toContain("bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'");
     expect(preMergeScript).toContain('sitemap.txt is missing from the built site');
   });
 
@@ -135,5 +152,12 @@ describe('package test scripts', () => {
     expect(podmanDev).toContain('if [ -n "${STRIPE_LISTEN_PID:-}" ]; then');
     expect(podmanDev).toContain('kill "$STRIPE_LISTEN_PID"');
     expect(podmanDev).not.toContain('kill "${STRIPE_LISTEN_PID:-0}"');
+  });
+
+  it('lets host test harnesses disable Stripe forwarding without provider access', () => {
+    const hostDev = readFileSync(join(repoRoot, 'scripts/dev.sh'), 'utf8');
+
+    expect(hostDev).toContain('SKIP_STRIPE="${SKIP_STRIPE:-false}"');
+    expect(hostDev).not.toContain('SKIP_STRIPE=false');
   });
 });

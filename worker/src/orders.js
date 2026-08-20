@@ -1,5 +1,6 @@
 import { validateStoreOrderDraft } from './catalog.js';
 import { getValidationDiscountedSubtotalCents } from './coupons.js';
+import { normalizeStoredEventRegistration } from './event-registration.js';
 import { getDefaultPlatformTipPercent, getMaxPlatformTipPercent } from './provider-config.js';
 import { calculatePlatformTip, sanitizePlatformTipPercent } from './tip.js';
 
@@ -30,7 +31,9 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
     env: options.env || {},
     snapshot: options.snapshot,
     enforceSubmittedPrices: options.enforceSubmittedPrices !== false,
-    enforceInventory: options.enforceInventory === true
+    enforceInventory: options.enforceInventory === true,
+    enforceEventRegistration: options.enforceEventRegistration === true,
+    nowMs: options.nowMs
   });
 
   if (!validation.valid) {
@@ -86,6 +89,32 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
   const tipAmountCents = calculatePlatformTip(discountedSubtotalCents, tipPercent, maxTipPercent);
   const totalCents = discountedSubtotalCents + tipAmountCents + shippingCents + taxCents;
   const customer = normalizeCustomer(input, options);
+  const contactErrors = [];
+  const configuredRegistrations = validation.items.filter((item) => item.eventRegistration);
+  if (configuredRegistrations.length > 0 && !customer.email) {
+    contactErrors.push({
+      code: 'registration_email_required',
+      message: 'Enter an email address for this RSVP.'
+    });
+  }
+  if (configuredRegistrations.some((item) => item.eventRegistration?.requireContactName) && !customer.name) {
+    contactErrors.push({
+      code: 'registration_contact_name_required',
+      message: 'Enter the primary contact name for this RSVP.'
+    });
+  }
+  if (contactErrors.length > 0) {
+    return {
+      ok: false,
+      status: 422,
+      error: 'Complete the RSVP contact information to continue.',
+      validation: {
+        ...validation,
+        valid: false,
+        errors: [...validation.errors, ...contactErrors]
+      }
+    };
+  }
   const shippingAddress = normalizeOrderAddress(options.shippingAddress ?? input.shippingAddress);
   const billingAddress = normalizeOrderAddress(options.billingAddress ?? input.billingAddress);
   const shippingOption = normalizeString(options.shippingOption ?? input.shippingOption ?? 'standard') || 'standard';
@@ -162,7 +191,8 @@ export function normalizeStoreOrderDraftForHash(draft = {}) {
         collection: normalizeString(item?.collection),
         category: normalizeString(item?.category),
         shippingPreset: normalizeString(item?.shippingPreset),
-        taxCategory: normalizeString(item?.taxCategory)
+        taxCategory: normalizeString(item?.taxCategory),
+        ...(item?.registration ? { registration: normalizeStoredEventRegistration(item.registration) } : {})
       })).sort(compareHashItems)
     : [];
 
@@ -238,6 +268,7 @@ function compactStoreOrderItem(item = {}) {
     image: normalizeString(item.image),
     url: normalizeString(item.url),
     eventDetails: item.eventDetails || null,
+    ...(item.registration ? { registration: normalizeStoredEventRegistration(item.registration) } : {}),
     download: item.download || null,
     turnstileRequired: item.turnstileRequired === true
   };

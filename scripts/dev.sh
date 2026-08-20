@@ -16,7 +16,7 @@ WORKER_PORT=8989
 LOCAL_REPO_SERVICE_PORT=8799
 STRIPE_LOG="/tmp/store-stripe-listen.log"
 USES_FIRST_PARTY_LOCAL=true
-SKIP_STRIPE=false
+SKIP_STRIPE="${SKIP_STRIPE:-false}"
 
 prefer_current_node_path() {
   local candidate=""

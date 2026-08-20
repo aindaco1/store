@@ -599,6 +599,42 @@
   margin: 0;
 }
 
+.store-order__registration {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.store-order__registration-title,
+.store-order__registration-name {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-weight: 700;
+}
+
+.store-order__registration-attendees,
+.store-order__registration-answers {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.store-order__registration-answers {
+  padding-left: 0;
+}
+
+.store-order__registration-answers > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.store-order__registration-answers dd {
+  margin: 0;
+}
+
 .store-order__item-price,
 .store-order__total {
   color: var(--color-text-strong);

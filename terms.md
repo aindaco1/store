@@ -3,8 +3,8 @@ layout: default
 title: Terms and Store Policies
 lang: en
 translation_key: terms
-description: Review Dust Wave Shop's order, payment, shipping, no-returns, fulfillment, event, download, privacy, and acceptable-use policies.
-last_modified_at: 2026-07-14
+description: Review Dust Wave Shop's order, payment, shipping, no-returns, fulfillment, event registration, download, privacy, and acceptable-use policies.
+last_modified_at: 2026-08-18
 ---
 {% capture store_name %}{% include platform-display-title.html %}{% endcapture %}
 {% assign store_name = store_name | strip %}
@@ -18,7 +18,7 @@ last_modified_at: 2026-07-14
 
 # Terms & Store Policies
 
-**Effective July 14, 2026.** These terms govern use of {{ store_name }}, an online store operated by {{ operator_name }}. By using the site or placing an order, you agree to these terms and to any product- or event-specific terms shown before checkout. If a more specific term conflicts with these terms, the more specific term controls for that product or event unless prohibited by law.
+**Effective August 18, 2026.** These terms govern use of {{ store_name }}, an online store operated by {{ operator_name }}. By using the site or placing an order, you agree to these terms and to any product- or event-specific terms shown before checkout. If a more specific term conflicts with these terms, the more specific term controls for that product or event unless prohibited by law.
 
 ## 1. Eligibility and acceptable use
 
@@ -92,6 +92,10 @@ If charged merchandise cannot be shipped or another charged item cannot be fulfi
 
 Tickets and RSVPs are valid only for the event listed with the order. They may include QR or check-in credentials tied to the order. Keep ticket, QR, check-in, and order links private; sharing them can let someone else use the associated access.
 
+An event may set an RSVP opening or response deadline, a maximum party size, and required contact, attendee, accessibility, dietary, age-group, or other event-specific questions. Provide accurate information and submit another attendee's details only when you are authorized to do so. A no-charge RSVP is confirmed only after the store accepts it; it does not require a payment method when the total is zero.
+
+Store does not currently provide customer self-service RSVP edits, substitutions, cancellations, waitlists, or automatic waitlist promotion. Contact [{{ support_email }}](mailto:{{ support_email }}) if a confirmed registration needs review. Support may not be able to make a requested change when an event is closed, at capacity, already underway, or subject to event-specific restrictions.
+
 Customer-requested cancellations, missed events, and unused tickets remain subject to the return policy above and any event-specific terms. If we cancel an event, we will offer the applicable refund or replacement option. If an event is postponed, moved, or materially changed, we will explain whether existing tickets remain valid and what transfer, replacement, or refund options apply.
 
 ## 7. Digital products and downloads
@@ -108,7 +112,7 @@ Order lookup, order detail, download, ticket, check-in, and administration links
 
 ## 9. Privacy and data
 
-We collect information needed to operate the service, including contact details, order contents, prices and payment status, shipping information for physical products, ticket or RSVP details, reminder choices, referral information when supplied, and support messages. Stripe handles full payment-card details. Cloudflare provides site, Worker, security, storage, and operational infrastructure; Resend delivers email; and shipping, tax, address, analytics, or abuse-prevention providers receive limited data only when their service is needed and enabled.
+We collect information needed to operate the service, including contact details, order contents, prices and payment status, shipping information for physical products, ticket or RSVP details such as attendee names and event-specific answers, reminder choices, referral information when supplied, and support messages. Stripe handles full payment-card details. Cloudflare provides site, Worker, security, storage, and operational infrastructure; Resend delivers email; and shipping, tax, address, analytics, or abuse-prevention providers receive limited data only when their service is needed and enabled.
 
 Authorized administrators may access customer, attendee, order, reporting, inventory, download, and fulfillment information only within their assigned role and scope. Super administrators may access information needed to operate, secure, reconcile, support, audit, back up, or restore the store. We do not sell customer personal information. Records may be retained for fulfillment, accounting, fraud prevention, security, legal obligations, disputes, payment reconciliation, and disaster recovery, then deleted or minimized when no longer reasonably needed.
 

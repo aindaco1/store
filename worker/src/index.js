@@ -70,6 +70,7 @@ import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } fr
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
 import { applyStoreCouponCode, getValidationTaxableSubtotalCents, loadStoreCoupons, saveStoreCoupons, upsertStoreCoupon } from './coupons.js';
 import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
+import { normalizeEventRegistrationConfig, normalizeStoredEventRegistration } from './event-registration.js';
 import { getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { MEDIA_MANIFEST_PATH, classifyMediaPath, mediaPathLabel, mediaPlacementBudget, normalizeMediaManifest } from './media-catalog.js';
 import { getScopedConsole } from './logger.js';
@@ -6095,6 +6096,7 @@ async function buildStoreSummaryItem(request, env, storedOrder, item = {}, index
     currency: item.currency || storedOrder.orderDraft?.currency || 'USD',
     fulfillmentType: type,
     event: summarizeStoreEventDetails(item.eventDetails),
+    registration: normalizeStoredEventRegistration(item.registration),
     actions: {}
   };
 
@@ -7631,6 +7633,58 @@ function getStoreItemQuantity(item = {}) {
   return Math.max(1, Number(item.quantity || 1) || 1);
 }
 
+function getStoreRegistrationAttendees(item = {}) {
+  const registration = item.registration && typeof item.registration === 'object' && !Array.isArray(item.registration)
+    ? item.registration
+    : null;
+  if (!registration || !Array.isArray(registration.attendees)) return [];
+  return registration.attendees.slice(0, getStoreItemQuantity(item)).map((attendee, index) => ({
+    id: String(attendee?.id || `attendee-${index + 1}`).trim().slice(0, 80),
+    name: String(attendee?.name || '').trim().slice(0, 120),
+    answers: Array.isArray(attendee?.answers) ? attendee.answers : []
+  }));
+}
+
+function normalizeStoreCheckInRecord(record = {}, maxQuantity = 1) {
+  const rawQuantity = Number(record.quantity ?? record.count);
+  const checkedIn = record.checkedIn === true;
+  return {
+    checkedIn,
+    quantity: checkedIn
+      ? Math.max(1, Math.min(maxQuantity, Number.isFinite(rawQuantity) && rawQuantity > 0 ? Math.floor(rawQuantity) : maxQuantity))
+      : 0,
+    checkedInAt: checkedIn ? String(record.checkedInAt || '') : '',
+    checkedInBy: checkedIn ? String(record.checkedInBy || '') : '',
+    updatedAt: String(record.updatedAt || ''),
+    updatedBy: String(record.updatedBy || ''),
+    note: String(record.note || '')
+  };
+}
+
+function getStoreAttendeeCheckInState(storedOrder = {}, itemId = '', item = {}, attendeeId = '') {
+  const normalizedItemId = normalizeStoreFulfillmentId(itemId);
+  const checkIns = getStoreFulfillmentCheckIns(storedOrder);
+  const itemRecord = checkIns[normalizedItemId] && typeof checkIns[normalizedItemId] === 'object'
+    ? checkIns[normalizedItemId]
+    : {};
+  const attendeeRecords = itemRecord.attendees && typeof itemRecord.attendees === 'object' && !Array.isArray(itemRecord.attendees)
+    ? itemRecord.attendees
+    : null;
+  if (attendeeRecords) {
+    const record = attendeeRecords[String(attendeeId || '')];
+    return normalizeStoreCheckInRecord(record && typeof record === 'object' ? record : {}, 1);
+  }
+  // Allocate an item-level record predating attendee check-in in roster order so
+  // a partially checked-in legacy party does not become fully checked in.
+  const attendees = getStoreRegistrationAttendees(item);
+  const attendeeIndex = attendees.findIndex((attendee) => attendee.id === String(attendeeId || ''));
+  const legacyState = normalizeStoreCheckInRecord(itemRecord, getStoreItemQuantity(item));
+  if (attendeeIndex >= 0 && legacyState.checkedIn && attendeeIndex < legacyState.quantity) {
+    return normalizeStoreCheckInRecord({ ...itemRecord, quantity: 1 }, 1);
+  }
+  return normalizeStoreCheckInRecord({}, 1);
+}
+
 function getStoreItemCheckInState(storedOrder = {}, itemId = '', item = {}) {
   const normalizedItemId = normalizeStoreFulfillmentId(itemId);
   const checkIns = getStoreFulfillmentCheckIns(storedOrder);
@@ -7638,20 +7692,33 @@ function getStoreItemCheckInState(storedOrder = {}, itemId = '', item = {}) {
     ? checkIns[normalizedItemId]
     : {};
   const itemQuantity = getStoreItemQuantity(item);
-  const rawQuantity = Number(record.quantity ?? record.count);
-  const checkedIn = record.checkedIn === true;
-  const checkedQuantity = checkedIn
-    ? Math.max(1, Math.min(itemQuantity, Number.isFinite(rawQuantity) && rawQuantity > 0 ? Math.floor(rawQuantity) : itemQuantity))
-    : 0;
+  const attendees = getStoreRegistrationAttendees(item);
+  if (attendees.length > 0) {
+    const attendeeStates = attendees.map((attendee) => getStoreAttendeeCheckInState(
+      storedOrder,
+      normalizedItemId,
+      item,
+      attendee.id
+    ));
+    const checkedAttendees = attendeeStates.filter((state) => state.checkedIn);
+    const latestState = checkedAttendees.slice().sort((a, b) => (
+      (Date.parse(b.updatedAt || b.checkedInAt || '') || 0) - (Date.parse(a.updatedAt || a.checkedInAt || '') || 0)
+    ))[0] || {};
+    return {
+      checkedIn: checkedAttendees.length === attendees.length,
+      quantity: checkedAttendees.length,
+      checkedInAt: checkedAttendees.length === attendees.length ? String(latestState.checkedInAt || '') : '',
+      checkedInBy: checkedAttendees.length === attendees.length ? String(latestState.checkedInBy || '') : '',
+      updatedAt: String(latestState.updatedAt || ''),
+      updatedBy: String(latestState.updatedBy || ''),
+      note: String(latestState.note || '')
+    };
+  }
+
+  const normalized = normalizeStoreCheckInRecord(record, itemQuantity);
 
   return {
-    checkedIn,
-    quantity: checkedQuantity,
-    checkedInAt: checkedIn ? String(record.checkedInAt || '') : '',
-    checkedInBy: checkedIn ? String(record.checkedInBy || '') : '',
-    updatedAt: String(record.updatedAt || ''),
-    updatedBy: String(record.updatedBy || ''),
-    note: String(record.note || '')
+    ...normalized
   };
 }
 
@@ -7663,6 +7730,17 @@ function buildAdminStoreFulfillmentItem(storedOrder = {}, item = {}, index = 0) 
     ? getStoreDownloadAccessState(storedOrder, itemId, item)
     : null;
   const event = summarizeStoreEventDetails(item.eventDetails);
+  const registrationAttendees = getStoreRegistrationAttendees(item).map((attendee) => ({
+    ...attendee,
+    checkIn: getStoreAttendeeCheckInState(storedOrder, itemId, item, attendee.id)
+  }));
+  const registration = item.registration && typeof item.registration === 'object' && !Array.isArray(item.registration)
+    ? {
+        version: Math.max(1, Number(item.registration.version || 1) || 1),
+        answers: Array.isArray(item.registration.answers) ? item.registration.answers : [],
+        attendees: registrationAttendees
+      }
+    : null;
   return {
     id: itemId,
     productId: item.productId || '',
@@ -7678,6 +7756,7 @@ function buildAdminStoreFulfillmentItem(storedOrder = {}, item = {}, index = 0) 
     fulfillmentType,
     shippable: item.shippable === true || fulfillmentType === 'physical',
     event,
+    registration,
     checkIn,
     checkInAvailable: isStoreTicketLikeItem(item),
     downloadAccess,
@@ -7825,7 +7904,16 @@ function adminStoreOrderSearchText(order = {}) {
       item.checkIn?.checkedIn ? 'checked in' : 'not checked in',
       item.checkIn?.checkedInBy,
       item.checkIn?.updatedBy,
-      item.checkIn?.note
+      item.checkIn?.note,
+      ...(Array.isArray(item.registration?.attendees) ? item.registration.attendees.flatMap((attendee) => [
+        attendee.id,
+        attendee.name,
+        ...(Array.isArray(attendee.answers) ? attendee.answers.flatMap((answer) => [
+          answer.label,
+          ...(Array.isArray(answer.value) ? answer.value : [answer.value]),
+          ...(Array.isArray(answer.displayValue) ? answer.displayValue : [answer.displayValue])
+        ]) : [])
+      ]) : [])
     ]) : [])
   ].filter(Boolean).join(' ').toLowerCase();
 }
@@ -7893,6 +7981,7 @@ function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
     checkInUpdatedAt: item.checkIn?.updatedAt || '',
     checkInUpdatedBy: item.checkIn?.updatedBy || '',
     checkInNote: item.checkIn?.note || '',
+    registration: item.registration || null,
     downloadAccessManageable: order.fulfillmentReady === true && item.fulfillmentType === 'digital',
     downloadAccess: item.downloadAccess || null,
     downloadAccessStatus: item.downloadAccess?.status || '',
@@ -8381,13 +8470,17 @@ function adminStoreEventDetailsSummary(source = {}) {
     : source?.eventDetails && typeof source.eventDetails === 'object'
       ? source.eventDetails
       : {};
+  const normalizedRegistration = normalizeEventRegistrationConfig(event);
   return {
     startsAt: String(event.starts_at || event.startsAt || '').trim(),
     endsAt: String(event.ends_at || event.endsAt || '').trim(),
     venue: String(event.venue || '').trim(),
     address: compactAdminStoreEventAddress(event.address || ''),
     ticketDelivery: String(event.ticket_delivery || event.ticketDelivery || '').trim(),
-    ics: event.ics !== false
+    ics: event.ics !== false,
+    registration: normalizedRegistration.configured && normalizedRegistration.errors.length === 0
+      ? normalizedRegistration.config
+      : null
   };
 }
 
@@ -8459,6 +8552,13 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     eventVenue: eventDetails.venue,
     eventAddress: eventDetails.address,
     eventIcs: eventDetails.ics,
+    rsvpRegistrationEnabled: Boolean(eventDetails.registration),
+    rsvpRegistrationOpensAt: eventDetails.registration?.opensAt || '',
+    rsvpRegistrationClosesAt: eventDetails.registration?.closesAt || '',
+    rsvpMaxPartySize: eventDetails.registration?.maxPartySize || 20,
+    rsvpRequireContactName: eventDetails.registration?.requireContactName !== false,
+    rsvpRequireAttendeeNames: eventDetails.registration?.requireAttendeeNames !== false,
+    rsvpQuestions: eventDetails.registration?.questions || [],
     hasEventDetails: Boolean(product?.event_details),
     turnstileRequired: product?.turnstile_required === true
   };
@@ -8690,6 +8790,37 @@ function serializeAdminStoreEventDetailsYaml(eventDetails = {}) {
   yamlAdminMaybeLine(lines, 'address', event.address, '  ');
   yamlAdminMaybeLine(lines, 'ticket_delivery', event.ticketDelivery, '  ');
   yamlAdminMaybeLine(lines, 'ics', event.ics, '  ');
+  if (event.registration) {
+    const registration = event.registration;
+    lines.push('  registration:');
+    yamlAdminMaybeLine(lines, 'opens_at', registration.opensAt, '    ');
+    yamlAdminMaybeLine(lines, 'closes_at', registration.closesAt, '    ');
+    yamlAdminMaybeLine(lines, 'max_party_size', registration.maxPartySize, '    ');
+    yamlAdminMaybeLine(lines, 'require_contact_name', registration.requireContactName, '    ');
+    yamlAdminMaybeLine(lines, 'require_attendee_names', registration.requireAttendeeNames, '    ');
+    if (Array.isArray(registration.questions) && registration.questions.length > 0) {
+      lines.push('    questions:');
+      for (const question of registration.questions) {
+        lines.push(`      - id: ${yamlAdminValue(question.id || '', 'string')}`);
+        lines.push(`        label: ${yamlAdminValue(question.label || '', 'string')}`);
+        lines.push(`        type: ${yamlAdminValue(question.type || 'text', 'string')}`);
+        lines.push(`        scope: ${yamlAdminValue(question.scope || 'party', 'string')}`);
+        lines.push(`        required: ${question.required === true ? 'true' : 'false'}`);
+        if (question.type === 'text' || question.type === 'textarea') {
+          lines.push(`        max_length: ${Math.max(1, Number(question.maxLength || 160) || 160)}`);
+        }
+        if (Array.isArray(question.options) && question.options.length > 0) {
+          lines.push('        options:');
+          for (const option of question.options) {
+            lines.push(`          - value: ${yamlAdminValue(option.value || '', 'string')}`);
+            lines.push(`            label: ${yamlAdminValue(option.label || option.value || '', 'string')}`);
+          }
+        }
+      }
+    } else {
+      lines.push('    questions: []');
+    }
+  }
   return lines.length > 1 ? lines.join('\n') : 'event_details: {}';
 }
 
@@ -9013,7 +9144,16 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
   ).trim().toLowerCase();
   const digitalProduct = nextFulfillmentType === 'digital';
   const eventProduct = isAdminStoreEventFulfillmentType(nextFulfillmentType);
-  const eventFieldKeys = ['eventStartsAt', 'eventEndsAt', 'eventVenue', 'eventAddress', 'eventIcs'];
+  const registrationFieldKeys = [
+    'rsvpRegistrationEnabled',
+    'rsvpRegistrationOpensAt',
+    'rsvpRegistrationClosesAt',
+    'rsvpMaxPartySize',
+    'rsvpRequireContactName',
+    'rsvpRequireAttendeeNames',
+    'rsvpQuestions'
+  ];
+  const eventFieldKeys = ['eventStartsAt', 'eventEndsAt', 'eventVenue', 'eventAddress', 'eventIcs', ...registrationFieldKeys];
   const eventFieldsSubmitted = eventFieldKeys.some((fieldKey) => hasAdminStoreProductPatchField(fields, fieldKey));
   if (!eventProduct) {
     if (product?.event_details || eventFieldsSubmitted) {
@@ -9036,6 +9176,63 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
       const normalized = normalizeAdminStoreBooleanField(fields.eventIcs, 'Calendar file');
       if (normalized.ok) eventDetails.ics = normalized.value;
       else errors.push(normalized.error);
+    }
+    if (nextFulfillmentType !== 'rsvp') {
+      eventDetails.registration = null;
+    } else {
+      let registrationEnabled = Boolean(eventDetails.registration);
+      if (hasAdminStoreProductPatchField(fields, 'rsvpRegistrationEnabled')) {
+        const normalized = normalizeAdminStoreBooleanField(fields.rsvpRegistrationEnabled, 'RSVP registration');
+        if (normalized.ok) registrationEnabled = normalized.value;
+        else errors.push(normalized.error);
+      }
+      if (!registrationEnabled) {
+        eventDetails.registration = null;
+      } else {
+        const registration = {
+          opensAt: eventDetails.registration?.opensAt || '',
+          closesAt: eventDetails.registration?.closesAt || '',
+          maxPartySize: eventDetails.registration?.maxPartySize || 20,
+          requireContactName: eventDetails.registration?.requireContactName !== false,
+          requireAttendeeNames: eventDetails.registration?.requireAttendeeNames !== false,
+          questions: Array.isArray(eventDetails.registration?.questions) ? eventDetails.registration.questions : []
+        };
+        if (hasAdminStoreProductPatchField(fields, 'rsvpRegistrationOpensAt')) {
+          registration.opensAt = String(fields.rsvpRegistrationOpensAt || '').trim();
+        }
+        if (hasAdminStoreProductPatchField(fields, 'rsvpRegistrationClosesAt')) {
+          registration.closesAt = String(fields.rsvpRegistrationClosesAt || '').trim();
+        }
+        if (hasAdminStoreProductPatchField(fields, 'rsvpMaxPartySize')) {
+          registration.maxPartySize = Number(fields.rsvpMaxPartySize);
+        }
+        for (const [fieldKey, prop, label] of [
+          ['rsvpRequireContactName', 'requireContactName', 'RSVP contact name requirement'],
+          ['rsvpRequireAttendeeNames', 'requireAttendeeNames', 'RSVP attendee name requirement']
+        ]) {
+          if (!hasAdminStoreProductPatchField(fields, fieldKey)) continue;
+          const normalized = normalizeAdminStoreBooleanField(fields[fieldKey], label);
+          if (normalized.ok) registration[prop] = normalized.value;
+          else errors.push(normalized.error);
+        }
+        if (hasAdminStoreProductPatchField(fields, 'rsvpQuestions')) {
+          try {
+            const submittedQuestions = typeof fields.rsvpQuestions === 'string'
+              ? JSON.parse(fields.rsvpQuestions || '[]')
+              : fields.rsvpQuestions;
+            if (!Array.isArray(submittedQuestions)) throw new Error('not an array');
+            registration.questions = submittedQuestions;
+          } catch (_error) {
+            errors.push('RSVP questions must be a JSON array.');
+          }
+        }
+        const normalizedRegistration = normalizeEventRegistrationConfig({ registration });
+        if (normalizedRegistration.errors.length > 0) {
+          errors.push(...normalizedRegistration.errors.map((issue) => issue.message));
+        } else {
+          eventDetails.registration = normalizedRegistration.config;
+        }
+      }
     }
     if (eventDetails.ticketDelivery === '') eventDetails.ticketDelivery = 'qr';
     frontMatter.push({
@@ -9656,7 +9853,14 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
     hasAdminStoreProductPatchField(fields, 'eventEndsAt') ||
     hasAdminStoreProductPatchField(fields, 'eventVenue') ||
     hasAdminStoreProductPatchField(fields, 'eventAddress') ||
-    hasAdminStoreProductPatchField(fields, 'eventIcs')
+    hasAdminStoreProductPatchField(fields, 'eventIcs') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpRegistrationEnabled') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpRegistrationOpensAt') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpRegistrationClosesAt') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpMaxPartySize') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpRequireContactName') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpRequireAttendeeNames') ||
+    hasAdminStoreProductPatchField(fields, 'rsvpQuestions')
   ) {
     const eventDetails = adminStoreEventDetailsSummary(preview);
     if (hasAdminStoreProductPatchField(fields, 'eventStartsAt')) eventDetails.startsAt = String(fields.eventStartsAt || '').trim();
@@ -9666,6 +9870,47 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
     if (hasAdminStoreProductPatchField(fields, 'eventIcs')) {
       eventDetails.ics = fields.eventIcs === true || String(fields.eventIcs || '').trim().toLowerCase() === 'true';
     }
+    const rsvpProduct = String(preview.fulfillment_type || preview.type || '').trim().toLowerCase() === 'rsvp';
+    let registrationEnabled = rsvpProduct && Boolean(eventDetails.registration);
+    if (hasAdminStoreProductPatchField(fields, 'rsvpRegistrationEnabled')) {
+      registrationEnabled = rsvpProduct && (
+        fields.rsvpRegistrationEnabled === true || String(fields.rsvpRegistrationEnabled || '').trim().toLowerCase() === 'true'
+      );
+    }
+    if (registrationEnabled) {
+      const registration = {
+        opensAt: hasAdminStoreProductPatchField(fields, 'rsvpRegistrationOpensAt')
+          ? String(fields.rsvpRegistrationOpensAt || '').trim()
+          : eventDetails.registration?.opensAt || '',
+        closesAt: hasAdminStoreProductPatchField(fields, 'rsvpRegistrationClosesAt')
+          ? String(fields.rsvpRegistrationClosesAt || '').trim()
+          : eventDetails.registration?.closesAt || '',
+        maxPartySize: hasAdminStoreProductPatchField(fields, 'rsvpMaxPartySize')
+          ? Number(fields.rsvpMaxPartySize)
+          : eventDetails.registration?.maxPartySize || 20,
+        requireContactName: hasAdminStoreProductPatchField(fields, 'rsvpRequireContactName')
+          ? fields.rsvpRequireContactName === true || String(fields.rsvpRequireContactName || '').trim().toLowerCase() === 'true'
+          : eventDetails.registration?.requireContactName !== false,
+        requireAttendeeNames: hasAdminStoreProductPatchField(fields, 'rsvpRequireAttendeeNames')
+          ? fields.rsvpRequireAttendeeNames === true || String(fields.rsvpRequireAttendeeNames || '').trim().toLowerCase() === 'true'
+          : eventDetails.registration?.requireAttendeeNames !== false,
+        questions: eventDetails.registration?.questions || []
+      };
+      if (hasAdminStoreProductPatchField(fields, 'rsvpQuestions')) {
+        try {
+          const questions = typeof fields.rsvpQuestions === 'string'
+            ? JSON.parse(fields.rsvpQuestions || '[]')
+            : fields.rsvpQuestions;
+          if (Array.isArray(questions)) registration.questions = questions;
+        } catch (_error) {}
+      }
+      const normalizedRegistration = normalizeEventRegistrationConfig({ registration });
+      eventDetails.registration = normalizedRegistration.errors.length === 0
+        ? normalizedRegistration.config
+        : eventDetails.registration;
+    } else {
+      eventDetails.registration = null;
+    }
     if (eventDetails.ticketDelivery === '') eventDetails.ticketDelivery = 'qr';
     preview.event_details = {
       starts_at: eventDetails.startsAt,
@@ -9673,7 +9918,8 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
       venue: eventDetails.venue,
       address: eventDetails.address,
       ticket_delivery: eventDetails.ticketDelivery,
-      ics: eventDetails.ics
+      ics: eventDetails.ics,
+      ...(eventDetails.registration ? { registration: eventDetails.registration } : {})
     };
   }
 
@@ -12476,6 +12722,10 @@ function storeAttendeeRowsCsv(rows = []) {
     'order_token',
     'customer_name',
     'customer_email',
+    'attendee_id',
+    'attendee_name',
+    'registration_answers',
+    'attendee_answers',
     'quantity',
     'checked_in_quantity',
     'unchecked_quantity',
@@ -12486,10 +12736,21 @@ function storeAttendeeRowsCsv(rows = []) {
     'check_in_updated_by',
     'check_in_note'
   ];
-  const csvRows = attendeeRows.map((row) => {
+  const formatAnswers = (answers) => (Array.isArray(answers) ? answers : []).map((answer) => ({
+    id: String(answer?.id || ''),
+    label: String(answer?.label || ''),
+    value: answer?.value ?? '',
+    ...(answer?.displayValue !== undefined ? { displayValue: answer.displayValue } : {})
+  }));
+  const csvRows = attendeeRows.flatMap((row) => {
     const quantity = Math.max(0, Number(row.quantity || 0) || 0);
     const checkedInQuantity = Math.max(0, Number(row.checkedInQuantity || 0) || 0);
-    return [
+    const attendees = Array.isArray(row.registration?.attendees) ? row.registration.attendees : [];
+    const buildRow = (attendee = null) => {
+      const attendeeCheckIn = attendee?.checkIn || {};
+      const effectiveQuantity = attendee ? 1 : quantity;
+      const effectiveCheckedQuantity = attendee ? (attendeeCheckIn.checkedIn === true ? 1 : 0) : checkedInQuantity;
+      return [
       row.eventStartsAt,
       row.eventVenue,
       row.eventAddress,
@@ -12498,16 +12759,22 @@ function storeAttendeeRowsCsv(rows = []) {
       row.orderToken,
       row.customerName,
       row.customerEmail,
-      quantity,
-      Math.min(quantity, checkedInQuantity),
-      Math.max(0, quantity - checkedInQuantity),
-      row.checkedIn ? 'yes' : 'no',
-      row.checkedInAt,
-      row.checkedInBy,
-      row.checkInUpdatedAt,
-      row.checkInUpdatedBy,
-      row.checkInNote
-    ];
+      attendee?.id || '',
+      attendee?.name || '',
+      JSON.stringify(formatAnswers(row.registration?.answers)),
+      JSON.stringify(formatAnswers(attendee?.answers)),
+      effectiveQuantity,
+      Math.min(effectiveQuantity, effectiveCheckedQuantity),
+      Math.max(0, effectiveQuantity - effectiveCheckedQuantity),
+      (attendee ? attendeeCheckIn.checkedIn === true : row.checkedIn) ? 'yes' : 'no',
+      attendee ? attendeeCheckIn.checkedInAt || '' : row.checkedInAt,
+      attendee ? attendeeCheckIn.checkedInBy || '' : row.checkedInBy,
+      attendee ? attendeeCheckIn.updatedAt || '' : row.checkInUpdatedAt,
+      attendee ? attendeeCheckIn.updatedBy || '' : row.checkInUpdatedBy,
+      attendee ? attendeeCheckIn.note || '' : row.checkInNote
+      ];
+    };
+    return attendees.length > 0 ? attendees.map(buildRow) : [buildRow()];
   });
   return rebuildCsvReport({ header, rows: csvRows }).csv;
 }
@@ -13188,48 +13455,107 @@ async function handleAdminStoreOrderCheckIn(request, env, body = {}, ctx = null)
   }
 
   const intent = normalizeAdminStoreCheckInIntent(body, match.item);
+  const registrationAttendees = getStoreRegistrationAttendees(match.item);
+  const requestedAttendeeId = String(body.attendeeId || '').trim();
+  if (requestedAttendeeId && !registrationAttendees.some((attendee) => attendee.id === requestedAttendeeId)) {
+    return privateJsonResponse({ error: 'Store RSVP attendee not found' }, 404, env);
+  }
   const now = new Date().toISOString();
   const previousCheckIns = getStoreFulfillmentCheckIns(loaded.storedOrder);
   const previousRecord = previousCheckIns[match.itemId] && typeof previousCheckIns[match.itemId] === 'object'
     ? previousCheckIns[match.itemId]
     : {};
-  const history = (Array.isArray(previousRecord.history) ? previousRecord.history : [])
-    .slice(-9)
-    .concat([{
-      checkedIn: intent.checkedIn,
-      quantity: intent.quantity,
-      at: now,
-      by: auth.user.email
-    }]);
-  const nextRecord = intent.checkedIn
-    ? {
-        ...previousRecord,
-        itemId: match.itemId,
-        checkedIn: true,
-        quantity: intent.quantity,
-        checkedInAt: previousRecord.checkedInAt || now,
-        checkedInBy: previousRecord.checkedInBy || auth.user.email,
-        checkedOutAt: '',
-        checkedOutBy: '',
-        updatedAt: now,
-        updatedBy: auth.user.email,
-        note: intent.note,
-        history
-      }
-    : {
-        ...previousRecord,
-        itemId: match.itemId,
-        checkedIn: false,
-        quantity: 0,
-        checkedInAt: '',
-        checkedInBy: '',
-        checkedOutAt: now,
-        checkedOutBy: auth.user.email,
-        updatedAt: now,
-        updatedBy: auth.user.email,
-        note: intent.note,
-        history
-      };
+  const buildCheckInRecord = (previous = {}, attendeeId = '') => {
+    const history = (Array.isArray(previous.history) ? previous.history : [])
+      .slice(-9)
+      .concat([{
+        checkedIn: intent.checkedIn,
+        quantity: intent.checkedIn ? 1 : 0,
+        at: now,
+        by: auth.user.email
+      }]);
+    return intent.checkedIn
+      ? {
+          ...previous,
+          ...(attendeeId ? { attendeeId } : {}),
+          checkedIn: true,
+          quantity: 1,
+          checkedInAt: previous.checkedInAt || now,
+          checkedInBy: previous.checkedInBy || auth.user.email,
+          checkedOutAt: '',
+          checkedOutBy: '',
+          updatedAt: now,
+          updatedBy: auth.user.email,
+          note: intent.note,
+          history
+        }
+      : {
+          ...previous,
+          ...(attendeeId ? { attendeeId } : {}),
+          checkedIn: false,
+          quantity: 0,
+          checkedInAt: '',
+          checkedInBy: '',
+          checkedOutAt: now,
+          checkedOutBy: auth.user.email,
+          updatedAt: now,
+          updatedBy: auth.user.email,
+          note: intent.note,
+          history
+        };
+  };
+  let nextRecord;
+  if (registrationAttendees.length > 0) {
+    const previousAttendeeRecords = previousRecord.attendees && typeof previousRecord.attendees === 'object' && !Array.isArray(previousRecord.attendees)
+      ? previousRecord.attendees
+      : {};
+    const targetIds = requestedAttendeeId
+      ? [requestedAttendeeId]
+      : registrationAttendees.map((attendee) => attendee.id);
+    const nextAttendeeRecords = {};
+    const legacyState = normalizeStoreCheckInRecord(previousRecord, getStoreItemQuantity(match.item));
+    registrationAttendees.forEach((attendee, attendeeIndex) => {
+      const legacyAttendeeRecord = legacyState.checkedIn && attendeeIndex < legacyState.quantity
+        ? { ...previousRecord, checkedIn: true, quantity: 1 }
+        : {};
+      const prior = previousAttendeeRecords[attendee.id] && typeof previousAttendeeRecords[attendee.id] === 'object'
+        ? previousAttendeeRecords[attendee.id]
+        : (Object.keys(previousAttendeeRecords).length === 0 ? legacyAttendeeRecord : {});
+      nextAttendeeRecords[attendee.id] = targetIds.includes(attendee.id)
+        ? buildCheckInRecord(prior, attendee.id)
+        : { ...prior, attendeeId: attendee.id };
+    });
+    const checkedInQuantity = Object.values(nextAttendeeRecords).filter((record) => record.checkedIn === true).length;
+    const history = (Array.isArray(previousRecord.history) ? previousRecord.history : [])
+      .slice(-9)
+      .concat([{
+        checkedIn: intent.checkedIn,
+        quantity: checkedInQuantity,
+        attendeeId: requestedAttendeeId,
+        at: now,
+        by: auth.user.email
+      }]);
+    nextRecord = {
+      ...previousRecord,
+      itemId: match.itemId,
+      attendees: nextAttendeeRecords,
+      checkedIn: checkedInQuantity === registrationAttendees.length,
+      quantity: checkedInQuantity,
+      checkedInAt: checkedInQuantity === registrationAttendees.length ? (previousRecord.checkedInAt || now) : '',
+      checkedInBy: checkedInQuantity === registrationAttendees.length ? (previousRecord.checkedInBy || auth.user.email) : '',
+      updatedAt: now,
+      updatedBy: auth.user.email,
+      note: intent.note,
+      history
+    };
+  } else {
+    const itemRecord = buildCheckInRecord(previousRecord);
+    nextRecord = {
+      ...itemRecord,
+      itemId: match.itemId,
+      quantity: intent.checkedIn ? intent.quantity : 0
+    };
+  }
   const updatedOrder = {
     ...loaded.storedOrder,
     fulfillmentCheckIns: {
@@ -13247,8 +13573,9 @@ async function handleAdminStoreOrderCheckIn(request, env, body = {}, ctx = null)
     adminRole: auth.user.role,
     orderToken,
     itemId: match.itemId,
+    attendeeId: requestedAttendeeId,
     checkedIn: intent.checkedIn,
-    quantity: intent.quantity
+    quantity: requestedAttendeeId ? 1 : intent.quantity
   });
 
   const order = buildAdminStoreOrderRecord(updatedOrder);
@@ -13257,6 +13584,13 @@ async function handleAdminStoreOrderCheckIn(request, env, body = {}, ctx = null)
     success: true,
     order,
     fulfillment: item ? buildAdminStoreFulfillmentRow(order, item) : null,
+    mutation: {
+      orderToken,
+      itemId: match.itemId,
+      attendeeId: requestedAttendeeId,
+      checkedIn: intent.checkedIn,
+      quantity: requestedAttendeeId ? 1 : intent.quantity
+    },
     auditKey,
     writeBudget: adminWriteBudget({ readOnly: false, kvWritesExpected: 2 })
   }, 200, env);
@@ -13397,7 +13731,8 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     env,
     snapshot: storeCatalogSnapshot,
     enforceSubmittedPrices: true,
-    enforceInventory: false
+    enforceInventory: false,
+    enforceEventRegistration: true
   });
   const couponCode = String(body.couponCode || body.coupon_code || '').trim();
   if (validation.valid && couponCode) {
@@ -17948,8 +18283,12 @@ function corsResponse(env = null, isPublic = false) {
 }
 
 export {
+  adminStoreEventDetailsSummary,
+  applyAdminStoreProductPatchToMarkdown,
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
+  buildAdminStoreFulfillmentRow,
+  buildAdminStoreOrderRecord,
   buildAdminStoreOrdersCacheRequest,
   buildAdminStoreOrdersWorkersCachePurgeProps,
   buildAdminStoreOrdersWorkersCachePurgeRequest,
@@ -17966,6 +18305,9 @@ export {
   fetchAdminStoreOrdersWorkersCache,
   purgeAdminStoreOrdersWorkersCacheNow,
   readAdminStoreOrdersWorkersCacheProps,
+  normalizeAdminStoreProductPublishBody,
+  serializeAdminStoreEventDetailsYaml,
+  storeAttendeeRowsCsv,
   workersCacheEnabledForAdminStoreOrders,
   storeOrderReconciliationRowsCsv,
   processStoreEventReminders,

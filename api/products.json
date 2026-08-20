@@ -50,6 +50,7 @@ permalink: /api/products.json
           "url": {{ product.url | absolute_url | jsonify }},
           "type": {{ product_type | jsonify }},
           "event": {{ product.event | default: "" | jsonify }},
+          "event_registration": {% if product_type == "rsvp" and product.event_details.registration %}{{ product.event_details.registration | jsonify }}{% else %}null{% endif %},
           "collection": {{ product_collection | jsonify }},
           "category": {{ product_category | jsonify }},
           "localized_paths": {{ product_localized_paths | jsonify }},

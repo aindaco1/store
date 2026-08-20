@@ -108,6 +108,7 @@ Fulfillment-aware fields:
 - Digital products hide inventory controls.
 - Digital products show a File select when Variant Based is No.
 - Digital variant-based products hide the product-level File field and show a File column per variant.
+- RSVP products may enable registration and configure opening/closing timestamps, maximum party size, contact and attendee name requirements, and bounded party- or attendee-scoped questions. The guided question builder supports stable IDs, text/long-text/single-choice/multiple-choice/checkbox answers, party or per-attendee scope, required state, text limits, and 2–20 choice rows. Question IDs and choice values derive automatically from labels for new rows, are read-only like generated product and variant identifiers, and remain unchanged when an existing label is edited. Every builder field includes localized keyboard- and pointer-accessible help. The builder serializes into the existing product field; preview and publish still use the same Worker normalizer, so an invalid definition cannot be published through the dashboard.
 
 Variants:
 
@@ -196,10 +197,12 @@ Current behavior:
 
 - Filter by order status, fulfillment type, ticket check-in state, or search query.
 - Export fulfillment CSV.
-- Export attendee CSV for ticket/RSVP products.
+- Export attendee CSV for ticket/RSVP products. Configured registrations expand to one row per named attendee with canonical party/attendee responses; legacy orders remain one row per item.
 - Import historical Snipcart CSV exports into production Store order storage.
 - View order totals and fulfillment rows.
-- Mark ticket/RSVP rows checked in or unchecked. Single-action check-in controls use the same responsive button sizing as other order actions so they fit inside desktop tables and mobile rows.
+- Mark legacy ticket/RSVP rows checked in or unchecked. Named RSVP registrations expose one independently audited check-in control per attendee, and partial check-ins roll up to the existing attendance totals.
+- Review the historical question labels and answers stored with a configured registration. Product edits affect new checkouts only and do not reinterpret confirmed responses.
+- Keep expanded RSVP responses and attendee check-in controls inside the desktop Actions column; tablet and mobile widths continue to use the card presentation.
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 - Explicitly refresh Orders. When the first-page filter has not changed, the dashboard reuses its in-memory payload and announces that no new orders were found.

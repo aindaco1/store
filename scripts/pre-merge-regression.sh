@@ -310,6 +310,7 @@ start_worker() {
 }
 
 cleanup() {
+  local worker_config_restore=""
   stop_worker
   if [[ -n "${JEKYLL_PID}" ]]; then
     kill "${JEKYLL_PID}" 2>/dev/null || true
@@ -325,7 +326,9 @@ cleanup() {
     mv "${ORIGINAL_DEV_VARS_BACKUP}" worker/.dev.vars
   fi
   if [[ -n "${ORIGINAL_WORKER_CONFIG_BACKUP}" && -f "${ORIGINAL_WORKER_CONFIG_BACKUP}" ]]; then
-    cp -p "${ORIGINAL_WORKER_CONFIG_BACKUP}" worker/wrangler.toml
+    worker_config_restore="$(mktemp worker/.wrangler.toml.restore.XXXXXX)"
+    cp -p "${ORIGINAL_WORKER_CONFIG_BACKUP}" "${worker_config_restore}"
+    mv -f "${worker_config_restore}" worker/wrangler.toml
     rm -f "${ORIGINAL_WORKER_CONFIG_BACKUP}"
   fi
 }
@@ -461,6 +464,7 @@ run_phase "4. Syntax checks" bash -lc '
   node scripts/optimize-media.mjs --check --manifest-only >/dev/null
   node --check worker/src/tier-inventory-do.js
   node --check worker/src/catalog.js
+  node --check worker/src/event-registration.js
   node --check worker/src/orders.js
   node --check shared/dust-wave-platform/packages/build-core/bin/minify-site-assets.mjs
   node --check scripts/audit-performance-budgets.mjs
@@ -493,7 +497,7 @@ run_phase "6. Full unit suite" npm run test:unit
 
 USE_PODMAN_JEKYLL=false
 if prepare_host_jekyll; then
-  run_phase "7. Store build artifact checks" bash -lc 'scripts/pre-merge-regression.sh __host_or_podman_build_check'
+  run_phase "7. Store build artifact checks" scripts/pre-merge-regression.sh __host_or_podman_build_check
 else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true

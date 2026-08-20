@@ -4,7 +4,7 @@ Cloudflare Worker API for Store checkout, fulfillment, admin operations, shippin
 
 ## Shared Platform Boundary
 
-Store `v1.1.22` pins Dust Wave Platform `v0.31.0` at exact commit
+Store `v1.2.0` pins Dust Wave Platform `v0.31.0` at exact commit
 `5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579`. The Worker consumes the pinned
 `worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
 packages for characterized, runtime-neutral mechanics. Store retains every
@@ -50,7 +50,7 @@ Local defaults:
 
 - `GET /api/store/inventory`: return only confirmed `available` counts for public, inventory-tracked SKUs from the existing derived projection. The response uses a fixed-key 15-second public cache, never exposes limits, claims, reservations, product/customer/order/admin data, and does not replace authoritative checkout validation.
 - `POST /api/cart/validate`: validate a Store cart against the generated catalog and optional coupon code.
-- `POST /api/checkout/intent`: create an order draft and Stripe PaymentIntent, or confirm a no-payment order.
+- `POST /api/checkout/intent`: canonicalize the cart and any configured RSVP registration, then create an order draft and Stripe PaymentIntent or confirm a no-payment order.
 - `GET /api/orders/:token`: return token-scoped order summary and fulfillment actions.
 - `GET /api/orders/:token/downloads/:itemId`: serve a confirmed digital download.
 - `GET /api/orders/:token/tickets/:itemId.svg`: return ticket/RSVP QR SVG.
@@ -162,7 +162,7 @@ Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in
 
 1. Browser validates cart state with `/api/cart/validate`.
 2. Browser starts checkout with `/api/checkout/intent`.
-3. Worker validates IDs, SKUs, variants, prices, coupon, tip, inventory metadata, shipping metadata, tax categories, and fulfillment metadata against the generated catalog.
+3. Worker validates IDs, SKUs, variants, prices, coupon, tip, inventory metadata, shipping metadata, tax categories, fulfillment metadata, and configured RSVP registration against the generated catalog.
 4. Worker creates `orders:<orderToken>` in `STORE_STATE`.
 5. Positive-count SKUs reserve through `STORE_INVENTORY_COORDINATOR`.
 6. Paid orders receive a Stripe PaymentIntent client secret; free RSVP/free orders confirm immediately.
@@ -170,7 +170,7 @@ Local secrets belong in ignored `worker/.dev.vars`; production secrets belong in
 8. Success commits inventory, stores the confirmed order, indexes order lookup, queues email/reminder work, and enables fulfillment actions.
 9. Failure releases inventory reservations and records the private failure state.
 
-Payment setup, settlement, reconciliation, and Stripe operations are documented in [Payment Processor](../docs/PAYMENT_PROCESSOR.md).
+Payment setup, settlement, reconciliation, and Stripe operations are documented in [Payment Processor](../docs/PAYMENT_PROCESSOR.md). RSVP authoring, privacy, validation, fulfillment, and current limitations are documented in [RSVP Registration](../docs/RSVP.md).
 
 ## Ethical Risk Guardrails
 

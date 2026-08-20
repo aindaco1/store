@@ -343,6 +343,12 @@ function renderStoreOrderItems(items = [], t = (_key, fallback) => fallback, the
     const note = fulfillmentNote
       ? `<p style="margin: 4px 0 0 0; color: ${theme.mutedTextColor}; font-size: 13px;">${renderEmailTextWithLink(fulfillmentNote, orderPageLabel, orderUrl, theme)}</p>`
       : '';
+    const attendeeNames = Array.isArray(item.registration?.attendees)
+      ? item.registration.attendees.map((attendee) => String(attendee?.name || '').trim()).filter(Boolean)
+      : [];
+    const attendees = attendeeNames.length > 0
+      ? `<p style="margin: 4px 0 0 0; color: ${theme.mutedTextColor}; font-size: 13px;">${escapeHtml(t('store_order.attendees_label', 'Attendees'))}: ${escapeHtml(attendeeNames.join(', '))}</p>`
+      : '';
 
     return `
     <div style="padding: 12px 0; border-top: 1px solid ${theme.borderColor};">
@@ -353,6 +359,7 @@ function renderStoreOrderItems(items = [], t = (_key, fallback) => fallback, the
       <p style="margin: 4px 0 0 0; color: ${theme.mutedTextColor}; font-size: 13px;">
         ${escapeHtml(t('store_order.quantity_label', 'Qty'))}: ${quantity} · ${escapeHtml(fulfillmentLabel)}
       </p>
+      ${attendees}
       ${note}
     </div>`;
   });

@@ -1,5 +1,61 @@
 # Changelog
 
+## v1.2.0 - 2026-08-18
+
+### RSVP registration essentials
+
+- Added an opt-in, versioned `event_details.registration` contract for RSVP
+  deadlines, party-size limits, contact and attendee names, and bounded party-
+  or attendee-scoped custom questions. One shared Worker normalizer now governs
+  checkout validation and dashboard publishing.
+- Replaced the RSVP question JSON textarea in Products with a guided, localized
+  question builder for labels, stable IDs, answer types, party/attendee scope,
+  required state, maximum length, and answer choices. The builder serializes to
+  the existing JSON field, so repository front matter and the canonical Worker
+  schema remain unchanged. New question IDs and choice values derive
+  automatically from their visible labels, remain read-only in the dashboard,
+  and stay unchanged when a published label is edited. Every builder field now
+  includes localized, keyboard-accessible guidance.
+- Extended the cart with accessible registration controls while keeping guest
+  names and responses out of persistent browser storage. The Worker re-resolves
+  current repository product data, rejects unknown choices and closed windows,
+  and stores canonical historical question and response snapshots with orders.
+  Checkout places Contact before RSVP details and uses the same base panel
+  surface for both. Zero-total carts omit tip and payment-method controls,
+  submit a zero tip percentage, use **Complete order**, and skip Stripe
+  prewarming; paid and mixed carts retain the existing tip and payment behavior.
+- Added private roster and response views, attendee search, per-attendee
+  check-in with legacy item-level compatibility, partial attendance totals, and
+  one-row-per-attendee CSV export. Customer confirmations show their submitted
+  roster; transactional email includes names but omits custom responses. The
+  desktop Orders table now reserves a bounded response/action column and wraps
+  long roster content without letting response text or check-in buttons escape
+  the table.
+- Added English and Spanish runtime copy, repository/admin configuration docs,
+  order-data inventory and backup guidance, ethical-risk review, and focused
+  contracts for schema bounds, tamper rejection, product publication, browser
+  storage privacy, confirmation rendering, email, check-in, and export.
+- Preserved every physical, digital, ticket, service, and unconfigured RSVP
+  path by activating the feature only for RSVP products with an explicit
+  registration block. The release build remains within existing JavaScript and
+  CSS performance budgets without raising thresholds.
+- Kept a running local checkout Worker healthy across configuration sync and
+  pre-merge cleanup by atomically replacing generated and restored Wrangler
+  configuration files.
+- Kept local customer confirmations out of the production-only durable email
+  queue so free RSVP and paid checkout QA sends immediately when Resend is
+  configured, while dry-run flags still prevent provider calls and production
+  retains scheduled retries.
+- Preserved the non-sensitive RSVP form schema across cart recovery while
+  keeping guest names and answers memory-only. Existing direct-link carts can
+  repair that schema from the current product page, and checkout now surfaces
+  the Worker's specific validation message instead of a generic draft error.
+- Reconciled the README files, RSVP/configuration/payment/dashboard/workflow/
+  testing guides, public English and Spanish order/Terms copy, merge checklists,
+  and release evidence with the shipped behavior. The roadmap now separates
+  completed registration essentials from explicitly unshipped RSVP self-service,
+  invitation, communication, door, series, and analytics work.
+
 ## v1.1.22 - 2026-08-06
 
 ### Separately versioned Jekyll golden-project contract

@@ -344,6 +344,7 @@
           data-product-inventory-tracking="{{ tracks_inventory }}"
           data-product-low-stock-threshold="{{ low_stock_threshold }}"
           data-store-sold-out-label="{{ sold_out_label | escape }}"
+          {% if product_type == "rsvp" and product.event_details.registration %}data-event-registration="{{ product.event_details.registration | jsonify | escape }}"{% endif %}
           {% if product_unavailable or selected_variant_unavailable %}disabled aria-disabled="true"{% endif %}
           {% if resolved_shipping and resolved_shipping.manual_domestic_rate %}data-item-manual-domestic-rate="{{ resolved_shipping.manual_domestic_rate }}"{% endif %}
           {% if resolved_shipping and resolved_shipping.weight_oz != nil %}data-item-shipping-weight-oz="{{ resolved_shipping.weight_oz }}"{% endif %}

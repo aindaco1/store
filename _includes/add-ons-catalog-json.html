@@ -64,6 +64,7 @@
             "type": {{ merchandising_type | jsonify }},
             "fulfillment_type": {{ fulfillment_type | jsonify }},
             "category": {{ fulfillment_type | jsonify }},
+            "event_registration": {% if fulfillment_type == "rsvp" and product.event_details.registration %}{{ product.event_details.registration | jsonify }}{% else %}null{% endif %},
             "collection": {{ product_collection | jsonify }},
             "shipping_preset": {{ shipping_preset | jsonify }},
             "shipping": {% if resolved_shipping %}{{ resolved_shipping | jsonify }}{% else %}null{% endif %},

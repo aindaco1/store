@@ -10,6 +10,7 @@ Read it alongside:
 - [docs/PAYMENT_PROCESSOR.md](./docs/PAYMENT_PROCESSOR.md) for Stripe, canonical checkout, webhooks, and reconciliation
 - [docs/ADD_ON_PRODUCTS.md](./docs/ADD_ON_PRODUCTS.md) for Store add-ons and variant pricing
 - [docs/DASHBOARD.md](./docs/DASHBOARD.md) for private administration and publishing
+- [docs/RSVP.md](./docs/RSVP.md) for named attendees, custom questions, deadlines, and attendee check-in
 - [docs/PERFORMANCE.md](./docs/PERFORMANCE.md) for budgets, caching, and runtime observability
 - [docs/SECURITY.md](./docs/SECURITY.md) for security boundaries and release checks
 - [docs/BACKUP_RESTORE.md](./docs/BACKUP_RESTORE.md) for backup, restore, and disaster recovery
@@ -129,6 +130,7 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; product-authored copy r
 - Downloads: [docs/DOWNLOADS.md](./docs/DOWNLOADS.md)
 - Shipping and tax: [docs/SHIPPING.md](./docs/SHIPPING.md)
 - Dashboard: [docs/DASHBOARD.md](./docs/DASHBOARD.md)
+- RSVP registration: [docs/RSVP.md](./docs/RSVP.md)
 - Performance: [docs/PERFORMANCE.md](./docs/PERFORMANCE.md)
 - Security: [docs/SECURITY.md](./docs/SECURITY.md)
 - Backup and recovery: [docs/BACKUP_RESTORE.md](./docs/BACKUP_RESTORE.md)

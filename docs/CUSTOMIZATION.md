@@ -83,6 +83,14 @@ event_details:
     Albuquerque, NM 87106
 ```
 
+### RSVP registration
+
+An `rsvp` product may opt into Store-owned registration by adding `event_details.registration`. The dashboard Products editor supports the same fields as repository front matter: opening and closing timestamps, maximum party size, contact/attendee name requirements, and party- or attendee-scoped questions.
+
+Registration is intentionally opt-in. Do not add an empty block to products that should keep the legacy RSVP path. The Worker uses the current repository definition as authority, and confirmed orders retain a historical question/response snapshot. Free zero-total registrations confirm without Stripe; the browser omits payment controls and uses **Complete order**. Paid RSVP or mixed carts keep normal PaymentIntent checkout.
+
+See [RSVP.md](RSVP.md) for the complete schema, bounds, privacy rules, shipped operator workflow, current limitations, and focused tests.
+
 Product localization uses one canonical product file. Generated language-prefixed pages use `localized.{lang}` overrides when present and fall back to canonical content when omitted:
 
 ```yaml

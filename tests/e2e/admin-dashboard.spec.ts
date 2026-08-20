@@ -48,7 +48,7 @@ function settingsRow(row: Record<string, any>) {
   return withFieldHelp(row as { label: string; help?: string });
 }
 
-async function runAxe(page: any) {
+async function runAxe(page: any, selector = '') {
   await page.route('**/__axe-core.js', async (route: any) => {
     await route.fulfill({
       path: axePath,
@@ -56,17 +56,19 @@ async function runAxe(page: any) {
     });
   });
   await page.addScriptTag({ url: '/__axe-core.js' });
-  return page.evaluate(async () => {
-    return (window as any).axe.run(document, {
+  return page.evaluate(async (contextSelector: string) => {
+    const context = contextSelector ? document.querySelector(contextSelector) : document;
+    if (!context) throw new Error(`Missing axe context: ${contextSelector}`);
+    return (window as any).axe.run(context, {
       rules: {
         'color-contrast': { enabled: false }
       }
     });
-  });
+  }, selector);
 }
 
-async function expectNoAxeViolations(page: any) {
-  const results = await runAxe(page);
+async function expectNoAxeViolations(page: any, selector = '') {
+  const results = await runAxe(page, selector);
   expect(
     results.violations,
     results.violations.map((violation: any) => `${violation.id}: ${violation.help}`).join('\n')
@@ -969,7 +971,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
         id: DEMO_RSVP_ITEM_ID,
         name: 'Demo RSVP',
         variantLabel: '',
-        quantity: 1,
+        quantity: 2,
         fulfillmentType: 'rsvp'
       }]
     }, {
@@ -1088,10 +1090,45 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       status: 'confirmed',
       paymentStatus: 'not_required',
       totalCents: 0,
-      quantity: 1,
+      quantity: 2,
       checkInAvailable: true,
       checkedIn: false,
-      checkedInQuantity: 0
+      checkedInQuantity: 0,
+      registration: {
+        version: 1,
+        answers: [{
+          id: 'accessibility_needs',
+          label: 'Accessibility needs or accommodations',
+          type: 'textarea',
+          scope: 'party',
+          value: 'None'
+        }],
+        attendees: [{
+          id: 'attendee-1',
+          name: 'Alonso Indacochea',
+          answers: [{
+            id: 'age_group',
+            label: 'Age group',
+            type: 'single_select',
+            scope: 'attendee',
+            value: '18_plus',
+            displayValue: '18 or older'
+          }],
+          checkIn: { checkedIn: false, quantity: 0 }
+        }, {
+          id: 'attendee-2',
+          name: 'Kathleen Holscher',
+          answers: [{
+            id: 'age_group',
+            label: 'Age group',
+            type: 'single_select',
+            scope: 'attendee',
+            value: '18_plus',
+            displayValue: '18 or older'
+          }],
+          checkIn: { checkedIn: false, quantity: 0 }
+        }]
+      }
     }, {
       orderToken: TICKET_ORDER_TOKEN,
       createdAt: '2026-06-11T12:00:00.000Z',
@@ -1708,6 +1745,21 @@ function storeProductsPayload() {
       shippingPreset: 'ticket',
       inventoryTracking: true,
       inventory: 0,
+      rsvpRegistrationEnabled: true,
+      rsvpRegistrationOpensAt: '2026-08-01T06:00:00.000Z',
+      rsvpRegistrationClosesAt: '2026-12-18T06:59:00.000Z',
+      rsvpMaxPartySize: 4,
+      rsvpRequireContactName: true,
+      rsvpRequireAttendeeNames: true,
+      rsvpQuestions: [{
+        id: 'accessibility_needs',
+        label: 'Accessibility needs or accommodations',
+        type: 'textarea',
+        scope: 'party',
+        required: false,
+        maxLength: 500,
+        options: []
+      }],
       variants: []
     }],
     writeBudget: { readOnly: true, kvWritesExpected: 0 }
@@ -2188,7 +2240,7 @@ test.describe('Admin Dashboard', () => {
     await expect(demoRow).toContainText('Demo Digital Download');
     await expect(demoRow.getByRole('button', { name: 'Refresh download access for Demo Digital Download' })).toBeVisible();
     await expect(demoRow.getByRole('button', { name: 'Revoke download access for Demo Digital Download' })).toBeVisible();
-    await expect(demoRow.getByRole('button', { name: 'Check in' })).toHaveCount(2);
+    await expect(demoRow.getByRole('button', { name: /Check in/ })).toHaveCount(3);
     await expect.poll(() => demoRow.locator('.admin-store-orders__actions .btn').evaluateAll((buttons: HTMLElement[]) => {
       return buttons.every((button) => {
         var style = getComputedStyle(button);
@@ -2449,6 +2501,16 @@ test.describe('Admin Dashboard', () => {
     await expect(rsvpEditor).toBeVisible();
     await expect(rsvpEditor.locator('[data-store-product-field="image"]')).toHaveValue('/assets/images/calendar-2026.png');
     await expect(rsvpEditor.locator('.admin-store-products__image-preview img')).toHaveAttribute('src', /calendar-2026\.png$/);
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpRegistrationEnabled"]')).toHaveValue('true');
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpMaxPartySize"]')).toHaveValue('4');
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpQuestions"]')).toHaveValue(/accessibility_needs/);
+    await expect(rsvpEditor.locator('[data-store-product-field="rsvpQuestions"]')).toBeHidden();
+    await expect(rsvpEditor.locator('[data-store-product-field-wrapper="rsvpQuestions"]')).toBeVisible();
+    await expect(rsvpEditor.locator('[data-store-rsvp-question]')).toHaveCount(1);
+    const existingRsvpQuestion = rsvpEditor.locator('[data-store-rsvp-question]').first();
+    await expect(existingRsvpQuestion.locator('[data-store-rsvp-question-field="label"]')).toHaveValue('Accessibility needs or accommodations');
+    await expect(existingRsvpQuestion.locator('[data-store-rsvp-question-field="type"]')).toHaveValue('textarea');
+    await expect(existingRsvpQuestion.locator('[data-store-rsvp-question-field="scope"]')).toHaveValue('party');
     await expect.poll(async () => rsvpEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.src)).toBe(`${SITE_BASE}/assets/images/calendar-2026.png`);
     await expect.poll(async () => rsvpEditor.frameLocator('[data-store-product-preview-frame]').locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
     await rsvpEditor.getByRole('button', { name: 'Cancel' }).click();
@@ -2458,6 +2520,7 @@ test.describe('Admin Dashboard', () => {
     await expect(ticketEditor).toBeVisible();
     await expect(productsResults.locator('.admin-store-products__editor-row')).toHaveAttribute('data-store-product-editor-row', 'ticket-1');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
+    await expect(ticketEditor.locator('[data-store-product-field-wrapper="rsvpRegistrationEnabled"]')).toBeHidden();
     await expect(ticketEditor.locator('[data-store-product-variant]')).toHaveCount(2);
     await expect(ticketEditor.locator('[data-store-product-variant="general-admission"] [data-store-variant-field="label"]')).toHaveValue('General Admission');
     await expect(ticketEditor.locator('[data-store-product-variant="supporter-ticket"] [data-store-variant-field="price"]')).toHaveValue('20');
@@ -2952,7 +3015,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Orders', exact: true })).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('keeps Store orders single-action buttons inside the desktop table', async ({ page }) => {
+  test('keeps RSVP responses and actions inside the desktop orders table', async ({ page }) => {
     await routeAdminWorker(page);
     await page.setViewportSize({ width: 1366, height: 768 });
 
@@ -2961,25 +3024,116 @@ test.describe('Admin Dashboard', () => {
 
     await selectAdminSection(page, 'Orders');
     const ordersResults = page.locator('#admin-store-orders-results');
-    await expect(ordersResults).toContainText(TICKET_ORDER_TOKEN);
+    await expect(ordersResults).toContainText(DEMO_ORDER_TOKEN);
 
-    const ticketRow = ordersResults.locator('tbody tr').filter({ hasText: TICKET_ORDER_TOKEN });
-    await expect.poll(() => ticketRow.locator('.admin-store-orders__actions').evaluate((cell: HTMLElement) => {
-      const button = cell.querySelector('.btn') as HTMLElement | null;
+    const demoRow = ordersResults.locator('tbody tr').filter({ hasText: DEMO_ORDER_TOKEN });
+    const actions = demoRow.locator('.admin-store-orders__actions');
+    await expect(actions).toContainText('Registration responses');
+    await expect(actions).toContainText('Alonso Indacochea');
+    await expect(actions).toContainText('Kathleen Holscher');
+    await expect.poll(() => actions.evaluate((cell: HTMLElement) => {
+      const buttons = Array.from(cell.querySelectorAll('.btn')) as HTMLElement[];
       const root = cell.closest('#admin-store-orders-results') as HTMLElement | null;
-      if (!button || !root) return false;
+      if (!buttons.length || !root) return false;
       const cellRect = cell.getBoundingClientRect();
-      const buttonRect = button.getBoundingClientRect();
       const rootRect = root.getBoundingClientRect();
       return (
-        getComputedStyle(cell).containerType === 'inline-size' &&
-        button.scrollWidth <= button.clientWidth + 1 &&
-        buttonRect.left >= cellRect.left - 1 &&
-        buttonRect.right <= cellRect.right + 1 &&
+        cell.scrollWidth <= cell.clientWidth + 2 &&
+        buttons.every((button) => {
+          const buttonRect = button.getBoundingClientRect();
+          return button.scrollWidth <= button.clientWidth + 1 &&
+            buttonRect.left >= cellRect.left - 1 &&
+            buttonRect.right <= cellRect.right + 1;
+        }) &&
         cellRect.right <= rootRect.right + 1
       );
     })).toBe(true);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
+    await expectNoAxeViolations(page, '#admin-store-orders-results');
+  });
+
+  test('builds RSVP questions without requiring admins to edit JSON', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-rsvp-builder');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Products');
+
+    const productsResults = page.locator('#admin-store-products-results');
+    const rsvpProductRow = productsResults.locator('tbody > tr:not(.admin-store-products__editor-row)')
+      .filter({ hasText: 'DUST WAVE Free RSVP' });
+    await rsvpProductRow.getByRole('button', { name: 'Edit' }).click();
+
+    const editor = page.locator(`[data-store-product-editor="${RSVP_ITEM_ID}"]`);
+    const source = editor.locator('[data-store-product-field="rsvpQuestions"]');
+    await expect(source).toBeHidden();
+    const existingQuestion = editor.locator('[data-store-rsvp-question]').first();
+    const existingQuestionLabel = existingQuestion.locator('[data-store-rsvp-question-field="label"]');
+    const existingQuestionId = existingQuestion.locator('[data-store-rsvp-question-field="id"]');
+    await expect(existingQuestionId).toHaveAttribute('readonly', '');
+    await existingQuestionLabel.fill('Accessibility requests');
+    await expect(existingQuestionId).toHaveValue('accessibility_needs');
+    await existingQuestionLabel.fill('Accessibility needs or accommodations');
+
+    await editor.getByRole('button', { name: 'Add question' }).click();
+    await expect(editor.locator('[data-store-rsvp-question]')).toHaveCount(2);
+
+    const question = editor.locator('[data-store-rsvp-question]').last();
+    await expect(question.locator('[data-store-rsvp-question-field="label"]')).toHaveAttribute('required', '');
+    await expect(question.locator('[data-store-rsvp-question-field="id"]')).toHaveAttribute('required', '');
+    await expect(question.locator('[data-store-rsvp-question-field="id"]')).toHaveAttribute('readonly', '');
+    await question.locator('[data-store-rsvp-question-field="label"]').fill('Age group');
+    await expect(question.locator('[data-store-rsvp-question-field="id"]')).toHaveValue('age_group');
+    await question.locator('[data-store-rsvp-question-field="type"]').selectOption('single_select');
+    await question.locator('[data-store-rsvp-question-field="scope"]').selectOption('attendee');
+    await question.locator('[data-store-rsvp-question-field="required"]').selectOption('true');
+    await expect(question.locator('[data-store-rsvp-option]')).toHaveCount(2);
+
+    const choices = question.locator('[data-store-rsvp-option]');
+    await expect(choices.nth(0).locator('[data-store-rsvp-option-field="label"]')).toHaveAttribute('required', '');
+    await expect(choices.nth(0).locator('[data-store-rsvp-option-field="value"]')).toHaveAttribute('required', '');
+    await expect(choices.nth(0).locator('[data-store-rsvp-option-field="value"]')).toHaveAttribute('readonly', '');
+    await choices.nth(0).locator('[data-store-rsvp-option-field="label"]').fill('Under 18');
+    await expect(choices.nth(0).locator('[data-store-rsvp-option-field="value"]')).toHaveValue('under_18');
+    await choices.nth(1).locator('[data-store-rsvp-option-field="label"]').fill('18 or older');
+    await expect(choices.nth(1).locator('[data-store-rsvp-option-field="value"]')).toHaveValue('18_or_older');
+    const describedControls = editor.locator([
+      '[data-store-product-field-wrapper="rsvpQuestions"] [data-store-rsvp-question-field]',
+      '[data-store-product-field-wrapper="rsvpQuestions"] [data-store-rsvp-option-field]'
+    ].join(', '));
+    await expect.poll(() => describedControls.evaluateAll((controls) => controls.every((control) => {
+      const helpId = control.getAttribute('aria-describedby');
+      const tooltip = helpId ? document.getElementById(helpId) : null;
+      return Boolean(tooltip && tooltip.getAttribute('role') === 'tooltip' && tooltip.textContent?.trim());
+    }))).toBe(true);
+    await expect(editor.locator('.admin-store-products__rsvp-builder-title .admin-settings__help-button')).toBeVisible();
+    await expect(question.locator('.admin-store-products__rsvp-choices-title .admin-settings__help-button')).toBeVisible();
+    await expectNoAxeViolations(page, '[data-store-product-field-wrapper="rsvpQuestions"]');
+
+    await editor.getByRole('button', { name: 'Publish product' }).click();
+    await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
+    const publishedQuestions = JSON.parse(calls.storeProductPublishes[0].fields.rsvpQuestions);
+    expect(publishedQuestions).toEqual([
+      expect.objectContaining({
+        id: 'accessibility_needs',
+        label: 'Accessibility needs or accommodations',
+        type: 'textarea',
+        scope: 'party',
+        required: false,
+        maxLength: 500
+      }),
+      {
+        id: 'age_group',
+        label: 'Age group',
+        type: 'single_select',
+        scope: 'attendee',
+        required: true,
+        options: [
+          { value: 'under_18', label: 'Under 18' },
+          { value: '18_or_older', label: '18 or older' }
+        ]
+      }
+    ]);
   });
 
   test('loads the Spanish admin route and keeps limited admins in Store-only areas', async ({ page }) => {

@@ -22,6 +22,29 @@ event_details:
   venue: "DUST WAVE"
   ticket_delivery: qr
   ics: true
+  registration:
+    opens_at: "2026-08-01T00:00:00-06:00"
+    closes_at: "2026-12-17T23:59:00-07:00"
+    max_party_size: 4
+    require_contact_name: true
+    require_attendee_names: true
+    questions:
+      - id: accessibility_needs
+        label: "Accessibility needs or accommodations"
+        type: textarea
+        scope: party
+        required: false
+        max_length: 500
+      - id: age_group
+        label: "Age group"
+        type: single_select
+        scope: attendee
+        required: true
+        options:
+          - value: under_18
+            label: "Under 18"
+          - value: 18_plus
+            label: "18 or older"
 turnstile_required: true
 ---
 A starter free RSVP product for Store's no-payment, Turnstile-protected ticket flow.

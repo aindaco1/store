@@ -65,7 +65,7 @@ GitHub Actions supply-chain rules:
 
 | Key Pattern | Binding | Data | Sensitivity |
 | --- | --- | --- | --- |
-| `orders:{token}` | KV | Order draft/settlement/fulfillment state | High |
+| `orders:{token}` | KV | Order draft/settlement/fulfillment state, including opt-in RSVP attendee names and custom responses | High |
 | `store-order-email:{emailHash}` | KV | Order lookup index by customer email hash | Medium |
 | `store-order-lookup:{jti}` | KV | Short-lived one-time order lookup nonce | Medium |
 | `store-inventory-overrides:v1` | KV | Admin-entered SKU baseline overrides | Medium |
@@ -146,8 +146,11 @@ The browser cart is convenience state only. The Worker recalculates and validate
 - tip/platform fee policy
 - inventory availability and reservation ownership
 - free-order versus paid PaymentIntent behavior
+- configured RSVP registration windows, party size, exact attendee rows, required names/answers, and allowed choices from the current repository product
 
 Tampered carts must fail closed with `422` before Stripe work begins. Paid Store orders become confirmed only through a valid Stripe `payment_intent.succeeded` webhook whose metadata and order hash match the stored draft. Failed/canceled payments release reservations.
+
+Guest names and RSVP answers are submission data, not cart persistence. They remain in memory before checkout, are excluded from Stripe metadata, logs, audit payloads, public catalog data, and transactional email answers, and become authoritative only inside the protected order record after Worker validation. The non-sensitive form schema may be persisted so a cart can recover its fields.
 
 For the payment processor setup and settlement model, see [PAYMENT_PROCESSOR.md](PAYMENT_PROCESSOR.md).
 
