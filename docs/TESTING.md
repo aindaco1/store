@@ -56,6 +56,8 @@ npm run localization:review -- --output-dir=/tmp/store-localization-review
 npm run production:posture -- --secrets-file=/path/to/wrangler-secret-list.json
 ```
 
+The scheduled production-posture audit also requires `preview_urls = false` to be explicit in `worker/wrangler.toml`. Missing or enabled Worker preview URLs are a release-blocking configuration drift finding.
+
 Lighthouse runs through `podman-stack-run.sh` by default. Production posture accepts Wrangler's secret-name JSON only and never reads secret values. Session/download/audit tests prove CSRF/role gates, data minimization, redaction, rate-limit thresholds, and audit behavior.
 
 Local services:
