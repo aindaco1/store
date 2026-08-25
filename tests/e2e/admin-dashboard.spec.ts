@@ -2525,17 +2525,17 @@ test.describe('Admin Dashboard', () => {
     await expect(ticketEditor.locator('[data-store-product-variant="general-admission"] [data-store-variant-field="label"]')).toHaveValue('General Admission');
     await expect(ticketEditor.locator('[data-store-product-variant="supporter-ticket"] [data-store-variant-field="price"]')).toHaveValue('20');
     await expect(ticketEditor.locator('[data-store-product-variants-enabled]')).toHaveValue('true');
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeDisabled();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeDisabled();
     await ticketEditor.locator('[data-store-product-variants-enabled]').selectOption('false');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeHidden();
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeEnabled();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeEnabled();
     await ticketEditor.locator('[data-store-product-variants-enabled]').selectOption('true');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeDisabled();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeDisabled();
     await ticketEditor.locator('[data-store-product-variants-enabled]').selectOption('false');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeHidden();
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeEnabled();
-    await ticketEditor.getByRole('button', { name: 'Publish product' }).click();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeEnabled();
+    await ticketEditor.getByRole('button', { name: 'Publish changes' }).click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
     expect(calls.storeProductPublishes[0]).toMatchObject({
       intent: 'publish',
@@ -2646,7 +2646,7 @@ test.describe('Admin Dashboard', () => {
     })).toBe(true);
     await expect(productEditor.getByRole('button', { name: 'Refresh preview' })).toHaveCount(0);
     await expect(productEditor.locator('[data-store-product-field="image"]')).toHaveValue('/assets/images/fronteras-poster.png');
-    const productPublish = productEditor.getByRole('button', { name: 'Publish product' });
+    const productPublish = productEditor.getByRole('button', { name: 'Publish changes' });
     await expect(productPublish).toBeDisabled();
     await productEditor.locator('[data-store-product-field="name"]').fill('Fronteras Poster (Big) Draft');
     await expect(productPublish).toBeEnabled();
@@ -2836,7 +2836,7 @@ test.describe('Admin Dashboard', () => {
     await addedVariant.locator('[data-store-variant-field="inventory"]').fill('3');
     await generatedVariant.getByRole('button', { name: 'Remove' }).click();
     await expect(productEditor.locator('[data-store-product-variant]')).toHaveCount(1);
-    await productEditor.getByRole('button', { name: 'Publish product' }).click();
+    await productEditor.getByRole('button', { name: 'Publish changes' }).click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(2);
     expect(calls.storeProductPublishes[1]).toMatchObject({
       intent: 'publish',
@@ -3156,7 +3156,7 @@ test.describe('Admin Dashboard', () => {
     await expect(question.locator('.admin-store-products__rsvp-choices-title .admin-settings__help-button')).toBeVisible();
     await expectNoAxeViolations(page, '[data-store-product-field-wrapper="rsvpQuestions"]');
 
-    await editor.getByRole('button', { name: 'Publish product' }).click();
+    await editor.getByRole('button', { name: 'Publish changes' }).click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
     const publishedQuestions = JSON.parse(calls.storeProductPublishes[0].fields.rsvpQuestions);
     expect(publishedQuestions).toEqual([
