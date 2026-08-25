@@ -39,8 +39,8 @@ exclude:
   - shared/dust-wave-jekyll-template
 platform:
   name: Shop
-  version: 1.2.1
-  release_label: v1.2.1
+  version: 1.2.2
+  release_label: v1.2.2
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Shop <orders@shop.dustwave.xyz>

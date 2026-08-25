@@ -102,7 +102,7 @@ Editor behavior:
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
 - Successful archive requests say that the archive was saved before reporting repository/deploy progress. The product list can continue to show the prior deployed status until the triggered build finishes and the refreshed catalog reaches the Worker.
-- Production repository reads retry transient GitHub transport failures. If a write response is lost, the Worker reads the current file before retrying and treats an exact content match as a reconciled success; changed content remains a conflict that requires reload instead of an overwrite.
+- Production repository reads use Cloudflare-compatible manual redirect handling and reject every 3xx response without following it. Transient GitHub transport failures are retried. If a write response is lost, the Worker reads the current file before retrying and treats an exact content match as a reconciled success; changed content remains a conflict that requires reload instead of an overwrite.
 - The editor expands inline under the product row being edited.
 
 Fulfillment-aware fields:

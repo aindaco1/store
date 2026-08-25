@@ -45,6 +45,12 @@ function notConfigured(env) {
   return { ok: false, status: 503, error: 'GITHUB_TOKEN not configured', code: 'github_not_configured' };
 }
 
+function githubFailureLabel(result = {}) {
+  const status = Number(result?.status) || 502;
+  const code = String(result?.code || '').trim().replace(/[^a-z0-9_-]/giu, '').slice(0, 64);
+  return code ? `${status} ${code}` : String(status);
+}
+
 async function triggerGitHubWorkflow(env, {
   workflow,
   inputs = {},
@@ -99,7 +105,7 @@ export async function getGitHubTextFile(env, filePath) {
     () => client.getTextFile(filePath),
     `GitHub file read for ${filePath}`
   );
-  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to load GitHub file ${filePath}: ${result.status}`);
+  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to load GitHub file ${filePath}: ${githubFailureLabel(result)}`);
   return result;
 }
 
@@ -114,7 +120,7 @@ export async function listGitHubDirectory(env, directoryPath, options = {}) {
     { quiet: options?.quiet === true }
   );
   if (!result.ok && options?.quiet !== true) {
-    getScopedConsole(env, 'github').error(`Failed to list GitHub directory ${directoryPath}: ${result.status}`);
+    getScopedConsole(env, 'github').error(`Failed to list GitHub directory ${directoryPath}: ${githubFailureLabel(result)}`);
   }
   return result;
 }
@@ -163,7 +169,7 @@ export async function putGitHubTextFile(env, filePath, content, message, sha) {
     getScopedConsole(env, 'github').warn(`GitHub file write for ${filePath} failed transiently; retrying (${attempt}/${GITHUB_WRITE_ATTEMPTS - 1})`);
     await waitForGitHubRetry(env, attempt);
   }
-  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to update GitHub file ${filePath}: ${result.status}`);
+  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to update GitHub file ${filePath}: ${githubFailureLabel(result)}`);
   return result;
 }
 
@@ -175,18 +181,18 @@ export async function putGitHubTextFiles(env, files, message) {
       error: `${result.path} changed in GitHub before the batch commit could be created. Reload the products and try again.`
     };
   }
-  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to batch-update GitHub files: ${result.status}`);
+  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to batch-update GitHub files: ${githubFailureLabel(result)}`);
   return result;
 }
 
 export async function putGitHubBase64File(env, filePath, base64Content, message, sha = undefined) {
   const result = await getClient(env).putBase64File(filePath, base64Content, message, sha);
-  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to update GitHub file ${filePath}: ${result.status}`);
+  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to update GitHub file ${filePath}: ${githubFailureLabel(result)}`);
   return result;
 }
 
 export async function deleteGitHubFile(env, filePath, message) {
   const result = await getClient(env).deleteFile(filePath, message);
-  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to delete GitHub file ${filePath}: ${result.status}`);
+  if (!result.ok) getScopedConsole(env, 'github').error(`Failed to delete GitHub file ${filePath}: ${githubFailureLabel(result)}`);
   return result;
 }
