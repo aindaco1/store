@@ -14,7 +14,7 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Catalog visibility controls** — Draft, archived, sold-out, private, and active states consistently control listings, public JSON, SEO metadata, and crawl inclusion.
 - [x] **Live public availability** — Inventory-tracked home and product pages refresh confirmed availability once per navigation from a sanitized short-lived projection; static counts remain the failure fallback and checkout remains authoritative.
 - [x] **Store-owned cart** — The browser runtime handles variants, quantities, add-ons, coupons, shipping and tax previews, reminder consent, and accessible cart interactions before server validation.
-- [x] **Product and media authoring** — Admin workflows support product preview, ordering, publishing, media upload and replacement, explicit alt/decorative state, reference visibility, placement warnings, and source-preserving optimization.
+- [x] **Product and media authoring** — Admin workflows support product preview, ordering, publishing, media upload and replacement, explicit alt/decorative state, reference visibility, placement warnings, and source-preserving optimization. Editor actions remain visible while long forms scroll, and status transitions remain visibly pending until the matching publish action succeeds.
 - [x] **Deterministic media inventory** — A rebuildable repository manifest records source hashes, dimensions or duration, derivatives, references, optimization state, budgets, and broken links without creating a second media database.
 
 ### Checkout, payments, pricing, shipping, tax, and inventory

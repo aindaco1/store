@@ -5197,7 +5197,7 @@
 
   function createStoreProductFieldLabel(labelText, field, describedElement, helpText) {
     var labelRow = createElement('span', 'admin-store-products__field-label');
-    labelRow.appendChild(document.createTextNode(labelText));
+    labelRow.appendChild(createElement('span', 'admin-store-products__field-label-text', labelText));
     if (helpText === false) return labelRow;
     var help = createHelp({
       label: labelText,
@@ -5208,6 +5208,32 @@
     });
     if (help) labelRow.appendChild(help);
     return labelRow;
+  }
+
+  function storeProductPublishActionLabel(form) {
+    if (storeProductIsCreateForm(form)) return 'Create product';
+    var status = $('[data-store-product-field="status"]', form);
+    var currentStatus = String(status && status.value || '').trim();
+    var initialStatus = String(form && form.dataset.storeProductInitialStatus || '').trim();
+    if (currentStatus === initialStatus) return 'Publish changes';
+    if (currentStatus === 'archived') return 'Archive product';
+    if (currentStatus === 'draft') return 'Save as draft';
+    if (currentStatus === 'sold_out') return 'Mark sold out';
+    if (currentStatus === 'active') return 'Activate product';
+    return 'Publish changes';
+  }
+
+  function storeProductUnsavedHint(form) {
+    var status = $('[data-store-product-field="status"]', form);
+    var currentStatus = String(status && status.value || '').trim();
+    var initialStatus = String(form && form.dataset.storeProductInitialStatus || '').trim();
+    if (currentStatus !== initialStatus) {
+      if (currentStatus === 'archived') return 'Not archived yet - publish to save.';
+      if (currentStatus === 'draft') return 'Draft selected - publish to save.';
+      if (currentStatus === 'sold_out') return 'Sold out selected - publish to save.';
+      if (currentStatus === 'active') return 'Active selected - publish to save.';
+    }
+    return 'Unsaved changes';
   }
 
   function storeProductFieldHelpClass(field) {
@@ -7838,8 +7864,26 @@
     var form = createElement('form', 'admin-store-products__editor');
     form.dataset.storeProductEditor = product.productId || '';
     if (isNewProduct) form.dataset.storeProductNew = 'true';
-    form.dataset.storeProductActionLabel = isNewProduct ? 'Create product' : 'Publish product';
-    form.appendChild(createElement('h3', 'admin-store-products__editor-title', isNewProduct ? 'Create product' : product.name || product.productId || 'Product'));
+    form.dataset.storeProductInitialStatus = String(product.status || (isNewProduct ? 'draft' : 'active'));
+    form.dataset.storeProductActionLabel = isNewProduct ? 'Create product' : 'Publish changes';
+    var header = createElement('div', 'admin-store-products__editor-header');
+    header.appendChild(createElement('h3', 'admin-store-products__editor-title', isNewProduct ? 'Create product' : product.name || product.productId || 'Product'));
+    var actions = createElement('div', 'admin-store-products__editor-actions');
+    var saveHint = createElement('small', 'admin-store-products__editor-save-hint', '');
+    saveHint.dataset.storeProductSaveHint = 'true';
+    saveHint.hidden = true;
+    var publish = createElement('button', 'btn', form.dataset.storeProductActionLabel);
+    publish.type = 'submit';
+    publish.dataset.storeProductPublish = 'true';
+    publish.disabled = true;
+    var cancel = createElement('button', 'btn btn--secondary', 'Cancel');
+    cancel.type = 'button';
+    cancel.dataset.storeProductCancel = 'true';
+    actions.appendChild(saveHint);
+    actions.appendChild(publish);
+    actions.appendChild(cancel);
+    header.appendChild(actions);
+    form.appendChild(header);
     var fields = createElement('div', 'admin-store-products__editor-fields');
     var fulfillmentValue = product.fulfillmentType || 'physical';
     var basics = createElement('div', 'admin-store-products__editor-section admin-store-products__editor-section--basics');
@@ -7903,17 +7947,6 @@
     if (fulfillmentControl) fulfillmentControl.dataset.previousFulfillmentType = fulfillmentControl.value;
     syncStoreProductFulfillmentDependentFields(form);
     syncStoreProductVariantsSection($('[data-store-product-variants]', form));
-    var actions = createElement('div', 'admin-store-products__editor-actions');
-    var publish = createElement('button', 'btn', form.dataset.storeProductActionLabel);
-    publish.type = 'submit';
-    publish.dataset.storeProductPublish = 'true';
-    publish.disabled = true;
-    var cancel = createElement('button', 'btn btn--secondary', 'Cancel');
-    cancel.type = 'button';
-    cancel.dataset.storeProductCancel = 'true';
-    actions.appendChild(publish);
-    actions.appendChild(cancel);
-    form.appendChild(actions);
     if (isNewProduct) syncStoreProductDerivedSku(form);
     form.addEventListener('input', function(event) {
       if (event.target && event.target.dataset && event.target.dataset.storeVariantField === 'label') {
@@ -8461,8 +8494,15 @@
   function updateStoreProductEditorDirtyState(form) {
     if (!form) return;
     var publish = $('[data-store-product-publish]', form);
-    var label = form.dataset.storeProductActionLabel || 'Publish product';
-    setDirtyButtonState(publish, storeProductEditorHasUnsavedChanges(form), label, label);
+    var dirty = storeProductEditorHasUnsavedChanges(form);
+    var label = storeProductPublishActionLabel(form);
+    var hint = $('[data-store-product-save-hint]', form);
+    form.dataset.storeProductActionLabel = label;
+    setDirtyButtonState(publish, dirty, label, label);
+    if (hint) {
+      hint.textContent = dirty ? storeProductUnsavedHint(form) : '';
+      hint.hidden = !dirty;
+    }
   }
 
   function resetStoreProductEditorDirtyBaseline(form) {
@@ -8772,12 +8812,19 @@
       }
       var publish = $('[data-store-product-publish]', form);
       if (publish) publish.disabled = true;
-      setStatus($('#admin-store-products-status'), storeProductIsCreateForm(form) ? 'Creating product...' : 'Publishing product...');
+      var submittedStatus = String(body && body.fields && body.fields.status || '').trim();
+      var progressMessage = storeProductIsCreateForm(form)
+        ? 'Creating product...'
+        : submittedStatus === 'archived'
+          ? 'Archiving product...'
+          : 'Publishing product...';
+      setStatus($('#admin-store-products-status'), progressMessage);
       requestJson('/admin/store/products/publish', {
         method: 'POST',
         body: body
       }).then(function(data) {
         var message = data.deployNotice || data.message || 'Product published.';
+        if (submittedStatus === 'archived') message = 'Archive saved. ' + message;
         editingProductId = '';
         return loadStoreProducts().finally(function() {
           setStatus($('#admin-store-products-status'), message);

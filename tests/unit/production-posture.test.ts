@@ -9,9 +9,21 @@ const root = path.resolve(__dirname, '..', '..');
 function productionConfig() {
   const config = JSON.parse(fs.readFileSync(path.join(root, 'config', 'production-posture.json'), 'utf8'));
   const wranglerSource = fs.readFileSync(path.join(root, 'worker', 'wrangler.toml'), 'utf8');
+  const inventory = normalizeWranglerInventory(wranglerSource);
   return {
     config,
-    inventory: normalizeWranglerInventory(wranglerSource),
+    inventory: {
+      ...inventory,
+      vars: {
+        ...inventory.vars,
+        APP_MODE: 'live',
+        SITE_BASE: 'https://shop.dustwave.xyz',
+        WORKER_BASE: 'https://checkout.dustwave.xyz',
+        CANONICAL_SITE_BASE: 'https://shop.dustwave.xyz',
+        CANONICAL_WORKER_BASE: 'https://checkout.dustwave.xyz',
+        CORS_ALLOWED_ORIGIN: 'https://shop.dustwave.xyz'
+      }
+    },
     wranglerConfig: parseWranglerConfig(wranglerSource)
   };
 }

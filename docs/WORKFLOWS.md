@@ -213,15 +213,20 @@ The checkout path consults the reservation-aware coordinator before committing s
 ### Product Publish
 
 1. Admin edits a product in **Products**.
-2. Browser submits:
+2. Status changes remain pending until the visible editor action is used. For
+   example, selecting **Archived** shows **Archive product** and does not change
+   the repository by itself.
+3. Browser submits:
 
    ```text
    POST /admin/store/products/publish
    ```
 
-3. Worker validates fields and variants.
-4. Worker patches the matching `_products/*.md` file through GitHub.
-5. Worker records an audit event and triggers the normal deploy path.
+4. Worker validates fields and variants.
+5. Worker patches the matching `_products/*.md` file through GitHub.
+6. Worker records an audit event and triggers the normal deploy path. The
+   archive is committed at this point, but the prior public catalog can remain
+   visible until deployment and cache propagation finish.
 
 ### Product Image Upload
 

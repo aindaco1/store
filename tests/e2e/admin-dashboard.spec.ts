@@ -2525,17 +2525,17 @@ test.describe('Admin Dashboard', () => {
     await expect(ticketEditor.locator('[data-store-product-variant="general-admission"] [data-store-variant-field="label"]')).toHaveValue('General Admission');
     await expect(ticketEditor.locator('[data-store-product-variant="supporter-ticket"] [data-store-variant-field="price"]')).toHaveValue('20');
     await expect(ticketEditor.locator('[data-store-product-variants-enabled]')).toHaveValue('true');
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeDisabled();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeDisabled();
     await ticketEditor.locator('[data-store-product-variants-enabled]').selectOption('false');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeHidden();
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeEnabled();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeEnabled();
     await ticketEditor.locator('[data-store-product-variants-enabled]').selectOption('true');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeDisabled();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeDisabled();
     await ticketEditor.locator('[data-store-product-variants-enabled]').selectOption('false');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeHidden();
-    await expect(ticketEditor.getByRole('button', { name: 'Publish product' })).toBeEnabled();
-    await ticketEditor.getByRole('button', { name: 'Publish product' }).click();
+    await expect(ticketEditor.getByRole('button', { name: 'Publish changes' })).toBeEnabled();
+    await ticketEditor.getByRole('button', { name: 'Publish changes' }).click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
     expect(calls.storeProductPublishes[0]).toMatchObject({
       intent: 'publish',
@@ -2646,7 +2646,7 @@ test.describe('Admin Dashboard', () => {
     })).toBe(true);
     await expect(productEditor.getByRole('button', { name: 'Refresh preview' })).toHaveCount(0);
     await expect(productEditor.locator('[data-store-product-field="image"]')).toHaveValue('/assets/images/fronteras-poster.png');
-    const productPublish = productEditor.getByRole('button', { name: 'Publish product' });
+    const productPublish = productEditor.getByRole('button', { name: 'Publish changes' });
     await expect(productPublish).toBeDisabled();
     await productEditor.locator('[data-store-product-field="name"]').fill('Fronteras Poster (Big) Draft');
     await expect(productPublish).toBeEnabled();
@@ -2836,7 +2836,7 @@ test.describe('Admin Dashboard', () => {
     await addedVariant.locator('[data-store-variant-field="inventory"]').fill('3');
     await generatedVariant.getByRole('button', { name: 'Remove' }).click();
     await expect(productEditor.locator('[data-store-product-variant]')).toHaveCount(1);
-    await productEditor.getByRole('button', { name: 'Publish product' }).click();
+    await productEditor.getByRole('button', { name: 'Publish changes' }).click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(2);
     expect(calls.storeProductPublishes[1]).toMatchObject({
       intent: 'publish',
@@ -3015,6 +3015,52 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Orders', exact: true })).toHaveAttribute('aria-selected', 'true');
   });
 
+  test('keeps product help controls separated and makes archive publishing explicit', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 1586, height: 900 });
+
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-product-archive');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Products');
+    await expect.poll(() => calls.storeProducts.length).toBe(1);
+
+    const productRow = page.locator('#admin-store-products-results tbody > tr[data-store-product-order-row]')
+      .filter({ hasText: 'Fronteras Poster (Big)' });
+    await productRow.getByRole('button', { name: 'Edit', exact: true }).click();
+    const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+    await expect(editor).toBeVisible();
+
+    expect(await editor.evaluate((root) => {
+      const price = root.querySelector('[data-store-product-field-wrapper="price"]');
+      const status = root.querySelector('[data-store-product-field-wrapper="status"]');
+      const priceLabel = price?.querySelector('.admin-store-products__field-label');
+      const priceHelp = price?.querySelector('.admin-settings__help-button');
+      const statusLabel = status?.querySelector('.admin-store-products__field-label');
+      if (!priceLabel || !priceHelp || !statusLabel) return false;
+      return priceLabel.scrollWidth <= priceLabel.clientWidth + 1 &&
+        priceHelp.getBoundingClientRect().right + 8 <= statusLabel.getBoundingClientRect().left;
+    })).toBe(true);
+
+    await editor.locator('[data-store-product-field="status"]').selectOption('archived');
+    await expect(editor.getByText('Not archived yet - publish to save.', { exact: true })).toBeVisible();
+    const archive = editor.getByRole('button', { name: 'Archive product', exact: true });
+    await expect(archive).toBeVisible();
+    await expect(archive).toBeEnabled();
+    expect(await archive.evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= window.innerHeight;
+    })).toBe(true);
+
+    await archive.click();
+    await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
+    expect(calls.storeProductPublishes[0]).toMatchObject({
+      intent: 'publish',
+      productId: 'fronteras-poster-big',
+      fields: { status: 'archived' }
+    });
+    await expect(page.locator('#admin-store-products-status')).toContainText('Archive saved.');
+  });
+
   test('keeps RSVP responses and actions inside the desktop orders table', async ({ page }) => {
     await routeAdminWorker(page);
     await page.setViewportSize({ width: 1366, height: 768 });
@@ -3110,7 +3156,7 @@ test.describe('Admin Dashboard', () => {
     await expect(question.locator('.admin-store-products__rsvp-choices-title .admin-settings__help-button')).toBeVisible();
     await expectNoAxeViolations(page, '[data-store-product-field-wrapper="rsvpQuestions"]');
 
-    await editor.getByRole('button', { name: 'Publish product' }).click();
+    await editor.getByRole('button', { name: 'Publish changes' }).click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
     const publishedQuestions = JSON.parse(calls.storeProductPublishes[0].fields.rsvpQuestions);
     expect(publishedQuestions).toEqual([

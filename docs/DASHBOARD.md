@@ -99,6 +99,8 @@ Editor behavior:
 - SEO description writes the front matter `description` value used by product metadata, social cards, and Product JSON-LD. Keep it concise and separate from the longer visible product page content.
 - Preview renders a sandboxed static product page preview. It mirrors the public product page layout, including full-image display, product-detail spacing, responsive product copy order, compact event address formatting, and Google Maps address links. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
+- Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
+- Successful archive requests say that the archive was saved before reporting repository/deploy progress. The product list can continue to show the prior deployed status until the triggered build finishes and the refreshed catalog reaches the Worker.
 - The editor expands inline under the product row being edited.
 
 Fulfillment-aware fields:
