@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Synchronize production Worker configuration
+        run: npm run sync:worker-config
+
       - name: List production Worker secret names
         run: |
           if ! (cd worker && npx wrangler secret list --format json) > worker-secrets.json; then

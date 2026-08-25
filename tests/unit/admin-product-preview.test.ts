@@ -28,5 +28,8 @@ describe('Store admin product preview', () => {
     expect(html).toContain('3405 Central Ave NE<br>Albuquerque, NM 87106');
     expect(html).not.toContain('Bernalillo County');
     expect(html).not.toContain('United States');
+    expect(html).not.toContain('fonts.googleapis.com');
+    expect(html).not.toContain('fonts.gstatic.com');
+    expect(html).toContain('https://use.typekit.net/hoj2yet.css');
   });
 });

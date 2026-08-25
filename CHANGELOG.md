@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.2.1 - 2026-08-24
+
+### Admin publishing reliability and production posture
+
+- Made repository-backed product publishing resilient to transient GitHub
+  transport failures. Product reads retry within a bounded window, and an
+  ambiguous write is reconciled against current repository content before a
+  safe retry, preventing both false 502 failures and duplicate archive commits.
+- Changed event addresses to a multiline editor that preserves repository line
+  breaks. **Find address** stays beside the address on desktop and stacks below
+  it on narrow screens without horizontal overflow.
+- Kept product previews script-free while moving them to an opaque sandbox that
+  does not emit blocked-script warnings. Removed the disallowed Google Fonts
+  request; the existing Typekit/local Store styling remains available within
+  the production Content Security Policy.
+- Corrected the scheduled Production Posture workflow behind issue #50. It now
+  synchronizes production Worker configuration before auditing, and provider
+  probes prefer canonical production origins over localhost-safe development
+  defaults.
+- Added focused Worker, workflow, preview, desktop, and mobile regressions for
+  retry/reconciliation behavior, canonical provider targets, clean preview
+  execution, and responsive multiline addresses.
+
 ## v1.2.0 - 2026-08-24
 
 ### Product publishing and release hardening

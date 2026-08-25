@@ -9721,10 +9721,8 @@ function formatAdminStorePreviewPrice(cents, currency = 'USD') {
 }
 
 function adminStorePreviewFontHead() {
-  return `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preconnect" href="https://use.typekit.net" crossorigin>
+  return `<link rel="preconnect" href="https://use.typekit.net" crossorigin>
   <link rel="dns-prefetch" href="https://p.typekit.net">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:400,700">
   <link rel="stylesheet" href="https://use.typekit.net/hoj2yet.css">`;
 }
 

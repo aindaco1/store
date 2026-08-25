@@ -3,6 +3,33 @@
 import { createGitHubClient } from '../../shared/dust-wave-platform/packages/worker-core/src/github.js';
 import { getScopedConsole } from './logger.js';
 
+const GITHUB_READ_ATTEMPTS = 3;
+const GITHUB_WRITE_ATTEMPTS = 3;
+
+function isRetryableGitHubResult(result = {}) {
+  if (['github_timeout', 'github_request_failed', 'github_invalid_response'].includes(result?.code)) return true;
+  return [429, 500, 502, 503, 504].includes(Number(result?.status));
+}
+
+function waitForGitHubRetry(env = {}, attempt = 1) {
+  if (String(env.APP_MODE || '').trim().toLowerCase() === 'test') return Promise.resolve();
+  const delayMs = Math.min(500, 125 * (2 ** Math.max(0, attempt - 1)));
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+async function readWithGitHubRetry(env, operation, label, { quiet = false } = {}) {
+  let result = null;
+  for (let attempt = 1; attempt <= GITHUB_READ_ATTEMPTS; attempt += 1) {
+    result = await operation();
+    if (result.ok || !isRetryableGitHubResult(result) || attempt === GITHUB_READ_ATTEMPTS) return result;
+    if (!quiet) {
+      getScopedConsole(env, 'github').warn(`${label} failed transiently; retrying (${attempt}/${GITHUB_READ_ATTEMPTS - 1})`);
+    }
+    await waitForGitHubRetry(env, attempt);
+  }
+  return result;
+}
+
 function getClient(env = {}) {
   return createGitHubClient({
     token: env.GITHUB_TOKEN,
@@ -66,7 +93,12 @@ export function triggerMediaOptimization(env, { scope = 'changed' } = {}) {
 export async function getGitHubTextFile(env, filePath) {
   const missing = notConfigured(env);
   if (missing) return missing;
-  const result = await getClient(env).getTextFile(filePath);
+  const client = getClient(env);
+  const result = await readWithGitHubRetry(
+    env,
+    () => client.getTextFile(filePath),
+    `GitHub file read for ${filePath}`
+  );
   if (!result.ok) getScopedConsole(env, 'github').error(`Failed to load GitHub file ${filePath}: ${result.status}`);
   return result;
 }
@@ -74,7 +106,13 @@ export async function getGitHubTextFile(env, filePath) {
 export async function listGitHubDirectory(env, directoryPath, options = {}) {
   const missing = notConfigured(env);
   if (missing) return missing;
-  const result = await getClient(env).listDirectory(directoryPath);
+  const client = getClient(env);
+  const result = await readWithGitHubRetry(
+    env,
+    () => client.listDirectory(directoryPath),
+    `GitHub directory read for ${directoryPath}`,
+    { quiet: options?.quiet === true }
+  );
   if (!result.ok && options?.quiet !== true) {
     getScopedConsole(env, 'github').error(`Failed to list GitHub directory ${directoryPath}: ${result.status}`);
   }
@@ -82,7 +120,49 @@ export async function listGitHubDirectory(env, directoryPath, options = {}) {
 }
 
 export async function putGitHubTextFile(env, filePath, content, message, sha) {
-  const result = await getClient(env).putTextFile(filePath, content, message, sha);
+  const missing = notConfigured(env);
+  if (missing) return missing;
+  const client = getClient(env);
+  const expectedContent = String(content ?? '');
+  let result = null;
+  for (let attempt = 1; attempt <= GITHUB_WRITE_ATTEMPTS; attempt += 1) {
+    result = await client.putTextFile(filePath, expectedContent, message, sha);
+    if (result.ok) return result;
+
+    const ambiguous = isRetryableGitHubResult(result) || [409, 422].includes(Number(result.status));
+    if (ambiguous) {
+      const current = await readWithGitHubRetry(
+        env,
+        () => client.getTextFile(filePath),
+        `GitHub write reconciliation for ${filePath}`,
+        { quiet: true }
+      );
+      if (current.ok && current.content === expectedContent) {
+        return {
+          ok: true,
+          path: current.path || filePath,
+          contentSha: current.sha || '',
+          commitSha: '',
+          commitUrl: '',
+          reconciled: true
+        };
+      }
+      if (current.ok && (!sha || current.sha !== sha)) {
+        result = {
+          ok: false,
+          status: 409,
+          path: current.path || filePath,
+          code: 'github_file_changed',
+          error: `${filePath} changed in GitHub before the update could be confirmed. Reload and try again.`
+        };
+        break;
+      }
+    }
+
+    if (!isRetryableGitHubResult(result) || attempt === GITHUB_WRITE_ATTEMPTS) break;
+    getScopedConsole(env, 'github').warn(`GitHub file write for ${filePath} failed transiently; retrying (${attempt}/${GITHUB_WRITE_ATTEMPTS - 1})`);
+    await waitForGitHubRetry(env, attempt);
+  }
   if (!result.ok) getScopedConsole(env, 'github').error(`Failed to update GitHub file ${filePath}: ${result.status}`);
   return result;
 }

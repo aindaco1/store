@@ -13,13 +13,16 @@ export function resolveProviderTargets({
   stagingVars = {}
 } = {}) {
   const siteBase = normalizedValue(siteBaseOverride) ||
+    normalizedValue(vars.CANONICAL_SITE_BASE) ||
     normalizedValue(vars.SITE_BASE) ||
     DEFAULT_SITE_BASE;
   const workerBase = normalizedValue(workerBaseOverride) ||
+    normalizedValue(vars.CANONICAL_WORKER_BASE) ||
     normalizedValue(vars.WORKER_BASE) ||
     DEFAULT_WORKER_BASE;
   const testWorkerBase = normalizedValue(stripeTestWebhookBase) ||
     normalizedValue(stagingVars.WORKER_BASE) ||
+    normalizedValue(stagingVars.CANONICAL_WORKER_BASE) ||
     workerBase;
 
   return { siteBase, workerBase, testWorkerBase };

@@ -140,6 +140,20 @@ describe('workflow security posture', () => {
     expect(workflow).not.toMatch(/backup:snapshot|--kv-values|--r2-objects|wrangler deploy|contents: write|pull-requests: write/);
   });
 
+  it('checks scheduled production posture against synchronized production origins', () => {
+    const workflow = readWorkflow('production-posture.yml');
+    const syncIndex = workflow.indexOf('npm run sync:worker-config');
+    const providersIndex = workflow.indexOf('npm run release:providers');
+    const postureIndex = workflow.indexOf('npm run production:posture');
+
+    expect(workflow).toContain("cron: '11 4 * * 1'");
+    expect(workflow).toContain("timezone: 'America/Denver'");
+    expect(syncIndex).toBeGreaterThan(0);
+    expect(providersIndex).toBeGreaterThan(syncIndex);
+    expect(postureIndex).toBeGreaterThan(providersIndex);
+    expect(workflow).not.toMatch(/wrangler deploy|deploy:worker|purge_cache|contents: write|pull-requests: write/);
+  });
+
   it('pins the localization review runtime and keeps the workflow read-only', () => {
     const workflow = readWorkflow('localization-review.yml');
 

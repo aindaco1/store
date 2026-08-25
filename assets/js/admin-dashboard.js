@@ -2830,48 +2830,6 @@
     return match ? storeProductPreviewOrigin(match[2]) : '';
   }
 
-  function storeProductPreviewKnownOrigins() {
-    return [
-      storeMarketingBaseUrl(),
-      script && script.dataset ? script.dataset.canonicalSiteUrl : '',
-      window.location.origin
-    ].map(storeProductPreviewOrigin).filter(Boolean).filter(function(origin, index, origins) {
-      return origins.indexOf(origin) === index;
-    });
-  }
-
-  function storeProductPreviewAssetUrl(value) {
-    var raw = String(value || '').trim();
-    if (!raw || /^(?:data:|blob:)/i.test(raw)) return raw;
-    var base = normalizeBase(storeProductPreviewBaseUrl());
-    var previewOrigin = storeProductPreviewOrigin(base);
-    if (!previewOrigin) return raw;
-    try {
-      var parsed = new URL(raw, base + '/');
-      var knownOrigins = storeProductPreviewKnownOrigins();
-      var isKnownSiteAsset = knownOrigins.indexOf(parsed.origin) >= 0 && parsed.pathname.indexOf('/assets/') === 0;
-      var isRelativeAsset = raw.charAt(0) === '/' && parsed.pathname.indexOf('/assets/') === 0;
-      if (isKnownSiteAsset || isRelativeAsset) {
-        return previewOrigin + parsed.pathname + parsed.search + parsed.hash;
-      }
-      return raw;
-    } catch (_error) {
-      return raw;
-    }
-  }
-
-  function repairStoreProductPreviewFrameImages(frame) {
-    if (!frame || !frame.contentDocument) return;
-    sanitizeStoreProductPreviewDocument(frame.contentDocument);
-    $all('img', frame.contentDocument).forEach(function(image) {
-      var current = image.getAttribute('src') || '';
-      var next = storeProductPreviewAssetUrl(current);
-      image.loading = 'eager';
-      image.decoding = 'sync';
-      if (next && next !== current) image.setAttribute('src', next);
-    });
-  }
-
   function marketingDefault(name, fallback) {
     if (!script || !script.dataset) return fallback || '';
     return script.dataset[name] || fallback || '';
@@ -7751,10 +7709,11 @@
     var frame = document.createElement('iframe');
     frame.title = 'Product preview';
     frame.dataset.storeProductPreviewFrame = 'true';
-    frame.setAttribute('sandbox', 'allow-same-origin');
-    frame.addEventListener('load', function() {
-      repairStoreProductPreviewFrameImages(frame);
-    });
+    // Scripts are removed before rendering. Keeping the frame in an opaque
+    // origin isolates it from the dashboard while allowing browser-managed
+    // frame helpers to run without noisy sandbox execution errors.
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>';
     previewHeader.appendChild(createStoreProductFieldLabel('Preview', 'preview', frame));
     preview.appendChild(previewHeader);
     preview.appendChild(previewStatus);
@@ -7801,6 +7760,12 @@
     doc.querySelectorAll('script').forEach(function(node) {
       node.remove();
     });
+    doc.querySelectorAll('link[href]').forEach(function(node) {
+      var href = String(node.getAttribute('href') || '').trim().toLowerCase();
+      if (href.indexOf('https://fonts.googleapis.com/') === 0 || href.indexOf('https://fonts.gstatic.com/') === 0) {
+        node.remove();
+      }
+    });
     doc.querySelectorAll('*').forEach(function(node) {
       Array.from(node.attributes || []).forEach(function(attribute) {
         var name = String(attribute.name || '').toLowerCase();
@@ -7836,9 +7801,6 @@
       var html = data && data.preview ? data.preview.html : '';
       if (!html) throw new Error('Preview did not return HTML.');
       frame.srcdoc = storeProductPreviewHtmlWithBase(html);
-      window.setTimeout(function() {
-        repairStoreProductPreviewFrameImages(frame);
-      }, 0);
       setStatus(status, 'Preview updated.');
     }).catch(function(error) {
       if (form.dataset.storeProductPreviewRequest !== requestId) return;
@@ -8128,10 +8090,11 @@
     var wrapper = createElement('div', 'admin-store-products__field admin-store-products__field--event-address');
     wrapper.dataset.storeProductFieldWrapper = 'eventAddress';
     var inputId = 'store-product-event-address-' + Math.random().toString(36).slice(2);
-    var input = document.createElement('input');
-    input.type = 'text';
+    var input = document.createElement('textarea');
+    input.rows = 2;
     input.id = inputId;
     input.className = 'admin-settings__input';
+    input.autocomplete = 'street-address';
     input.value = product.eventAddress || product.eventDetails?.address || '';
     input.dataset.storeProductField = 'eventAddress';
     var label = document.createElement('label');

@@ -4362,9 +4362,6 @@ textarea.admin-settings__input--readonly {
     grid-column: 1 / -1;
   }
 
-  .admin-store-products__event-address-control {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 760px) {
@@ -4377,6 +4374,10 @@ textarea.admin-settings__input--readonly {
   .admin-store-products__editor-section--basics [data-store-product-field-wrapper],
   .admin-store-products__editor-section--event [data-store-product-field-wrapper] {
     grid-column: 1 / -1;
+  }
+
+  .admin-store-products__event-address-control {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
