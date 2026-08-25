@@ -11232,6 +11232,7 @@ async function handleAdminStoreProductOrderPublish(request, env) {
     })),
     results,
     rebuild,
+    deployment: adminRepoDeployment(env, rebuild, committedProducts[0]?.commitSha),
     auditKey,
     repositoryMode: adminRepoMode(env),
     changedFields: ['order'],

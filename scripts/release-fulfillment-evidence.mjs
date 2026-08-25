@@ -8,6 +8,8 @@ const ADMIN_EMAIL = 'release-admin@example.com';
 const results = [];
 const waitUntilTasks = [];
 let requestCounter = 0;
+const EVIDENCE_NOW_MS = Date.now();
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 class MockKVNamespace {
   constructor() {
@@ -91,7 +93,7 @@ function assert(condition, label, detail) {
 }
 
 function nowIso(offsetMs = 0) {
-  return new Date(Date.UTC(2026, 6, 5, 3, 30, 0) + offsetMs).toISOString();
+  return new Date(EVIDENCE_NOW_MS + offsetMs).toISOString();
 }
 
 function buildOrder({
@@ -203,8 +205,8 @@ function ticketItem() {
     currency: 'USD',
     fulfillmentType: 'ticket',
     eventDetails: {
-      starts_at: '2026-08-15T02:00:00.000Z',
-      ends_at: '2026-08-15T04:00:00.000Z',
+      starts_at: nowIso(10 * DAY_MS),
+      ends_at: nowIso((10 * DAY_MS) + (2 * 60 * 60 * 1000)),
       venue: 'Guild Cinema',
       address: '3405 Central Ave NE, Albuquerque, NM 87106'
     }
@@ -222,7 +224,7 @@ function rsvpItem() {
     currency: 'USD',
     fulfillmentType: 'rsvp',
     eventDetails: {
-      starts_at: '2026-08-16T02:00:00.000Z',
+      starts_at: nowIso(11 * DAY_MS),
       venue: 'Launch Room',
       address: 'Albuquerque, NM'
     }

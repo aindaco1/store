@@ -55,4 +55,12 @@ describe('Release Core consumer adapters', () => {
     expect(source).toContain('release-core/src/screen-reader-evidence.js');
     expect(source).not.toContain('node:child_process');
   });
+
+  it('keeps release fulfillment event fixtures relative to the evidence run', () => {
+    const source = readFileSync('scripts/release-fulfillment-evidence.mjs', 'utf8');
+
+    expect(source).toContain('const EVIDENCE_NOW_MS = Date.now();');
+    expect(source).toContain('starts_at: nowIso(10 * DAY_MS)');
+    expect(source).not.toMatch(/starts_at:\s*['"]20\d{2}-/);
+  });
 });

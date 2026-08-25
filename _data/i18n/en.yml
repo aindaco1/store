@@ -243,12 +243,32 @@ admin:
   deployment_archive_requested: Archive saved. Waiting for the deployment to start - %{elapsed} elapsed.
   deployment_archive_queued: Archive saved. Deployment queued - %{elapsed} elapsed.
   deployment_archive_running: Archive saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_active_requested: Active status saved. Waiting for the deployment to start - %{elapsed} elapsed.
+  deployment_active_queued: Active status saved. Deployment queued - %{elapsed} elapsed.
+  deployment_active_running: Active status saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_draft_requested: Draft saved. Waiting for the deployment to start - %{elapsed} elapsed.
+  deployment_draft_queued: Draft saved. Deployment queued - %{elapsed} elapsed.
+  deployment_draft_running: Draft saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_sold_out_requested: Sold out status saved. Waiting for the deployment to start - %{elapsed} elapsed.
+  deployment_sold_out_queued: Sold out status saved. Deployment queued - %{elapsed} elapsed.
+  deployment_sold_out_running: Sold out status saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_order_requested: Product order saved. Waiting for the deployment to start - %{elapsed} elapsed.
+  deployment_order_queued: Product order saved. Deployment queued - %{elapsed} elapsed.
+  deployment_order_running: Product order saved. Updating the storefront - %{elapsed} elapsed.
   deployment_product_requested: Product saved. Waiting for the deployment to start - %{elapsed} elapsed.
   deployment_product_queued: Product saved. Deployment queued - %{elapsed} elapsed.
   deployment_product_running: Product saved. Updating checkout and storefront - %{elapsed} elapsed.
   deployment_archive_complete: Archived and unavailable to shoppers. Deployment completed in %{elapsed}.
+  deployment_active_complete: Active status deployed in %{elapsed}.
+  deployment_draft_complete: Saved as draft. Deployment completed in %{elapsed}.
+  deployment_sold_out_complete: Sold out and unavailable for purchase. Deployment completed in %{elapsed}.
+  deployment_order_complete: Product order deployment completed in %{elapsed}.
   deployment_product_complete: Product deployment completed in %{elapsed}.
   deployment_archive_failed: Archive saved, but the deployment did not complete. The prior storefront may still be live.
+  deployment_active_failed: Active status saved, but the deployment did not complete. The prior storefront status may still be live.
+  deployment_draft_failed: Draft saved, but the deployment did not complete. The prior storefront may still be live.
+  deployment_sold_out_failed: Sold out status saved, but the deployment did not complete. The prior storefront availability may still be live.
+  deployment_order_failed: Product order saved, but the deployment did not complete. The prior storefront order may still be live.
   deployment_product_failed: Product saved, but the deployment did not complete.
   deployment_progress_unavailable: Change saved, but deployment progress could not be checked.
   deployment_open_run: Open GitHub run
