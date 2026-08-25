@@ -212,30 +212,36 @@ The checkout path consults the reservation-aware coordinator before committing s
 
 ### Product Publish
 
-1. Admin edits a product in **Products**.
-2. Status changes remain pending until the visible editor action is used. For
-   example, selecting **Archived** shows **Archive product** and does not change
-   the repository by itself.
-3. Browser submits:
+1. Admin edits a product, applies a bulk status, or arranges product rows in
+   **Products**.
+2. Status changes remain pending until the existing visible action is used:
+   **Activate product**, **Save as draft**, **Archive product**, or **Mark sold
+   out**. Reordering remains local until **Save order** is used.
+3. Browser submits the matching existing endpoint:
 
    ```text
    POST /admin/store/products/publish
+   POST /admin/store/products/bulk-publish
+   POST /admin/store/products/order
    ```
 
-4. Worker validates fields and variants.
-5. Worker patches the matching `_products/*.md` file through GitHub.
+4. Worker validates the requested fields, targets, variants, or product order.
+5. Worker patches the matching `_products/*.md` file or files through GitHub.
 6. Worker records an audit event and triggers the normal deploy path. The
-   archive is committed at this point, but the prior public catalog can remain
-   visible until deployment and cache propagation finish.
+   repository change is committed at this point, but the prior public catalog
+   can remain visible until deployment and cache propagation finish.
 7. The dashboard queries the authenticated, private/no-store deployment-status
-   route for the workflow run matching that full commit SHA. It reports
-   requested, queued, running, failed, or completed state and measures from the
-   dispatch request to the workflow's completion timestamp.
+   route for the workflow run matching that full commit SHA. One shared
+   operation-aware controller reports requested, queued, running, failed, or
+   completed state with context-specific copy and measures from the dispatch
+   request to the workflow's completion timestamp.
 8. Only a successful matching run triggers the product-list refresh. At that
-   point the static listing/API omit an archived product, its direct page keeps
-   purchase controls disabled and noindexed, and Worker cart validation rejects
-   it as unavailable. Failure leaves the saved archive and prior deployed list
-   visibly distinct and provides the GitHub run link when known.
+   point Active is public and inventory-aware; Draft and Archived are omitted
+   from public listings and unavailable to checkout; and Sold out stays public
+   but unavailable to purchase. Product order saves keep the arranged rows on
+   screen until this refresh. Failure leaves the saved repository change and
+   prior deployed list visibly distinct and provides the GitHub run link when
+   known.
 
 ### Product Image Upload
 

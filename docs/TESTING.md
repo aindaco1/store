@@ -10,7 +10,7 @@ pre-merge gate runs this check before builds and also rejects the template
 submodule from generated site output. `npm run jekyll-template:sync` is an
 explicit upgrade-branch operation, not a build step.
 
-Store `v1.2.2` records Platform `v0.34.1` and Jekyll Template `v0.1.0` as exact
+Store `v1.2.3` records Platform `v0.34.1` and Jekyll Template `v0.1.0` as exact
 gitlinks. After cloning, switching branches, or reviewing a shared dependency
 upgrade, initialize the recorded commits and run the narrow pin/drift contract
 before broader tests:

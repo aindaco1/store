@@ -243,12 +243,32 @@ admin:
   deployment_archive_requested: Archivo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
   deployment_archive_queued: Archivo guardado. Despliegue en cola - %{elapsed} transcurrido.
   deployment_archive_running: Archivo guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_active_requested: Estado activo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
+  deployment_active_queued: Estado activo guardado. Despliegue en cola - %{elapsed} transcurrido.
+  deployment_active_running: Estado activo guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_draft_requested: Borrador guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
+  deployment_draft_queued: Borrador guardado. Despliegue en cola - %{elapsed} transcurrido.
+  deployment_draft_running: Borrador guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_sold_out_requested: Estado de agotado guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
+  deployment_sold_out_queued: Estado de agotado guardado. Despliegue en cola - %{elapsed} transcurrido.
+  deployment_sold_out_running: Estado de agotado guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_order_requested: Orden de productos guardada. Esperando que inicie el despliegue - %{elapsed} transcurrido.
+  deployment_order_queued: Orden de productos guardada. Despliegue en cola - %{elapsed} transcurrido.
+  deployment_order_running: Orden de productos guardada. Actualizando la tienda - %{elapsed} transcurrido.
   deployment_product_requested: Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
   deployment_product_queued: Producto guardado. Despliegue en cola - %{elapsed} transcurrido.
   deployment_product_running: Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
   deployment_archive_complete: Archivado y no disponible para compradores. El despliegue terminó en %{elapsed}.
+  deployment_active_complete: Estado activo desplegado en %{elapsed}.
+  deployment_draft_complete: Guardado como borrador. El despliegue terminó en %{elapsed}.
+  deployment_sold_out_complete: Agotado y no disponible para comprar. El despliegue terminó en %{elapsed}.
+  deployment_order_complete: El despliegue del orden de productos terminó en %{elapsed}.
   deployment_product_complete: El despliegue del producto terminó en %{elapsed}.
   deployment_archive_failed: El archivo se guardó, pero el despliegue no terminó. La tienda anterior puede seguir activa.
+  deployment_active_failed: El estado activo se guardó, pero el despliegue no terminó. El estado anterior de la tienda puede seguir publicado.
+  deployment_draft_failed: El borrador se guardó, pero el despliegue no terminó. La tienda anterior puede seguir activa.
+  deployment_sold_out_failed: El estado de agotado se guardó, pero el despliegue no terminó. La disponibilidad anterior puede seguir activa.
+  deployment_order_failed: La orden de productos se guardó, pero el despliegue no terminó. El orden anterior de la tienda puede seguir activo.
   deployment_product_failed: El producto se guardó, pero el despliegue no terminó.
   deployment_progress_unavailable: El cambio se guardó, pero no se pudo comprobar el progreso del despliegue.
   deployment_open_run: Abrir ejecución de GitHub

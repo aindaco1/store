@@ -87,7 +87,7 @@ List behavior:
 - **Refresh inventory** performs one explicit authenticated read of the current coordinator snapshot. The page does not poll or create a second inventory cache in the browser.
 - If the configured baseline and coordinator limit disagree, the row shows the coordinator limit as drift instead of presenting the baseline as live availability.
 - Rows are draggable to change storefront display order.
-- Reordering changes the browser view immediately but is not persisted until Save order is clicked.
+- Reordering changes the browser view immediately but is not persisted until Save order is clicked. After saving, the arranged rows remain in place while deployment progresses; the list refreshes only after the exact matching run succeeds.
 - Bulk status changes support active, draft, archived, and sold out.
 - Product creation uses the same editor as product editing.
 
@@ -101,7 +101,8 @@ Editor behavior:
 - Event Address is a multiline field so street and locality lines remain distinct. **Find address** stays in the same row at desktop widths and stacks below the field on narrow screens.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
-- Successful production publishes return the saved commit and deployment request. The editor then shows an accessible **Saved → Deploying → Deployed** indicator, the exact GitHub run state, and elapsed save-to-deploy time. It keeps the editor and prior product list in place until that run succeeds, then refreshes from the newly deployed Worker catalog. A failed or unobservable run leaves the saved state explicit, preserves the prior list instead of presenting it as current, and links the GitHub run when available. Bulk archive status changes reuse the same tracker.
+- Successful production publishes return the saved commit and deployment request. One operation-aware controller handles ordinary product edits, Active, Draft, Archived, and Sold out transitions, bulk status changes, and Save order. It shows an accessible **Saved → Deploying → Deployed** indicator, the exact GitHub run state, operation-specific copy, and elapsed save-to-deploy time. The editor or arranged rows and prior product list remain in place until that run succeeds, then the dashboard refreshes from the newly deployed Worker catalog. A failed or unobservable run leaves the saved state explicit, preserves the prior list instead of presenting it as current, and links the GitHub run when available.
+- Status semantics do not change with the shared controller: Active is public and inventory-aware; Draft and Archived are omitted from public listings and unavailable to checkout; Sold out remains public but unavailable to purchase.
 - Archived products are excluded from public catalog JSON and listings. A direct archived page remains non-indexable with disabled purchase controls, and canonical Worker cart validation rejects the product even if a stale or manipulated browser submits it.
 - Production repository reads use Cloudflare-compatible manual redirect handling and reject every 3xx response without following it. Transient GitHub transport failures are retried. If a write response is lost, the Worker reads the current file before retrying and treats an exact content match as a reconciled success; changed content remains a conflict that requires reload instead of an overwrite.
 - The editor expands inline under the product row being edited.

@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.2.2`. The preceding `v1.2.1` release remains independently reversible. Product publishing uses Cloudflare-compatible, fail-closed GitHub redirect handling, retries transient repository reads, and reconciles ambiguous writes. Event addresses retain multiple lines with responsive lookup controls, product previews stay isolated without blocked-script/font-policy noise, and scheduled posture evidence targets canonical production origins. RSVP products retain the versioned repository-backed registration shipped in v1.2.0 while physical, digital, ticket, service, and unconfigured RSVP paths keep their existing behavior. Store pins Platform v0.34.1 and the separate Jekyll Template v0.1.0; Store retains local build copies, configuration, content, production origins, credentials, deployment, and rollback authority.
+Current release: `v1.2.3`. The preceding `v1.2.2` release remains independently reversible. Single and bulk product status changes, ordinary edits, and reordering share exact-commit deployment progress and refresh only after success while preserving the established controls and status semantics. Archived and draft products stay private and unavailable; sold-out products stay public but unavailable to purchase; active products retain their inventory-aware behavior. Product publishing uses Cloudflare-compatible, fail-closed GitHub redirect handling, retries transient repository reads, and reconciles ambiguous writes. Event addresses retain multiple lines with responsive lookup controls, product previews stay isolated without blocked-script/font-policy noise, and scheduled posture evidence targets canonical production origins. RSVP products retain the versioned repository-backed registration shipped in v1.2.0 while physical, digital, ticket, service, and unconfigured RSVP paths keep their existing behavior. Store pins Platform v0.34.1 and the separate Jekyll Template v0.1.0; Store retains local build copies, configuration, content, production origins, credentials, deployment, and rollback authority.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent and no-payment checkout, opt-in RSVP forms, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, named attendee check-in, private response review, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 
@@ -25,7 +25,7 @@ The current repository is production-ready from a code-path perspective: public 
 At this sweep the source catalog contains:
 
 - 50 product records in `_products/`
-- 26 active products and 24 archived products
+- 25 active products and 25 archived products
 - 25 physical products, 23 ticket products, 1 digital product, and 1 free RSVP product
 - launch-test fixtures for controlled direct-link checkout/download/check-in smoke tests
 

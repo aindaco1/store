@@ -522,12 +522,32 @@
         deploymentArchiveRequested: 'Archive saved. Waiting for the deployment to start - %{elapsed} elapsed.',
         deploymentArchiveQueued: 'Archive saved. Deployment queued - %{elapsed} elapsed.',
         deploymentArchiveRunning: 'Archive saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentActiveRequested: 'Active status saved. Waiting for the deployment to start - %{elapsed} elapsed.',
+        deploymentActiveQueued: 'Active status saved. Deployment queued - %{elapsed} elapsed.',
+        deploymentActiveRunning: 'Active status saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentDraftRequested: 'Draft saved. Waiting for the deployment to start - %{elapsed} elapsed.',
+        deploymentDraftQueued: 'Draft saved. Deployment queued - %{elapsed} elapsed.',
+        deploymentDraftRunning: 'Draft saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentSoldOutRequested: 'Sold out status saved. Waiting for the deployment to start - %{elapsed} elapsed.',
+        deploymentSoldOutQueued: 'Sold out status saved. Deployment queued - %{elapsed} elapsed.',
+        deploymentSoldOutRunning: 'Sold out status saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentOrderRequested: 'Product order saved. Waiting for the deployment to start - %{elapsed} elapsed.',
+        deploymentOrderQueued: 'Product order saved. Deployment queued - %{elapsed} elapsed.',
+        deploymentOrderRunning: 'Product order saved. Updating the storefront - %{elapsed} elapsed.',
         deploymentProductRequested: 'Product saved. Waiting for the deployment to start - %{elapsed} elapsed.',
         deploymentProductQueued: 'Product saved. Deployment queued - %{elapsed} elapsed.',
         deploymentProductRunning: 'Product saved. Updating checkout and storefront - %{elapsed} elapsed.',
         deploymentArchiveComplete: 'Archived and unavailable to shoppers. Deployment completed in %{elapsed}.',
+        deploymentActiveComplete: 'Active status deployed in %{elapsed}.',
+        deploymentDraftComplete: 'Saved as draft. Deployment completed in %{elapsed}.',
+        deploymentSoldOutComplete: 'Sold out and unavailable for purchase. Deployment completed in %{elapsed}.',
+        deploymentOrderComplete: 'Product order deployment completed in %{elapsed}.',
         deploymentProductComplete: 'Product deployment completed in %{elapsed}.',
         deploymentArchiveFailed: 'Archive saved, but the deployment did not complete. The prior storefront may still be live.',
+        deploymentActiveFailed: 'Active status saved, but the deployment did not complete. The prior storefront status may still be live.',
+        deploymentDraftFailed: 'Draft saved, but the deployment did not complete. The prior storefront may still be live.',
+        deploymentSoldOutFailed: 'Sold out status saved, but the deployment did not complete. The prior storefront availability may still be live.',
+        deploymentOrderFailed: 'Product order saved, but the deployment did not complete. The prior storefront order may still be live.',
         deploymentProductFailed: 'Product saved, but the deployment did not complete.',
         deploymentProgressUnavailable: 'Change saved, but deployment progress could not be checked.',
         deploymentOpenRun: 'Open GitHub run'
@@ -573,12 +593,32 @@
         deploymentArchiveRequested: 'Archivo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
         deploymentArchiveQueued: 'Archivo guardado. Despliegue en cola - %{elapsed} transcurrido.',
         deploymentArchiveRunning: 'Archivo guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentActiveRequested: 'Estado activo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
+        deploymentActiveQueued: 'Estado activo guardado. Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentActiveRunning: 'Estado activo guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentDraftRequested: 'Borrador guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
+        deploymentDraftQueued: 'Borrador guardado. Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentDraftRunning: 'Borrador guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentSoldOutRequested: 'Estado de agotado guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
+        deploymentSoldOutQueued: 'Estado de agotado guardado. Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentSoldOutRunning: 'Estado de agotado guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentOrderRequested: 'Orden de productos guardada. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
+        deploymentOrderQueued: 'Orden de productos guardada. Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentOrderRunning: 'Orden de productos guardada. Actualizando la tienda - %{elapsed} transcurrido.',
         deploymentProductRequested: 'Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
         deploymentProductQueued: 'Producto guardado. Despliegue en cola - %{elapsed} transcurrido.',
         deploymentProductRunning: 'Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
         deploymentArchiveComplete: 'Archivado y no disponible para compradores. El despliegue termino en %{elapsed}.',
+        deploymentActiveComplete: 'Estado activo desplegado en %{elapsed}.',
+        deploymentDraftComplete: 'Guardado como borrador. El despliegue termino en %{elapsed}.',
+        deploymentSoldOutComplete: 'Agotado y no disponible para comprar. El despliegue termino en %{elapsed}.',
+        deploymentOrderComplete: 'El despliegue del orden de productos termino en %{elapsed}.',
         deploymentProductComplete: 'El despliegue del producto termino en %{elapsed}.',
         deploymentArchiveFailed: 'El archivo se guardo, pero el despliegue no termino. La tienda anterior puede seguir activa.',
+        deploymentActiveFailed: 'El estado activo se guardo, pero el despliegue no termino. El estado anterior de la tienda puede seguir publicado.',
+        deploymentDraftFailed: 'El borrador se guardo, pero el despliegue no termino. La tienda anterior puede seguir activa.',
+        deploymentSoldOutFailed: 'El estado de agotado se guardo, pero el despliegue no termino. La disponibilidad anterior puede seguir activa.',
+        deploymentOrderFailed: 'La orden de productos se guardo, pero el despliegue no termino. El orden anterior de la tienda puede seguir activo.',
         deploymentProductFailed: 'El producto se guardo, pero el despliegue no termino.',
         deploymentProgressUnavailable: 'El cambio se guardo, pero no se pudo comprobar el progreso del despliegue.',
         deploymentOpenRun: 'Abrir ejecucion de GitHub'
@@ -4450,10 +4490,16 @@
     }).then(function(data) {
       var message = data.deployNotice || 'Product order saved.';
       storeProductsSavedOrderIds = orderIds.slice();
-      return loadStoreProducts().finally(function() {
-        setStatus($('#admin-store-products-status'), message);
+      return trackStoreProductDeployment(data, {
+        operation: 'order'
+      }).then(function(deployment) {
+        return refreshStoreProductsAfterDeployment(deployment, {
+          operation: 'order',
+          fallbackMessage: message
+        });
       });
     }).catch(function(error) {
+      if (error && error.deploymentSaved) return;
       setStatus($('#admin-store-products-status'), formatError(error), true);
       syncStoreProductsOrderControls($('#admin-store-products-results'));
     });
@@ -8531,26 +8577,48 @@
     return minutes + 'm' + (seconds ? ' ' + seconds + 's' : '');
   }
 
-  function storeProductDeploymentMessageKey(deployment, archived) {
-    var prefix = archived ? 'deploymentArchive' : 'deploymentProduct';
+  var STORE_PRODUCT_DEPLOYMENT_OPERATION_SUFFIXES = Object.freeze({
+    product: 'Product',
+    active: 'Active',
+    draft: 'Draft',
+    archived: 'Archive',
+    sold_out: 'SoldOut',
+    order: 'Order'
+  });
+
+  function normalizeStoreProductDeploymentOperation(operation) {
+    var normalized = String(operation || '').trim().toLowerCase();
+    return STORE_PRODUCT_DEPLOYMENT_OPERATION_SUFFIXES[normalized] ? normalized : 'product';
+  }
+
+  function storeProductDeploymentOperationKey(operation, phase) {
+    var normalized = normalizeStoreProductDeploymentOperation(operation);
+    return 'deployment' + STORE_PRODUCT_DEPLOYMENT_OPERATION_SUFFIXES[normalized] + phase;
+  }
+
+  function storeProductDeploymentMessageKey(deployment, operation) {
     var status = String(deployment && deployment.status || deployment && deployment.state || 'requested');
-    if (status === 'queued' || status === 'pending' || status === 'waiting') return prefix + 'Queued';
-    if (status === 'in_progress') return prefix + 'Running';
-    return prefix + 'Requested';
+    if (status === 'queued' || status === 'pending' || status === 'waiting') {
+      return storeProductDeploymentOperationKey(operation, 'Queued');
+    }
+    if (status === 'in_progress') return storeProductDeploymentOperationKey(operation, 'Running');
+    return storeProductDeploymentOperationKey(operation, 'Requested');
   }
 
   function renderStoreProductDeployment(deployment, options) {
     var status = $('#admin-store-products-status');
     if (!status) return;
     var opts = options || {};
-    var archived = opts.archived === true;
+    var operation = normalizeStoreProductDeploymentOperation(opts.operation);
     var failed = opts.failed === true;
     var fallbackStartedAt = Number(opts.startedAt || Date.now());
     var elapsedMs = Number(deployment && deployment.elapsedMs || 0) || Math.max(0, Date.now() - fallbackStartedAt);
     var elapsed = formatStoreProductDeploymentDuration(elapsedMs);
     var message = failed
-      ? localizedAdminText(opts.progressUnavailable ? 'deploymentProgressUnavailable' : (archived ? 'deploymentArchiveFailed' : 'deploymentProductFailed'))
-      : localizedAdminText(storeProductDeploymentMessageKey(deployment, archived), { elapsed: elapsed });
+      ? localizedAdminText(opts.progressUnavailable
+        ? 'deploymentProgressUnavailable'
+        : storeProductDeploymentOperationKey(operation, 'Failed'))
+      : localizedAdminText(storeProductDeploymentMessageKey(deployment, operation), { elapsed: elapsed });
     var nextState = failed ? 'failed' : String(deployment && (deployment.status || deployment.state) || 'requested');
     var stateChanged = status.dataset.storeDeploymentState !== nextState;
 
@@ -8603,7 +8671,7 @@
         var untrackedError = new Error('Deployment progress is unavailable.');
         untrackedError.deploymentSaved = true;
         renderStoreProductDeployment({}, {
-          archived: opts.archived,
+          operation: opts.operation,
           failed: true,
           progressUnavailable: true,
           startedAt: Date.now()
@@ -8633,7 +8701,7 @@
       if (refresh) refresh.disabled = false;
     }
 
-    renderStoreProductDeployment(tracking, { archived: opts.archived, startedAt: startedAt });
+    renderStoreProductDeployment(tracking, { operation: opts.operation, startedAt: startedAt });
 
     return new Promise(function(resolve, reject) {
       function failTracking(message, deployment, progressUnavailable) {
@@ -8641,7 +8709,7 @@
         error.deploymentSaved = true;
         error.deployment = deployment || {};
         renderStoreProductDeployment(deployment || {}, {
-          archived: opts.archived,
+          operation: opts.operation,
           failed: true,
           progressUnavailable: progressUnavailable === true,
           runUrl: runUrl,
@@ -8686,7 +8754,7 @@
             return;
           }
           renderStoreProductDeployment(deployment, {
-            archived: opts.archived,
+            operation: opts.operation,
             startedAt: startedAt,
             runUrl: runUrl
           });
@@ -8702,7 +8770,7 @@
             elapsedMs: Math.max(0, Date.now() - startedAt),
             url: runUrl
           }, {
-            archived: opts.archived,
+            operation: opts.operation,
             startedAt: startedAt,
             runUrl: runUrl
           });
@@ -8711,6 +8779,24 @@
       }
 
       poll();
+    });
+  }
+
+  function refreshStoreProductsAfterDeployment(deployment, options) {
+    var opts = options || {};
+    var operation = normalizeStoreProductDeploymentOperation(opts.operation);
+    return loadStoreProducts().finally(function() {
+      if (!deployment) {
+        setStatus($('#admin-store-products-status'), opts.fallbackMessage || 'Product changes published.');
+        return;
+      }
+      setStatus(
+        $('#admin-store-products-status'),
+        localizedAdminText(
+          storeProductDeploymentOperationKey(operation, 'Complete'),
+          { elapsed: formatStoreProductDeploymentDuration(deployment.elapsedMs || deployment.durationMs) }
+        )
+      );
     });
   }
 
@@ -8863,21 +8949,12 @@
         }).then(function(data) {
           var message = data.deployNotice || 'Bulk product edits published.';
           return trackStoreProductDeployment(data, {
-            archived: status === 'archived'
+            operation: status
           }).then(function(deployment) {
             selectedStoreProductIds.clear();
-            return loadStoreProducts().finally(function() {
-              if (!deployment) {
-                setStatus($('#admin-store-products-status'), message);
-                return;
-              }
-              setStatus(
-                $('#admin-store-products-status'),
-                localizedAdminText(
-                  status === 'archived' ? 'deploymentArchiveComplete' : 'deploymentProductComplete',
-                  { elapsed: formatStoreProductDeploymentDuration(deployment.elapsedMs || deployment.durationMs) }
-                )
-              );
+            return refreshStoreProductsAfterDeployment(deployment, {
+              operation: status,
+              fallbackMessage: message
             });
           });
         }).catch(function(error) {
@@ -9016,6 +9093,10 @@
       var publish = $('[data-store-product-publish]', form);
       if (publish) publish.disabled = true;
       var submittedStatus = String(body && body.fields && body.fields.status || '').trim();
+      var initialStatus = String(form.dataset.storeProductInitialStatus || '').trim();
+      var deploymentOperation = !storeProductIsCreateForm(form) && submittedStatus !== initialStatus
+        ? submittedStatus
+        : 'product';
       var progressMessage = storeProductIsCreateForm(form)
         ? 'Creating product...'
         : submittedStatus === 'archived'
@@ -9029,23 +9110,13 @@
         var message = data.deployNotice || data.message || 'Product published.';
         if (submittedStatus === 'archived') message = 'Archive saved. ' + message;
         return trackStoreProductDeployment(data, {
-          archived: submittedStatus === 'archived',
+          operation: deploymentOperation,
           form: form
         }).then(function(deployment) {
           editingProductId = '';
-          return loadStoreProducts().finally(function() {
-            if (!deployment) {
-              setStatus($('#admin-store-products-status'), message);
-              return;
-            }
-            var elapsed = formatStoreProductDeploymentDuration(deployment.elapsedMs || deployment.durationMs);
-            setStatus(
-              $('#admin-store-products-status'),
-              localizedAdminText(
-                submittedStatus === 'archived' ? 'deploymentArchiveComplete' : 'deploymentProductComplete',
-                { elapsed: elapsed }
-              )
-            );
+          return refreshStoreProductsAfterDeployment(deployment, {
+            operation: deploymentOperation,
+            fallbackMessage: message
           });
         });
       }).catch(function(error) {
