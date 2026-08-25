@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.2.2 - 2026-08-25
+
+### Admin repository transport compatibility
+
+- Fixed the production Archive and Publish actions failing with an immediate
+  `502` before contacting GitHub. The pinned shared client had requested the
+  unsupported Cloudflare Workers redirect mode `error`; Worker Core `0.12.1`
+  now uses supported manual handling and rejects every 3xx response explicitly.
+- Kept redirects fail-closed without forwarding the GitHub token or exposing a
+  provider location. Existing bounded read retries, ambiguous-write
+  reconciliation, repository authority, and rebuild behavior remain unchanged.
+- Added the bounded shared transport failure code to Worker logs so future
+  provider incidents distinguish timeouts, request failures, invalid responses,
+  redirects, and GitHub API errors without exposing response bodies or secrets.
+- Advanced the immutable Platform pin to `v0.34.1` at
+  `ae380c43a16af352ae946f47dd1b7aa4e5b093f0`, added Store pin/runtime
+  regression coverage, and documented the corrected incident diagnosis.
+
 ## v1.2.1 - 2026-08-24
 
 ### Admin publishing reliability and production posture

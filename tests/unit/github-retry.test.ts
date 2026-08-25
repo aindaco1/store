@@ -46,6 +46,7 @@ describe('GitHub publish recovery', () => {
       sha: 'sha-current'
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(([, init]) => init?.redirect === 'manual')).toBe(true);
   });
 
   it('retries a transient product write after confirming the original file is unchanged', async () => {

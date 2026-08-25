@@ -4,8 +4,8 @@ Cloudflare Worker API for Store checkout, fulfillment, admin operations, shippin
 
 ## Shared Platform Boundary
 
-Store `v1.2.1` pins Dust Wave Platform `v0.31.0` at exact commit
-`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579`. The Worker consumes the pinned
+Store `v1.2.2` pins Dust Wave Platform `v0.34.1` at exact commit
+`ae380c43a16af352ae946f47dd1b7aa4e5b093f0`. The Worker consumes the pinned
 `worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
 packages for characterized, runtime-neutral mechanics. Store retains every
 route, request schema, catalog/order model, Durable Object and KV policy,

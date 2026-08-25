@@ -4,10 +4,10 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-- Current release: `v1.2.1`. RSVP products can opt into registration windows, party limits, named attendees, guided setup for scoped custom questions, private response review, attendee-level check-in, and attendee CSV export without changing other product or fulfillment paths. Zero-total checkout omits tip and payment-method controls, uses **Complete order**, and does not load Stripe; paid and mixed carts retain the payment flow. Store continues to pin Platform `v0.31.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`.
-- Product publishing keeps its save controls visible while editing, labels pending status transitions explicitly, separates a committed archive from the following catalog deployment, and safely retries transient repository transport failures. Product event addresses preserve multiple lines with responsive lookup controls; static previews remain isolated without blocked-script or disallowed-font console noise. Desktop field-help spacing and narrow-screen containment are covered by browser regressions.
+- Current release: `v1.2.2`. RSVP products can opt into registration windows, party limits, named attendees, guided setup for scoped custom questions, private response review, attendee-level check-in, and attendee CSV export without changing other product or fulfillment paths. Zero-total checkout omits tip and payment-method controls, uses **Complete order**, and does not load Stripe; paid and mixed carts retain the payment flow. Store pins Platform `v0.34.1` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`.
+- Product publishing keeps its save controls visible while editing, labels pending status transitions explicitly, separates a committed archive from the following catalog deployment, and safely retries transient repository transport failures. Platform Worker Core `0.12.1` uses Cloudflare-compatible fail-closed redirect handling so repository reads reach GitHub instead of failing locally with a 502. Product event addresses preserve multiple lines with responsive lookup controls; static previews remain isolated without blocked-script or disallowed-font console noise. Desktop field-help spacing and narrow-screen containment are covered by browser regressions.
 - Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
-- The preceding `v1.1.22` release remains independently reversible.
+- The preceding `v1.2.1` release remains independently reversible.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.
 - Cloudflare Worker: `https://checkout.dustwave.xyz`.
 - Local development defaults: Jekyll on `http://127.0.0.1:4002`, Worker on `http://127.0.0.1:8989`, local repo sidecar on `http://127.0.0.1:8799`.
@@ -26,8 +26,8 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Shared Foundations and Ownership
 
-Store `v1.2.1` pins Dust Wave Platform `v0.31.0` at exact commit
-`5ca8ee6d0ff8912ccfdc27c8459a5ef72f8c0579` and Dust Wave Jekyll Template
+Store `v1.2.2` pins Dust Wave Platform `v0.34.1` at exact commit
+`ae380c43a16af352ae946f47dd1b7aa4e5b093f0` and Dust Wave Jekyll Template
 `v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
 Platform supplies characterized Worker, admin, browser, design, build, release,
 shipping, tax, inventory, media, and test primitives. The Jekyll Template owns
