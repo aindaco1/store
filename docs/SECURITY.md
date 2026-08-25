@@ -185,7 +185,7 @@ Digital products use private R2 objects and signed fulfillment actions.
 
 Admin writes use a single server-side normalization boundary before touching GitHub-backed files or KV.
 
-Super-admin session revocation requires an authenticated session, trusted origin, CSRF token, exact non-secret session hash, and audit event. Searchable audit JSON and filtered CSV expose an explicit redacted field set rather than arbitrary event payloads. The scheduled Production Posture workflow reads secret names/config/provider evidence only and may create a sanitized GitHub issue; it never writes Worker settings, secrets, customer data, or provider state.
+Super-admin session revocation requires an authenticated session, trusted origin, CSRF token, exact non-secret session hash, and audit event. Searchable audit JSON and filtered CSV expose an explicit redacted field set rather than arbitrary event payloads. The scheduled Production Posture workflow generates production-shaped configuration only in its disposable checkout, then reads secret names/config/provider evidence and may create a sanitized GitHub issue; it never writes deployed Worker settings, secrets, customer data, or provider state.
 
 Required protections:
 

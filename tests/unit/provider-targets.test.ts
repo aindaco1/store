@@ -28,6 +28,21 @@ describe('release provider targets', () => {
     }).testWorkerBase).toBe('https://stripe-test.example.workers.dev');
   });
 
+  it('prefers canonical production origins over localhost-safe runtime defaults', () => {
+    expect(resolveProviderTargets({
+      vars: {
+        SITE_BASE: 'http://127.0.0.1:4002',
+        WORKER_BASE: 'http://127.0.0.1:8989',
+        CANONICAL_SITE_BASE: 'https://shop.dustwave.xyz',
+        CANONICAL_WORKER_BASE: 'https://checkout.dustwave.xyz'
+      }
+    })).toEqual({
+      siteBase: 'https://shop.dustwave.xyz',
+      workerBase: 'https://checkout.dustwave.xyz',
+      testWorkerBase: 'https://checkout.dustwave.xyz'
+    });
+  });
+
   it('uses safe production defaults when no configuration is available', () => {
     expect(resolveProviderTargets()).toEqual({
       siteBase: 'https://shop.dustwave.xyz',

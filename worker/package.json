@@ -1,6 +1,6 @@
 {
   "name": "store-worker",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Cloudflare Worker for Store checkout, orders, inventory, shipping, tax, emails, and admin APIs",
   "main": "src/index.js",
   "type": "module",

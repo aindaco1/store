@@ -1710,6 +1710,10 @@ function storeProductsPayload() {
       shippingPreset: 'ticket',
       inventoryTracking: true,
       inventory: 0,
+      eventStartsAt: '2026-08-22T13:30:00-06:00',
+      eventEndsAt: '2026-08-22T15:00:00-06:00',
+      eventVenue: 'Guild Cinema',
+      eventAddress: '3405 Central Ave NE\nAlbuquerque, NM 87106',
       variantOptionName: 'Ticket Type',
       variants: [{
         id: 'general',
@@ -2521,6 +2525,19 @@ test.describe('Admin Dashboard', () => {
     await expect(productsResults.locator('.admin-store-products__editor-row')).toHaveAttribute('data-store-product-editor-row', 'ticket-1');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
     await expect(ticketEditor.locator('[data-store-product-field-wrapper="rsvpRegistrationEnabled"]')).toBeHidden();
+    const eventAddress = ticketEditor.locator('[data-store-product-field="eventAddress"]');
+    const findAddress = ticketEditor.getByRole('button', { name: 'Find address' });
+    await expect(eventAddress).toHaveJSProperty('tagName', 'TEXTAREA');
+    await expect(eventAddress).toHaveValue('3405 Central Ave NE\nAlbuquerque, NM 87106');
+    expect(await ticketEditor.locator('.admin-store-products__event-address-control').evaluate((controls) => {
+      const address = controls.querySelector('textarea');
+      const button = controls.querySelector('button');
+      if (!(address instanceof HTMLElement) || !(button instanceof HTMLElement)) return false;
+      const addressRect = address.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      return Math.abs(addressRect.top - buttonRect.top) <= 2 && buttonRect.left > addressRect.right;
+    })).toBe(true);
+    await expect(findAddress).toBeVisible();
     await expect(ticketEditor.locator('[data-store-product-variant]')).toHaveCount(2);
     await expect(ticketEditor.locator('[data-store-product-variant="general-admission"] [data-store-variant-field="label"]')).toHaveValue('General Admission');
     await expect(ticketEditor.locator('[data-store-product-variant="supporter-ticket"] [data-store-variant-field="price"]')).toHaveValue('20');
@@ -2717,8 +2734,7 @@ test.describe('Admin Dashboard', () => {
       bodyScriptRan: false,
       javascriptHref: ''
     });
-    // Chromium can report blocked sandbox script attempts to the parent console; the assertions above verify they did not execute.
-    expect(sandboxScriptErrors.every((message) => message.includes('Blocked script execution') && message.includes('frame is sandboxed'))).toBe(true);
+    expect(sandboxScriptErrors).toEqual([]);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront--product.admin-store-product-preview')).toBeVisible();
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.storefront__eyebrow')).toHaveCount(0);
     await expect(productEditor.frameLocator('[data-store-product-preview-frame]').locator('.store-product-card__eyebrow')).toHaveCount(0);
@@ -3326,6 +3342,16 @@ test.describe('Admin Dashboard', () => {
     await ticketProductRow.getByRole('button', { name: 'Edit' }).click();
     const ticketEditor = page.locator('[data-store-product-editor="ticket-1"]');
     await expect(ticketEditor).toBeVisible();
+    await expect(ticketEditor.locator('[data-store-product-field="eventAddress"]')).toHaveJSProperty('tagName', 'TEXTAREA');
+    await expect(ticketEditor.locator('[data-store-product-field="eventAddress"]')).toHaveValue('3405 Central Ave NE\nAlbuquerque, NM 87106');
+    expect(await ticketEditor.locator('.admin-store-products__event-address-control').evaluate((controls) => {
+      const address = controls.querySelector('textarea');
+      const button = controls.querySelector('button');
+      if (!(address instanceof HTMLElement) || !(button instanceof HTMLElement)) return false;
+      const addressRect = address.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+      return buttonRect.top >= addressRect.bottom && buttonRect.right <= window.innerWidth + 1;
+    })).toBe(true);
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
     const variantsTable = ticketEditor.locator('.admin-store-products__variants-table');
     await expect.poll(() => variantsTable.evaluate((table: HTMLElement) => {

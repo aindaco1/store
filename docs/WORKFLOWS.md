@@ -16,7 +16,7 @@ Store uses a static storefront with Worker-owned checkout, inventory, fulfillmen
 - Public Spanish shells share the same Store workflows as English routes; creator/customer-authored content is not auto-translated.
 - Customer/admin data collection, marketing/reminder sends, analytics, automation, public token/link changes, and external provider additions require an [ethical risk review](ETHICAL_RISK.md) before merge.
 
-Scheduled operational evidence includes **Workers Cache Evidence** nightly, **Recovery Readiness** weekly, **Production Posture** weekly, **Localization Review** monthly, and the protected quarterly recovery preflight. Production Posture checks names/status/config only and opens or updates a sanitized issue on actionable drift; it never mutates runtime configuration. Localization Review produces a human-review packet without asserting translation approval.
+Scheduled operational evidence includes **Workers Cache Evidence** nightly, **Recovery Readiness** weekly, **Production Posture** weekly, **Localization Review** monthly, and the protected quarterly recovery preflight. Production Posture synchronizes the repository's production-shaped Worker configuration inside its disposable checkout, prefers canonical production origins for provider probes, checks names/status/config only, and opens or updates a sanitized issue on actionable drift; it never mutates deployed runtime configuration or provider state. Localization Review produces a human-review packet without asserting translation approval.
 
 ## Ethical Risk Review Workflow
 

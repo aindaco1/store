@@ -97,10 +97,12 @@ Editor behavior:
 - SKU is read-only. Existing product SKUs are preserved; new product SKUs derive from product name.
 - Product page content uses the Store block content editor for visible product-detail copy.
 - SEO description writes the front matter `description` value used by product metadata, social cards, and Product JSON-LD. Keep it concise and separate from the longer visible product page content.
-- Preview renders a sandboxed static product page preview. It mirrors the public product page layout, including full-image display, product-detail spacing, responsive product copy order, compact event address formatting, and Google Maps address links. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected.
+- Preview renders a sandboxed static product page preview. It mirrors the public product page layout, including full-image display, product-detail spacing, responsive product copy order, compact event address formatting, and Google Maps address links. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected; the frame retains an opaque origin and does not request stylesheets outside the production Content Security Policy.
+- Event Address is a multiline field so street and locality lines remain distinct. **Find address** stays in the same row at desktop widths and stacks below the field on narrow screens.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
 - Successful archive requests say that the archive was saved before reporting repository/deploy progress. The product list can continue to show the prior deployed status until the triggered build finishes and the refreshed catalog reaches the Worker.
+- Production repository reads retry transient GitHub transport failures. If a write response is lost, the Worker reads the current file before retrying and treats an exact content match as a reconciled success; changed content remains a conflict that requires reload instead of an overwrite.
 - The editor expands inline under the product row being edited.
 
 Fulfillment-aware fields:
@@ -333,6 +335,7 @@ Responsive behavior currently covered by E2E tests:
 - Admin tab layout on tablet.
 - Products table/editor on mobile.
 - Product preview event address formatting, Google Maps links, and product-detail spacing.
+- Multiline event address preservation, desktop inline lookup placement, and narrow-screen stacking.
 - Coupons table/editor on mobile.
 - Orders rows on mobile and single-action check-in buttons in desktop tables.
 - Downloads rows on mobile.
