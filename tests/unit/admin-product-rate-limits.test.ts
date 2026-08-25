@@ -73,4 +73,19 @@ describe('Store admin product rate limits', () => {
     expect(publishResponse.status).not.toBe(429);
     expect([401, 403]).toContain(publishResponse.status);
   });
+
+  it('authenticates deployment-status reads before contacting GitHub', async () => {
+    const env = buildEnv();
+    const response = await worker.fetch(new Request(
+      `http://127.0.0.1:8989/admin/store/deployments/status?commitSha=${'a'.repeat(40)}&workflow=deploy.yml`,
+      {
+        headers: {
+          Origin: 'http://127.0.0.1:4002',
+          'CF-Connecting-IP': '203.0.113.10'
+        }
+      }
+    ), env as any, { waitUntil() {} } as any);
+
+    expect([401, 403]).toContain(response.status);
+  });
 });

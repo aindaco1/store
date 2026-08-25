@@ -58,6 +58,9 @@
   var storeProductAddressLookupCache = new Map();
   var storeProductPreviewRequestCounter = 0;
   var storeProductMediaCache = new Map();
+  var storeProductDeploymentPollToken = 0;
+  var STORE_PRODUCT_DEPLOYMENT_POLL_MS = 4000;
+  var STORE_PRODUCT_DEPLOYMENT_TIMEOUT_MS = 15 * 60 * 1000;
   var SNIPCART_IMPORT_MAX_CSV_BYTES = 1024 * 1024;
   var currentStoreOrdersPayload = null;
   var storeOrderPayloadCache = new Map();
@@ -255,6 +258,7 @@
     element.setAttribute('aria-live', prominent ? 'assertive' : 'polite');
     element.setAttribute('aria-atomic', 'true');
     element.textContent = message || '';
+    delete element.dataset.storeDeploymentState;
     if (prominent) element.setAttribute('data-admin-prominent-status', 'true');
     else element.removeAttribute('data-admin-prominent-status');
   }
@@ -511,7 +515,22 @@
         inventoryOverride: 'Override',
         inventorySetBaseline: 'Set baseline',
         inventoryResetBaseline: 'Reset baseline',
-        inventoryBaselineAria: 'Inventory baseline for %{label}'
+        inventoryBaselineAria: 'Inventory baseline for %{label}',
+        deploymentSaved: 'Saved',
+        deploymentDeploying: 'Deploying',
+        deploymentDeployed: 'Deployed',
+        deploymentArchiveRequested: 'Archive saved. Waiting for the deployment to start - %{elapsed} elapsed.',
+        deploymentArchiveQueued: 'Archive saved. Deployment queued - %{elapsed} elapsed.',
+        deploymentArchiveRunning: 'Archive saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentProductRequested: 'Product saved. Waiting for the deployment to start - %{elapsed} elapsed.',
+        deploymentProductQueued: 'Product saved. Deployment queued - %{elapsed} elapsed.',
+        deploymentProductRunning: 'Product saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentArchiveComplete: 'Archived and unavailable to shoppers. Deployment completed in %{elapsed}.',
+        deploymentProductComplete: 'Product deployment completed in %{elapsed}.',
+        deploymentArchiveFailed: 'Archive saved, but the deployment did not complete. The prior storefront may still be live.',
+        deploymentProductFailed: 'Product saved, but the deployment did not complete.',
+        deploymentProgressUnavailable: 'Change saved, but deployment progress could not be checked.',
+        deploymentOpenRun: 'Open GitHub run'
       },
       es: {
         about: 'Acerca de',
@@ -547,7 +566,22 @@
         inventoryOverride: 'Anulacion',
         inventorySetBaseline: 'Establecer base',
         inventoryResetBaseline: 'Restablecer base',
-        inventoryBaselineAria: 'Base de inventario para %{label}'
+        inventoryBaselineAria: 'Base de inventario para %{label}',
+        deploymentSaved: 'Guardado',
+        deploymentDeploying: 'Desplegando',
+        deploymentDeployed: 'Desplegado',
+        deploymentArchiveRequested: 'Archivo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
+        deploymentArchiveQueued: 'Archivo guardado. Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentArchiveRunning: 'Archivo guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentProductRequested: 'Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
+        deploymentProductQueued: 'Producto guardado. Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentProductRunning: 'Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentArchiveComplete: 'Archivado y no disponible para compradores. El despliegue termino en %{elapsed}.',
+        deploymentProductComplete: 'El despliegue del producto termino en %{elapsed}.',
+        deploymentArchiveFailed: 'El archivo se guardo, pero el despliegue no termino. La tienda anterior puede seguir activa.',
+        deploymentProductFailed: 'El producto se guardo, pero el despliegue no termino.',
+        deploymentProgressUnavailable: 'El cambio se guardo, pero no se pudo comprobar el progreso del despliegue.',
+        deploymentOpenRun: 'Abrir ejecucion de GitHub'
       }
     };
     if (runtimeAdminMessages[key]) return interpolateAdminText(runtimeAdminMessages[key], replacements);
@@ -8489,6 +8523,197 @@
     });
   }
 
+  function formatStoreProductDeploymentDuration(milliseconds) {
+    var totalSeconds = Math.max(0, Math.round(Number(milliseconds || 0) / 1000));
+    if (totalSeconds < 60) return totalSeconds + 's';
+    var minutes = Math.floor(totalSeconds / 60);
+    var seconds = totalSeconds % 60;
+    return minutes + 'm' + (seconds ? ' ' + seconds + 's' : '');
+  }
+
+  function storeProductDeploymentMessageKey(deployment, archived) {
+    var prefix = archived ? 'deploymentArchive' : 'deploymentProduct';
+    var status = String(deployment && deployment.status || deployment && deployment.state || 'requested');
+    if (status === 'queued' || status === 'pending' || status === 'waiting') return prefix + 'Queued';
+    if (status === 'in_progress') return prefix + 'Running';
+    return prefix + 'Requested';
+  }
+
+  function renderStoreProductDeployment(deployment, options) {
+    var status = $('#admin-store-products-status');
+    if (!status) return;
+    var opts = options || {};
+    var archived = opts.archived === true;
+    var failed = opts.failed === true;
+    var fallbackStartedAt = Number(opts.startedAt || Date.now());
+    var elapsedMs = Number(deployment && deployment.elapsedMs || 0) || Math.max(0, Date.now() - fallbackStartedAt);
+    var elapsed = formatStoreProductDeploymentDuration(elapsedMs);
+    var message = failed
+      ? localizedAdminText(opts.progressUnavailable ? 'deploymentProgressUnavailable' : (archived ? 'deploymentArchiveFailed' : 'deploymentProductFailed'))
+      : localizedAdminText(storeProductDeploymentMessageKey(deployment, archived), { elapsed: elapsed });
+    var nextState = failed ? 'failed' : String(deployment && (deployment.status || deployment.state) || 'requested');
+    var stateChanged = status.dataset.storeDeploymentState !== nextState;
+
+    clear(status);
+    status.setAttribute('role', failed ? 'alert' : 'status');
+    status.setAttribute('aria-live', failed ? 'assertive' : (stateChanged ? 'polite' : 'off'));
+    status.setAttribute('aria-atomic', 'true');
+    status.setAttribute('data-admin-prominent-status', 'true');
+    status.dataset.storeDeploymentState = nextState;
+
+    var content = createElement('div', 'admin-store-products__deployment admin-dashboard__status-message');
+    content.appendChild(createElement('p', 'admin-store-products__deployment-message', message));
+
+    if (!failed) {
+      var progress = createElement('progress', 'admin-store-products__deployment-progress');
+      progress.max = 1;
+      progress.setAttribute('aria-label', localizedAdminText('deploymentDeploying'));
+      content.appendChild(progress);
+    }
+
+    var steps = createElement('ol', 'admin-store-products__deployment-steps');
+    [
+      [localizedAdminText('deploymentSaved'), 'complete'],
+      [localizedAdminText('deploymentDeploying'), failed ? 'failed' : 'current'],
+      [localizedAdminText('deploymentDeployed'), failed ? 'blocked' : 'pending']
+    ].forEach(function(step) {
+      var marker = step[1] === 'complete' ? '✓ ' : step[1] === 'current' ? '● ' : step[1] === 'pending' ? '○ ' : '× ';
+      var item = createElement('li', 'admin-store-products__deployment-step', marker + step[0]);
+      item.dataset.state = step[1];
+      steps.appendChild(item);
+    });
+    content.appendChild(steps);
+
+    var runUrl = String(deployment && deployment.url || opts.runUrl || '');
+    if (/^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/\d+$/i.test(runUrl)) {
+      var link = createElement('a', 'admin-dashboard__status-action', localizedAdminText('deploymentOpenRun'));
+      link.href = runUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      content.appendChild(link);
+    }
+    status.appendChild(content);
+  }
+
+  function trackStoreProductDeployment(publishData, options) {
+    var tracking = publishData && publishData.deployment;
+    var opts = options || {};
+    if (!tracking || !tracking.commitSha || !tracking.requestedAt) {
+      if (publishData && publishData.published !== false && publishData.repositoryMode === 'github') {
+        var untrackedError = new Error('Deployment progress is unavailable.');
+        untrackedError.deploymentSaved = true;
+        renderStoreProductDeployment({}, {
+          archived: opts.archived,
+          failed: true,
+          progressUnavailable: true,
+          startedAt: Date.now()
+        });
+        return Promise.reject(untrackedError);
+      }
+      return Promise.resolve(null);
+    }
+    var pollToken = ++storeProductDeploymentPollToken;
+    var startedAt = Date.parse(tracking.requestedAt);
+    if (!Number.isFinite(startedAt)) startedAt = Date.now();
+    var runId = '';
+    var runUrl = '';
+    var lastStatus = 'requested';
+    var consecutiveErrors = 0;
+    var form = opts.form || null;
+    var cancel = form ? $('[data-store-product-cancel]', form) : null;
+    var refresh = $('#admin-store-products-refresh');
+
+    if (form) form.setAttribute('aria-busy', 'true');
+    if (cancel) cancel.disabled = true;
+    if (refresh) refresh.disabled = true;
+
+    function releaseBusyState() {
+      if (form) form.removeAttribute('aria-busy');
+      if (cancel) cancel.disabled = false;
+      if (refresh) refresh.disabled = false;
+    }
+
+    renderStoreProductDeployment(tracking, { archived: opts.archived, startedAt: startedAt });
+
+    return new Promise(function(resolve, reject) {
+      function failTracking(message, deployment, progressUnavailable) {
+        var error = new Error(message);
+        error.deploymentSaved = true;
+        error.deployment = deployment || {};
+        renderStoreProductDeployment(deployment || {}, {
+          archived: opts.archived,
+          failed: true,
+          progressUnavailable: progressUnavailable === true,
+          runUrl: runUrl,
+          startedAt: startedAt
+        });
+        releaseBusyState();
+        reject(error);
+      }
+
+      function poll() {
+        if (pollToken !== storeProductDeploymentPollToken) {
+          releaseBusyState();
+          resolve(null);
+          return;
+        }
+        if (Date.now() - startedAt > STORE_PRODUCT_DEPLOYMENT_TIMEOUT_MS) {
+          failTracking('Deployment tracking timed out.', { url: runUrl }, true);
+          return;
+        }
+
+        requestJson('/admin/store/deployments/status', {
+          params: {
+            commitSha: tracking.commitSha,
+            requestedAt: tracking.requestedAt,
+            workflow: tracking.workflow || 'deploy.yml',
+            runId: runId
+          }
+        }).then(function(data) {
+          consecutiveErrors = 0;
+          var deployment = data && data.deployment || { status: 'requested' };
+          if (deployment.runId) runId = deployment.runId;
+          if (deployment.url) runUrl = deployment.url;
+          lastStatus = String(deployment.status || 'requested');
+
+          if (deployment.status === 'completed') {
+            if (deployment.conclusion === 'success') {
+              releaseBusyState();
+              resolve(deployment);
+              return;
+            }
+            failTracking('Deployment did not complete successfully.', deployment, false);
+            return;
+          }
+          renderStoreProductDeployment(deployment, {
+            archived: opts.archived,
+            startedAt: startedAt,
+            runUrl: runUrl
+          });
+          window.setTimeout(poll, STORE_PRODUCT_DEPLOYMENT_POLL_MS);
+        }).catch(function(error) {
+          consecutiveErrors += 1;
+          if (consecutiveErrors >= 5) {
+            failTracking(formatError(error), { url: runUrl }, true);
+            return;
+          }
+          renderStoreProductDeployment({
+            status: lastStatus,
+            elapsedMs: Math.max(0, Date.now() - startedAt),
+            url: runUrl
+          }, {
+            archived: opts.archived,
+            startedAt: startedAt,
+            runUrl: runUrl
+          });
+          window.setTimeout(poll, STORE_PRODUCT_DEPLOYMENT_POLL_MS);
+        });
+      }
+
+      poll();
+    });
+  }
+
   function setupStoreProductsEvents() {
     var root = $('#admin-store-products-results');
     if (!root) return;
@@ -8637,11 +8862,26 @@
           }
         }).then(function(data) {
           var message = data.deployNotice || 'Bulk product edits published.';
-          selectedStoreProductIds.clear();
-          return loadStoreProducts().finally(function() {
-            setStatus($('#admin-store-products-status'), message);
+          return trackStoreProductDeployment(data, {
+            archived: status === 'archived'
+          }).then(function(deployment) {
+            selectedStoreProductIds.clear();
+            return loadStoreProducts().finally(function() {
+              if (!deployment) {
+                setStatus($('#admin-store-products-status'), message);
+                return;
+              }
+              setStatus(
+                $('#admin-store-products-status'),
+                localizedAdminText(
+                  status === 'archived' ? 'deploymentArchiveComplete' : 'deploymentProductComplete',
+                  { elapsed: formatStoreProductDeploymentDuration(deployment.elapsedMs || deployment.durationMs) }
+                )
+              );
+            });
           });
         }).catch(function(error) {
+          if (error && error.deploymentSaved) return;
           bulkApply.disabled = false;
           setStatus($('#admin-store-products-status'), formatError(error), true);
         });
@@ -8788,11 +9028,28 @@
       }).then(function(data) {
         var message = data.deployNotice || data.message || 'Product published.';
         if (submittedStatus === 'archived') message = 'Archive saved. ' + message;
-        editingProductId = '';
-        return loadStoreProducts().finally(function() {
-          setStatus($('#admin-store-products-status'), message);
+        return trackStoreProductDeployment(data, {
+          archived: submittedStatus === 'archived',
+          form: form
+        }).then(function(deployment) {
+          editingProductId = '';
+          return loadStoreProducts().finally(function() {
+            if (!deployment) {
+              setStatus($('#admin-store-products-status'), message);
+              return;
+            }
+            var elapsed = formatStoreProductDeploymentDuration(deployment.elapsedMs || deployment.durationMs);
+            setStatus(
+              $('#admin-store-products-status'),
+              localizedAdminText(
+                submittedStatus === 'archived' ? 'deploymentArchiveComplete' : 'deploymentProductComplete',
+                { elapsed: elapsed }
+              )
+            );
+          });
         });
       }).catch(function(error) {
+        if (error && error.deploymentSaved) return;
         updateStoreProductEditorDirtyState(form);
         setStatus($('#admin-store-products-status'), formatError(error), true);
       });

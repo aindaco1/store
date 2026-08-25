@@ -77,7 +77,7 @@ async function expectNoAxeViolations(page: any, selector = '') {
 
 async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
   const role = options.role || 'super_admin';
-  const calls: Record<string, any[]> = {
+  const calls: Record<string, any> = {
     authStart: [],
     authExchange: [],
     adminSessions: [],
@@ -114,6 +114,10 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeProductMedia: [],
     storeProductPreviews: [],
     storeProductPublishes: [],
+    storeDeployments: [],
+    storeDeploymentDelayMs: 0,
+    storeDeploymentRequestedAt: new Date().toISOString(),
+    storeProductEvents: [],
     storeProductBulkPublishes: [],
     storeProductOrders: [],
     storeDownloads: [],
@@ -121,6 +125,25 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     storeDownloadCreates: [],
     storeDownloadDeletes: [],
     storeInventoryWrites: []
+  };
+  const requestedDeployment = {
+    state: 'requested',
+    commitSha: 'a'.repeat(40),
+    workflow: 'deploy.yml',
+    requestedAt: calls.storeDeploymentRequestedAt
+  };
+  const completedDeployment = {
+    found: true,
+    runId: 32859642847,
+    status: 'completed',
+    conclusion: 'success',
+    requestedAt: calls.storeDeploymentRequestedAt,
+    createdAt: '2026-08-25T14:27:48.000Z',
+    startedAt: '2026-08-25T14:28:00.000Z',
+    updatedAt: '2026-08-25T14:29:06.000Z',
+    durationMs: 66000,
+    elapsedMs: 79000,
+    url: 'https://github.com/dustwave/store/actions/runs/32859642847'
   };
   const user = {
     email: role === 'super_admin' ? SUPER_ADMIN_EMAIL : LIMITED_ADMIN_EMAIL,
@@ -543,6 +566,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     }
     if (url.pathname === '/admin/store/products' && method === 'GET') {
       calls.storeProducts.push({ method });
+      calls.storeProductEvents.push('products');
       return fulfillJson(storeProductsPayload());
     }
     if (url.pathname === '/admin/store/products/media' && method === 'GET') {
@@ -579,13 +603,27 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
     }
     if (url.pathname === '/admin/store/products/publish' && method === 'POST') {
       calls.storeProductPublishes.push(body);
+      calls.storeProductEvents.push('publish');
       return fulfillJson({
         success: true,
         published: true,
         created: body.createProduct === true,
         productId: body.productId,
+        commitSha: 'a'.repeat(40),
+        deployment: requestedDeployment,
         deployNotice: body.createProduct === true ? 'Product created. Deploy started.' : 'Product published. Deploy started.',
         writeBudget: { readOnly: false, kvWritesExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/store/deployments/status' && method === 'GET') {
+      calls.storeDeployments.push(Object.fromEntries(url.searchParams.entries()));
+      calls.storeProductEvents.push('deployment');
+      if (calls.storeDeploymentDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, calls.storeDeploymentDelayMs));
+      }
+      return fulfillJson({
+        success: true,
+        deployment: completedDeployment
       });
     }
     if (url.pathname === '/admin/store/products/bulk-publish' && method === 'POST') {
@@ -596,6 +634,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole } = {}) {
         updated: body.productIds?.length || 0,
         skipped: 0,
         productIds: body.productIds || [],
+        commitSha: 'a'.repeat(40),
+        deployment: requestedDeployment,
         deployNotice: 'Bulk product publish committed changes to GitHub and started a deploy.',
         writeBudget: { readOnly: false, kvWritesExpected: 1 }
       });
@@ -2559,7 +2599,7 @@ test.describe('Admin Dashboard', () => {
       productId: 'ticket-1',
       variants: []
     });
-    await expect(page.locator('#admin-store-products-status')).toContainText('Product published. Deploy started.');
+    await expect(page.locator('#admin-store-products-status')).toContainText('Product deployment completed in 1m 19s.');
     const productInventoryControls = posterRow.locator('[data-store-product-inventory-controls]');
     await expect(productInventoryControls).toContainText('Available 12');
     await expect(productInventoryControls).toContainText('Baseline 12');
@@ -2882,7 +2922,7 @@ test.describe('Admin Dashboard', () => {
         alt: 'Fronteras Poster (Big)'
       })
     ]));
-    await expect(page.locator('#admin-store-products-status')).toContainText('Product published. Deploy started.');
+    await expect(page.locator('#admin-store-products-status')).toContainText('Product deployment completed in 1m 19s.');
 
     await page.locator('#admin-store-product-create').click();
     await expect(productsResults.locator('.admin-store-products__editor-row').first()).toHaveAttribute('data-store-product-editor-row', '__new_store_product__');
@@ -2949,7 +2989,7 @@ test.describe('Admin Dashboard', () => {
         status: 'active'
       }]
     });
-    await expect(page.locator('#admin-store-products-status')).toContainText('Product created. Deploy started.');
+    await expect(page.locator('#admin-store-products-status')).toContainText('Product deployment completed in 1m 19s.');
 
     const bulkApply = page.locator('[data-store-products-bulk-apply]');
     const bulkStatus = page.locator('[data-store-products-bulk-status]');
@@ -2969,7 +3009,7 @@ test.describe('Admin Dashboard', () => {
       productIds: ['fronteras-poster-big'],
       fields: { status: 'draft' }
     });
-    await expect(page.locator('#admin-store-products-status')).toContainText('Bulk product publish committed changes to GitHub and started a deploy.');
+    await expect(page.locator('#admin-store-products-status')).toContainText('Product deployment completed in 1m 19s.');
 
     await selectAdminSection(page, 'Downloads');
     await expect(page.locator('#admin-store-downloads-load')).toHaveCount(0);
@@ -3067,6 +3107,7 @@ test.describe('Admin Dashboard', () => {
       return rect.top >= 0 && rect.bottom <= window.innerHeight;
     })).toBe(true);
 
+    calls.storeDeploymentDelayMs = 2000;
     await archive.click();
     await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
     expect(calls.storeProductPublishes[0]).toMatchObject({
@@ -3074,7 +3115,27 @@ test.describe('Admin Dashboard', () => {
       productId: 'fronteras-poster-big',
       fields: { status: 'archived' }
     });
-    await expect(page.locator('#admin-store-products-status')).toContainText('Archive saved.');
+    const deploymentStatus = page.locator('#admin-store-products-status');
+    await expect(deploymentStatus).toContainText('Archive saved. Waiting for the deployment to start');
+    await expect(deploymentStatus.locator('progress')).toBeVisible();
+    await expect(editor).toBeVisible();
+    expect(calls.storeProducts).toHaveLength(1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectNoHorizontalOverflow(page);
+    await expect(deploymentStatus.locator('.admin-store-products__deployment-step')).toHaveText([
+      '✓ Saved',
+      '● Deploying',
+      '○ Deployed'
+    ]);
+    await expect.poll(() => calls.storeDeployments.length).toBe(1);
+    await expect(deploymentStatus).toContainText('Archived and unavailable to shoppers. Deployment completed in 1m 19s.');
+    await expect.poll(() => calls.storeProducts.length).toBe(2);
+    expect(calls.storeProductEvents.slice(-3)).toEqual(['publish', 'deployment', 'products']);
+    expect(calls.storeDeployments[0]).toMatchObject({
+      commitSha: 'a'.repeat(40),
+      requestedAt: calls.storeDeploymentRequestedAt,
+      workflow: 'deploy.yml'
+    });
   });
 
   test('keeps RSVP responses and actions inside the desktop orders table', async ({ page }) => {

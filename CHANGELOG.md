@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Archive availability and deployment progress
+
+- Kept archived, draft, sold-out, and unavailable products disabled when the
+  browser synchronizes product controls or confirmed inventory, closing the
+  client-side path that could re-enable Film Fatale's archived direct-page
+  purchase button. Public catalog projections still omit archived products and
+  Worker cart validation remains the server-authoritative rejection boundary.
+- Added authenticated, bounded GitHub workflow-run tracking for the exact
+  product-publish commit. Product and bulk-status publishes now show requested,
+  queued, running, failed, and completed progress with measured elapsed time,
+  and refresh the catalog only after the matching deployment succeeds.
+- Added English/Spanish status copy plus unit, security, desktop, narrow-screen,
+  public-catalog, direct-page, and canonical checkout regressions.
+
 ## v1.2.2 - 2026-08-25
 
 ### Admin repository transport compatibility

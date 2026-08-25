@@ -61,9 +61,12 @@ The scheduled production-posture audit also requires `preview_urls = false` to b
 The production-posture unit fixture supplies production origins in memory while
 the tracked Wrangler defaults remain localhost-safe. Product-status coverage
 separately proves that an archived dashboard payload survives canonical Worker
-normalization and rewrites repository markdown, while the admin browser suite
-checks desktop help spacing, visible pending-archive guidance, the submitted
-status, and the archive confirmation message.
+normalization and rewrites repository markdown. The catalog suite also pins Film
+Fatale to archived Worker validation, while the product-options unit and public
+browser suites prove client synchronization cannot re-enable an archived direct
+page and that public JSON omits it. The admin browser suite checks desktop help
+spacing, visible pending-archive guidance, the submitted status, exact-commit
+deployment tracking, no premature catalog refresh, and measured completion.
 
 Lighthouse runs through `podman-stack-run.sh` by default. Production posture accepts Wrangler's secret-name JSON only and never reads secret values. Session/download/audit tests prove CSRF/role gates, data minimization, redaction, rate-limit thresholds, and audit behavior.
 

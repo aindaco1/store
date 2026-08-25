@@ -343,7 +343,7 @@
 
   function availabilityState(tracksInventory, inventory, lowStockThreshold, status, messages, inventoryConfigured) {
     var normalizedStatus = String(status || '').trim().toLowerCase();
-    if (normalizedStatus === 'sold_out' || normalizedStatus === 'sold-out' || normalizedStatus === 'unavailable') {
+    if (inventoryStatusIsUnavailable(normalizedStatus)) {
       return { state: 'unavailable', text: messages.soldOut || 'Sold out' };
     }
     if (!tracksInventory) return { state: 'none', text: '' };

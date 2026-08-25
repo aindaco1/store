@@ -237,6 +237,21 @@ admin:
   rsvp_remove_choice_number: "Remove choice %{number}"
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
+  deployment_saved: Saved
+  deployment_deploying: Deploying
+  deployment_deployed: Deployed
+  deployment_archive_requested: Archive saved. Waiting for the deployment to start - %{elapsed} elapsed.
+  deployment_archive_queued: Archive saved. Deployment queued - %{elapsed} elapsed.
+  deployment_archive_running: Archive saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_product_requested: Product saved. Waiting for the deployment to start - %{elapsed} elapsed.
+  deployment_product_queued: Product saved. Deployment queued - %{elapsed} elapsed.
+  deployment_product_running: Product saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_archive_complete: Archived and unavailable to shoppers. Deployment completed in %{elapsed}.
+  deployment_product_complete: Product deployment completed in %{elapsed}.
+  deployment_archive_failed: Archive saved, but the deployment did not complete. The prior storefront may still be live.
+  deployment_product_failed: Product saved, but the deployment did not complete.
+  deployment_progress_unavailable: Change saved, but deployment progress could not be checked.
+  deployment_open_run: Open GitHub run
   store_coupons_intro: Create, edit, and delete Store coupon codes for cart-wide or product-specific discounts.
   store_downloads_intro: Verify digital download file keys against the %{platform} downloads bucket and configured fallback URLs.
 misc:

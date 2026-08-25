@@ -101,7 +101,8 @@ Editor behavior:
 - Event Address is a multiline field so street and locality lines remain distinct. **Find address** stays in the same row at desktop widths and stacks below the field on narrow screens.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
-- Successful archive requests say that the archive was saved before reporting repository/deploy progress. The product list can continue to show the prior deployed status until the triggered build finishes and the refreshed catalog reaches the Worker.
+- Successful production publishes return the saved commit and deployment request. The editor then shows an accessible **Saved → Deploying → Deployed** indicator, the exact GitHub run state, and elapsed save-to-deploy time. It keeps the editor and prior product list in place until that run succeeds, then refreshes from the newly deployed Worker catalog. A failed or unobservable run leaves the saved state explicit, preserves the prior list instead of presenting it as current, and links the GitHub run when available. Bulk archive status changes reuse the same tracker.
+- Archived products are excluded from public catalog JSON and listings. A direct archived page remains non-indexable with disabled purchase controls, and canonical Worker cart validation rejects the product even if a stale or manipulated browser submits it.
 - Production repository reads use Cloudflare-compatible manual redirect handling and reject every 3xx response without following it. Transient GitHub transport failures are retried. If a write response is lost, the Worker reads the current file before retrying and treats an exact content match as a reconciled success; changed content remains a conflict that requires reload instead of an overwrite.
 - The editor expands inline under the product row being edited.
 
@@ -129,6 +130,7 @@ Product write endpoints:
 - `POST /admin/store/products/publish`
 - `POST /admin/store/products/bulk-publish`
 - `POST /admin/store/products/order`
+- `GET /admin/store/deployments/status`
 - `GET /admin/store/products/media`
 - `POST /admin/store/products/media/optimize`
 

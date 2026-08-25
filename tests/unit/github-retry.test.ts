@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getGitHubTextFile, putGitHubTextFile } from '../../worker/src/github.js';
+import { getGitHubTextFile, getGitHubWorkflowRun, putGitHubTextFile } from '../../worker/src/github.js';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -30,6 +30,7 @@ function buildEnv() {
 
 describe('GitHub publish recovery', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -99,5 +100,93 @@ describe('GitHub publish recovery', () => {
       contentSha: 'sha-archived'
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('tracks the exact dispatched deployment by commit and measures save-to-live time', async () => {
+    const commitSha = 'a'.repeat(40);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      workflow_runs: [{
+        id: 32859642847,
+        head_sha: commitSha,
+        status: 'completed',
+        conclusion: 'success',
+        created_at: '2026-08-25T14:27:48.000Z',
+        run_started_at: '2026-08-25T14:28:00.000Z',
+        updated_at: '2026-08-25T14:29:06.000Z',
+        html_url: 'https://github.com/dustwave/store/actions/runs/32859642847'
+      }]
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getGitHubWorkflowRun(buildEnv(), {
+      commitSha,
+      requestedAt: '2026-08-25T14:27:47.000Z',
+      workflow: 'deploy.yml'
+    })).resolves.toMatchObject({
+      ok: true,
+      run: {
+        found: true,
+        runId: 32859642847,
+        status: 'completed',
+        conclusion: 'success',
+        durationMs: 66000,
+        elapsedMs: 79000,
+        url: 'https://github.com/dustwave/store/actions/runs/32859642847'
+      }
+    });
+
+    const requestUrl = String(fetchMock.mock.calls[0][0]);
+    expect(requestUrl).toContain('/actions/workflows/deploy.yml/runs?');
+    expect(requestUrl).toContain(`head_sha=${commitSha}`);
+    expect(requestUrl).toContain('event=workflow_dispatch');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET', redirect: 'manual' });
+  });
+
+  it('reports a requested state until GitHub creates the matching workflow run', async () => {
+    const commitSha = 'b'.repeat(40);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ workflow_runs: [] })));
+
+    await expect(getGitHubWorkflowRun(buildEnv(), {
+      commitSha,
+      requestedAt: new Date().toISOString(),
+      workflow: 'deploy.yml'
+    })).resolves.toMatchObject({
+      ok: true,
+      run: {
+        found: false,
+        runId: null,
+        status: 'requested',
+        conclusion: ''
+      }
+    });
+  });
+
+  it('keeps subsequent run polling bound to the published commit', async () => {
+    const commitSha = 'c'.repeat(40);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: 32859642847,
+      head_sha: commitSha,
+      status: 'in_progress',
+      conclusion: null,
+      created_at: '2026-08-25T14:27:48.000Z',
+      run_started_at: '2026-08-25T14:28:00.000Z',
+      updated_at: '2026-08-25T14:28:20.000Z',
+      html_url: 'https://github.com/dustwave/store/actions/runs/32859642847'
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getGitHubWorkflowRun(buildEnv(), {
+      commitSha,
+      runId: 32859642847,
+      requestedAt: '2026-08-25T14:27:47.000Z'
+    })).resolves.toMatchObject({
+      ok: true,
+      run: {
+        runId: 32859642847,
+        status: 'in_progress',
+        conclusion: ''
+      }
+    });
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/actions/runs/32859642847');
   });
 });

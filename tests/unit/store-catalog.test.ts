@@ -40,8 +40,23 @@ describe('Store catalog snapshot and validation', () => {
   it('keeps event addresses compact in the Worker catalog snapshot', () => {
     const filmFatale = findStoreProduct('film-fatale-at-the-guild-cinema', STORE_CATALOG_SNAPSHOT);
 
+    expect(filmFatale).toMatchObject({
+      id: 'film-fatale-at-the-guild-cinema',
+      status: 'archived'
+    });
     expect(filmFatale?.event_details?.address).toBe('3405 Central Ave NE\nAlbuquerque, NM 87106');
     expect(filmFatale?.event_details?.address).not.toMatch(/Bernalillo County|United States|Nob Hill|The Guild Cinema/);
+
+    const result = validateStoreOrderDraft({
+      items: [{ id: 'film-fatale-at-the-guild-cinema', price: 15, quantity: 1 }]
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'product_unavailable',
+        productId: 'film-fatale-at-the-guild-cinema'
+      })
+    ]));
   });
 
   it('keeps every published RSVP registration config valid and RSVP-scoped', () => {

@@ -216,6 +216,28 @@ test.describe('Store Public Page Controls', () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test('archived Film Fatale stays out of the catalog and cannot be added from its direct page', async ({ page }) => {
+    await gotoDomReady(page, '/');
+    await expect(page.locator('#film-fatale-at-the-guild-cinema')).toHaveCount(0);
+
+    const catalogResponse = await page.request.get('/api/products.json');
+    expect(catalogResponse.ok()).toBe(true);
+    const catalog = await catalogResponse.json();
+    expect(catalog.products.some((product: { id?: string }) => (
+      product.id === 'film-fatale-at-the-guild-cinema'
+    ))).toBe(false);
+
+    await gotoDomReady(page, '/products/film-fatale-at-the-guild-cinema/');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/i);
+    const archivedCard = page.locator('.storefront__product-detail [data-store-product-card]').first();
+    const addButton = archivedCard.locator('button.store-add-item');
+    await expect(archivedCard).toBeVisible();
+    await expect(addButton).toBeDisabled();
+    await expect(addButton).toHaveAttribute('aria-disabled', 'true');
+    await expect(addButton).toHaveAttribute('data-product-status', 'archived');
+    await expect(addButton).toHaveText(/sold out/i);
+  });
+
   test('product pages expose language-prefixed localized routes with canonical product controls', async ({ page }) => {
     await gotoDomReady(page, '/products/fronteras-t-shirt/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');

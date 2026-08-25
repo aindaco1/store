@@ -45,6 +45,7 @@
  *   POST /admin/store/products/publish - Publish Store product catalog edits
  *   POST /admin/store/products/bulk-publish - Publish bulk Store product catalog edits
  *   POST /admin/store/products/order - Publish Store product display order
+ *   GET  /admin/store/deployments/status - Track the GitHub deployment for a catalog commit
  *   GET  /admin/store/coupons   - Read Store coupon codes
  *   POST /admin/store/coupons   - Create or update Store coupon codes
  *   POST /admin/store/coupons/delete - Delete Store coupon codes
@@ -71,7 +72,7 @@ import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOr
 import { applyStoreCouponCode, getValidationTaxableSubtotalCents, loadStoreCoupons, saveStoreCoupons, upsertStoreCoupon } from './coupons.js';
 import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
 import { normalizeEventRegistrationConfig, normalizeStoredEventRegistration } from './event-registration.js';
-import { getGitHubTextFile, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
+import { getGitHubTextFile, getGitHubWorkflowRun, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { MEDIA_MANIFEST_PATH, classifyMediaPath, mediaPathLabel, mediaPlacementBudget, normalizeMediaManifest } from './media-catalog.js';
 import { getScopedConsole } from './logger.js';
 import { getStoreTranslator, normalizeStoreLang } from './i18n.js';
@@ -337,6 +338,18 @@ async function triggerAdminMediaOptimization(env, options = {}) {
 
 function adminRepoDeployNotice(env, githubNotice, localNotice) {
   return isLocalAdminRepoWritesEnabled(env) ? localNotice : githubNotice;
+}
+
+function adminRepoDeployment(env, rebuild = {}, commitSha = '') {
+  if (isLocalAdminRepoWritesEnabled(env) || rebuild?.triggered !== true) return null;
+  const normalizedCommitSha = String(commitSha || '').trim().toLowerCase();
+  if (!/^[a-f0-9]{40}$/u.test(normalizedCommitSha)) return null;
+  return {
+    state: 'requested',
+    commitSha: normalizedCommitSha,
+    workflow: String(rebuild.workflow || env.GITHUB_WORKFLOW || 'deploy.yml').trim(),
+    requestedAt: String(rebuild.requestedAt || new Date().toISOString())
+  };
 }
 
 const STRIPE_CUSTOM_UI_MODE_API_VERSION = DEFAULT_STRIPE_API_VERSION;
@@ -3275,6 +3288,10 @@ export default {
         const rl = await checkRateLimit(request, env, ADMIN_PRODUCT_PUBLISH_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
         return handleAdminStoreProductOrderPublish(request, env);
+      }
+
+      if (path === '/admin/store/deployments/status' && method === 'GET') {
+        return handleAdminStoreDeploymentStatus(request, env);
       }
 
       if (path === '/admin/store/coupons' && method === 'GET') {
@@ -10167,6 +10184,33 @@ async function handleAdminStoreProducts(request, env) {
   }, 200, env);
 }
 
+async function handleAdminStoreDeploymentStatus(request, env) {
+  const auth = await requireAdminSession(request, env, 'store:read', { accessScope: STORE_ADMIN_SCOPE });
+  if (!auth.ok) return auth.response;
+
+  const url = new URL(request.url);
+  const result = await getGitHubWorkflowRun(env, {
+    commitSha: url.searchParams.get('commitSha') || '',
+    runId: url.searchParams.get('runId') || '',
+    requestedAt: url.searchParams.get('requestedAt') || '',
+    workflow: url.searchParams.get('workflow') || env.GITHUB_WORKFLOW || 'deploy.yml'
+  });
+  if (!result.ok) {
+    return privateJsonResponse({
+      success: false,
+      error: result.error || 'Unable to read deployment status.',
+      code: result.code || 'github_workflow_status_failed',
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, result.status || 502, env);
+  }
+
+  return privateJsonResponse({
+    success: true,
+    deployment: result.run,
+    writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
+}
+
 const ADMIN_STORE_STATE_ABBREVIATIONS = {
   alabama: 'AL',
   alaska: 'AK',
@@ -10911,6 +10955,7 @@ async function handleAdminStoreProductPublish(request, env) {
     commitUrl: committed.commitUrl,
     repositoryMode: adminRepoMode(env),
     rebuild,
+    deployment: adminRepoDeployment(env, rebuild, committed.commitSha),
     auditKey,
     changedFields: normalized.patch.changedFields,
     deployNotice: normalized.createProduct
@@ -11045,6 +11090,7 @@ async function handleAdminStoreProductBulkPublish(request, env) {
     productIds: normalized.targets.map((target) => target.productId),
     results,
     rebuild,
+    deployment: adminRepoDeployment(env, rebuild, committedProducts[0]?.commitSha),
     auditKey,
     repositoryMode: adminRepoMode(env),
     changedFields: normalized.patch.changedFields,

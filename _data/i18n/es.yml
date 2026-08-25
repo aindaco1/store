@@ -237,6 +237,21 @@ admin:
   rsvp_remove_choice_number: "Quitar la opción %{number}"
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
+  deployment_saved: Guardado
+  deployment_deploying: Desplegando
+  deployment_deployed: Desplegado
+  deployment_archive_requested: Archivo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
+  deployment_archive_queued: Archivo guardado. Despliegue en cola - %{elapsed} transcurrido.
+  deployment_archive_running: Archivo guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_product_requested: Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
+  deployment_product_queued: Producto guardado. Despliegue en cola - %{elapsed} transcurrido.
+  deployment_product_running: Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_archive_complete: Archivado y no disponible para compradores. El despliegue terminó en %{elapsed}.
+  deployment_product_complete: El despliegue del producto terminó en %{elapsed}.
+  deployment_archive_failed: El archivo se guardó, pero el despliegue no terminó. La tienda anterior puede seguir activa.
+  deployment_product_failed: El producto se guardó, pero el despliegue no terminó.
+  deployment_progress_unavailable: El cambio se guardó, pero no se pudo comprobar el progreso del despliegue.
+  deployment_open_run: Abrir ejecución de GitHub
   store_coupons_intro: Crea, edita y elimina códigos de cupón para descuentos de carrito completo o productos específicos.
   store_downloads_intro: Verifica las claves de archivos digitales contra el bucket de descargas de %{platform} y las URL de respaldo configuradas.
 misc:

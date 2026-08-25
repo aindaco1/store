@@ -10,6 +10,7 @@ describe('Store auth protection', () => {
       '/admin/store/health',
       '/admin/store/orders',
       '/admin/store/products',
+      `/admin/store/deployments/status?commitSha=${'a'.repeat(40)}&workflow=deploy.yml`,
       '/admin/store/coupons',
       '/admin/store/downloads',
       '/admin/store/inventory'

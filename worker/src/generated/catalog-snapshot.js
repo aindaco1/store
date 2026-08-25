@@ -400,7 +400,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "url": "https://shop.dustwave.xyz/products/film-fatale-at-the-guild-cinema/",
       "type": "ticket",
       "fulfillment_type": "ticket",
-      "status": "active",
+      "status": "archived",
       "public": true,
       "launch_test": false,
       "order": 50.0,
@@ -2883,7 +2883,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "53b5b970461bb9590c8751317603b48ac262f9d1c5d7d65f329f6bd03b879a7f"
+  "source_hash": "899273a42ed5f0bd0d0c643add81adce545da8a74db410e220afb3d7f33f15aa"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

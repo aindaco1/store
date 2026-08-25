@@ -158,4 +158,44 @@ describe('Store product options live inventory', () => {
     expect(document.querySelectorAll('[data-store-availability]')[1].textContent).toBe('Sold out');
     expect(document.querySelectorAll<HTMLButtonElement>('.store-add-item')[1].disabled).toBe(true);
   });
+
+  it('does not re-enable an archived product while synchronizing controls', async () => {
+    document.body.insertAdjacentHTML('beforeend', `
+      <article class="store-product-card" data-store-product-card>
+        <p
+          data-store-availability
+          data-store-inventory-state="unavailable"
+          data-store-tracks-inventory="true"
+          data-store-low-stock-threshold="5"
+          data-store-sold-out-label="Sold out">Sold out</p>
+        <div data-store-product-controls>
+          <input type="number" value="1" data-store-quantity>
+          <button
+            class="store-add-item"
+            type="button"
+            disabled
+            aria-disabled="true"
+            data-store-base-price="15"
+            data-item-price="15"
+            data-product-sku="film-fatale-at-the-guild-cinema"
+            data-product-status="archived"
+            data-product-base-status="archived"
+            data-product-inventory="105"
+            data-product-inventory-configured="true"
+            data-product-inventory-tracking="true"
+            data-store-button-label="Add Ticket"
+            data-store-sold-out-label="Sold out">Sold out</button>
+        </div>
+      </article>
+    `);
+
+    await import('../../assets/js/store-product-options.js');
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+
+    const archivedButton = document.querySelector<HTMLButtonElement>('[data-product-status="archived"]');
+    expect(archivedButton?.disabled).toBe(true);
+    expect(archivedButton?.getAttribute('aria-disabled')).toBe('true');
+    expect(archivedButton?.textContent).toBe('Sold out');
+    expect(archivedButton?.closest('[data-store-product-card]')?.querySelector('[data-store-availability]')?.textContent).toBe('Sold out');
+  });
 });

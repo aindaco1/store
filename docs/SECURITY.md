@@ -13,6 +13,7 @@ This guide describes the current Store security model for production. Historical
 - Stripe is authoritative for paid settlement only after webhook signature verification.
 - Cloudflare KV stores operational records and session state; Durable Objects coordinate race-sensitive checkout/inventory work; R2 stores private digital download objects.
 - GitHub-backed catalog/admin publishing paths are admin-only and normalized server-side before commit.
+- GitHub deployment status is read only by authenticated Store admins, matched to a validated full commit SHA and allowlisted workflow filename, reduced to bounded run metadata, and returned private/no-store.
 
 ## Ethical Risk And User Trust
 
@@ -200,6 +201,7 @@ Required protections:
 - runtime admin users stored in KV, not `_config.yml`
 - local dashboard navigation persistence limited to non-sensitive tab identifiers
 - Workers Cache use limited to authenticated, normalized, non-search read paths with private/no-store browser responses
+- deployment polling limited to authenticated Store reads; the Worker keeps the GitHub token server-side and exposes only normalized state, timing, conclusion, run ID, and validated run URL
 
 Limited admins should see only the Store surfaces allowed by their access scopes. Super admins retain settings and user-management access.
 
