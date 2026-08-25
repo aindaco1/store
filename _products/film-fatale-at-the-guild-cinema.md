@@ -7,7 +7,7 @@ price: 15
 image: "/assets/images/products/product-new-product-20260708-075131.png"
 type: "ticket"
 fulfillment_type: "ticket"
-status: "active"
+status: "archived"
 category: "dustwave"
 order: 50
 shipping_preset: ""
@@ -30,9 +30,7 @@ event_details:
   starts_at: "2026-08-22T13:30:00-06:00"
   ends_at: "2026-08-22T15:00:00-06:00"
   venue: "Guild Cinema"
-  address: |-
-    3405 Central Ave NE
-    Albuquerque, NM 87106
+  address: "3405 Central Ave NE\nAlbuquerque, NM 87106"
   ticket_delivery: "qr"
   ics: true
 ---
