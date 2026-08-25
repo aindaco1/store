@@ -58,6 +58,13 @@ npm run production:posture -- --secrets-file=/path/to/wrangler-secret-list.json
 
 The scheduled production-posture audit also requires `preview_urls = false` to be explicit in `worker/wrangler.toml`. Missing or enabled Worker preview URLs are a release-blocking configuration drift finding.
 
+The production-posture unit fixture supplies production origins in memory while
+the tracked Wrangler defaults remain localhost-safe. Product-status coverage
+separately proves that an archived dashboard payload survives canonical Worker
+normalization and rewrites repository markdown, while the admin browser suite
+checks desktop help spacing, visible pending-archive guidance, the submitted
+status, and the archive confirmation message.
+
 Lighthouse runs through `podman-stack-run.sh` by default. Production posture accepts Wrangler's secret-name JSON only and never reads secret values. Session/download/audit tests prove CSRF/role gates, data minimization, redaction, rate-limit thresholds, and audit behavior.
 
 Local services:
@@ -73,7 +80,7 @@ Default Playwright specs:
 - `tests/e2e/public-page-controls.spec.ts`
 - `tests/e2e/admin-dashboard.spec.ts`
 
-These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, direct-link multi-attendee RSVP registration and storage privacy, zero-total checkout without payment UI, paid-checkout payment UI preservation, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, guided RSVP question creation and JSON serialization, desktop RSVP response/action containment, product preview address/link/layout parity, product publish, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
+These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, direct-link multi-attendee RSVP registration and storage privacy, zero-total checkout without payment UI, paid-checkout payment UI preservation, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, guided RSVP question creation and JSON serialization, desktop RSVP response/action containment, product preview address/link/layout parity, product publish and explicit archive confirmation, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 
@@ -344,6 +351,7 @@ Production smoke:
 - Stripe webhooks confirm paid orders.
 - Failed payments release reservations.
 - Admin product publish triggers deploy.
+- On a harmless test product, selecting Archived remains visibly pending until **Archive product** is used; after publish succeeds, the repository records `status: archived` and the deployed catalog eventually removes the product from public listings.
 - Admin download replacement works on a non-public test product.
 - Admin coupon create/apply/delete works on a harmless test cart.
 - Admin user scopes are correct.

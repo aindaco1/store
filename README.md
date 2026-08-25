@@ -5,6 +5,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 ## Current State
 
 - Current release: `v1.2.0`. RSVP products can opt into registration windows, party limits, named attendees, guided setup for scoped custom questions, private response review, attendee-level check-in, and attendee CSV export without changing other product or fulfillment paths. Zero-total checkout omits tip and payment-method controls, uses **Complete order**, and does not load Stripe; paid and mixed carts retain the payment flow. Store continues to pin Platform `v0.31.0` plus the separately versioned `dust-wave-jekyll-template` `v0.1.0`.
+- Product publishing keeps its save controls visible while editing, labels pending status transitions explicitly, and separates a committed archive from the following catalog deployment. Desktop field-help spacing and narrow-screen containment are covered by browser regressions.
 - Inventory-tracked home and product pages refresh confirmed availability once per navigation through a sanitized, 15-second cached Worker projection. Static product counts remain the no-JavaScript or network-failure fallback; cart validation and checkout remain the reservation-aware authority.
 - The preceding `v1.1.22` release remains independently reversible.
 - Static Jekyll storefront: `https://shop.dustwave.xyz`.

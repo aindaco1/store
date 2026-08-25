@@ -3015,6 +3015,52 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('tab', { name: 'Orders', exact: true })).toHaveAttribute('aria-selected', 'true');
   });
 
+  test('keeps product help controls separated and makes archive publishing explicit', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await page.setViewportSize({ width: 1586, height: 900 });
+
+    await gotoDomReady(page, '/admin/?admin_login=admin-token-product-archive');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Products');
+    await expect.poll(() => calls.storeProducts.length).toBe(1);
+
+    const productRow = page.locator('#admin-store-products-results tbody > tr[data-store-product-order-row]')
+      .filter({ hasText: 'Fronteras Poster (Big)' });
+    await productRow.getByRole('button', { name: 'Edit', exact: true }).click();
+    const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+    await expect(editor).toBeVisible();
+
+    expect(await editor.evaluate((root) => {
+      const price = root.querySelector('[data-store-product-field-wrapper="price"]');
+      const status = root.querySelector('[data-store-product-field-wrapper="status"]');
+      const priceLabel = price?.querySelector('.admin-store-products__field-label');
+      const priceHelp = price?.querySelector('.admin-settings__help-button');
+      const statusLabel = status?.querySelector('.admin-store-products__field-label');
+      if (!priceLabel || !priceHelp || !statusLabel) return false;
+      return priceLabel.scrollWidth <= priceLabel.clientWidth + 1 &&
+        priceHelp.getBoundingClientRect().right + 8 <= statusLabel.getBoundingClientRect().left;
+    })).toBe(true);
+
+    await editor.locator('[data-store-product-field="status"]').selectOption('archived');
+    await expect(editor.getByText('Not archived yet - publish to save.', { exact: true })).toBeVisible();
+    const archive = editor.getByRole('button', { name: 'Archive product', exact: true });
+    await expect(archive).toBeVisible();
+    await expect(archive).toBeEnabled();
+    expect(await archive.evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.top >= 0 && rect.bottom <= window.innerHeight;
+    })).toBe(true);
+
+    await archive.click();
+    await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
+    expect(calls.storeProductPublishes[0]).toMatchObject({
+      intent: 'publish',
+      productId: 'fronteras-poster-big',
+      fields: { status: 'archived' }
+    });
+    await expect(page.locator('#admin-store-products-status')).toContainText('Archive saved.');
+  });
+
   test('keeps RSVP responses and actions inside the desktop orders table', async ({ page }) => {
     await routeAdminWorker(page);
     await page.setViewportSize({ width: 1366, height: 768 });

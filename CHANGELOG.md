@@ -1,6 +1,32 @@
 # Changelog
 
-## v1.2.0 - 2026-08-18
+## v1.2.0 - 2026-08-24
+
+### Product publishing and release hardening
+
+- Kept Product editor actions visible in a sticky header and made status
+  transitions explicit: selecting Archived, Draft, Sold out, or Active now
+  shows that the change is pending and changes the primary action to the
+  matching publish operation. Successful archives distinguish the committed
+  repository change from the following catalog deployment and propagation.
+- Widened the desktop Price field and increased the basics-row gap so field
+  help buttons stay inside their own labels instead of colliding with adjacent
+  fields. The same editor remains single-column without horizontal overflow on
+  narrow screens.
+- Added browser regression coverage for help-control separation, visible
+  archive actions, submitted archived status, and archive confirmation, plus a
+  Worker-boundary regression proving that the canonical product markdown patch
+  persists `status: "archived"`.
+- Kept the checked-in Wrangler origins localhost-safe while making the
+  production-posture unit fixture explicitly production-shaped. The complete
+  unit suite can now run directly without requiring the pre-merge config-sync
+  wrapper.
+- Required `preview_urls = false` in production posture so an omitted or
+  enabled Cloudflare Worker preview URL blocks release. Production custom
+  domains remain the only intended public Worker routes.
+- Advanced the transitive development-only `nanoid` lock from `3.3.17` to
+  `3.3.18`, clearing the release dependency audit without changing Store or
+  Worker runtime dependencies.
 
 ### RSVP registration essentials
 

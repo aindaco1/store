@@ -2546,12 +2546,25 @@ textarea.admin-settings__input--readonly {
   margin-bottom: 4px;
 }
 
+.admin-store-products__editor-header {
+  align-items: center;
+  background: $surface--base;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 4px 0;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
 .admin-store-products__editor-title {
   color: $color--primary;
   font-size: clamp(1.05rem, 1.7vw, 1.35rem);
   font-weight: 700;
   line-height: 1.1;
-  margin-bottom: 2px;
+  margin: 0;
 }
 
 .admin-store-products__preview-title,
@@ -3760,7 +3773,18 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-products__editor-actions {
   @include admin-action-row(6px);
-  margin-top: 6px;
+}
+
+@media (max-width: 760px) {
+  .admin-store-products__editor-actions {
+    display: grid;
+    flex-basis: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-store-products__editor-save-hint {
+    grid-column: 1 / -1;
+  }
 }
 
 @mixin admin-store-products-variant-card-layout {
@@ -4185,6 +4209,7 @@ textarea.admin-settings__input--readonly {
 @media (min-width: 760px) {
   .admin-store-products__editor-section--basics {
     align-items: start;
+    column-gap: 12px;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -4205,8 +4230,8 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-products__editor-section--basics [data-store-product-field-wrapper="price"] {
-    flex: 0 0 5.5rem;
-    max-width: 5.5rem;
+    flex: 0 0 7rem;
+    max-width: 7rem;
   }
 
   .admin-store-products__editor-section--basics [data-store-product-field-wrapper="status"],
