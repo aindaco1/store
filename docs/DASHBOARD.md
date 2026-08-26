@@ -43,7 +43,7 @@ Settings is available to `super_admin` users only. It reads from `/admin/setting
 Current Settings sections:
 
 - Platform: site title, platform name, company, author, timezone, support/order/update email addresses, add-ons enabled, add-on product count, and read-only app mode.
-- Post-event email: delay, mission statement, commercial postal address, one-time/monthly support URLs and amounts, and newsletter opt-in URL.
+- Post-event email: compact timing/compliance, mission, destination, and support-amount groups plus a sandboxed preview that follows unsaved values and supports a selectable sample event with English/Spanish switching.
 - Brand & SEO: logo, footer logo, favicon, default social image, X handle, social image alt text, same-as links, and merchant return policy controls for Product/Organization JSON-LD.
 - Canonical URLs: production site URL and production Worker URL.
 - Checkout: Stripe publishable key.
@@ -100,6 +100,7 @@ Editor behavior:
 - SEO description writes the front matter `description` value used by product metadata, social cards, and Product JSON-LD. Keep it concise and separate from the longer visible product page content.
 - Preview renders a sandboxed static product page preview. It mirrors the public product page layout, including full-image display, product-detail spacing, responsive product copy order, compact event address formatting, and Google Maps address links. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected; the frame retains an opaque origin and does not request stylesheets outside the production Content Security Policy.
 - Event Address is a multiline field so street and locality lines remain distinct. **Find address** stays in the same row at desktop widths and stacks below the field on narrow screens.
+- Ticket and RSVP editors place Starts at, Ends at, and Post-event email in one three-column desktop row and stack them on narrow screens. New event products default the post-event setting to Yes. Once the configured end plus global delay has passed, the control is read-only; the Worker enforces the same cutoff. Earlier confirmed purchasers are reconciled automatically at send time, with one message per normalized email address.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
 - Successful production publishes return the saved commit and deployment request. One operation-aware controller handles ordinary product edits, Active, Draft, Archived, and Sold out transitions, bulk status changes, and Save order. It shows an accessible **Saved → Deploying → Deployed** indicator, the exact GitHub run state, operation-specific copy, and elapsed save-to-deploy time. The editor or arranged rows and prior product list remain in place until that run succeeds, then the dashboard refreshes from the newly deployed Worker catalog. A failed or unobservable run leaves the saved state explicit, preserves the prior list instead of presenting it as current, and links the GitHub run when available.
@@ -214,7 +215,6 @@ Current behavior:
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 - Explicitly refresh Orders. When the first-page filter has not changed, the dashboard reuses its in-memory payload and announces that no new orders were found.
-- Super admins can preview an elapsed event's commercial post-event email and deduplicated purchaser audience. This workflow forces a fresh order scan, displays recipients and exclusions, and renders the exact email in a sandboxed frame. Queueing is blocked unless the event is enabled and eligible, configuration is complete, the scan is untruncated, the preview digest/count still match, and the operator supplies the exact acknowledgement. Preview never sends.
 
 Performance/cache behavior:
 
@@ -245,8 +245,8 @@ Order support endpoints:
 - `POST /admin/store/orders/import-snipcart`
 - `POST /admin/store/orders/check-in`
 - `POST /admin/store/orders/download-access`
-- `GET /admin/store/marketing/event-followup/preview`
-- `POST /admin/store/marketing/event-followup/queue`
+- `GET /admin/store/marketing/event-followup/products` (sample events for the Settings preview)
+- `POST /admin/store/marketing/event-followup/preview` (sandboxed preview from draft settings; no audience scan or send)
 
 ## Analytics
 

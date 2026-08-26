@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildAdminStoreEventFollowupAudience } from '../../worker/src/index.js';
+import {
+  buildAdminStoreEventFollowupAudience,
+  reconcileStoreEventFollowupAudiences
+} from '../../worker/src/index.js';
 import { suppressPromotionalEmail } from '../../worker/src/email-outbox.js';
 
 class MemoryKV {
@@ -155,6 +158,89 @@ describe('Store event follow-up audience', () => {
       from: 'Dust Wave Shop <updates@shop.test>',
       subject: 'Gracias por acompañarnos en FILM FATALE at the Guild Cinema | Dust Wave Shop',
       digest: expect.stringMatching(/^[a-f0-9]{64}$/)
+    });
+  });
+
+  it('automatically queues earlier confirmed purchasers once an enabled event reaches its scheduled send time', async () => {
+    const kv = new MemoryKV();
+    const storedOrder = order('store-order-earlier', 'earlier@example.com', 2);
+    await kv.put(`orders:${storedOrder.orderToken}`, JSON.stringify(storedOrder));
+    await kv.put('admin-store-orders:index:v2', JSON.stringify({
+      version: 2,
+      generatedAt: new Date().toISOString(),
+      latestKnownUpdatedAt: '',
+      watermark: 'orders-v2-stale0000000000',
+      scanned: 0,
+      indexed: 0,
+      listCalls: 1,
+      truncated: false,
+      orders: []
+    }));
+    const eventDetails = {
+      starts_at: '2026-08-22T13:30:00-06:00',
+      ends_at: '2026-08-22T15:00:00-06:00',
+      followup: { enabled: true, enabled_at: '2026-08-21T12:00:00.000Z' }
+    };
+    const env = {
+      STORE_STATE: kv,
+      SITE_BASE: 'https://shop.test',
+      WORKER_BASE: 'https://checkout.test',
+      MAGIC_LINK_SECRET: 'local-followup-secret',
+      PLATFORM_NAME: 'Shop',
+      PLATFORM_COMPANY_NAME: 'Dust Wave',
+      UPDATES_EMAIL_FROM: 'Dust Wave Shop <updates@shop.test>',
+      EVENT_FOLLOWUP_POSTAL_ADDRESS: '709 Haines Avenue NW\nAlbuquerque, NM 87102',
+      EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL: 'https://buy.stripe.com/one-time',
+      STORE_CATALOG_JSON: JSON.stringify({
+        version: 1,
+        products: [{
+          id: 'film-fatale-at-the-guild-cinema',
+          name: 'FILM FATALE at the Guild Cinema',
+          type: 'ticket',
+          fulfillment_type: 'ticket',
+          event_details: eventDetails
+        }]
+      })
+    } as any;
+
+    await expect(reconcileStoreEventFollowupAudiences(env, new Date('2026-08-24T22:00:00.000Z'))).resolves.toMatchObject({
+      eligibleProducts: 1,
+      reconciledProducts: 1,
+      queued: 1,
+      failed: 0
+    });
+    const queued = await kv.list({ prefix: 'store-event-followup:v1:' });
+    expect(queued.keys).toHaveLength(1);
+    await expect(reconcileStoreEventFollowupAudiences(env, new Date('2026-08-24T22:01:00.000Z'))).resolves.toMatchObject({
+      eligibleProducts: 1,
+      reconciledProducts: 0,
+      skipped: 1
+    });
+  });
+
+  it('does not historical-send legacy enabled events that lack an activation timestamp', async () => {
+    const kv = new MemoryKV();
+    const env = {
+      STORE_STATE: kv,
+      STORE_CATALOG_JSON: JSON.stringify({
+        version: 1,
+        products: [{
+          id: 'legacy-event',
+          name: 'Legacy event',
+          type: 'ticket',
+          fulfillment_type: 'ticket',
+          event_details: {
+            ends_at: '2026-08-01T20:00:00.000Z',
+            followup: { enabled: true }
+          }
+        }]
+      })
+    } as any;
+
+    await expect(reconcileStoreEventFollowupAudiences(env, new Date('2026-08-26T20:00:00.000Z'))).resolves.toMatchObject({
+      eligibleProducts: 0,
+      reconciledProducts: 0,
+      queued: 0
     });
   });
 });

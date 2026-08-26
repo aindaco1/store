@@ -173,35 +173,6 @@ admin:
   export_attendees: Export attendees
   refresh_orders: Refresh orders
   orders_unchanged: No order changes since the last refresh.
-  event_followup_title: Post-event thank-you email
-  event_followup_note: Commercial email · fresh audience check required
-  event_followup_intro: Preview the exact email and a deduplicated confirmed-purchaser audience. Imported, test, invalid, suppressed, and already-processed records are excluded.
-  event_followup_product_aria: Event product
-  event_followup_choose_product: Choose an event…
-  event_followup_refresh: Refresh preview
-  event_followup_recipients: Eligible recipients
-  event_followup_preview_title: Post-event email preview
-  event_followup_ack_prefix: Type
-  event_followup_ack_suffix: after the audience and copy are approved.
-  event_followup_queue: Queue approved audience
-  event_followup_loading_products: Loading event products...
-  event_followup_no_products: No ticket or RSVP products with an event end were found.
-  event_followup_enabled: enabled
-  event_followup_disabled: disabled
-  event_followup_audience_summary: "Unique recipients: %{recipients} · Matching orders: %{orders} · Ticket/RSVP spots: %{spots} · Duplicate purchases collapsed: %{duplicates} · Imported excluded: %{imported} · Suppressed: %{suppressed} · Already processed: %{processed}"
-  event_followup_eligible_now: Eligible now
-  event_followup_eligible_at: "Eligible: %{date}"
-  event_followup_configuration_ready: Configuration ready
-  event_followup_configuration_incomplete: Configuration incomplete
-  event_followup_recipient_summary: "%{email} — Ticket/RSVP spots: %{spots} · Orders: %{orders}"
-  event_followup_email_meta: "From: %{from} · Subject: %{subject} · Copy: %{copy}"
-  event_followup_choose_first: Choose an event product first.
-  event_followup_scanning: Running a fresh order scan and rendering the email...
-  event_followup_preview_ready: Fresh preview ready. No email has been queued or sent.
-  event_followup_refresh_before_queue: Refresh the preview before queueing.
-  event_followup_confirm_queue: Queue the approved post-event email for %{count} unique recipients for %{event}?
-  event_followup_rechecking: Rechecking the audience and queueing approved email...
-  event_followup_queued: Post-event email queued.
   refresh_inventory: Refresh inventory
   inventory_refreshing: Refreshing inventory availability...
   inventory_refreshed: Inventory availability refreshed.

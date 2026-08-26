@@ -67,6 +67,7 @@ Existing body.
     expect(applied.ok).toBe(true);
     expect(applied.content).toContain('  registration:');
     expect(applied.content).toContain('  followup:\n    enabled: true');
+    expect(applied.content).toMatch(/    enabled_at: "[^"]+"/);
     expect(applied.content).toContain('    max_party_size: 4');
     expect(applied.content).toContain('      - id: "accessibility_needs"');
     expect(applied.content).toContain('        scope: "attendee"');
@@ -118,5 +119,34 @@ Existing body.
     expect(normalized.ok).toBe(true);
     const eventPatch = normalized.patch.frontMatter.find((entry) => entry.key === 'event_details');
     expect(eventPatch?.replacement).toContain('  followup:\n    enabled: false');
+  });
+
+  it('rejects changing the post-event setting after its scheduled send time', () => {
+    const env = {
+      STORE_CATALOG_JSON: JSON.stringify({
+        version: 1,
+        products: [{
+          id: 'past-ticket',
+          name: 'Past ticket',
+          fulfillment_type: 'ticket',
+          event_details: {
+            ends_at: '2026-08-01T20:00:00.000Z',
+            followup: { enabled: false }
+          }
+        }]
+      })
+    } as any;
+    const normalized = normalizeAdminStoreProductPublishBody({
+      intent: 'publish',
+      productId: 'past-ticket',
+      fields: {
+        fulfillmentType: 'ticket',
+        eventEndsAt: '2027-08-01T20:00:00.000Z',
+        eventFollowupEnabled: true
+      }
+    }, env);
+
+    expect(normalized.ok).toBe(false);
+    expect(normalized.errors.join(' ')).toContain('Post-event follow-up is locked');
   });
 });

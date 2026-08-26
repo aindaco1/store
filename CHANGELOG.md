@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## v1.3.1 - 2026-08-26
+
+### Automatic post-event follow-up operations
+
+- Replaced the Orders-based audience, recipient, preview, acknowledgement, and
+  manual backfill workflow with automatic reconciliation of unique confirmed
+  purchasers when an enabled ticket or RSVP event reaches its scheduled send
+  time. Purchasers confirmed before activation are included, while activation
+  at or after the cutoff never creates a historical send.
+- Recorded the activation timestamp in repository-backed event metadata and
+  locked the post-event toggle in both the product editor and Worker mutation
+  boundary after the scheduled send time. Legacy enabled records without an
+  activation timestamp fail closed instead of producing an unreviewed send.
+- Moved the English/Spanish email preview into **Settings -> Post-event email**,
+  where it uses unsaved configuration values and a selectable sample event
+  without scanning or exposing customer data.
+- Compacted related post-event settings and placed **Starts at**, **Ends at**,
+  and **Post-event email** in one three-column desktop row that stacks on narrow
+  screens.
+- Added automatic audience, timing-lock, unsaved-preview, localization,
+  deduplication, desktop, mobile, and navigation-state regression coverage.
+
 ## v1.3.0 - 2026-08-26
 
 ### Post-event thank-you and support email

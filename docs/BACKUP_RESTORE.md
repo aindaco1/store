@@ -25,7 +25,7 @@ The Store owner/operator approved these objectives, the four-hour active-sales s
 
 - **Authoritative:** `orders:` (including opt-in RSVP attendee names and custom responses), inventory overrides, coupons, admin users, saved referrals, reminder suppressions, permanent hashed promotional-email opt-outs, and `STORE_DOWNLOADS` objects.
 - **Idempotency/control:** `stripe-event:`, `email-delivery:v1:`, `email-suppression:v1:`, `resend-webhook:v1:`, customer/admin email sent markers, abandoned-cart sent markers, event-reminder sent markers, and post-event sent markers. Restore these before unpausing webhooks/email jobs to prevent duplicate side effects.
-- **Derived/rebuildable:** `admin-store-orders:index:v2`, `store-payment-reconciliation-state:v1`, inventory projections, email lookup indexes, queue summaries, health rows, and address lookup cache. Do not restore these as authoritative records.
+- **Derived/rebuildable:** `admin-store-orders:index:v2`, `store-payment-reconciliation-state:v1`, post-event reconciliation markers, inventory projections, email lookup indexes, queue summaries, health rows, and address lookup cache. Do not restore these as authoritative records.
 - **Incident evidence:** `processor-event:v1:`, `reconciliation-break:v1:`, admin audit, and selected observability/purge-failure records. Restore only when payment/incident retention requires it.
 - **Ephemeral/quarantined:** `email-outbox:v1:` pending payloads, sessions, login nonces, rate limits, one-time lookup/resume capabilities, pending reminder and post-event follow-up records, marketing drafts, and cron markers. Never restore them to production without a provider-delivery and duplicate-send review.
 
