@@ -155,6 +155,34 @@
             </div>
             <button id="admin-store-orders-refresh" class="btn btn--secondary" type="button">{% include t.html key="admin.refresh_orders" lang=current_lang %}</button>
           </div>
+          <section id="admin-store-event-followup" class="admin-store-orders__import admin-store-orders__event-followup admin-section-panel" data-super-admin-only hidden>
+            <div class="admin-store-orders__import-copy">
+              <label class="admin-store-orders__import-title" for="admin-store-event-followup-product">{% include t.html key="admin.event_followup_title" lang=current_lang %}</label>
+              <span class="admin-store-orders__import-note">{% include t.html key="admin.event_followup_note" lang=current_lang %}</span>
+              <p class="admin-app__muted">{% include t.html key="admin.event_followup_intro" lang=current_lang %}</p>
+            </div>
+            <div class="admin-store-orders__import-controls">
+              <select id="admin-store-event-followup-product" class="admin-settings__input" aria-label="{% include t.html key="admin.event_followup_product_aria" lang=current_lang %}">
+                <option value="">{% include t.html key="admin.event_followup_choose_product" lang=current_lang %}</option>
+              </select>
+              <button id="admin-store-event-followup-preview" class="btn btn--secondary" type="button">{% include t.html key="admin.event_followup_refresh" lang=current_lang %}</button>
+            </div>
+            <div id="admin-store-event-followup-status" class="admin-dashboard__status admin-store-marketing__field--full" role="status" aria-live="polite"></div>
+            <div id="admin-store-event-followup-summary" class="admin-store-orders__import-summary" aria-live="polite"></div>
+            <details id="admin-store-event-followup-recipients" class="admin-store-marketing__field--full" hidden>
+              <summary>{% include t.html key="admin.event_followup_recipients" lang=current_lang %}</summary>
+              <ul id="admin-store-event-followup-recipient-list"></ul>
+            </details>
+            <div id="admin-store-event-followup-email-preview" class="admin-store-marketing__field--full admin-store-products__preview" hidden>
+              <p id="admin-store-event-followup-email-meta" class="admin-app__muted"></p>
+              <iframe id="admin-store-event-followup-email-frame" title="{% include t.html key="admin.event_followup_preview_title" lang=current_lang %}" sandbox=""></iframe>
+            </div>
+            <div id="admin-store-event-followup-queue-controls" class="admin-store-orders__field admin-store-marketing__field--full" hidden>
+              <label for="admin-store-event-followup-ack">{% include t.html key="admin.event_followup_ack_prefix" lang=current_lang %} <code>QUEUE EVENT FOLLOW-UP</code> {% include t.html key="admin.event_followup_ack_suffix" lang=current_lang %}</label>
+              <input id="admin-store-event-followup-ack" class="admin-settings__input" type="text" autocomplete="off">
+              <button id="admin-store-event-followup-queue" class="btn" type="button" disabled>{% include t.html key="admin.event_followup_queue" lang=current_lang %}</button>
+            </div>
+          </section>
           <div class="admin-store-orders__import admin-section-panel">
             <div class="admin-store-orders__import-copy">
               <label

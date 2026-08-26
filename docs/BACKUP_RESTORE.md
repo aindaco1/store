@@ -23,11 +23,11 @@ The Store owner/operator approved these objectives, the four-hour active-sales s
 
 ## Data Classes
 
-- **Authoritative:** `orders:` (including opt-in RSVP attendee names and custom responses), inventory overrides, coupons, admin users, saved referrals, reminder suppressions, and `STORE_DOWNLOADS` objects.
-- **Idempotency/control:** `stripe-event:`, `email-delivery:v1:`, `email-suppression:v1:`, `resend-webhook:v1:`, customer/admin email sent markers, abandoned-cart sent markers, and event-reminder sent markers. Restore these before unpausing webhooks/email jobs to prevent duplicate side effects.
+- **Authoritative:** `orders:` (including opt-in RSVP attendee names and custom responses), inventory overrides, coupons, admin users, saved referrals, reminder suppressions, permanent hashed promotional-email opt-outs, and `STORE_DOWNLOADS` objects.
+- **Idempotency/control:** `stripe-event:`, `email-delivery:v1:`, `email-suppression:v1:`, `resend-webhook:v1:`, customer/admin email sent markers, abandoned-cart sent markers, event-reminder sent markers, and post-event sent markers. Restore these before unpausing webhooks/email jobs to prevent duplicate side effects.
 - **Derived/rebuildable:** `admin-store-orders:index:v2`, `store-payment-reconciliation-state:v1`, inventory projections, email lookup indexes, queue summaries, health rows, and address lookup cache. Do not restore these as authoritative records.
 - **Incident evidence:** `processor-event:v1:`, `reconciliation-break:v1:`, admin audit, and selected observability/purge-failure records. Restore only when payment/incident retention requires it.
-- **Ephemeral/quarantined:** `email-outbox:v1:` pending payloads, sessions, login nonces, rate limits, one-time lookup/resume capabilities, pending reminder records, marketing drafts, and cron markers. Never restore them to production without a provider-delivery and duplicate-send review.
+- **Ephemeral/quarantined:** `email-outbox:v1:` pending payloads, sessions, login nonces, rate limits, one-time lookup/resume capabilities, pending reminder and post-event follow-up records, marketing drafts, and cron markers. Never restore them to production without a provider-delivery and duplicate-send review.
 
 Outbox queue state is rebuildable. If exceptional incident review authorizes pending-message recovery, restore delivery, suppression, and webhook idempotency evidence first, reconcile provider acceptance, then rebuild the queue marker. Never bulk-restore frozen pending payloads merely because they exist in a snapshot.
 
@@ -246,8 +246,8 @@ Restore order:
 1. Git/config/build artifacts and matching storefront/Worker version.
 2. Admin users only when break-glass access requires it.
 3. Orders and payment/fulfillment records.
-4. Inventory overrides, coupons, referrals, and suppression preferences.
-5. Stripe/email/reminder idempotency markers before side effects resume.
+4. Inventory overrides, coupons, referrals, and suppression preferences, including permanent promotional-email opt-outs.
+5. Stripe/email/reminder/post-event idempotency markers before side effects resume.
 6. R2 objects, verified by size/checksum.
 7. Rebuild order/email/inventory projections and reconcile Durable Object reservations.
 8. Preserve audit evidence when required; do not restore observability or purge-failure rows as runtime state.

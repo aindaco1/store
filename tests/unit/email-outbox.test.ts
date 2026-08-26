@@ -3,9 +3,11 @@ import {
   EMAIL_DELIVERY_PREFIX,
   EMAIL_OUTBOX_PREFIX,
   EMAIL_SUPPRESSION_PREFIX,
+  PROMOTIONAL_EMAIL_SUPPRESSION_PREFIX,
   enqueueEmailOutbox,
   processEmailOutbox,
   processResendWebhook,
+  suppressPromotionalEmail,
   verifyResendWebhook
 } from '../../worker/src/email-outbox.js';
 
@@ -174,7 +176,8 @@ describe('Store durable Resend email outbox', () => {
 
   it.each([
     ['store_abandoned_cart', { email: 'buyer@example.com', resumeUrl: 'https://shop.test/cart', unsubscribeUrl: 'https://shop.test/unsubscribe' }],
-    ['store_event_reminder', { email: 'buyer@example.com', orderToken: 'store-order-one', item: { name: 'Event' } }]
+    ['store_event_reminder', { email: 'buyer@example.com', orderToken: 'store-order-one', item: { name: 'Event' } }],
+    ['store_event_followup', { email: 'buyer@example.com', eventTitle: 'Event' }]
   ])('checks suppression immediately before a %s delivery', async (kind, payload) => {
     const kv = new MemoryKV();
     const email = 'buyer@example.com';
@@ -189,6 +192,34 @@ describe('Store durable Resend email outbox', () => {
     expect(result.suppressed).toBe(1);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`, { type: 'json' })).toMatchObject({ status: 'suppressed' });
+  });
+
+  it('applies recipient opt-out only to optional promotional Store email', async () => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    await suppressPromotionalEmail(env, 'buyer@example.com');
+    const emailHash = await sha256Hex('buyer@example.com');
+    expect(await kv.get(`${PROMOTIONAL_EMAIL_SUPPRESSION_PREFIX}${emailHash}`, { type: 'json' })).toMatchObject({
+      reason: 'recipient_opt_out'
+    });
+    const followup = await enqueueEmailOutbox(env, {
+      kind: 'store_event_followup',
+      dedupeKey: 'optional-followup',
+      payload: { email: 'buyer@example.com', eventTitle: 'Event' }
+    });
+    const receipt = await enqueueEmailOutbox(env, {
+      kind: 'store_order',
+      dedupeKey: 'essential-receipt',
+      orderToken: 'store-order-one',
+      payload: orderPayload()
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'email_receipt' }), { status: 200 })));
+
+    const result = await processEmailOutbox(env, { now: new Date('2027-07-13T12:00:00Z'), limit: 10 });
+
+    expect(result).toMatchObject({ suppressed: 1, sent: 1 });
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${followup.jobId}`, { type: 'json' })).toMatchObject({ status: 'suppressed' });
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${receipt.jobId}`, { type: 'json' })).toMatchObject({ status: 'accepted' });
   });
 
   it('verifies Resend signatures and stores delivery and permanent-bounce evidence', async () => {

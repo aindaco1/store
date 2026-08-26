@@ -428,7 +428,10 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
         "venue": "Guild Cinema",
         "address": "3405 Central Ave NE\nAlbuquerque, NM 87106",
         "ticket_delivery": "qr",
-        "ics": true
+        "ics": true,
+        "followup": {
+          "enabled": true
+        }
       },
       "turnstile_required": false
     },
@@ -2883,7 +2886,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "899273a42ed5f0bd0d0c643add81adce545da8a74db410e220afb3d7f33f15aa"
+  "source_hash": "e0a343772f2376904ae8e0f6ab6f7f9149292bbfa54a77a6098eb81c44f6c2e8"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

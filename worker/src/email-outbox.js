@@ -2,6 +2,7 @@ export const EMAIL_OUTBOX_PREFIX = 'email-outbox:v1:';
 export const EMAIL_OUTBOX_QUEUE_STATE_KEY = 'email-outbox-queue:v1';
 export const EMAIL_DELIVERY_PREFIX = 'email-delivery:v1:';
 export const EMAIL_SUPPRESSION_PREFIX = 'email-suppression:v1:';
+export const PROMOTIONAL_EMAIL_SUPPRESSION_PREFIX = 'promotional-email-suppression:v1:';
 export const RESEND_WEBHOOK_MARKER_PREFIX = 'resend-webhook:v1:';
 export const EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const EMAIL_DELIVERY_TTL_SECONDS = 400 * 24 * 60 * 60;
@@ -10,16 +11,44 @@ const EMAIL_PROCESSING_LEASE_MS = 10 * 60 * 1000;
 const RESEND_IDEMPOTENCY_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 const MAX_FROZEN_PROVIDER_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
-const MARKETING_KINDS = new Set(['store_event_reminder', 'store_abandoned_cart']);
+const MARKETING_KINDS = new Set(['store_event_reminder', 'store_abandoned_cart', 'store_event_followup']);
+const OPTIONAL_PROMOTIONAL_KINDS = new Set(['store_event_followup']);
 const TEMPLATE_SENDERS = Object.freeze({
   store_order: 'sendStoreOrderEmail',
   store_event_reminder: 'sendStoreEventReminderEmail',
-  store_abandoned_cart: 'sendStoreAbandonedCartEmail'
+  store_abandoned_cart: 'sendStoreAbandonedCartEmail',
+  store_event_followup: 'sendStoreEventFollowupEmail'
 });
 
 function jobKey(jobId) { return `${EMAIL_OUTBOX_PREFIX}${jobId}`; }
 function deliveryKey(jobId) { return `${EMAIL_DELIVERY_PREFIX}${jobId}`; }
 async function suppressionKey(email) { return `${EMAIL_SUPPRESSION_PREFIX}${await sha256Hex(normalizeEmail(email))}`; }
+async function promotionalSuppressionKey(email) { return `${PROMOTIONAL_EMAIL_SUPPRESSION_PREFIX}${await sha256Hex(normalizeEmail(email))}`; }
+
+export async function suppressPromotionalEmail(env, email, { source = 'unsubscribe', reason = 'recipient_opt_out' } = {}) {
+  const normalized = normalizeEmail(email);
+  if (!env?.STORE_STATE?.put || !normalized) return { suppressed: false, reason: 'invalid_email_or_storage' };
+  const emailHash = await sha256Hex(normalized);
+  const key = await promotionalSuppressionKey(normalized);
+  await env.STORE_STATE.put(key, JSON.stringify({
+    version: 1,
+    emailHash,
+    source: String(source || 'unsubscribe').slice(0, 80),
+    reason: String(reason || 'recipient_opt_out').slice(0, 120),
+    suppressedAt: new Date().toISOString()
+  }));
+  return { suppressed: true, emailHash, key };
+}
+
+export async function isEmailOutboxRecipientSuppressed(env, kind, email) {
+  const normalized = normalizeEmail(email);
+  if (!env?.STORE_STATE?.get || !normalized) return false;
+  const checks = [];
+  if (MARKETING_KINDS.has(kind)) checks.push(env.STORE_STATE.get(await suppressionKey(normalized)));
+  if (OPTIONAL_PROMOTIONAL_KINDS.has(kind)) checks.push(env.STORE_STATE.get(await promotionalSuppressionKey(normalized)));
+  if (!checks.length) return false;
+  return (await Promise.all(checks)).some(Boolean);
+}
 
 export function emailOutboxEnabled(env = {}) {
   if (env.EMAIL_OUTBOX_ENABLED === undefined) return String(env.APP_MODE || '').trim().toLowerCase() === 'live';
@@ -88,9 +117,8 @@ async function renderProviderPayload(env, job) {
 }
 
 async function recipientSuppressed(env, job) {
-  if (!MARKETING_KINDS.has(job.kind)) return false;
   const email = normalizeEmail(job.payload?.email || job.payload?.to);
-  return email ? Boolean(await env.STORE_STATE.get(await suppressionKey(email))) : false;
+  return email ? isEmailOutboxRecipientSuppressed(env, job.kind, email) : false;
 }
 
 async function markAcceptedStoreOrder(env, job, acceptedAt) {

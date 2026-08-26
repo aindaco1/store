@@ -42,6 +42,18 @@ TOP_LEVEL_ORDER = [
   'ORDERS_EMAIL_FROM',
   'UPDATES_EMAIL_FROM',
   'EMAIL_OUTBOX_ENABLED',
+  'EVENT_FOLLOWUP_DELAY_HOURS',
+  'EVENT_FOLLOWUP_MISSION',
+  'EVENT_FOLLOWUP_POSTAL_ADDRESS',
+  'EVENT_FOLLOWUP_ORGANIZATION_URL',
+  'EVENT_FOLLOWUP_SHOP_URL',
+  'EVENT_FOLLOWUP_PROJECT_SUPPORT_URL',
+  'EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME',
+  'EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL',
+  'EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD',
+  'EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL',
+  'EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD',
+  'EVENT_FOLLOWUP_NEWSLETTER_URL',
   'PAYMENT_RECONCILIATION_ENABLED',
   'PLATFORM_FOOTER_LOGO_PATH',
   'PLATFORM_FAVICON_PATH',
@@ -135,6 +147,18 @@ DEV_ENV_ORDER = [
   'ORDERS_EMAIL_FROM',
   'UPDATES_EMAIL_FROM',
   'EMAIL_OUTBOX_ENABLED',
+  'EVENT_FOLLOWUP_DELAY_HOURS',
+  'EVENT_FOLLOWUP_MISSION',
+  'EVENT_FOLLOWUP_POSTAL_ADDRESS',
+  'EVENT_FOLLOWUP_ORGANIZATION_URL',
+  'EVENT_FOLLOWUP_SHOP_URL',
+  'EVENT_FOLLOWUP_PROJECT_SUPPORT_URL',
+  'EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME',
+  'EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL',
+  'EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD',
+  'EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL',
+  'EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD',
+  'EVENT_FOLLOWUP_NEWSLETTER_URL',
   'PAYMENT_RECONCILIATION_ENABLED',
   'PLATFORM_FOOTER_LOGO_PATH',
   'PLATFORM_FAVICON_PATH',
@@ -240,7 +264,11 @@ def parse_simple_assignments(content)
 end
 
 def toml_unescape(value)
-  value.gsub(/\\(["\\])/, '\1')
+  value
+    .gsub('\\n', "\n")
+    .gsub('\\r', "\r")
+    .gsub('\\t', "\t")
+    .gsub(/\\(["\\])/, '\1')
 end
 
 def parse_table_assignments(content, section_header)
@@ -302,7 +330,12 @@ def format_int(value)
 end
 
 def toml_escape(value)
-  String(value).gsub('\\', '\\\\').gsub('"', '\"')
+  String(value)
+    .gsub('\\', '\\\\')
+    .gsub("\n", '\\n')
+    .gsub("\r", '\\r')
+    .gsub("\t", '\\t')
+    .gsub('"', '\"')
 end
 
 def csv_value(value, fallback = nil)
@@ -401,6 +434,7 @@ end
 def build_mirror_values(config, existing)
   platform = config['platform'] || {}
   email = config['email'] || {}
+  event_followup = email['event_followup'] || {}
   payments = config['payments'] || {}
   admin = config['admin'] || {}
   pricing = config['pricing'] || {}
@@ -436,6 +470,18 @@ def build_mirror_values(config, existing)
     'ORDERS_EMAIL_FROM' => platform['orders_email_from'] || existing['ORDERS_EMAIL_FROM'],
     'UPDATES_EMAIL_FROM' => platform['updates_email_from'] || existing['UPDATES_EMAIL_FROM'],
     'EMAIL_OUTBOX_ENABLED' => email.key?('outbox_enabled') ? (email['outbox_enabled'] ? 'true' : 'false') : existing['EMAIL_OUTBOX_ENABLED'],
+    'EVENT_FOLLOWUP_DELAY_HOURS' => event_followup.key?('delay_hours') ? format_int(event_followup['delay_hours']) : existing['EVENT_FOLLOWUP_DELAY_HOURS'],
+    'EVENT_FOLLOWUP_MISSION' => event_followup.key?('mission') ? event_followup['mission'].to_s : existing['EVENT_FOLLOWUP_MISSION'],
+    'EVENT_FOLLOWUP_POSTAL_ADDRESS' => event_followup.key?('postal_address') ? event_followup['postal_address'].to_s : existing['EVENT_FOLLOWUP_POSTAL_ADDRESS'],
+    'EVENT_FOLLOWUP_ORGANIZATION_URL' => event_followup.key?('organization_url') ? event_followup['organization_url'].to_s : existing['EVENT_FOLLOWUP_ORGANIZATION_URL'],
+    'EVENT_FOLLOWUP_SHOP_URL' => event_followup.key?('shop_url') ? event_followup['shop_url'].to_s : existing['EVENT_FOLLOWUP_SHOP_URL'],
+    'EVENT_FOLLOWUP_PROJECT_SUPPORT_URL' => event_followup.key?('project_support_url') ? event_followup['project_support_url'].to_s : existing['EVENT_FOLLOWUP_PROJECT_SUPPORT_URL'],
+    'EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME' => event_followup.key?('project_support_name') ? event_followup['project_support_name'].to_s : existing['EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME'],
+    'EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL' => event_followup.key?('support_one_time_url') ? event_followup['support_one_time_url'].to_s : existing['EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL'],
+    'EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD' => event_followup.key?('support_one_time_suggested_usd') ? format_decimal(event_followup['support_one_time_suggested_usd'], 2) : existing['EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD'],
+    'EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL' => event_followup.key?('support_monthly_url') ? event_followup['support_monthly_url'].to_s : existing['EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL'],
+    'EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD' => event_followup.key?('support_monthly_usd') ? format_decimal(event_followup['support_monthly_usd'], 2) : existing['EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD'],
+    'EVENT_FOLLOWUP_NEWSLETTER_URL' => event_followup.key?('newsletter_url') ? event_followup['newsletter_url'].to_s : existing['EVENT_FOLLOWUP_NEWSLETTER_URL'],
     'PAYMENT_RECONCILIATION_ENABLED' => payments.key?('reconciliation_enabled') ? (payments['reconciliation_enabled'] ? 'true' : 'false') : existing['PAYMENT_RECONCILIATION_ENABLED'],
     'PLATFORM_FOOTER_LOGO_PATH' => platform.key?('footer_logo_path') ? platform['footer_logo_path'].to_s : existing['PLATFORM_FOOTER_LOGO_PATH'],
     'PLATFORM_FAVICON_PATH' => platform.key?('favicon_path') ? platform['favicon_path'].to_s : existing['PLATFORM_FAVICON_PATH'],

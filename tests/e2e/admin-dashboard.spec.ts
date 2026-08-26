@@ -97,6 +97,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     storeMarketingReferrals: [],
     storeMarketingAbandonedHealth: [],
     storeMarketingAbandonedSuppression: [],
+    storeEventFollowupProducts: [],
     storeMarketingDrafts: [],
     auditCsv: [],
     auditSearch: [],
@@ -285,6 +286,23 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
           reason: 'admin_suppression',
           email: 'buyer@example.com',
           emailHash: 'a'.repeat(64)
+        }],
+        writeBudget: { readOnly: true, kvWritesExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/store/marketing/event-followup/products' && method === 'GET') {
+      calls.storeEventFollowupProducts.push({ method });
+      return fulfillJson({
+        success: true,
+        scope: 'store',
+        products: [{
+          productId: 'ticket-1',
+          name: 'DUST WAVE Event Ticket',
+          status: 'active',
+          fulfillmentType: 'ticket',
+          eventEndsAt: '2026-08-22T15:00:00-06:00',
+          eventFollowupEnabled: true,
+          launchTest: false
         }],
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
       });
@@ -2291,6 +2309,8 @@ test.describe('Admin Dashboard', () => {
 
     await selectAdminSection(page, 'Orders');
     await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
+    await expect.poll(() => calls.storeEventFollowupProducts.length).toBe(1);
+    await expect(page.locator('#admin-store-event-followup-product option')).toHaveCount(2);
     await expect(page.getByRole('button', { name: 'About Import Snipcart CSV' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Status' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
@@ -3593,7 +3613,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-store-orders-attendance')).toContainText('Attendance');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)).toBe(true);
 
-    const importControls = page.locator('.admin-store-orders__import-controls');
+    const importControls = page.locator('#admin-store-orders-snipcart-file').locator('..');
     await expect.poll(() => importControls.evaluate((controls: HTMLElement) => {
       const chooseButton = controls.querySelector<HTMLElement>('.admin-store-orders__file-button');
       const filename = controls.querySelector<HTMLElement>('.admin-store-orders__file-name');

@@ -173,6 +173,35 @@ admin:
   export_attendees: Export attendees
   refresh_orders: Refresh orders
   orders_unchanged: No order changes since the last refresh.
+  event_followup_title: Post-event thank-you email
+  event_followup_note: Commercial email · fresh audience check required
+  event_followup_intro: Preview the exact email and a deduplicated confirmed-purchaser audience. Imported, test, invalid, suppressed, and already-processed records are excluded.
+  event_followup_product_aria: Event product
+  event_followup_choose_product: Choose an event…
+  event_followup_refresh: Refresh preview
+  event_followup_recipients: Eligible recipients
+  event_followup_preview_title: Post-event email preview
+  event_followup_ack_prefix: Type
+  event_followup_ack_suffix: after the audience and copy are approved.
+  event_followup_queue: Queue approved audience
+  event_followup_loading_products: Loading event products...
+  event_followup_no_products: No ticket or RSVP products with an event end were found.
+  event_followup_enabled: enabled
+  event_followup_disabled: disabled
+  event_followup_audience_summary: "Unique recipients: %{recipients} · Matching orders: %{orders} · Ticket/RSVP spots: %{spots} · Duplicate purchases collapsed: %{duplicates} · Imported excluded: %{imported} · Suppressed: %{suppressed} · Already processed: %{processed}"
+  event_followup_eligible_now: Eligible now
+  event_followup_eligible_at: "Eligible: %{date}"
+  event_followup_configuration_ready: Configuration ready
+  event_followup_configuration_incomplete: Configuration incomplete
+  event_followup_recipient_summary: "%{email} — Ticket/RSVP spots: %{spots} · Orders: %{orders}"
+  event_followup_email_meta: "From: %{from} · Subject: %{subject} · Copy: %{copy}"
+  event_followup_choose_first: Choose an event product first.
+  event_followup_scanning: Running a fresh order scan and rendering the email...
+  event_followup_preview_ready: Fresh preview ready. No email has been queued or sent.
+  event_followup_refresh_before_queue: Refresh the preview before queueing.
+  event_followup_confirm_queue: Queue the approved post-event email for %{count} unique recipients for %{event}?
+  event_followup_rechecking: Rechecking the audience and queueing approved email...
+  event_followup_queued: Post-event email queued.
   refresh_inventory: Refresh inventory
   inventory_refreshing: Refreshing inventory availability...
   inventory_refreshed: Inventory availability refreshed.
@@ -514,6 +543,7 @@ email:
     store_order_lookup: Find your order
     store_abandoned_cart: Finish your checkout
     store_event_reminder: Event reminder
+    store_event_followup: Thanks for showing up for %{event}
   common:
     questions_prefix: Questions? Reply to this email or visit
   store_order:
@@ -560,6 +590,36 @@ email:
     attachments: The calendar invite is attached when available. Open your order page for tickets and check-in QR codes.
     cta: View order
     footer: You are receiving this because this email address is attached to an event or RSVP order from %{platform}.
+  store_event_followup:
+    fallback_title: your event
+    preheader: Thanks for showing up for independent film and helping Dust Wave keep going.
+    heading: You showed up -- and that matters.
+    thanks: Thanks for coming to %{event}. Seriously.
+    gathering: A roomful of people choosing to experience weird, handmade, independent work together -- that’s the whole point.
+    mission_link_intro: Every ticket and RSVP helps
+    mission_link_tail: keep going.
+    mission_fallback: We make films, put on screenings, and try to clear a little more room for ambitious work outside the usual industry machinery. We’re proud practitioners of DIY -- but even **DIY ain't cheap.** Just by showing up, you helped.
+    project_fallback_name: the project page
+    support_heading: Want to help keep this thing going?
+    support_body: Movies cost money. So do rooms, equipment, insurance, crew meals, and the thousand unglamorous things between “what if?” and “we made it.”
+    support_ways_intro: "There’s not one right way to help (but here are some suggestions):"
+    shop_link: Pick up something from the %{company} Shop
+    project_link: Back an active project on %{platform}
+    direct_link: Support %{company} directly below
+    support_ways_close: Any of it helps us stay independent and keep making ambitious work with people we believe in.
+    one_time_label: Pitch in once
+    one_time_detail: Give whatever amount feels right. It isn’t tied to a specific campaign; it helps with whatever comes next.
+    one_time_cta: Support once
+    monthly_label: Keep it going each month
+    monthly_detail: Monthly support helps with the unglamorous stuff and gives the next strange idea a little room to become real.
+    monthly_cta: Support monthly
+    support_disclosure: Support payments are processed by Stripe and are not tax-deductible charitable contributions.
+    newsletter_heading: Money not in the cards right now? No sweat.
+    newsletter_body: The newsletter is where we share new films, screenings, behind-the-scenes experiments, and assorted Dust Wave shenanigans.
+    newsletter_cta: Keep up with the shenanigans
+    single_message: This is the only post-event email we will send you about %{event}.
+    commercial_disclosure: This message includes optional ways to financially support %{company}.
+    unsubscribe: Opt out of optional Store emails
   store_order_lookup:
     heading: Find your order
     body_one: Here is your secure link to view your %{platform} order. It works for 15 minutes.

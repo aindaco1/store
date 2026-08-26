@@ -7,7 +7,7 @@ Since `v1.0.4`, Store order receipts live fully in this path: Stripe PaymentInte
 ## Senders
 
 - Order and lookup emails use `ORDERS_EMAIL_FROM`.
-- Admin access, abandoned checkout, and event reminder emails use `UPDATES_EMAIL_FROM` with `ORDERS_EMAIL_FROM` as fallback.
+- Admin access, abandoned checkout, event reminder, and post-event emails use `UPDATES_EMAIL_FROM` with `ORDERS_EMAIL_FROM` as fallback.
 - Replies default to `SUPPORT_EMAIL`.
 
 ## Email Types
@@ -91,9 +91,40 @@ The cron handler processes due reminders and retries failures with bounded backo
 
 Cron status and recent errors are visible in **Settings -> Store readiness** and through the authenticated cron/observability endpoints.
 
+### Post-event thank-you and support
+
+Ticket and RSVP products can opt into one commercial follow-up after the configured event end. The default delay is 24 hours. The dashboard **Products** editor writes an explicit setting:
+
+```yaml
+event_details:
+  ends_at: "2026-08-22T15:00:00-06:00"
+  followup:
+    enabled: true
+```
+
+New event-product forms default this control to **Yes**. Existing products without `event_details.followup.enabled: true` remain disabled, preventing a deployment from retroactively emailing past audiences.
+
+The audience contract is:
+
+- Confirmed, fulfillment-ready first-party purchasers only.
+- Ticket and RSVP line items for the selected product only.
+- One message per normalized email address, even when that address placed multiple orders or bought multiple tickets.
+- Snipcart imports, launch-test items, invalid addresses, bounce/complaint suppressions, explicit promotional opt-outs, and already-processed recipients are excluded.
+- No attendee names, registration answers, order tokens, or private fulfillment links appear in the message.
+
+The message thanks the purchaser for showing up, explains how attendance supports the configured organization and mission, and offers several non-exclusive ways to help: shop for merchandise, back an active project, use the one-time or monthly direct-support links, or separately opt into the newsletter. The logo and organization name use `organization_url`; merchandise uses `shop_url`; and the reusable project destination uses `project_support_url` plus `project_support_name`. Direct-support cards use a two-column presentation-table layout on desktop and stack through a small email-safe media query on narrow screens. Because the message asks for financial support, it also includes the configured physical postal address, support-payment disclosure, a visible opt-out, and one-click `List-Unsubscribe` headers.
+
+Configuration lives under `email.event_followup` in `_config.yml` and is mirrored to Worker variables by `scripts/sync-worker-config.rb`. Forks should replace the mission, postal address, organization/shop/project destinations, support URLs/amounts, and newsletter URL with their own settings. A short mission phrase wrapped in `**double asterisks**` renders as safely escaped bold text. Store's current sender is configured as `Dust Wave Shop` through `platform.updates_email_from`.
+
+Automatic candidates use `store-event-followup:v1:*`, `store-event-followup-sent:v1:*`, and `store-event-followup-queue:v1`. The final email uses the shared durable outbox kind `store_event_followup`, keyed by event product, hashed normalized address, and copy version.
+
+For an elapsed event or other reviewed backfill, super admins use **Orders -> Post-event thank-you email**. Preview forces a fresh order scan and shows the exact rendered email, unique recipient list/count, duplicate collapse, exclusions, current configuration readiness, and a fingerprint. Queueing requires that unchanged fingerprint, unchanged count, an eligible event time, complete configuration, an untruncated scan, a confirmation dialog, and the exact acknowledgement `QUEUE EVENT FOLLOW-UP`. Previewing never queues or sends email.
+
+The opt-out endpoint accepts browser GET and one-click POST requests. It writes a durable `promotional-email-suppression:v1:<email-hash>` preference and suppresses current and future optional/promotional Store email. The preference does not expire automatically and must be restored before optional email processing resumes. It does not suppress receipts, tickets, security messages, order lookup, or essential fulfillment updates.
+
 ## Durable Delivery
 
-Production order confirmations, event reminders, and opted-in abandoned-checkout reminders use the shared KV outbox when `EMAIL_OUTBOX_ENABLED=true`. The order or reminder state is committed first; email delivery is an independently retryable side effect.
+Production order confirmations, event reminders, post-event follow-ups, and opted-in abandoned-checkout reminders use the shared KV outbox when `EMAIL_OUTBOX_ENABLED=true`. The order or reminder state is committed first; email delivery is an independently retryable side effect.
 
 Local `./scripts/dev.sh` checkout keeps `EMAIL_OUTBOX_ENABLED=false` in the generated `env.dev` settings because Wrangler does not run Cron Triggers automatically. Customer order confirmations therefore send immediately in the Worker's background task when `RESEND_API_KEY` is configured, while the order remains authoritative if delivery fails. Set `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` in `worker/.dev.vars` when local QA should render and record the message without calling Resend. Production continues to use the durable outbox and scheduled retry path.
 
@@ -138,6 +169,7 @@ Unit coverage includes:
 - Order confirmation email payloads and attachment passthrough.
 - Super-admin order notification payloads.
 - Event reminder email payloads.
+- Post-event email rendering, timing, audience deduplication, suppression, and durable delivery.
 - Event order attachment generation.
 - Reminder queue creation and due reminder delivery.
 - Order lookup delivery.
@@ -145,7 +177,7 @@ Unit coverage includes:
 Run the focused suite with:
 
 ```sh
-npm run test:unit -- tests/unit/email-store.test.ts tests/unit/event-reminders.test.ts tests/unit/order-lookup-email.test.ts
+npm run test:unit -- tests/unit/email-store.test.ts tests/unit/event-reminders.test.ts tests/unit/event-followup-audience.test.ts tests/unit/email-outbox.test.ts tests/unit/order-lookup-email.test.ts
 ```
 
 For release payment evidence, run the target Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The Worker records email delivery markers without calling Resend, and `npm run release:payment-smoke -- --direct-webhook` verifies customer/admin order emails would render for the local signed-webhook matrix.

@@ -70,6 +70,7 @@ Use stable question IDs after publication. The dashboard enforces this by preser
 - Checkout places **Contact** before **RSVP details** and sends response values to the Worker. The Worker resolves the current product definition, enforces the open/deadline window and party size, rejects unknown choices, and stores canonical question snapshots with the order.
 - Free RSVPs continue to confirm without Stripe. Paid RSVP configurations, if used, retain the existing PaymentIntent and inventory lifecycle.
 - The private order page shows the submitted attendee roster and responses. Customer email lists attendee names but omits custom answers.
+- An RSVP product can explicitly enable the one-time post-event purchaser email under `event_details.followup.enabled`. It targets the confirmed order email, not attendee addresses or registration answers, and remains disabled for legacy products until an admin opts in.
 - Admin Orders supports attendee search, per-attendee check-in, partial attendance totals, response review, and one-row-per-attendee CSV export. Desktop response/action content is constrained to its table column, while tablet/mobile rows use the existing card layout. Older item-level check-ins remain readable and mutable.
 - A direct-linked cart that predates the registration schema can repair the non-sensitive schema from the current product page. Names and answers remain memory-only, and the Worker still performs the authoritative validation.
 
@@ -88,7 +89,7 @@ The following are not shipped in v1.2.0:
 - Customer self-service edits, substitutions, or cancellations.
 - Capacity-aware waitlists or automatic promotion.
 - Invite-only household links, invitation imports, or explicit yes/no/maybe responses.
-- Event-wide guest messaging beyond the existing confirmed-order reminder workflow.
+- Event-wide guest messaging beyond confirmed-order reminders and the single explicitly enabled post-event purchaser email.
 - Camera scanning, offline door mode, walk-in registration, or event-scoped door-staff roles.
 - Recurring event series, reusable event templates, or cross-event guest profiles.
 

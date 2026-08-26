@@ -26,6 +26,7 @@ const REQUIRED_DYNAMIC_STORAGE_PREFIXES = [
   'email-outbox-queue:v1',
   'email-delivery:v1:',
   'email-suppression:v1:',
+  'promotional-email-suppression:v1:',
   'resend-webhook:v1:',
   'workers-cache-purge-failure:recent',
   'cron:'
