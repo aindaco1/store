@@ -174,6 +174,34 @@ describe('Store durable Resend email outbox', () => {
     });
   });
 
+  it('retries an untyped provider-stage failure within the idempotency window', async () => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    const queued = await enqueueEmailOutbox(env, {
+      kind: 'store_order',
+      dedupeKey: 'provider-stage-retry',
+      orderToken: 'store-order-one',
+      payload: orderPayload()
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      get ok() { throw new Error('Provider transport result unavailable'); }
+    })));
+
+    const result = await processEmailOutbox(env, { now: new Date('2027-07-13T12:00:00Z') });
+
+    expect(result).toMatchObject({ sent: 0, retried: 1, failed: 0 });
+    expect(await kv.get(`${EMAIL_OUTBOX_PREFIX}${queued.jobId}`, { type: 'json' })).toMatchObject({
+      status: 'retry',
+      attempts: 1,
+      lastError: {
+        type: 'Error',
+        statusCode: 0,
+        stage: 'provider'
+      }
+    });
+    expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${queued.jobId}`)).toBeNull();
+  });
+
   it.each([
     ['store_abandoned_cart', { email: 'buyer@example.com', resumeUrl: 'https://shop.test/cart', unsubscribeUrl: 'https://shop.test/unsubscribe' }],
     ['store_event_reminder', { email: 'buyer@example.com', orderToken: 'store-order-one', item: { name: 'Event' } }],

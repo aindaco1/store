@@ -23,6 +23,8 @@
   screens.
 - Added automatic audience, timing-lock, unsaved-preview, localization,
   deduplication, desktop, mobile, and navigation-state regression coverage.
+- Kept untyped provider-stage outbox failures retryable inside Resend's
+  deterministic idempotency window instead of terminally dropping the job.
 
 ## v1.3.0 - 2026-08-26
 
