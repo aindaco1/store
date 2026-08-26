@@ -68,8 +68,7 @@
   var storeOrderLoadTimer = null;
   var storeOrderRenderTimer = null;
   var storeOrderLoadRequestCounter = 0;
-  var storeEventFollowupProductsLoaded = false;
-  var storeEventFollowupPreview = null;
+  var storeEventFollowupPreviewTimer = null;
   var adminFieldIdCounter = 0;
   var storeProductDescriptionEditorCounter = 0;
   var storeProductDescriptionUploadCounter = 0;
@@ -1030,7 +1029,6 @@
       loadStoreMarketingData();
     }
     if (key === 'store-orders' && !storeOrdersLoaded) loadStoreOrders();
-    if (key === 'store-orders' && currentUser && currentUser.role === 'super_admin') loadStoreEventFollowupProducts();
     if (key === 'store-products' && !storeProductsLoaded) loadStoreProducts();
     if (key === 'store-coupons' && !storeCouponsLoaded) loadStoreCoupons();
     if (key === 'store-downloads' && !storeDownloadsLoaded) loadStoreDownloads();
@@ -1701,7 +1699,7 @@
     label.textContent = row.label || row.path || 'Setting';
     header.appendChild(label);
     var body = createElement('div', 'admin-settings__row-body');
-    if (row.input === 'plan-usage' || row.input === 'store-readiness' || row.input === 'workers-cache-controls' || row.input === 'admin-session-review' || row.input === 'admin-audit-review' || row.input === 'performance-observability') {
+    if (row.input === 'plan-usage' || row.input === 'store-readiness' || row.input === 'workers-cache-controls' || row.input === 'admin-session-review' || row.input === 'admin-audit-review' || row.input === 'performance-observability' || row.input === 'event-followup-preview') {
       wrapper.classList.add('admin-settings__row--custom');
       if (row.hideLabel) wrapper.classList.add('admin-settings__row--hide-label');
       var customControl = row.input === 'plan-usage'
@@ -1714,7 +1712,9 @@
               ? createAdminAuditReview()
               : row.input === 'performance-observability'
                 ? createPerformanceObservability()
-                : createWorkersCacheControls();
+                : row.input === 'event-followup-preview'
+                  ? createStoreEventFollowupSettingsPreview()
+                  : createWorkersCacheControls();
       body.appendChild(customControl);
       if (!row.hideLabel) wrapper.appendChild(header);
       wrapper.appendChild(body);
@@ -1929,7 +1929,7 @@
       currentSettingsSection = Math.min(currentSettingsSection, Math.max(0, settingsSections.length - 1));
       settingOriginalValues.clear();
       renderSettingsTabs();
-      selectSettingsSection(currentSettingsSection);
+      selectSettingsSection(currentSettingsSection, { persist: false });
       hydrateStoreMarketingDefaults(marketingSettingsSection);
       setStatus(status, '');
     }).catch(function(error) {
@@ -2692,6 +2692,165 @@
     return root;
   }
 
+  function storeEventFollowupDraftSettings(root) {
+    var fields = {
+      mission: 'email.event_followup.mission',
+      postalAddress: 'email.event_followup.postal_address',
+      organizationUrl: 'email.event_followup.organization_url',
+      shopUrl: 'email.event_followup.shop_url',
+      projectSupportUrl: 'email.event_followup.project_support_url',
+      projectSupportName: 'email.event_followup.project_support_name',
+      oneTimeSupportUrl: 'email.event_followup.support_one_time_url',
+      oneTimeSuggestedAmountUsd: 'email.event_followup.support_one_time_suggested_usd',
+      monthlySupportUrl: 'email.event_followup.support_monthly_url',
+      monthlyAmountUsd: 'email.event_followup.support_monthly_usd',
+      newsletterUrl: 'email.event_followup.newsletter_url'
+    };
+    return Object.keys(fields).reduce(function(settings, key) {
+      var control = $('[data-settings-path="' + fields[key] + '"]', root);
+      settings[key] = control ? (control.type === 'number' ? Number(control.value || 0) : control.value) : '';
+      return settings;
+    }, {});
+  }
+
+  function createStoreEventFollowupSettingsPreview() {
+    var root = createElement('section', 'admin-event-followup-preview admin-store-products__preview admin-section-panel');
+    root.dataset.eventFollowupSettingsPreview = 'true';
+    var header = createElement('div', 'admin-store-products__preview-header');
+    var copy = document.createElement('div');
+    copy.appendChild(createElement('h3', 'admin-card-heading', currentLang.indexOf('es') === 0 ? 'Vista previa del correo' : 'Email preview'));
+    copy.appendChild(createElement('p', 'admin-app__muted', currentLang.indexOf('es') === 0
+      ? 'Usa los valores sin publicar de arriba. Cambia el evento y el idioma para revisar ambas versiones.'
+      : 'Uses the unpublished values above. Change the sample event and language to review both versions.'));
+    header.appendChild(copy);
+    var controls = createElement('div', 'admin-settings__actions');
+    var product = document.createElement('select');
+    product.className = 'admin-settings__input';
+    product.dataset.eventFollowupPreviewProduct = 'true';
+    product.setAttribute('aria-label', currentLang.indexOf('es') === 0 ? 'Evento de muestra' : 'Sample event');
+    var language = document.createElement('select');
+    language.className = 'admin-settings__input';
+    language.dataset.eventFollowupPreviewLanguage = 'true';
+    language.setAttribute('aria-label', currentLang.indexOf('es') === 0 ? 'Idioma del correo' : 'Email language');
+    [['en', 'English'], ['es', 'Español']].forEach(function(pair) {
+      var option = document.createElement('option');
+      option.value = pair[0];
+      option.textContent = pair[1];
+      language.appendChild(option);
+    });
+    language.value = currentLang.indexOf('es') === 0 ? 'es' : 'en';
+    var refresh = createElement('button', 'btn btn--secondary btn--small', currentLang.indexOf('es') === 0 ? 'Actualizar' : 'Refresh');
+    refresh.type = 'button';
+    refresh.dataset.eventFollowupPreviewRefresh = 'true';
+    controls.appendChild(product);
+    controls.appendChild(language);
+    controls.appendChild(refresh);
+    header.appendChild(controls);
+    var meta = createElement('p', 'admin-app__muted admin-event-followup-preview__meta', '');
+    meta.dataset.eventFollowupPreviewMeta = 'true';
+    var frame = document.createElement('iframe');
+    frame.className = 'admin-event-followup-preview__frame';
+    frame.title = currentLang.indexOf('es') === 0 ? 'Vista previa del correo posterior al evento' : 'Post-event email preview';
+    frame.setAttribute('sandbox', '');
+    frame.dataset.eventFollowupPreviewFrame = 'true';
+    var status = createElement('p', 'admin-dashboard__status admin-store-products__preview-status', '');
+    status.dataset.eventFollowupPreviewStatus = 'true';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    root.appendChild(header);
+    root.appendChild(meta);
+    root.appendChild(frame);
+    root.appendChild(status);
+    [product, language].forEach(function(control) {
+      control.addEventListener('change', function() { refreshStoreEventFollowupSettingsPreview(root); });
+    });
+    refresh.addEventListener('click', function() { refreshStoreEventFollowupSettingsPreview(root); });
+    return root;
+  }
+
+  function scheduleStoreEventFollowupSettingsPreview(root) {
+    if (!root) return;
+    if (storeEventFollowupPreviewTimer) window.clearTimeout(storeEventFollowupPreviewTimer);
+    storeEventFollowupPreviewTimer = window.setTimeout(function() {
+      storeEventFollowupPreviewTimer = null;
+      refreshStoreEventFollowupSettingsPreview(root);
+    }, 350);
+  }
+
+  function refreshStoreEventFollowupSettingsPreview(root) {
+    var product = $('[data-event-followup-preview-product]', root);
+    var language = $('[data-event-followup-preview-language]', root);
+    var frame = $('[data-event-followup-preview-frame]', root);
+    var meta = $('[data-event-followup-preview-meta]', root);
+    var status = $('[data-event-followup-preview-status]', root);
+    var refresh = $('[data-event-followup-preview-refresh]', root);
+    if (!product || !product.value) return Promise.resolve(null);
+    if (refresh) refresh.disabled = true;
+    setStatus(status, currentLang.indexOf('es') === 0 ? 'Actualizando vista previa...' : 'Refreshing preview...');
+    return requestJson('/admin/store/marketing/event-followup/preview', {
+      method: 'POST',
+      body: {
+        productId: product.value,
+        preferredLang: language ? language.value : 'en',
+        settings: storeEventFollowupDraftSettings(root.closest('[data-settings-section-panel]') || document)
+      }
+    }).then(function(data) {
+      var preview = data.preview || {};
+      if (frame) frame.srcdoc = String(preview.html || '');
+      if (meta) meta.textContent = [preview.from || '', preview.subject || '', preview.copyVersion || ''].filter(Boolean).join(' · ');
+      setStatus(status, preview.configurationReady
+        ? (currentLang.indexOf('es') === 0 ? 'Vista previa actualizada.' : 'Preview updated.')
+        : (currentLang.indexOf('es') === 0 ? 'Vista previa actualizada. La configuración de envío todavía está incompleta.' : 'Preview updated. Sending configuration is still incomplete.'), !preview.configurationReady);
+      return data;
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+      return null;
+    }).finally(function() {
+      if (refresh) refresh.disabled = false;
+    });
+  }
+
+  function loadStoreEventFollowupSettingsPreview(root) {
+    var product = $('[data-event-followup-preview-product]', root);
+    var status = $('[data-event-followup-preview-status]', root);
+    if (!product || root.dataset.eventFollowupPreviewLoaded === 'true') return;
+    root.dataset.eventFollowupPreviewLoaded = 'true';
+    setStatus(status, currentLang.indexOf('es') === 0 ? 'Cargando eventos...' : 'Loading events...');
+    requestJson('/admin/store/marketing/event-followup/products').then(function(data) {
+      var products = (data.products || []).filter(function(item) {
+        return ['ticket', 'rsvp'].includes(String(item.fulfillmentType || '').toLowerCase());
+      }).sort(function(a, b) {
+        return (Date.parse(b.eventEndsAt || '') || 0) - (Date.parse(a.eventEndsAt || '') || 0);
+      });
+      product.textContent = '';
+      products.forEach(function(item) {
+        var option = document.createElement('option');
+        option.value = item.productId;
+        option.textContent = [item.name || item.productId, item.eventEndsAt ? formatDate(item.eventEndsAt) : ''].filter(Boolean).join(' · ');
+        product.appendChild(option);
+      });
+      if (!products.length) {
+        var empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = currentLang.indexOf('es') === 0 ? 'No hay eventos disponibles' : 'No events available';
+        product.appendChild(empty);
+        setStatus(status, empty.textContent, true);
+        return;
+      }
+      var section = root.closest('[data-settings-section-panel]');
+      if (section) {
+        section.addEventListener('input', function(event) {
+          if (event.target && event.target.matches('[data-settings-path^="email.event_followup."]')) {
+            scheduleStoreEventFollowupSettingsPreview(root);
+          }
+        });
+      }
+      refreshStoreEventFollowupSettingsPreview(root);
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+    });
+  }
+
   function createWorkersCacheControls() {
     var root = createElement('div', 'admin-workers-cache-controls');
     root.dataset.workersCacheControls = 'true';
@@ -2743,6 +2902,9 @@
     });
     $all('[data-performance-observability]', root).forEach(function(tracker) {
       loadPerformanceObservability(tracker);
+    });
+    $all('[data-event-followup-settings-preview]', root).forEach(function(preview) {
+      loadStoreEventFollowupSettingsPreview(preview);
     });
   }
 
@@ -4225,185 +4387,6 @@
     });
   }
 
-  function resetStoreEventFollowupPreview() {
-    storeEventFollowupPreview = null;
-    var summary = $('#admin-store-event-followup-summary');
-    var recipients = $('#admin-store-event-followup-recipients');
-    var recipientList = $('#admin-store-event-followup-recipient-list');
-    var emailPreview = $('#admin-store-event-followup-email-preview');
-    var frame = $('#admin-store-event-followup-email-frame');
-    var queueControls = $('#admin-store-event-followup-queue-controls');
-    var acknowledgement = $('#admin-store-event-followup-ack');
-    var queueButton = $('#admin-store-event-followup-queue');
-    if (summary) summary.textContent = '';
-    if (recipients) recipients.hidden = true;
-    if (recipientList) recipientList.textContent = '';
-    if (emailPreview) emailPreview.hidden = true;
-    if (frame) frame.srcdoc = '';
-    if (queueControls) queueControls.hidden = true;
-    if (acknowledgement) acknowledgement.value = '';
-    if (queueButton) queueButton.disabled = true;
-  }
-
-  function loadStoreEventFollowupProducts(force) {
-    if (!currentUser || currentUser.role !== 'super_admin') return Promise.resolve(null);
-    if (storeEventFollowupProductsLoaded && !force) return Promise.resolve(null);
-    var select = $('#admin-store-event-followup-product');
-    var status = $('#admin-store-event-followup-status');
-    if (!select) return Promise.resolve(null);
-    setStatus(status, localizedAdminText('eventFollowupLoadingProducts'));
-    return requestJson('/admin/store/marketing/event-followup/products').then(function(data) {
-      var previous = select.value;
-      var products = (data.products || []).filter(function(product) {
-        var type = String(product.fulfillmentType || '').toLowerCase();
-        return (type === 'ticket' || type === 'rsvp') && product.eventEndsAt;
-      }).sort(function(a, b) {
-        return (Date.parse(b.eventEndsAt || '') || 0) - (Date.parse(a.eventEndsAt || '') || 0);
-      });
-      select.textContent = '';
-      var placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = localizedAdminText('eventFollowupChooseProduct');
-      select.appendChild(placeholder);
-      products.forEach(function(product) {
-        var option = document.createElement('option');
-        option.value = product.productId;
-        option.textContent = [
-          product.name || product.productId,
-          product.eventEndsAt ? formatDate(product.eventEndsAt) : '',
-          localizedAdminText(product.eventFollowupEnabled ? 'eventFollowupEnabled' : 'eventFollowupDisabled')
-        ].filter(Boolean).join(' · ');
-        select.appendChild(option);
-      });
-      if (previous && products.some(function(product) { return product.productId === previous; })) select.value = previous;
-      storeEventFollowupProductsLoaded = true;
-      setStatus(status, products.length ? '' : localizedAdminText('eventFollowupNoProducts'));
-      return data;
-    }).catch(function(error) {
-      setStatus(status, formatError(error), true);
-      return null;
-    });
-  }
-
-  function renderStoreEventFollowupPreview(data) {
-    storeEventFollowupPreview = data;
-    var audience = data.audience || {};
-    var exclusions = audience.exclusions || {};
-    var product = data.product || {};
-    var preview = data.preview || {};
-    var summary = $('#admin-store-event-followup-summary');
-    var recipientDetails = $('#admin-store-event-followup-recipients');
-    var recipientList = $('#admin-store-event-followup-recipient-list');
-    var emailPreview = $('#admin-store-event-followup-email-preview');
-    var emailMeta = $('#admin-store-event-followup-email-meta');
-    var frame = $('#admin-store-event-followup-email-frame');
-    var queueControls = $('#admin-store-event-followup-queue-controls');
-    if (summary) {
-      summary.textContent = [
-        localizedAdminText('eventFollowupAudienceSummary', {
-          recipients: audience.eligibleRecipientCount || 0,
-          orders: audience.matchingOrders || 0,
-          spots: audience.matchingTicketQuantity || 0,
-          duplicates: audience.duplicatePurchasersCollapsed || 0,
-          imported: exclusions.importedOrders || 0,
-          suppressed: exclusions.suppressedRecipients || 0,
-          processed: exclusions.alreadyProcessedRecipients || 0
-        }),
-        product.eligibleNow
-          ? localizedAdminText('eventFollowupEligibleNow')
-          : localizedAdminText('eventFollowupEligibleAt', { date: formatDate(product.eligibleAt) }),
-        localizedAdminText(preview.configurationReady ? 'eventFollowupConfigurationReady' : 'eventFollowupConfigurationIncomplete')
-      ].join(' · ');
-    }
-    if (recipientList) {
-      recipientList.textContent = '';
-      (audience.recipients || []).forEach(function(recipient) {
-        var recipientSummary = localizedAdminText('eventFollowupRecipientSummary', {
-          email: recipient.email,
-          spots: recipient.ticketQuantity || 0,
-          orders: recipient.orderCount || 0
-        });
-        recipientList.appendChild(createElement('li', '', recipientSummary));
-      });
-    }
-    if (recipientDetails) recipientDetails.hidden = !(audience.recipients || []).length;
-    if (emailMeta) emailMeta.textContent = localizedAdminText('eventFollowupEmailMeta', {
-      from: preview.from || '',
-      subject: preview.subject || '',
-      copy: preview.copyVersion || ''
-    });
-    if (frame) frame.srcdoc = String(preview.html || '');
-    if (emailPreview) emailPreview.hidden = !preview.html;
-    var canQueue = Boolean(
-      product.eligibleNow &&
-      preview.configurationReady &&
-      Number(audience.eligibleRecipientCount || 0) > 0 &&
-      !(data.scan && data.scan.truncated)
-    );
-    if (queueControls) queueControls.hidden = !canQueue;
-    var acknowledgement = $('#admin-store-event-followup-ack');
-    var queueButton = $('#admin-store-event-followup-queue');
-    if (acknowledgement) acknowledgement.value = '';
-    if (queueButton) queueButton.disabled = true;
-  }
-
-  function previewStoreEventFollowup() {
-    var select = $('#admin-store-event-followup-product');
-    var button = $('#admin-store-event-followup-preview');
-    var status = $('#admin-store-event-followup-status');
-    var productId = String(select && select.value || '').trim();
-    if (!productId) {
-      setStatus(status, localizedAdminText('eventFollowupChooseFirst'), true);
-      return;
-    }
-    resetStoreEventFollowupPreview();
-    if (button) button.disabled = true;
-    setStatus(status, localizedAdminText('eventFollowupScanning'));
-    requestJson('/admin/store/marketing/event-followup/preview', {
-      params: { productId: productId }
-    }).then(function(data) {
-      renderStoreEventFollowupPreview(data);
-      setStatus(status, localizedAdminText('eventFollowupPreviewReady'));
-    }).catch(function(error) {
-      setStatus(status, formatError(error), true);
-    }).finally(function() {
-      if (button) button.disabled = false;
-    });
-  }
-
-  function queueStoreEventFollowup() {
-    var data = storeEventFollowupPreview;
-    var status = $('#admin-store-event-followup-status');
-    var button = $('#admin-store-event-followup-queue');
-    var acknowledgement = $('#admin-store-event-followup-ack');
-    if (!data || !data.preview || !data.product) {
-      setStatus(status, localizedAdminText('eventFollowupRefreshBeforeQueue'), true);
-      return;
-    }
-    var count = Number(data.audience && data.audience.eligibleRecipientCount || 0);
-    if (!window.confirm(localizedAdminText('eventFollowupConfirmQueue', {
-      count: count,
-      event: data.product.name || data.product.productId
-    }))) return;
-    if (button) button.disabled = true;
-    setStatus(status, localizedAdminText('eventFollowupRechecking'));
-    requestJson('/admin/store/marketing/event-followup/queue', {
-      method: 'POST',
-      body: {
-        productId: data.product.productId,
-        previewDigest: data.preview.digest,
-        expectedRecipientCount: count,
-        acknowledgement: acknowledgement ? acknowledgement.value : ''
-      }
-    }).then(function(result) {
-      setStatus(status, result.message || localizedAdminText('eventFollowupQueued'));
-      resetStoreEventFollowupPreview();
-    }).catch(function(error) {
-      setStatus(status, formatError(error), true);
-      if (button) button.disabled = false;
-    });
-  }
-
   function setupStoreOrdersEvents() {
     setupStoreOrdersFieldHelp();
     var refresh = $('#admin-store-orders-refresh');
@@ -4411,18 +4394,6 @@
       refresh.addEventListener('click', function() {
         loadStoreOrders({ force: true });
       });
-    }
-    var followupProduct = $('#admin-store-event-followup-product');
-    if (followupProduct) followupProduct.addEventListener('change', resetStoreEventFollowupPreview);
-    var followupPreview = $('#admin-store-event-followup-preview');
-    if (followupPreview) followupPreview.addEventListener('click', previewStoreEventFollowup);
-    var followupAcknowledgement = $('#admin-store-event-followup-ack');
-    var followupQueue = $('#admin-store-event-followup-queue');
-    if (followupAcknowledgement && followupQueue) {
-      followupAcknowledgement.addEventListener('input', function() {
-        followupQueue.disabled = followupAcknowledgement.value.trim() !== 'QUEUE EVENT FOLLOW-UP';
-      });
-      followupQueue.addEventListener('click', queueStoreEventFollowup);
     }
     var filters = $('#admin-store-order-filters');
     if (filters) {
@@ -4800,7 +4771,7 @@
     downloadFileKey: 'Existing download file delivered after checkout for digital products.',
     eventStartsAt: 'Event start date and time used for tickets, product pages, and calendar files.',
     eventEndsAt: 'Optional event end date and time used by calendar files when present.',
-    eventFollowupEnabled: 'Sends one optional thank-you and support email 24 hours after the event ends. Existing products stay off until explicitly enabled.',
+    eventFollowupEnabled: 'Sends one deduplicated thank-you and support email after the configured delay. Confirmed purchasers from before activation are included automatically when the scheduled time arrives.',
     eventVenue: 'Public venue name shown on event products, confirmations, and tickets.',
     eventAddress: 'Optional event address shown on the product page and embedded in calendar files.',
     eventIcs: 'Adds an iCalendar file link to event order confirmations when a start time is set.',
@@ -8159,8 +8130,14 @@
     }));
     eventDetails.appendChild(productField('Starts at', 'eventStartsAt', product.eventStartsAt || product.eventDetails?.startsAt || '', 'datetime-local'));
     eventDetails.appendChild(productField('Ends at', 'eventEndsAt', product.eventEndsAt || product.eventDetails?.endsAt || '', 'datetime-local'));
+    var eventFollowupLocked = product.eventFollowupLocked === true;
     eventDetails.appendChild(productField('Post-event email', 'eventFollowupEnabled', product.eventFollowupEnabled ? 'true' : 'false', 'select', {
-      options: [['true', 'Yes — send after 24 hours'], ['false', 'No']]
+      options: [['true', 'Yes — send automatically'], ['false', 'No']],
+      disabled: eventFollowupLocked,
+      locked: eventFollowupLocked,
+      note: eventFollowupLocked
+        ? 'Locked after the scheduled send time' + (product.eventFollowupScheduledAt ? ' (' + formatDate(product.eventFollowupScheduledAt) + ')' : '') + '.'
+        : ''
     }));
     eventDetails.appendChild(productField('Venue', 'eventVenue', product.eventVenue || product.eventDetails?.venue || '', 'text'));
     eventDetails.appendChild(createStoreProductEventAddressField(product));
@@ -8255,7 +8232,7 @@
     var wrapper = $('[data-store-product-field-wrapper="' + field + '"]', form);
     var control = $('[data-store-product-field="' + field + '"]', form);
     if (wrapper) wrapper.hidden = !visible;
-    if (control) control.disabled = !visible;
+    if (control) control.disabled = !visible || control.dataset.storeProductLocked === 'true';
   }
 
   function syncStoreProductVariantInventoryVisible(form, visible) {
@@ -8362,10 +8339,13 @@
     }
     if (opts.required) input.required = true;
     if (opts.maxLength) input.maxLength = opts.maxLength;
+    if (opts.disabled) input.disabled = true;
+    if (opts.locked) input.dataset.storeProductLocked = 'true';
     input.className = 'admin-settings__input';
     input.dataset.storeProductField = field;
     label.appendChild(createStoreProductFieldLabel(labelText, field, input, opts.noHelp ? false : opts.help));
     label.appendChild(input);
+    if (opts.note) label.appendChild(createElement('small', 'admin-app__muted admin-store-products__field-note', opts.note));
     return label;
   }
 
@@ -8988,7 +8968,6 @@
   function refreshStoreProductsAfterDeployment(deployment, options) {
     var opts = options || {};
     var operation = normalizeStoreProductDeploymentOperation(opts.operation);
-    storeEventFollowupProductsLoaded = false;
     return loadStoreProducts().finally(function() {
       if (!deployment) {
         setStatus($('#admin-store-products-status'), opts.fallbackMessage || 'Product changes published.');

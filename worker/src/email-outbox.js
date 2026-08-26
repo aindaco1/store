@@ -218,8 +218,11 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
         if (!job.contentHash) job.providerPayload = null;
       }
       const firstAttemptMs = Date.parse(job.firstAttemptAt || '');
-      const ambiguityExpired = error?.ambiguous && Number.isFinite(firstAttemptMs) && now.getTime() - firstAttemptMs > RESEND_IDEMPOTENCY_RETRY_WINDOW_MS;
-      const retryable = error?.retryable === true || failedBeforeProvider;
+      const providerOutcomeUnknown = deliveryStage === 'provider' && !(Number(error?.statusCode || 0) > 0);
+      const ambiguityExpired = (error?.ambiguous || providerOutcomeUnknown) &&
+        Number.isFinite(firstAttemptMs) &&
+        now.getTime() - firstAttemptMs > RESEND_IDEMPOTENCY_RETRY_WINDOW_MS;
+      const retryable = error?.retryable === true || failedBeforeProvider || providerOutcomeUnknown;
       if (!retryable || ambiguityExpired) {
         await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({
           version: 1, status: ambiguityExpired ? 'ambiguous' : 'failed', kind: job.kind, orderToken: job.orderToken,

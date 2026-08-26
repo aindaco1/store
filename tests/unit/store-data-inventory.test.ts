@@ -17,6 +17,7 @@ describe('Store data inventory coverage', () => {
       'stripe-event:',
       'store-order-admin-email-sent:',
       'admin-store-marketing-draft:builder',
+      'store-event-followup-reconciled:v1:',
       'store-event-address-lookup:'
     ]));
   });

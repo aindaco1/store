@@ -30,9 +30,8 @@
  *   GET  /admin/store/analytics  - Read Store order analytics
  *   GET  /admin/store/marketing/abandoned-checkout/health - Read checkout reminder health
  *   POST /admin/store/marketing/abandoned-checkout/suppression - Suppress checkout reminders
- *   GET  /admin/store/marketing/event-followup/products - List event products available for follow-up review
- *   GET  /admin/store/marketing/event-followup/preview - Preview an event follow-up and fresh audience
- *   POST /admin/store/marketing/event-followup/queue - Queue an approved event follow-up audience
+ *   GET  /admin/store/marketing/event-followup/products - List event products available for settings preview
+ *   POST /admin/store/marketing/event-followup/preview - Preview an event follow-up from draft settings
  *   GET  /admin/store/orders     - Read Store order fulfillment rows
  *   GET  /admin/store/orders/download-abuse - Read aggregate signed-download abuse diagnostics
  *   GET  /admin/store/orders.csv - Download Store order fulfillment CSV
@@ -392,13 +391,13 @@ const STORE_EVENT_REMINDER_OFFSETS = [
 ];
 const STORE_EVENT_FOLLOWUP_PREFIX = 'store-event-followup:v1:';
 const STORE_EVENT_FOLLOWUP_SENT_PREFIX = 'store-event-followup-sent:v1:';
+const STORE_EVENT_FOLLOWUP_RECONCILED_PREFIX = 'store-event-followup-reconciled:v1:';
 const STORE_EVENT_FOLLOWUP_QUEUE_STATE_KEY = 'store-event-followup-queue:v1';
 const STORE_EVENT_FOLLOWUP_TTL_SECONDS = 400 * 24 * 60 * 60;
 const STORE_EVENT_FOLLOWUP_DEFAULT_DELAY_HOURS = 24;
 const STORE_EVENT_FOLLOWUP_DEFAULT_BATCH_SIZE = 20;
 const STORE_EVENT_FOLLOWUP_TOKEN_SCOPE_UNSUBSCRIBE = 'store-event-followup-unsubscribe';
 const STORE_EVENT_FOLLOWUP_COPY_VERSION = 'store-event-followup-v2';
-const STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT = 'QUEUE EVENT FOLLOW-UP';
 const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 const ADMIN_STORE_PRODUCT_STATUSES = new Set(['active', 'draft', 'archived', 'sold_out']);
 const ADMIN_STORE_TAX_CATEGORIES = new Set(['admission', 'digital', 'exempt', 'standard']);
@@ -3187,11 +3186,7 @@ export default {
         return handleAdminStoreEventFollowupProducts(request, env);
       }
 
-      if (path === '/admin/store/marketing/event-followup/preview' && method === 'GET') {
-        return handleAdminStoreEventFollowupPreview(request, env, ctx);
-      }
-
-      if (path === '/admin/store/marketing/event-followup/queue' && method === 'POST') {
+      if (path === '/admin/store/marketing/event-followup/preview' && method === 'POST') {
         const parsedBody = await parseJsonRequestBody(request, env, {
           maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
           privateResponse: true,
@@ -3200,7 +3195,7 @@ export default {
         if (!parsedBody.ok) return parsedBody.response;
         const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rl.allowed) return rl.response;
-        return handleAdminStoreEventFollowupQueue(request, env, parsedBody.body || {}, ctx);
+        return handleAdminStoreEventFollowupPreview(request, env, parsedBody.body || {});
       }
 
       if (path === '/admin/store/marketing/abandoned-checkout/suppression' && method === 'POST') {
@@ -3598,11 +3593,15 @@ export default {
     }
 
     try {
+      const eventFollowupReconciliation = await reconcileStoreEventFollowupAudiences(env, now);
       const eventFollowupResults = await processStoreEventFollowups(env, now);
-      if (env.STORE_STATE && eventFollowupResults.attempted) {
+      if (env.STORE_STATE && (eventFollowupReconciliation.attempted || eventFollowupResults.attempted)) {
         await env.STORE_STATE.put('cron:lastEventFollowupRun', now.toISOString(), { expirationTtl: 172800 });
       }
-      console.log('Store event follow-up cron complete:', eventFollowupResults);
+      console.log('Store event follow-up cron complete:', {
+        reconciliation: eventFollowupReconciliation,
+        delivery: eventFollowupResults
+      });
     } catch (err) {
       console.error('Store event follow-up cron failed:', err);
       if (env.STORE_STATE) {
@@ -4428,6 +4427,17 @@ function storeEventFollowupEnabled(eventDetails = null) {
   return followup?.enabled === true;
 }
 
+function storeEventFollowupEnabledAt(eventDetails = null) {
+  if (!eventDetails || typeof eventDetails !== 'object') return '';
+  const followup = eventDetails.followup && typeof eventDetails.followup === 'object'
+    ? eventDetails.followup
+    : eventDetails.follow_up && typeof eventDetails.follow_up === 'object'
+      ? eventDetails.follow_up
+      : null;
+  const value = String(followup?.enabled_at || followup?.enabledAt || '').trim();
+  return Number.isFinite(parseTimestampMs(value)) ? new Date(parseTimestampMs(value)).toISOString() : '';
+}
+
 function getStoreEventFollowupDelayMs(env = {}) {
   const hours = Number(env.EVENT_FOLLOWUP_DELAY_HOURS || STORE_EVENT_FOLLOWUP_DEFAULT_DELAY_HOURS);
   const normalized = Number.isFinite(hours) ? Math.max(1, Math.min(24 * 30, hours)) : STORE_EVENT_FOLLOWUP_DEFAULT_DELAY_HOURS;
@@ -4437,6 +4447,21 @@ function getStoreEventFollowupDelayMs(env = {}) {
 function getStoreEventFollowupBatchSize(env = {}) {
   const raw = Number.parseInt(String(env.STORE_EVENT_FOLLOWUP_BATCH_SIZE || ''), 10);
   return Math.max(1, Math.min(100, Number.isFinite(raw) ? raw : STORE_EVENT_FOLLOWUP_DEFAULT_BATCH_SIZE));
+}
+
+function getStoreEventFollowupScheduledAt(env = {}, eventDetails = null) {
+  const event = summarizeStoreEventDetails(eventDetails);
+  const endsAtMs = parseTimestampMs(event?.endsAt);
+  return Number.isFinite(endsAtMs)
+    ? new Date(endsAtMs + getStoreEventFollowupDelayMs(env)).toISOString()
+    : '';
+}
+
+function storeEventFollowupEnabledBeforeScheduledSend(env = {}, eventDetails = null) {
+  if (!storeEventFollowupEnabled(eventDetails)) return false;
+  const enabledAtMs = parseTimestampMs(storeEventFollowupEnabledAt(eventDetails));
+  const scheduledAtMs = parseTimestampMs(getStoreEventFollowupScheduledAt(env, eventDetails));
+  return Number.isFinite(enabledAtMs) && Number.isFinite(scheduledAtMs) && enabledAtMs < scheduledAtMs;
 }
 
 function getStoreEventFollowupLanguageSelectionTime(order = {}) {
@@ -4492,6 +4517,11 @@ function getStoreEventFollowupSentKey(productId, emailHash) {
   return `${STORE_EVENT_FOLLOWUP_SENT_PREFIX}${getStoreEventFollowupIdentity(productId)}:${String(emailHash || '').trim().toLowerCase()}`;
 }
 
+function getStoreEventFollowupReconciledKey(productId, scheduledAt = '') {
+  const scheduledMs = parseTimestampMs(scheduledAt) || 0;
+  return `${STORE_EVENT_FOLLOWUP_RECONCILED_PREFIX}${getStoreEventFollowupIdentity(productId)}:${String(scheduledMs).padStart(13, '0')}`;
+}
+
 async function writeStoreEventFollowupQueueState(env, hasPending, nextDueAt = '') {
   if (!env?.STORE_STATE?.put) return;
   await env.STORE_STATE.put(STORE_EVENT_FOLLOWUP_QUEUE_STATE_KEY, JSON.stringify({
@@ -4516,7 +4546,11 @@ async function buildStoreEventFollowupRecords(storedOrder = {}, now = new Date()
   const nowMs = now instanceof Date && Number.isFinite(now.getTime()) ? now.getTime() : Date.now();
   const recordsByEvent = new Map();
   for (const item of items) {
-    if (!isStoreTicketLikeItem(item) || item.launchTest === true || !storeEventFollowupEnabled(item.eventDetails)) continue;
+    if (
+      !isStoreTicketLikeItem(item) ||
+      item.launchTest === true ||
+      !storeEventFollowupEnabledBeforeScheduledSend(env, item.eventDetails)
+    ) continue;
     const productId = String(item.productId || '').trim();
     const event = summarizeStoreEventDetails(item.eventDetails);
     const endsAtMs = parseTimestampMs(event?.endsAt);
@@ -4628,6 +4662,87 @@ function getCurrentStoreEventFollowupProduct(env, productId) {
   return catalog.productById.get(String(productId || '').trim()) || null;
 }
 
+async function reconcileStoreEventFollowupAudiences(env, now = new Date()) {
+  const results = {
+    attempted: false,
+    eligibleProducts: 0,
+    reconciledProducts: 0,
+    queued: 0,
+    skipped: 0,
+    failed: 0
+  };
+  if (!env?.STORE_STATE?.get || !env?.STORE_STATE?.put) return { ...results, skippedReason: 'storage_not_configured' };
+
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  const candidates = (catalog.products || []).filter((product) => {
+    const fulfillmentType = String(product?.fulfillment_type || product?.type || '').trim().toLowerCase();
+    const scheduledAtMs = parseTimestampMs(getStoreEventFollowupScheduledAt(env, product?.event_details));
+    return isAdminStoreEventFulfillmentType(fulfillmentType) &&
+      product?.launch_test !== true &&
+      storeEventFollowupEnabledBeforeScheduledSend(env, product?.event_details) &&
+      Number.isFinite(scheduledAtMs) &&
+      scheduledAtMs <= now.getTime();
+  });
+  results.eligibleProducts = candidates.length;
+  results.attempted = candidates.length > 0;
+
+  for (const product of candidates) {
+    const productId = String(product.id || '').trim();
+    const scheduledAt = getStoreEventFollowupScheduledAt(env, product.event_details);
+    const markerKey = getStoreEventFollowupReconciledKey(productId, scheduledAt);
+    if (await env.STORE_STATE.get(markerKey)) {
+      results.skipped += 1;
+      continue;
+    }
+    try {
+      const built = await buildAdminStoreEventFollowupAudience(env, productId, { forceScan: true, now });
+      if (!built.ok) throw new Error(built.error || 'Unable to build the post-event audience.');
+      if (built.scan.truncated) throw new Error('The Store order scan was truncated.');
+      const records = built.audience.recipients.map((recipient) => ({
+        version: 1,
+        status: 'pending',
+        copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+        automaticReconciliation: true,
+        productId: built.product.productId,
+        eventTitle: built.product.name,
+        endsAt: built.product.endsAt,
+        email: recipient.email,
+        emailHash: recipient.emailHash,
+        preferredLang: recipient.preferredLang || DEFAULT_I18N_LANG,
+        preferredLangSelectedAt: recipient.preferredLangSelectedAt || '',
+        orderToken: recipient.orderTokens[0] || '',
+        orderTokens: recipient.orderTokens,
+        orderCount: recipient.orderCount,
+        ticketQuantity: recipient.ticketQuantity,
+        sendAfter: now.toISOString(),
+        createdAt: now.toISOString(),
+        attempts: 0,
+        lastError: ''
+      }));
+      const queued = await queueStoreEventFollowupRecords(env, records);
+      await env.STORE_STATE.put(markerKey, JSON.stringify({
+        version: 1,
+        productId,
+        scheduledAt,
+        reconciledAt: now.toISOString(),
+        recipientCount: built.audience.eligibleRecipientCount,
+        queuedCount: queued.queued,
+        skippedCount: queued.skipped
+      }), { expirationTtl: STORE_EVENT_FOLLOWUP_TTL_SECONDS });
+      results.reconciledProducts += 1;
+      results.queued += queued.queued;
+      results.skipped += queued.skipped;
+    } catch (error) {
+      results.failed += 1;
+      console.error('Store event follow-up audience reconciliation failed:', {
+        productId,
+        error: error?.message || String(error)
+      });
+    }
+  }
+  return results;
+}
+
 async function processStoreEventFollowups(env, now = new Date()) {
   const empty = { attempted: false, sent: 0, skipped: 0, suppressed: 0, failed: 0, checked: 0 };
   if (!env?.STORE_STATE?.list) return { ...empty, skippedReason: 'storage_not_configured' };
@@ -4669,7 +4784,18 @@ async function processStoreEventFollowups(env, now = new Date()) {
       continue;
     }
     const currentProduct = getCurrentStoreEventFollowupProduct(env, record.productId);
-    if (!currentProduct || currentProduct.launch_test === true || !storeEventFollowupEnabled(currentProduct.event_details)) {
+    const manualBackfill = record.manualBackfill === true;
+    const currentScheduledAt = getStoreEventFollowupScheduledAt(env, currentProduct?.event_details);
+    const recordScheduledAt = Number.isFinite(parseTimestampMs(record.endsAt))
+      ? new Date(parseTimestampMs(record.endsAt) + getStoreEventFollowupDelayMs(env)).toISOString()
+      : '';
+    if (
+      !currentProduct ||
+      currentProduct.launch_test === true ||
+      !storeEventFollowupEnabled(currentProduct.event_details) ||
+      (!manualBackfill && !storeEventFollowupEnabledBeforeScheduledSend(env, currentProduct.event_details)) ||
+      (!manualBackfill && currentScheduledAt !== recordScheduledAt)
+    ) {
       await env.STORE_STATE.delete(key);
       results.skipped += 1;
       continue;
@@ -8894,6 +9020,7 @@ function adminStoreEventDetailsSummary(source = {}) {
     ticketDelivery: String(event.ticket_delivery || event.ticketDelivery || '').trim(),
     ics: event.ics !== false,
     followupEnabled: event.followupEnabled === true || storeEventFollowupEnabled(event),
+    followupEnabledAt: String(event.followupEnabledAt || storeEventFollowupEnabledAt(event)).trim(),
     registration: normalizedRegistration.configured && normalizedRegistration.errors.length === 0
       ? normalizedRegistration.config
       : null
@@ -8921,7 +9048,7 @@ function buildAdminStoreEditableVariant(variant = {}, overrides = {}, productId 
   };
 }
 
-function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
+function buildAdminStoreEditableProduct(product = {}, overrides = {}, env = {}) {
   const productId = String(product?.id || '').trim();
   const slug = String(product?.slug || '').trim();
   const variants = Array.isArray(product?.variants) ? product.variants : [];
@@ -8969,6 +9096,10 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     eventAddress: eventDetails.address,
     eventIcs: eventDetails.ics,
     eventFollowupEnabled: eventDetails.followupEnabled === true,
+    eventFollowupEnabledAt: eventDetails.followupEnabledAt,
+    eventFollowupScheduledAt: getStoreEventFollowupScheduledAt(env, product?.event_details),
+    eventFollowupLocked: Number.isFinite(parseTimestampMs(getStoreEventFollowupScheduledAt(env, product?.event_details))) &&
+      parseTimestampMs(getStoreEventFollowupScheduledAt(env, product?.event_details)) <= Date.now(),
     rsvpRegistrationEnabled: Boolean(eventDetails.registration),
     rsvpRegistrationOpensAt: eventDetails.registration?.opensAt || '',
     rsvpRegistrationClosesAt: eventDetails.registration?.closesAt || '',
@@ -9209,6 +9340,7 @@ function serializeAdminStoreEventDetailsYaml(eventDetails = {}) {
   yamlAdminMaybeLine(lines, 'ics', event.ics, '  ');
   lines.push('  followup:');
   lines.push(`    enabled: ${event.followupEnabled === true ? 'true' : 'false'}`);
+  if (event.followupEnabledAt) lines.push(`    enabled_at: ${yamlAdminValue(event.followupEnabledAt, 'string')}`);
   if (event.registration) {
     const registration = event.registration;
     lines.push('  registration:');
@@ -9580,6 +9712,8 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
       changedFields.push('eventDetails');
     }
   } else if (eventFieldsSubmitted || product?.event_details) {
+    const originalScheduledAt = getStoreEventFollowupScheduledAt(env, product?.event_details);
+    const originalScheduledAtMs = parseTimestampMs(originalScheduledAt);
     const eventDetails = adminStoreEventDetailsSummary(product);
     const updateEventString = (fieldKey, prop, label, max = 240) => {
       if (!hasAdminStoreProductPatchField(fields, fieldKey)) return;
@@ -9598,8 +9732,32 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     }
     if (hasAdminStoreProductPatchField(fields, 'eventFollowupEnabled')) {
       const normalized = normalizeAdminStoreBooleanField(fields.eventFollowupEnabled, 'Post-event follow-up');
-      if (normalized.ok) eventDetails.followupEnabled = normalized.value;
-      else errors.push(normalized.error);
+      if (normalized.ok) {
+        const previousEnabled = eventDetails.followupEnabled === true;
+        const scheduledAt = getStoreEventFollowupScheduledAt(env, {
+          ends_at: eventDetails.endsAt
+        });
+        const scheduledAtMs = parseTimestampMs(scheduledAt);
+        const lockedScheduledAt = Number.isFinite(originalScheduledAtMs) && originalScheduledAtMs <= Date.now()
+          ? originalScheduledAt
+          : scheduledAt;
+        if (
+          intent !== 'preview' &&
+          normalized.value !== previousEnabled &&
+          (
+            (Number.isFinite(originalScheduledAtMs) && originalScheduledAtMs <= Date.now()) ||
+            (Number.isFinite(scheduledAtMs) && scheduledAtMs <= Date.now())
+          )
+        ) {
+          errors.push(`Post-event follow-up is locked because its scheduled send time was ${lockedScheduledAt}.`);
+        } else if (intent !== 'preview' && normalized.value === true && !Number.isFinite(scheduledAtMs)) {
+          errors.push('Post-event follow-up needs a valid event end date and time.');
+        } else {
+          eventDetails.followupEnabled = normalized.value;
+          if (normalized.value && !previousEnabled) eventDetails.followupEnabledAt = new Date().toISOString();
+          if (!normalized.value) eventDetails.followupEnabledAt = '';
+        }
+      } else errors.push(normalized.error);
     }
     if (nextFulfillmentType !== 'rsvp') {
       eventDetails.registration = null;
@@ -10294,7 +10452,10 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
       eventDetails.ics = fields.eventIcs === true || String(fields.eventIcs || '').trim().toLowerCase() === 'true';
     }
     if (hasAdminStoreProductPatchField(fields, 'eventFollowupEnabled')) {
+      const previousEnabled = eventDetails.followupEnabled === true;
       eventDetails.followupEnabled = fields.eventFollowupEnabled === true || String(fields.eventFollowupEnabled || '').trim().toLowerCase() === 'true';
+      if (eventDetails.followupEnabled && !previousEnabled) eventDetails.followupEnabledAt = new Date().toISOString();
+      if (!eventDetails.followupEnabled) eventDetails.followupEnabledAt = '';
     }
     const rsvpProduct = String(preview.fulfillment_type || preview.type || '').trim().toLowerCase() === 'rsvp';
     let registrationEnabled = rsvpProduct && Boolean(eventDetails.registration);
@@ -10345,7 +10506,10 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
       address: eventDetails.address,
       ticket_delivery: eventDetails.ticketDelivery,
       ics: eventDetails.ics,
-      followup: { enabled: eventDetails.followupEnabled === true },
+      followup: {
+        enabled: eventDetails.followupEnabled === true,
+        ...(eventDetails.followupEnabledAt ? { enabled_at: eventDetails.followupEnabledAt } : {})
+      },
       ...(eventDetails.registration ? { registration: eventDetails.registration } : {})
     };
   }
@@ -10511,7 +10675,7 @@ async function buildAdminStoreProductsSnapshot(env) {
   const effectiveCatalog = normalizeStoreCatalogSnapshot(effectiveSnapshot);
   const catalogProducts = [...(baseCatalog.products || [])].sort(compareAdminStoreProducts);
   const rows = [];
-  const products = catalogProducts.map((product) => buildAdminStoreEditableProduct(product, overrides));
+  const products = catalogProducts.map((product) => buildAdminStoreEditableProduct(product, overrides, env));
   const productCount = catalogProducts.length;
   let variantRowCount = 0;
 
@@ -12424,7 +12588,7 @@ function normalizeAdminStoreEventFollowupProductId(value) {
   return /^[a-z0-9][a-z0-9._-]{0,119}$/i.test(productId) ? productId : '';
 }
 
-async function buildAdminStoreEventFollowupAudience(env, productId, { ctx = null } = {}) {
+async function buildAdminStoreEventFollowupAudience(env, productId, { ctx = null, forceScan = true, now = new Date() } = {}) {
   const normalizedProductId = normalizeAdminStoreEventFollowupProductId(productId);
   if (!normalizedProductId) return { ok: false, status: 400, error: 'Choose a valid event product.' };
   const product = getCurrentStoreEventFollowupProduct(env, normalizedProductId);
@@ -12443,7 +12607,7 @@ async function buildAdminStoreEventFollowupAudience(env, productId, { ctx = null
     return { ok: false, status: 409, error: 'Launch-test products cannot queue customer post-event email.' };
   }
 
-  const scanned = await readAdminStoreOrderScan(env, { force: true, ctx });
+  const scanned = await readAdminStoreOrderScan(env, { force: forceScan === true, ctx });
   if (!scanned.ok) return { ok: false, status: scanned.status || 503, error: scanned.error || 'Unable to read Store orders.' };
   const grouped = new Map();
   const exclusions = {
@@ -12552,7 +12716,7 @@ async function buildAdminStoreEventFollowupAudience(env, productId, { ctx = null
       fulfillmentType,
       endsAt: event.endsAt,
       eligibleAt,
-      eligibleNow: Date.now() >= Date.parse(eligibleAt)
+      eligibleNow: now.getTime() >= Date.parse(eligibleAt)
     },
     audience: {
       matchingOrders,
@@ -12611,7 +12775,10 @@ async function handleAdminStoreEventFollowupProducts(request, env) {
       status: String(product.status || ''),
       fulfillmentType,
       eventEndsAt: event.endsAt,
+      eventFollowupScheduledAt: getStoreEventFollowupScheduledAt(env, product.event_details),
       eventFollowupEnabled: storeEventFollowupEnabled(product.event_details),
+      eventFollowupLocked: Number.isFinite(parseTimestampMs(getStoreEventFollowupScheduledAt(env, product.event_details))) &&
+        parseTimestampMs(getStoreEventFollowupScheduledAt(env, product.event_details)) <= Date.now(),
       launchTest: product.launch_test === true
     }];
   });
@@ -12623,107 +12790,75 @@ async function handleAdminStoreEventFollowupProducts(request, env) {
   }, 200, env);
 }
 
-async function handleAdminStoreEventFollowupPreview(request, env, ctx = null) {
-  const auth = await requireSuperAdminEventFollowup(request, env);
-  if (!auth.ok) return auth.response;
-  const productId = new URL(request.url).searchParams.get('productId');
-  const built = await buildAdminStoreEventFollowupAudience(env, productId, { ctx });
-  if (!built.ok) return privateJsonResponse({ success: false, error: built.error }, built.status || 422, env);
-  return privateJsonResponse({
-    success: true,
-    scope: STORE_ADMIN_SCOPE,
-    ...built,
-    queueAcknowledgement: STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT,
-    writeBudget: adminReadBudget({
-      kvReadsExpected: Number(built.scan.scanned || 0) + Number(built.audience.uniquePurchasersBeforeSuppression || 0) * 2,
-      kvListExpected: 1
-    })
-  }, 200, env);
+function normalizeAdminStoreEventFollowupPreviewSettings(env, draft = {}) {
+  const defaults = getStoreEventFollowupSettings(env);
+  const text = (key, fallback, max = 2000) => String(draft?.[key] ?? fallback ?? '').trim().slice(0, max);
+  const url = (key, fallback) => {
+    const value = text(key, fallback, 2048);
+    if (!value) return '';
+    try {
+      const parsed = new URL(value);
+      return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : '';
+    } catch {
+      return '';
+    }
+  };
+  const amount = (key, fallback) => Math.max(0, Math.min(1000000, Number(draft?.[key] ?? fallback) || 0));
+  return {
+    mission: text('mission', defaults.mission),
+    postalAddress: text('postalAddress', defaults.postalAddress, 500),
+    organizationUrl: url('organizationUrl', defaults.organizationUrl),
+    shopUrl: url('shopUrl', defaults.shopUrl),
+    projectSupportUrl: url('projectSupportUrl', defaults.projectSupportUrl),
+    projectSupportName: text('projectSupportName', defaults.projectSupportName, 160),
+    oneTimeSupportUrl: url('oneTimeSupportUrl', defaults.oneTimeSupportUrl),
+    monthlySupportUrl: url('monthlySupportUrl', defaults.monthlySupportUrl),
+    newsletterUrl: url('newsletterUrl', defaults.newsletterUrl),
+    oneTimeSuggestedAmountUsd: amount('oneTimeSuggestedAmountUsd', defaults.oneTimeSuggestedAmountUsd),
+    monthlyAmountUsd: amount('monthlyAmountUsd', defaults.monthlyAmountUsd)
+  };
 }
 
-async function handleAdminStoreEventFollowupQueue(request, env, body = {}, ctx = null) {
+async function handleAdminStoreEventFollowupPreview(request, env, body = {}) {
   const auth = await requireSuperAdminEventFollowup(request, env, { requireCsrf: true });
   if (!auth.ok) return auth.response;
-  if (String(body.acknowledgement || '').trim() !== STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT) {
-    return privateJsonResponse({ error: `Type ${STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT} to queue this audience.` }, 422, env);
+  const productId = normalizeAdminStoreEventFollowupProductId(body.productId);
+  const product = getCurrentStoreEventFollowupProduct(env, productId);
+  if (!product) return privateJsonResponse({ success: false, error: 'Choose a valid event product.' }, 404, env);
+  const fulfillmentType = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
+  if (!isAdminStoreEventFulfillmentType(fulfillmentType)) {
+    return privateJsonResponse({ success: false, error: 'Choose a ticket or RSVP product.' }, 422, env);
   }
-  const built = await buildAdminStoreEventFollowupAudience(env, body.productId, { ctx });
-  if (!built.ok) return privateJsonResponse({ success: false, error: built.error }, built.status || 422, env);
-  if (built.scan.truncated) {
-    return privateJsonResponse({ error: 'The fresh order scan was truncated; queueing is blocked.' }, 409, env);
-  }
-  if (!built.product.eligibleNow) {
-    return privateJsonResponse({ error: `This event is not eligible until ${built.product.eligibleAt}.` }, 409, env);
-  }
-  if (!built.preview.configurationReady) {
-    return privateJsonResponse({ error: 'Post-event email settings, postal address, support links, or unsubscribe signing are incomplete.' }, 409, env);
-  }
-  const expectedCount = Number(body.expectedRecipientCount);
-  if (
-    String(body.previewDigest || '').trim() !== built.preview.digest ||
-    !Number.isInteger(expectedCount) ||
-    expectedCount !== built.audience.eligibleRecipientCount
-  ) {
-    return privateJsonResponse({
-      error: 'The audience or email configuration changed. Refresh the preview before queueing.',
-      currentDigest: built.preview.digest,
-      currentRecipientCount: built.audience.eligibleRecipientCount
-    }, 409, env);
-  }
-  if (!built.audience.recipients.length) {
-    return privateJsonResponse({ error: 'There are no eligible recipients to queue.' }, 409, env);
-  }
-  const now = new Date();
-  const records = built.audience.recipients.map((recipient) => ({
-    version: 1,
-    status: 'pending',
-    copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
-    manualBackfill: true,
-    productId: built.product.productId,
-    eventTitle: built.product.name,
-    endsAt: built.product.endsAt,
-    email: recipient.email,
-    emailHash: recipient.emailHash,
-    preferredLang: recipient.preferredLang || DEFAULT_I18N_LANG,
-    preferredLangSelectedAt: recipient.preferredLangSelectedAt || '',
-    orderToken: recipient.orderTokens[0] || '',
-    orderTokens: recipient.orderTokens,
-    orderCount: recipient.orderCount,
-    ticketQuantity: recipient.ticketQuantity,
-    sendAfter: now.toISOString(),
-    createdAt: now.toISOString(),
-    attempts: 0,
-    lastError: ''
-  }));
-  const queued = await queueStoreEventFollowupRecords(env, records);
-  const auditKey = await recordAdminAuditEvent(env, {
-    action: 'store_event_followup:queue',
-    adminEmail: auth.user.email,
-    adminRole: auth.user.role,
-    productId: built.product.productId,
-    copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
-    previewDigest: built.preview.digest,
-    recipientCount: built.audience.eligibleRecipientCount,
-    queuedCount: queued.queued,
-    skippedCount: queued.skipped
+  const settings = normalizeAdminStoreEventFollowupPreviewSettings(env, body.settings);
+  const message = await buildStoreEventFollowupEmailMessage(env, {
+    email: 'preview@example.invalid',
+    eventTitle: String(product.name || productId || 'Store event').trim(),
+    preferredLang: normalizePreferredLang(body.preferredLang),
+    unsubscribeUrl: getStoreEventFollowupUnsubscribeUrl(env, 'recipient-specific-token'),
+    ...settings
   });
   return privateJsonResponse({
     success: true,
-    productId: built.product.productId,
-    previewDigest: built.preview.digest,
-    recipientCount: built.audience.eligibleRecipientCount,
-    queuedCount: queued.queued,
-    skippedCount: queued.skipped,
-    nextDueAt: queued.nextDueAt,
-    auditKey,
-    message: `Queued ${queued.queued} deduplicated post-event email${queued.queued === 1 ? '' : 's'}.`,
-    writeBudget: adminWriteBudget({
-      readOnly: false,
-      kvReadsExpected: Number(built.scan.scanned || 0) + Number(built.audience.uniquePurchasersBeforeSuppression || 0) * 2,
-      kvWritesExpected: queued.queued + (auditKey ? 1 : 0) + 1,
-      kvListExpected: 1
-    })
-  }, 202, env);
+    scope: STORE_ADMIN_SCOPE,
+    product: {
+      productId,
+      name: String(product.name || productId),
+      fulfillmentType
+    },
+    preview: {
+      copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+      from: message.from,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+      configurationReady: message.valid && Boolean(
+        settings.postalAddress &&
+        (settings.oneTimeSupportUrl || settings.monthlySupportUrl) &&
+        getAbandonedCartTokenSecret(env)
+      )
+    },
+    writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
 }
 
 function incrementStoreAnalyticsBreakdown(map, key, quantity = 1, revenueCents = 0) {
@@ -16224,17 +16359,17 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['description', { label: 'Site description', input: 'textarea' }],
   ['platform.orders_email_from', { label: 'Orders email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
   ['platform.updates_email_from', { label: 'Updates email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
-  ['email.event_followup.delay_hours', { label: 'Post-event delay hours', type: 'number', input: 'integer', min: 1, max: 720, step: 1, layoutGroup: 'event-followup-timing', help: 'Delay after the configured event end before the one-time follow-up is eligible to send.' }],
+  ['email.event_followup.delay_hours', { label: 'Post-event delay hours', type: 'number', input: 'integer', min: 1, max: 720, step: 1, layoutGroup: 'event-followup-timing-compliance', help: 'Delay after the configured event end before the one-time follow-up is eligible to send.' }],
   ['email.event_followup.mission', { label: 'Post-event mission statement', input: 'textarea', help: 'Brand mission used in the thank-you email. Keep it concise and reusable across events; wrap a short phrase in **double asterisks** for bold emphasis.' }],
-  ['email.event_followup.postal_address', { label: 'Commercial email postal address', input: 'textarea', help: 'Physical postal address shown in the footer of the post-event commercial email.' }],
+  ['email.event_followup.postal_address', { label: 'Commercial email postal address', input: 'textarea', layoutGroup: 'event-followup-timing-compliance', help: 'Physical postal address shown in the footer of the post-event commercial email.' }],
   ['email.event_followup.organization_url', { label: 'Organization URL', input: 'url', layoutGroup: 'event-followup-brand-links', help: 'Public organization site used by the post-event logo and organization-name link.' }],
   ['email.event_followup.shop_url', { label: 'Merch shop URL', input: 'url', layoutGroup: 'event-followup-brand-links' }],
   ['email.event_followup.project_support_url', { label: 'Project-support URL', input: 'url', layoutGroup: 'event-followup-project-link' }],
   ['email.event_followup.project_support_name', { label: 'Project-support name', layoutGroup: 'event-followup-project-link' }],
-  ['email.event_followup.support_one_time_url', { label: 'One-time support URL', input: 'url', layoutGroup: 'event-followup-support-links' }],
-  ['email.event_followup.support_one_time_suggested_usd', { label: 'Suggested one-time support (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-support-amounts' }],
-  ['email.event_followup.support_monthly_url', { label: 'Monthly support URL', input: 'url', layoutGroup: 'event-followup-support-links' }],
-  ['email.event_followup.support_monthly_usd', { label: 'Monthly support amount (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-support-amounts' }],
+  ['email.event_followup.support_one_time_url', { label: 'One-time support URL', input: 'url', layoutGroup: 'event-followup-one-time' }],
+  ['email.event_followup.support_one_time_suggested_usd', { label: 'Suggested one-time support (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-one-time' }],
+  ['email.event_followup.support_monthly_url', { label: 'Monthly support URL', input: 'url', layoutGroup: 'event-followup-monthly' }],
+  ['email.event_followup.support_monthly_usd', { label: 'Monthly support amount (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-monthly' }],
   ['email.event_followup.newsletter_url', { label: 'Newsletter opt-in URL', input: 'url', help: 'Separate opt-in destination for recipients who are not ready to provide financial support.' }],
   ['platform.logo_path', { label: 'Logo', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site header and platform emails. Upload a square PNG, JPEG, or WebP under 512 KB, or paste an existing asset path.' }],
   ['platform.footer_logo_path', { label: 'Footer logo', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site footer. Upload an image or paste an existing asset path.' }],
@@ -17098,8 +17233,8 @@ async function handleAdminSettings(request, env) {
       ]),
       adminSettingsSection('Post-event email', [
         ['Post-event delay hours', Number(env.EVENT_FOLLOWUP_DELAY_HOURS || 24), editableAdminSetting('email.event_followup.delay_hours', 'number')],
-        ['Post-event mission statement', env.EVENT_FOLLOWUP_MISSION || '', editableAdminSetting('email.event_followup.mission')],
         ['Commercial email postal address', env.EVENT_FOLLOWUP_POSTAL_ADDRESS || '', editableAdminSetting('email.event_followup.postal_address')],
+        ['Post-event mission statement', env.EVENT_FOLLOWUP_MISSION || '', editableAdminSetting('email.event_followup.mission')],
         ['Organization URL', env.EVENT_FOLLOWUP_ORGANIZATION_URL || '', editableAdminSetting('email.event_followup.organization_url')],
         ['Merch shop URL', env.EVENT_FOLLOWUP_SHOP_URL || env.SITE_BASE || '', editableAdminSetting('email.event_followup.shop_url')],
         ['Project-support URL', env.EVENT_FOLLOWUP_PROJECT_SUPPORT_URL || '', editableAdminSetting('email.event_followup.project_support_url')],
@@ -17108,7 +17243,8 @@ async function handleAdminSettings(request, env) {
         ['Suggested one-time support (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD || 10), editableAdminSetting('email.event_followup.support_one_time_suggested_usd', 'number')],
         ['Monthly support URL', env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL || '', editableAdminSetting('email.event_followup.support_monthly_url')],
         ['Monthly support amount (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD || 5), editableAdminSetting('email.event_followup.support_monthly_usd', 'number')],
-        ['Newsletter opt-in URL', env.EVENT_FOLLOWUP_NEWSLETTER_URL || '', editableAdminSetting('email.event_followup.newsletter_url')]
+        ['Newsletter opt-in URL', env.EVENT_FOLLOWUP_NEWSLETTER_URL || '', editableAdminSetting('email.event_followup.newsletter_url')],
+        ['Email preview', '', { input: 'event-followup-preview', hideLabel: true }]
       ]),
       adminSettingsSection('Brand & SEO', [
         ['Logo', platformLogoPath, editableAdminSetting('platform.logo_path')],
@@ -19105,6 +19241,7 @@ export {
   storeOrderReconciliationRowsCsv,
   processStoreEventReminders,
   processStoreEventFollowups,
+  reconcileStoreEventFollowupAudiences,
   queueStoreEventFollowups,
   queueStoreEventReminders,
   signStoreFulfillmentToken

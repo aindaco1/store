@@ -98,6 +98,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     storeMarketingAbandonedHealth: [],
     storeMarketingAbandonedSuppression: [],
     storeEventFollowupProducts: [],
+    storeEventFollowupPreviews: [],
     storeMarketingDrafts: [],
     auditCsv: [],
     auditSearch: [],
@@ -304,6 +305,25 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
           eventFollowupEnabled: true,
           launchTest: false
         }],
+        writeBudget: { readOnly: true, kvWritesExpected: 0 }
+      });
+    }
+    if (url.pathname === '/admin/store/marketing/event-followup/preview' && method === 'POST') {
+      calls.storeEventFollowupPreviews.push(body);
+      return fulfillJson({
+        success: true,
+        scope: 'store',
+        product: { productId: body.productId, name: 'DUST WAVE Event Ticket', fulfillmentType: 'ticket' },
+        preview: {
+          copyVersion: 'store-event-followup-v2',
+          from: 'Dust Wave Shop <updates@dustwave.xyz>',
+          subject: body.preferredLang === 'es'
+            ? 'Gracias por acompañarnos en DUST WAVE Event Ticket | Dust Wave Shop'
+            : 'Thanks for showing up for DUST WAVE Event Ticket | Dust Wave Shop',
+          html: '<!doctype html><html><body><h1>You showed up -- and that matters.</h1></body></html>',
+          text: 'You showed up -- and that matters.',
+          configurationReady: true
+        },
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
       });
     }
@@ -843,6 +863,23 @@ function storeSettingsSections(lang = 'en') {
 		      settingsRow({ label: 'Add-on product count', value: '3', rawValue: 3, editable: true, path: 'add_ons.product_count', type: 'number', input: 'integer', min: 1, max: 5, step: 1, layoutGroup: 'platform-addons' }),
 		      settingsRow({ label: 'App mode', value: 'test' })
 		    ]
+  }, {
+    title: 'Post-event email',
+    rows: [
+      settingsRow({ label: 'Post-event delay hours', value: '24', rawValue: 24, editable: true, path: 'email.event_followup.delay_hours', type: 'number', input: 'integer', layoutGroup: 'event-followup-timing-compliance' }),
+      settingsRow({ label: 'Commercial email postal address', value: '709 Haines Avenue NW', rawValue: '709 Haines Avenue NW\nAlbuquerque, NM 87102', editable: true, path: 'email.event_followup.postal_address', type: 'string', input: 'textarea', layoutGroup: 'event-followup-timing-compliance' }),
+      settingsRow({ label: 'Post-event mission statement', value: 'Dust Wave makes independent film.', rawValue: 'Dust Wave makes independent film.', editable: true, path: 'email.event_followup.mission', type: 'string', input: 'textarea' }),
+      settingsRow({ label: 'Organization URL', value: 'https://dustwave.xyz', rawValue: 'https://dustwave.xyz', editable: true, path: 'email.event_followup.organization_url', type: 'string', input: 'url', layoutGroup: 'event-followup-brand-links' }),
+      settingsRow({ label: 'Merch shop URL', value: 'https://shop.dustwave.xyz', rawValue: 'https://shop.dustwave.xyz', editable: true, path: 'email.event_followup.shop_url', type: 'string', input: 'url', layoutGroup: 'event-followup-brand-links' }),
+      settingsRow({ label: 'Project-support URL', value: 'https://pool.dustwave.xyz', rawValue: 'https://pool.dustwave.xyz', editable: true, path: 'email.event_followup.project_support_url', type: 'string', input: 'url', layoutGroup: 'event-followup-project-link' }),
+      settingsRow({ label: 'Project-support name', value: 'The Pool', rawValue: 'The Pool', editable: true, path: 'email.event_followup.project_support_name', type: 'string', input: 'text', layoutGroup: 'event-followup-project-link' }),
+      settingsRow({ label: 'One-time support URL', value: 'https://buy.stripe.com/one-time', rawValue: 'https://buy.stripe.com/one-time', editable: true, path: 'email.event_followup.support_one_time_url', type: 'string', input: 'url', layoutGroup: 'event-followup-one-time' }),
+      settingsRow({ label: 'Suggested one-time support (USD)', value: '10', rawValue: 10, editable: true, path: 'email.event_followup.support_one_time_suggested_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-one-time' }),
+      settingsRow({ label: 'Monthly support URL', value: 'https://buy.stripe.com/monthly', rawValue: 'https://buy.stripe.com/monthly', editable: true, path: 'email.event_followup.support_monthly_url', type: 'string', input: 'url', layoutGroup: 'event-followup-monthly' }),
+      settingsRow({ label: 'Monthly support amount (USD)', value: '5', rawValue: 5, editable: true, path: 'email.event_followup.support_monthly_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-monthly' }),
+      settingsRow({ label: 'Newsletter opt-in URL', value: 'https://dustwave.xyz/newsletter.html', rawValue: 'https://dustwave.xyz/newsletter.html', editable: true, path: 'email.event_followup.newsletter_url', type: 'string', input: 'url' }),
+      settingsRow({ label: 'Email preview', value: '', rawValue: '', input: 'event-followup-preview', hideLabel: true })
+    ]
   }, {
     title: 'Brand & SEO',
     rows: [
@@ -1779,6 +1816,9 @@ function storeProductsPayload(productStatus = 'active', orderIds: string[] = [])
       inventory: 0,
       eventStartsAt: '2026-08-22T13:30:00-06:00',
       eventEndsAt: '2026-08-22T15:00:00-06:00',
+      eventFollowupEnabled: true,
+      eventFollowupScheduledAt: '2026-08-23T15:00:00-06:00',
+      eventFollowupLocked: true,
       eventVenue: 'Guild Cinema',
       eventAddress: '3405 Central Ave NE\nAlbuquerque, NM 87106',
       variantOptionName: 'Ticket Type',
@@ -2010,6 +2050,19 @@ test.describe('Admin Dashboard', () => {
 	    await expect(page.locator('[data-settings-path="platform.company_name"]')).toHaveValue('Dust Wave');
 	    await expect(page.locator('[data-settings-path="add_ons.enabled"]')).toHaveValue('true');
 	    await expect(page.locator('[data-settings-path="add_ons.product_count"]')).toHaveValue('3');
+
+    await selectSettingsSection(page, 'Post-event email');
+    const followupSettings = page.locator('[data-settings-section-panel="Post-event email"]');
+    await expect(followupSettings.locator('.admin-settings__field-grid')).toHaveCount(5);
+    await expect.poll(() => calls.storeEventFollowupProducts.length).toBe(1);
+    await expect.poll(() => calls.storeEventFollowupPreviews.length).toBeGreaterThanOrEqual(1);
+    await expect(followupSettings.locator('[data-event-followup-preview-product] option')).toHaveCount(1);
+    await expect(followupSettings.locator('[data-event-followup-preview-frame]')).toBeVisible();
+    await followupSettings.locator('[data-settings-path="email.event_followup.mission"]').fill('An unpublished mission draft.');
+    await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.mission).toBe('An unpublished mission draft.');
+    await followupSettings.locator('[data-event-followup-preview-language]').selectOption('es');
+    await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.preferredLang).toBe('es');
+    await expect(followupSettings.locator('[data-event-followup-preview-meta]')).toContainText('Gracias por acompañarnos');
 
     await selectSettingsSection(page, 'Brand & SEO');
     const brandPanel = page.locator('[data-settings-section-panel="Brand & SEO"]');
@@ -2309,8 +2362,7 @@ test.describe('Admin Dashboard', () => {
 
     await selectAdminSection(page, 'Orders');
     await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
-    await expect.poll(() => calls.storeEventFollowupProducts.length).toBe(1);
-    await expect(page.locator('#admin-store-event-followup-product option')).toHaveCount(2);
+    await expect(page.locator('#admin-store-event-followup')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'About Import Snipcart CSV' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Status' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
@@ -2624,6 +2676,14 @@ test.describe('Admin Dashboard', () => {
     await expect(productsResults.locator('.admin-store-products__editor-row')).toHaveAttribute('data-store-product-editor-row', 'ticket-1');
     await expect(ticketEditor.locator('[data-store-product-variants]')).toBeVisible();
     await expect(ticketEditor.locator('[data-store-product-field-wrapper="rsvpRegistrationEnabled"]')).toBeHidden();
+    const eventTimingFields = ticketEditor.locator('[data-store-product-field-wrapper="eventStartsAt"], [data-store-product-field-wrapper="eventEndsAt"], [data-store-product-field-wrapper="eventFollowupEnabled"]');
+    await expect(eventTimingFields).toHaveCount(3);
+    await expect.poll(() => eventTimingFields.evaluateAll((fields: HTMLElement[]) => {
+      const tops = fields.map((field) => Math.round(field.getBoundingClientRect().top));
+      return new Set(tops).size;
+    })).toBe(1);
+    await expect(ticketEditor.locator('[data-store-product-field="eventFollowupEnabled"]')).toBeDisabled();
+    await expect(ticketEditor.locator('[data-store-product-field-wrapper="eventFollowupEnabled"]')).toContainText('Locked after the scheduled send time');
     const eventAddress = ticketEditor.locator('[data-store-product-field="eventAddress"]');
     const findAddress = ticketEditor.getByRole('button', { name: 'Find address' });
     await expect(eventAddress).toHaveJSProperty('tagName', 'TEXTAREA');

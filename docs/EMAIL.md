@@ -100,9 +100,10 @@ event_details:
   ends_at: "2026-08-22T15:00:00-06:00"
   followup:
     enabled: true
+    enabled_at: "2026-08-01T18:00:00.000Z"
 ```
 
-New event-product forms default this control to **Yes**. Existing products without `event_details.followup.enabled: true` remain disabled, preventing a deployment from retroactively emailing past audiences.
+New event-product forms default this control to **Yes**. Publishing a transition from disabled to enabled records `enabled_at`. Existing products without `event_details.followup.enabled: true` remain disabled, and legacy enabled products without a valid `enabled_at` fail closed, preventing an upgrade from retroactively emailing past audiences. The product field becomes read-only after the scheduled send time, and the Worker rejects a stale attempt to change it after that cutoff.
 
 The audience contract is:
 
@@ -116,9 +117,11 @@ The message thanks the purchaser for showing up, explains how attendance support
 
 Configuration lives under `email.event_followup` in `_config.yml` and is mirrored to Worker variables by `scripts/sync-worker-config.rb`. Forks should replace the mission, postal address, organization/shop/project destinations, support URLs/amounts, and newsletter URL with their own settings. A short mission phrase wrapped in `**double asterisks**` renders as safely escaped bold text. Store's current sender is configured as `Dust Wave Shop` through `platform.updates_email_from`.
 
-Automatic candidates use `store-event-followup:v1:*`, `store-event-followup-sent:v1:*`, and `store-event-followup-queue:v1`. The final email uses the shared durable outbox kind `store_event_followup`, keyed by event product, hashed normalized address, and copy version.
+At the scheduled send time, the cron performs one automatic, bounded reconciliation of confirmed orders for each enabled event. This picks up purchasers who checked out before the feature was enabled, provided activation happened before the scheduled send time. Disabling before the cutoff prevents the send; re-enabling before the cutoff remains deduplicated. Enabling after the cutoff is blocked and never creates a historical send.
 
-For an elapsed event or other reviewed backfill, super admins use **Orders -> Post-event thank-you email**. Preview forces a fresh order scan and shows the exact rendered email, unique recipient list/count, duplicate collapse, exclusions, current configuration readiness, and a fingerprint. Queueing requires that unchanged fingerprint, unchanged count, an eligible event time, complete configuration, an untruncated scan, a confirmation dialog, and the exact acknowledgement `QUEUE EVENT FOLLOW-UP`. Previewing never queues or sends email.
+Automatic candidates use `store-event-followup:v1:*`, `store-event-followup-sent:v1:*`, `store-event-followup-reconciled:v1:*`, and `store-event-followup-queue:v1`. The final email uses the shared durable outbox kind `store_event_followup`, keyed by event product, hashed normalized address, and copy version.
+
+Super admins configure and preview the message in **Settings -> Post-event email**. The sandboxed preview uses the current unsaved settings values, a selectable sample event, and an English/Spanish toggle. Previewing never scans or exposes recipients and never queues or sends email. Store does not expose a general-purpose historical backfill control.
 
 The opt-out endpoint accepts browser GET and one-click POST requests. It writes a durable `promotional-email-suppression:v1:<email-hash>` preference and suppresses current and future optional/promotional Store email. The preference does not expire automatically and must be restored before optional email processing resumes. It does not suppress receipts, tickets, security messages, order lookup, or essential fulfillment updates.
 

@@ -4248,12 +4248,7 @@ textarea.admin-settings__input--readonly {
   .admin-store-products__editor-section--event {
     align-items: start;
     grid-column: 1 / -1;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .admin-store-products__editor-section--event [data-store-product-field-wrapper="eventStartsAt"],
-  .admin-store-products__editor-section--event [data-store-product-field-wrapper="eventEndsAt"] {
-    grid-column: span 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .admin-store-products__editor-section--event [data-store-product-field-wrapper="eventVenue"] {
@@ -4346,10 +4341,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-products__editor-section--basics [data-store-product-field-wrapper="name"] {
     grid-column: 1 / -1;
-  }
-
-  .admin-store-products__editor-section--event {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .admin-store-products__editor-section--event [data-store-product-field-wrapper="eventStartsAt"],

@@ -85,7 +85,7 @@ function buildConfirmedEventOrder(now: Date) {
           venue: 'Sund Brewery',
           address: '4501 1st St NW, Albuquerque, NM 87107',
           ics: true,
-          followup: { enabled: true }
+          followup: { enabled: true, enabled_at: now.toISOString() }
         }
       }],
       totals: {

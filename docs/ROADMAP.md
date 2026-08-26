@@ -38,6 +38,7 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Digital downloads** — Confirmed purchases receive durable entitlements with short-lived signed delivery, private/no-store responses, reusable R2-backed files, and item-level revoke or refresh controls.
 - [x] **Transactional email** — Store sends localized customer confirmations and super-admin notifications through Resend while keeping Stripe receipt email disabled for first-party orders.
 - [x] **Durable email delivery** — Order confirmations, event reminders, and consented abandoned-cart messages use a bounded outbox with idempotency, leases, backoff, delivery evidence, and suppression; provider failure does not roll back order or fulfillment truth.
+- [x] **Automatic post-event thank-you** — Ticket and RSVP products may opt into one localized, deduplicated thank-you and support email after the event. The cutoff locks repository-backed activation, due-time reconciliation includes earlier confirmed purchasers, Settings previews unsaved English/Spanish copy without exposing recipients, and the durable outbox preserves suppression and retry boundaries.
 - [x] **Reminder and referral tools** — Signed resume and unsubscribe links, event reminders, referral and UTM links, QR exports, saved referrals, and suppression controls support consented lifecycle communication.
 
 ### Admin, publishing, and operations
