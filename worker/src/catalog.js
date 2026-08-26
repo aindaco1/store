@@ -262,6 +262,7 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
         quantity: inventoryQuantity
       },
       eventDetails: product.event_details || null,
+      launchTest: product.launch_test === true,
       eventRegistration: eventRegistration.configured ? eventRegistration.config : null,
       registration: eventRegistration.registration,
       download: product.download || null,

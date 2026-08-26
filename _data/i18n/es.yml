@@ -173,6 +173,35 @@ admin:
   export_attendees: Exportar asistentes
   refresh_orders: Actualizar pedidos
   orders_unchanged: No hay cambios en los pedidos desde la ultima actualizacion.
+  event_followup_title: Correo de agradecimiento posterior al evento
+  event_followup_note: Correo comercial · se requiere una revision nueva de la audiencia
+  event_followup_intro: Previsualiza el correo exacto y una audiencia sin compradores confirmados duplicados. Se excluyen registros importados, de prueba, no validos, suprimidos y ya procesados.
+  event_followup_product_aria: Producto de evento
+  event_followup_choose_product: Elige un evento…
+  event_followup_refresh: Actualizar vista previa
+  event_followup_recipients: Destinatarios elegibles
+  event_followup_preview_title: Vista previa del correo posterior al evento
+  event_followup_ack_prefix: Escribe
+  event_followup_ack_suffix: despues de aprobar la audiencia y el contenido.
+  event_followup_queue: Poner audiencia aprobada en cola
+  event_followup_loading_products: Cargando productos de evento...
+  event_followup_no_products: No se encontraron productos de boleto o RSVP con una hora de finalizacion.
+  event_followup_enabled: activado
+  event_followup_disabled: desactivado
+  event_followup_audience_summary: "Destinatarios unicos: %{recipients} · Pedidos coincidentes: %{orders} · Lugares de boleto/RSVP: %{spots} · Compras duplicadas combinadas: %{duplicates} · Importados excluidos: %{imported} · Suprimidos: %{suppressed} · Ya procesados: %{processed}"
+  event_followup_eligible_now: Elegible ahora
+  event_followup_eligible_at: "Elegible: %{date}"
+  event_followup_configuration_ready: Configuracion lista
+  event_followup_configuration_incomplete: Configuracion incompleta
+  event_followup_recipient_summary: "%{email} — Lugares de boleto/RSVP: %{spots} · Pedidos: %{orders}"
+  event_followup_email_meta: "De: %{from} · Asunto: %{subject} · Version: %{copy}"
+  event_followup_choose_first: Elige primero un producto de evento.
+  event_followup_scanning: Ejecutando una revision nueva de pedidos y generando el correo...
+  event_followup_preview_ready: La vista previa nueva esta lista. No se ha puesto ningun correo en cola ni se ha enviado.
+  event_followup_refresh_before_queue: Actualiza la vista previa antes de poner el correo en cola.
+  event_followup_confirm_queue: ¿Poner el correo posterior al evento aprobado en cola para %{count} destinatarios unicos de %{event}?
+  event_followup_rechecking: Volviendo a comprobar la audiencia y poniendo el correo aprobado en cola...
+  event_followup_queued: Correo posterior al evento puesto en cola.
   refresh_inventory: Actualizar inventario
   inventory_refreshing: Actualizando la disponibilidad del inventario...
   inventory_refreshed: Disponibilidad del inventario actualizada.
@@ -514,6 +543,7 @@ email:
     store_order_lookup: Busca tu pedido
     store_abandoned_cart: Termina tu compra
     store_event_reminder: Recordatorio de evento
+    store_event_followup: Gracias por acompañarnos en %{event}
   common:
     questions_prefix: "¿Preguntas? Responde a este correo o visita"
   store_order:
@@ -560,6 +590,36 @@ email:
     attachments: La invitación de calendario se adjunta cuando está disponible. Abre la página del pedido para boletos y códigos QR de registro.
     cta: Ver pedido
     footer: Recibes esto porque este correo esta asociado a un pedido de evento o RSVP de %{platform}.
+  store_event_followup:
+    fallback_title: tu evento
+    preheader: Gracias por apoyar el cine independiente y ayudar a que Dust Wave siga adelante.
+    heading: Viniste -- y eso importa.
+    thanks: Gracias por acompañarnos en %{event}. En serio.
+    gathering: Una sala llena de personas que eligen vivir juntas una obra extraña, hecha a mano e independiente -- esa es la razón de todo esto.
+    mission_link_intro: Cada boleto y RSVP ayuda a
+    mission_link_tail: a seguir adelante.
+    mission_fallback: Hacemos películas, organizamos proyecciones e intentamos abrir un poco más de espacio para obras ambiciosas fuera de la maquinaria habitual de la industria. Nos enorgullece practicar el DIY -- pero hasta el **DIY cuesta.** Con solo venir, ayudaste.
+    project_fallback_name: la página de proyectos
+    support_heading: ¿Quieres ayudar a que esto siga adelante?
+    support_body: Hacer películas cuesta dinero. También las salas, el equipo, los seguros, las comidas del equipo y las mil cosas poco glamorosas que existen entre “¿y si...?” y “lo hicimos”.
+    support_ways_intro: "No hay una sola manera de ayudar (pero aquí van algunas sugerencias):"
+    shop_link: Elige algo de la tienda de %{company}
+    project_link: Apoya un proyecto activo en %{platform}
+    direct_link: Apoya directamente a %{company} abajo
+    support_ways_close: Cualquiera de estas opciones nos ayuda a seguir siendo independientes y a crear obras ambiciosas con personas en quienes creemos.
+    one_time_label: Aporta una vez
+    one_time_detail: Da la cantidad que te parezca adecuada. No está ligada a una campaña específica; ayuda con lo que venga después.
+    one_time_cta: Apoyar una vez
+    monthly_label: Ayuda a que siga cada mes
+    monthly_detail: El apoyo mensual ayuda con lo poco glamoroso y le da a la próxima idea extraña un poco de espacio para hacerse realidad.
+    monthly_cta: Apoyar mensualmente
+    support_disclosure: Los pagos de apoyo se procesan con Stripe y no son contribuciones caritativas deducibles de impuestos.
+    newsletter_heading: ¿El dinero no está en los planes ahora? No pasa nada.
+    newsletter_body: En el boletín compartimos nuevas películas, proyecciones, experimentos detrás de cámaras y otras travesuras de Dust Wave.
+    newsletter_cta: Seguir las travesuras
+    single_message: Este es el único correo posterior que te enviaremos sobre %{event}.
+    commercial_disclosure: Este mensaje incluye formas opcionales de apoyar económicamente a %{company}.
+    unsubscribe: No recibir correos opcionales de la Tienda
   store_order_lookup:
     heading: Busca tu pedido
     body_one: Aquí está tu enlace seguro para ver tu pedido de %{platform}. Funciona por 15 minutos.

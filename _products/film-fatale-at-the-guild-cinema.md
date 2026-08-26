@@ -33,6 +33,8 @@ event_details:
   address: "3405 Central Ave NE\nAlbuquerque, NM 87106"
   ticket_delivery: "qr"
   ics: true
+  followup:
+    enabled: true
 ---
 ## **🎥 Film Fatale! 📽️**
 

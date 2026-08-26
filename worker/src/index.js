@@ -11,6 +11,8 @@
  *   POST /shipping/quote         - Quote Store shipping
  *   POST /tax/quote              - Quote Store tax
  *   GET  /abandoned-cart/unsubscribe - Suppress Store checkout reminder emails
+ *   GET  /event-followup/unsubscribe - Suppress optional Store promotional emails
+ *   POST /event-followup/unsubscribe - One-click suppress optional Store promotional emails
  *   GET  /abandoned-cart/resume  - Restore a signed Store checkout reminder snapshot
  *   POST /webhooks/stripe        - Handle Stripe webhooks
  *   POST /webhooks/resend        - Handle signed Resend delivery events
@@ -28,6 +30,9 @@
  *   GET  /admin/store/analytics  - Read Store order analytics
  *   GET  /admin/store/marketing/abandoned-checkout/health - Read checkout reminder health
  *   POST /admin/store/marketing/abandoned-checkout/suppression - Suppress checkout reminders
+ *   GET  /admin/store/marketing/event-followup/products - List event products available for follow-up review
+ *   GET  /admin/store/marketing/event-followup/preview - Preview an event follow-up and fresh audience
+ *   POST /admin/store/marketing/event-followup/queue - Queue an approved event follow-up audience
  *   GET  /admin/store/orders     - Read Store order fulfillment rows
  *   GET  /admin/store/orders/download-abuse - Read aggregate signed-download abuse diagnostics
  *   GET  /admin/store/orders.csv - Download Store order fulfillment CSV
@@ -62,8 +67,8 @@
  *   GET  /admin/cron/status      - Check cron heartbeat status
  */
 
-import { sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventReminderEmail, sendStoreOrderAdminNotificationEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
-import { emailOutboxEnabled, enqueueEmailOutbox, processEmailOutbox, processResendWebhook, verifyResendWebhook } from './email-outbox.js';
+import { buildStoreEventFollowupEmailMessage, sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventFollowupEmail, sendStoreEventReminderEmail, sendStoreOrderAdminNotificationEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
+import { emailOutboxEnabled, enqueueEmailOutbox, isEmailOutboxRecipientSuppressed, processEmailOutbox, processResendWebhook, suppressPromotionalEmail, verifyResendWebhook } from './email-outbox.js';
 import { verifyStripeSignature, DEFAULT_STRIPE_API_VERSION } from './stripe.js';
 import { createStoreStripeClient, recordStripeProcessorEvent, storeReconciliationBreak } from './payment-integrity.js';
 import { reconcileIndexedStorePayments, STORE_PAYMENT_RECONCILIATION_STATE_KEY } from './store-payment-reconciliation.js';
@@ -385,6 +390,15 @@ const STORE_EVENT_REMINDER_OFFSETS = [
   { key: '6h', label: '6 hours before', ms: 6 * 60 * 60 * 1000 },
   { key: '1h', label: '1 hour before', ms: 60 * 60 * 1000 }
 ];
+const STORE_EVENT_FOLLOWUP_PREFIX = 'store-event-followup:v1:';
+const STORE_EVENT_FOLLOWUP_SENT_PREFIX = 'store-event-followup-sent:v1:';
+const STORE_EVENT_FOLLOWUP_QUEUE_STATE_KEY = 'store-event-followup-queue:v1';
+const STORE_EVENT_FOLLOWUP_TTL_SECONDS = 400 * 24 * 60 * 60;
+const STORE_EVENT_FOLLOWUP_DEFAULT_DELAY_HOURS = 24;
+const STORE_EVENT_FOLLOWUP_DEFAULT_BATCH_SIZE = 20;
+const STORE_EVENT_FOLLOWUP_TOKEN_SCOPE_UNSUBSCRIBE = 'store-event-followup-unsubscribe';
+const STORE_EVENT_FOLLOWUP_COPY_VERSION = 'store-event-followup-v2';
+const STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT = 'QUEUE EVENT FOLLOW-UP';
 const IDLE_QUEUE_RECHECK_TTL_SECONDS = 60 * 60;
 const ADMIN_STORE_PRODUCT_STATUSES = new Set(['active', 'draft', 'archived', 'sold_out']);
 const ADMIN_STORE_TAX_CATEGORIES = new Set(['admission', 'digital', 'exempt', 'standard']);
@@ -3169,6 +3183,26 @@ export default {
         return handleAdminStoreAbandonedCheckoutHealth(request, env);
       }
 
+      if (path === '/admin/store/marketing/event-followup/products' && method === 'GET') {
+        return handleAdminStoreEventFollowupProducts(request, env);
+      }
+
+      if (path === '/admin/store/marketing/event-followup/preview' && method === 'GET') {
+        return handleAdminStoreEventFollowupPreview(request, env, ctx);
+      }
+
+      if (path === '/admin/store/marketing/event-followup/queue' && method === 'POST') {
+        const parsedBody = await parseJsonRequestBody(request, env, {
+          maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
+          privateResponse: true,
+          emptyValue: {}
+        });
+        if (!parsedBody.ok) return parsedBody.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        return handleAdminStoreEventFollowupQueue(request, env, parsedBody.body || {}, ctx);
+      }
+
       if (path === '/admin/store/marketing/abandoned-checkout/suppression' && method === 'POST') {
         const parsedBody = await parseJsonRequestBody(request, env, {
           maxBytes: MAX_STANDARD_JSON_BODY_BYTES,
@@ -3413,6 +3447,10 @@ export default {
         return handleAbandonedCartUnsubscribe(request, env);
       }
 
+      if (path === '/event-followup/unsubscribe' && (method === 'GET' || method === 'POST')) {
+        return handleStoreEventFollowupUnsubscribe(request, env);
+      }
+
       if (path === '/abandoned-cart/resume' && method === 'GET') {
         const rl = await checkRateLimit(request, env, {
           ...RATE_LIMITS.orderRead,
@@ -3551,6 +3589,22 @@ export default {
       console.log('Store event reminder cron complete:', eventReminderResults);
     } catch (err) {
       console.error('Store event reminder cron failed:', err);
+      if (env.STORE_STATE) {
+        await env.STORE_STATE.put('cron:lastError', JSON.stringify({
+          at: new Date().toISOString(),
+          error: err?.message || String(err)
+        }), { expirationTtl: 604800 });
+      }
+    }
+
+    try {
+      const eventFollowupResults = await processStoreEventFollowups(env, now);
+      if (env.STORE_STATE && eventFollowupResults.attempted) {
+        await env.STORE_STATE.put('cron:lastEventFollowupRun', now.toISOString(), { expirationTtl: 172800 });
+      }
+      console.log('Store event follow-up cron complete:', eventFollowupResults);
+    } catch (err) {
+      console.error('Store event follow-up cron failed:', err);
       if (env.STORE_STATE) {
         await env.STORE_STATE.put('cron:lastError', JSON.stringify({
           at: new Date().toISOString(),
@@ -4364,6 +4418,318 @@ async function processStoreEventReminders(env, now = new Date()) {
   return results;
 }
 
+function storeEventFollowupEnabled(eventDetails = null) {
+  if (!eventDetails || typeof eventDetails !== 'object') return false;
+  const followup = eventDetails.followup && typeof eventDetails.followup === 'object'
+    ? eventDetails.followup
+    : eventDetails.follow_up && typeof eventDetails.follow_up === 'object'
+      ? eventDetails.follow_up
+      : null;
+  return followup?.enabled === true;
+}
+
+function getStoreEventFollowupDelayMs(env = {}) {
+  const hours = Number(env.EVENT_FOLLOWUP_DELAY_HOURS || STORE_EVENT_FOLLOWUP_DEFAULT_DELAY_HOURS);
+  const normalized = Number.isFinite(hours) ? Math.max(1, Math.min(24 * 30, hours)) : STORE_EVENT_FOLLOWUP_DEFAULT_DELAY_HOURS;
+  return normalized * 60 * 60 * 1000;
+}
+
+function getStoreEventFollowupBatchSize(env = {}) {
+  const raw = Number.parseInt(String(env.STORE_EVENT_FOLLOWUP_BATCH_SIZE || ''), 10);
+  return Math.max(1, Math.min(100, Number.isFinite(raw) ? raw : STORE_EVENT_FOLLOWUP_DEFAULT_BATCH_SIZE));
+}
+
+function getStoreEventFollowupLanguageSelectionTime(order = {}) {
+  for (const value of [order.confirmedAt, order.updatedAt, order.createdAt]) {
+    const timestamp = parseTimestampMs(value);
+    if (Number.isFinite(timestamp)) return new Date(timestamp).toISOString();
+  }
+  return '';
+}
+
+function shouldReplaceStoreEventFollowupLanguage(existingSelectedAt = '', candidateSelectedAt = '') {
+  const existingMs = parseTimestampMs(existingSelectedAt);
+  const candidateMs = parseTimestampMs(candidateSelectedAt);
+  if (!Number.isFinite(candidateMs)) return false;
+  return !Number.isFinite(existingMs) || candidateMs > existingMs;
+}
+
+function getStoreEventFollowupSettings(env = {}) {
+  return {
+    mission: String(env.EVENT_FOLLOWUP_MISSION || '').trim(),
+    postalAddress: String(env.EVENT_FOLLOWUP_POSTAL_ADDRESS || '').trim(),
+    organizationUrl: String(env.EVENT_FOLLOWUP_ORGANIZATION_URL || '').trim(),
+    shopUrl: String(env.EVENT_FOLLOWUP_SHOP_URL || env.SITE_BASE || '').trim(),
+    projectSupportUrl: String(env.EVENT_FOLLOWUP_PROJECT_SUPPORT_URL || '').trim(),
+    projectSupportName: String(env.EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME || '').trim(),
+    oneTimeSupportUrl: String(env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL || '').trim(),
+    monthlySupportUrl: String(env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL || '').trim(),
+    newsletterUrl: String(env.EVENT_FOLLOWUP_NEWSLETTER_URL || '').trim(),
+    oneTimeSuggestedAmountUsd: Math.max(0, Number(env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD || 10) || 0),
+    monthlyAmountUsd: Math.max(0, Number(env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD || 5) || 0)
+  };
+}
+
+function storeEventFollowupConfigurationReady(env = {}) {
+  const settings = getStoreEventFollowupSettings(env);
+  return Boolean(
+    settings.postalAddress &&
+    (settings.oneTimeSupportUrl || settings.monthlySupportUrl) &&
+    getAbandonedCartTokenSecret(env)
+  );
+}
+
+function getStoreEventFollowupIdentity(productId = '') {
+  return normalizeStoreFulfillmentId(productId);
+}
+
+function getStoreEventFollowupKey(record = {}) {
+  const dueMs = parseTimestampMs(record.sendAfter) || 0;
+  return `${STORE_EVENT_FOLLOWUP_PREFIX}${String(dueMs).padStart(13, '0')}:${getStoreEventFollowupIdentity(record.productId)}:${String(record.emailHash || '').trim().toLowerCase()}`;
+}
+
+function getStoreEventFollowupSentKey(productId, emailHash) {
+  return `${STORE_EVENT_FOLLOWUP_SENT_PREFIX}${getStoreEventFollowupIdentity(productId)}:${String(emailHash || '').trim().toLowerCase()}`;
+}
+
+async function writeStoreEventFollowupQueueState(env, hasPending, nextDueAt = '') {
+  if (!env?.STORE_STATE?.put) return;
+  await env.STORE_STATE.put(STORE_EVENT_FOLLOWUP_QUEUE_STATE_KEY, JSON.stringify({
+    version: 1,
+    hasPending: hasPending === true,
+    nextDueAt: hasPending === true ? String(nextDueAt || '') : '',
+    updatedAt: new Date().toISOString()
+  }), {
+    expirationTtl: hasPending === true ? STORE_EVENT_FOLLOWUP_TTL_SECONDS : IDLE_QUEUE_RECHECK_TTL_SECONDS
+  });
+}
+
+async function buildStoreEventFollowupRecords(storedOrder = {}, now = new Date(), env = {}) {
+  const orderDraft = storedOrder.orderDraft || {};
+  const orderToken = String(storedOrder.orderToken || orderDraft.orderToken || '').trim();
+  const email = normalizeAbandonedCartEmail(orderDraft.customer?.email);
+  if (!orderToken || !email || !isStoreOrderFulfillmentReady(storedOrder)) return [];
+  if (String(storedOrder.source || orderDraft.source || '').trim().toLowerCase() === 'snipcart') return [];
+
+  const emailHash = await sha256HexString(email);
+  const items = Array.isArray(orderDraft.items) ? orderDraft.items : [];
+  const nowMs = now instanceof Date && Number.isFinite(now.getTime()) ? now.getTime() : Date.now();
+  const recordsByEvent = new Map();
+  for (const item of items) {
+    if (!isStoreTicketLikeItem(item) || item.launchTest === true || !storeEventFollowupEnabled(item.eventDetails)) continue;
+    const productId = String(item.productId || '').trim();
+    const event = summarizeStoreEventDetails(item.eventDetails);
+    const endsAtMs = parseTimestampMs(event?.endsAt);
+    if (!productId || !Number.isFinite(endsAtMs)) continue;
+    const sendAfterMs = endsAtMs + getStoreEventFollowupDelayMs(env);
+    const identity = getStoreEventFollowupIdentity(productId);
+    const existing = recordsByEvent.get(identity);
+    recordsByEvent.set(identity, {
+      version: 1,
+      status: 'pending',
+      copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+      productId,
+      eventTitle: String(item.name || item.sku || productId || 'Store event').trim(),
+      endsAt: event.endsAt,
+      email,
+      emailHash,
+      preferredLang: orderDraft.preferredLang || storedOrder.preferredLang || DEFAULT_I18N_LANG,
+      preferredLangSelectedAt: getStoreEventFollowupLanguageSelectionTime({ ...orderDraft, ...storedOrder }) || new Date(nowMs).toISOString(),
+      orderToken,
+      orderTokens: [orderToken],
+      orderCount: Math.max(1, Number(existing?.orderCount || 0) + 1),
+      ticketQuantity: Math.max(1, Number(existing?.ticketQuantity || 0) + Math.max(1, Number(item.quantity || 1) || 1)),
+      sendAfter: new Date(sendAfterMs).toISOString(),
+      createdAt: new Date(nowMs).toISOString(),
+      attempts: 0,
+      lastError: ''
+    });
+  }
+  return Array.from(recordsByEvent.values());
+}
+
+async function queueStoreEventFollowupRecords(env, records = []) {
+  if (!env?.STORE_STATE?.put) return { queued: 0, skipped: 0, nextDueAt: '' };
+  let queued = 0;
+  let skipped = 0;
+  let nextDueAt = '';
+  for (const record of records) {
+    const sentKey = getStoreEventFollowupSentKey(record.productId, record.emailHash);
+    if (await env.STORE_STATE.get(sentKey)) {
+      skipped += 1;
+      continue;
+    }
+    const key = getStoreEventFollowupKey(record);
+    const existing = await env.STORE_STATE.get(key, { type: 'json' });
+    if (existing && ['pending', 'retry'].includes(String(existing.status || ''))) {
+      const existingTokens = new Set([
+        ...(Array.isArray(existing.orderTokens) ? existing.orderTokens : []),
+        existing.orderToken
+      ].map((token) => String(token || '').trim()).filter(Boolean));
+      const submittedTokens = [
+        ...(Array.isArray(record.orderTokens) ? record.orderTokens : []),
+        record.orderToken
+      ].map((token) => String(token || '').trim()).filter(Boolean);
+      const newTokens = submittedTokens.filter((token) => !existingTokens.has(token));
+      submittedTokens.forEach((token) => existingTokens.add(token));
+      if (!newTokens.length) {
+        skipped += 1;
+        continue;
+      }
+      record.orderTokens = Array.from(existingTokens);
+      record.orderToken = existing.orderToken || record.orderToken;
+      record.orderCount = record.orderTokens.length;
+      record.ticketQuantity = Math.max(1, Number(existing.ticketQuantity || 0) + Number(record.ticketQuantity || 0));
+      record.createdAt = existing.createdAt || record.createdAt;
+      if (shouldReplaceStoreEventFollowupLanguage(existing.preferredLangSelectedAt, record.preferredLangSelectedAt)) {
+        record.preferredLang = record.preferredLang || existing.preferredLang || DEFAULT_I18N_LANG;
+      } else {
+        record.preferredLang = existing.preferredLang || record.preferredLang || DEFAULT_I18N_LANG;
+        record.preferredLangSelectedAt = existing.preferredLangSelectedAt || record.preferredLangSelectedAt;
+      }
+    }
+    await env.STORE_STATE.put(key, JSON.stringify(record), {
+      expirationTtl: STORE_EVENT_FOLLOWUP_TTL_SECONDS
+    });
+    queued += 1;
+    if (!nextDueAt || Date.parse(record.sendAfter) < Date.parse(nextDueAt)) nextDueAt = record.sendAfter;
+  }
+  if (queued > 0) await writeStoreEventFollowupQueueState(env, true, nextDueAt);
+  return { queued, skipped, nextDueAt };
+}
+
+async function queueStoreEventFollowups(env, storedOrder = {}, now = new Date()) {
+  return queueStoreEventFollowupRecords(env, await buildStoreEventFollowupRecords(storedOrder, now, env));
+}
+
+function queueStoreEventFollowupsQuietly(ctx, env, storedOrder = {}) {
+  const orderToken = String(storedOrder.orderToken || storedOrder.orderDraft?.orderToken || '').trim();
+  queueBackgroundTask(
+    ctx,
+    queueStoreEventFollowups(env, storedOrder).catch((error) => {
+      console.error('Store event follow-up queue failed:', {
+        orderToken,
+        error: error?.message || String(error)
+      });
+    }),
+    `store event follow-up (${orderToken || 'unknown'})`
+  );
+}
+
+function getStoreEventFollowupUnsubscribeUrl(env, token) {
+  const base = String(getWorkerBase(env) || env.WORKER_BASE || env.SITE_BASE || '').trim() || 'https://checkout.dustwave.xyz';
+  const url = new URL('/event-followup/unsubscribe', base);
+  url.searchParams.set('t', token);
+  return url.toString();
+}
+
+function getCurrentStoreEventFollowupProduct(env, productId) {
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  return catalog.productById.get(String(productId || '').trim()) || null;
+}
+
+async function processStoreEventFollowups(env, now = new Date()) {
+  const empty = { attempted: false, sent: 0, skipped: 0, suppressed: 0, failed: 0, checked: 0 };
+  if (!env?.STORE_STATE?.list) return { ...empty, skippedReason: 'storage_not_configured' };
+  const queueState = await env.STORE_STATE.get(STORE_EVENT_FOLLOWUP_QUEUE_STATE_KEY, { type: 'json' });
+  if (queueState?.hasPending === false) return { ...empty, skippedReason: 'idle' };
+  const nextDueMs = Date.parse(queueState?.nextDueAt || '');
+  if (Number.isFinite(nextDueMs) && nextDueMs > now.getTime()) {
+    return { ...empty, skippedReason: 'not_due', nextDueAt: queueState.nextDueAt };
+  }
+  const listing = await env.STORE_STATE.list({
+    prefix: STORE_EVENT_FOLLOWUP_PREFIX,
+    limit: getStoreEventFollowupBatchSize(env)
+  });
+  const keys = Array.isArray(listing?.keys) ? listing.keys : [];
+  const results = { ...empty, attempted: keys.length > 0 };
+  let hasPending = listing?.list_complete === false;
+  let nextDueAt = '';
+
+  for (const keyInfo of keys) {
+    const key = String(keyInfo?.name || '').trim();
+    const record = key ? await env.STORE_STATE.get(key, { type: 'json' }) : null;
+    results.checked += 1;
+    const email = normalizeAbandonedCartEmail(record?.email);
+    if (!record?.productId || !record?.emailHash || !email) {
+      if (key) await env.STORE_STATE.delete(key);
+      results.skipped += 1;
+      continue;
+    }
+    const sendAfterMs = Date.parse(record.sendAfter || '');
+    if (Number.isFinite(sendAfterMs) && sendAfterMs > now.getTime()) {
+      hasPending = true;
+      if (!nextDueAt || sendAfterMs < Date.parse(nextDueAt)) nextDueAt = new Date(sendAfterMs).toISOString();
+      continue;
+    }
+    const sentKey = getStoreEventFollowupSentKey(record.productId, record.emailHash);
+    if (await env.STORE_STATE.get(sentKey)) {
+      await env.STORE_STATE.delete(key);
+      results.skipped += 1;
+      continue;
+    }
+    const currentProduct = getCurrentStoreEventFollowupProduct(env, record.productId);
+    if (!currentProduct || currentProduct.launch_test === true || !storeEventFollowupEnabled(currentProduct.event_details)) {
+      await env.STORE_STATE.delete(key);
+      results.skipped += 1;
+      continue;
+    }
+    if (await isEmailOutboxRecipientSuppressed(env, 'store_event_followup', email)) {
+      await env.STORE_STATE.put(sentKey, JSON.stringify({ status: 'suppressed', at: now.toISOString() }), {
+        expirationTtl: STORE_EVENT_FOLLOWUP_TTL_SECONDS
+      });
+      await env.STORE_STATE.delete(key);
+      results.suppressed += 1;
+      continue;
+    }
+    try {
+      if (!storeEventFollowupConfigurationReady(env)) throw new Error('Event follow-up configuration is incomplete');
+      const unsubscribeToken = await signAbandonedCartToken(env, {
+        scope: STORE_EVENT_FOLLOWUP_TOKEN_SCOPE_UNSUBSCRIBE,
+        email,
+        emailHash: record.emailHash
+      }, 60);
+      if (!unsubscribeToken) throw new Error('Event follow-up unsubscribe signing is not configured');
+      const payload = {
+        email,
+        eventTitle: record.eventTitle,
+        preferredLang: record.preferredLang || DEFAULT_I18N_LANG,
+        unsubscribeUrl: getStoreEventFollowupUnsubscribeUrl(env, unsubscribeToken),
+        ...getStoreEventFollowupSettings(env)
+      };
+      const result = emailOutboxEnabled(env)
+        ? await enqueueEmailOutbox(env, {
+            kind: 'store_event_followup',
+            payload,
+            dedupeKey: `${getStoreEventFollowupIdentity(record.productId)}:${record.emailHash}:${STORE_EVENT_FOLLOWUP_COPY_VERSION}`,
+            orderToken: record.orderToken || '',
+            expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          })
+        : await sendStoreEventFollowupEmail(env, payload);
+      if (!result?.sent) throw new Error(result?.reason || 'Event follow-up email was not accepted');
+      await env.STORE_STATE.put(sentKey, JSON.stringify({ status: result.queued ? 'queued' : 'sent', at: now.toISOString() }), {
+        expirationTtl: STORE_EVENT_FOLLOWUP_TTL_SECONDS
+      });
+      await env.STORE_STATE.delete(key);
+      results.sent += 1;
+    } catch (error) {
+      const attempts = Number(record.attempts || 0) + 1;
+      record.attempts = attempts;
+      record.lastError = String(error?.message || 'Event follow-up failed').slice(0, 300);
+      record.sendAfter = new Date(now.getTime() + getStoreEventReminderRetryDelayMs(attempts)).toISOString();
+      await env.STORE_STATE.delete(key);
+      await env.STORE_STATE.put(getStoreEventFollowupKey(record), JSON.stringify(record), {
+        expirationTtl: STORE_EVENT_FOLLOWUP_TTL_SECONDS
+      });
+      hasPending = true;
+      if (!nextDueAt || Date.parse(record.sendAfter) < Date.parse(nextDueAt)) nextDueAt = record.sendAfter;
+      results.failed += 1;
+    }
+  }
+  await writeStoreEventFollowupQueueState(env, hasPending, nextDueAt);
+  return results;
+}
+
 async function signAbandonedCartToken(env, payload = {}, ttlDays = 14) {
   const secret = getAbandonedCartTokenSecret(env);
   if (!secret) return '';
@@ -4935,6 +5301,34 @@ async function handleAbandonedCartUnsubscribe(request, env) {
   }
 
   return abandonedCartHtmlResponse('Reminder unsubscribed', 'You will not receive this checkout reminder.');
+}
+
+async function handleStoreEventFollowupUnsubscribe(request, env) {
+  if (!env?.STORE_STATE) {
+    return abandonedCartHtmlResponse('Preference unavailable', 'Email preference storage is not configured.', 503);
+  }
+  const url = new URL(request.url);
+  const token = String(url.searchParams.get('t') || '').trim();
+  const verified = token ? await verifyAbandonedCartToken(env, token) : null;
+  if (
+    !verified?.ok ||
+    verified.payload?.scope !== STORE_EVENT_FOLLOWUP_TOKEN_SCOPE_UNSUBSCRIBE ||
+    !verified.payload?.emailHash ||
+    !normalizeAbandonedCartEmail(verified.payload?.email)
+  ) {
+    return abandonedCartHtmlResponse('Preference link expired', verified?.error || 'This preference link is invalid or expired.', verified?.status || 400);
+  }
+  const result = await suppressPromotionalEmail(env, verified.payload.email, {
+    source: 'event_followup_unsubscribe',
+    reason: 'recipient_opt_out'
+  });
+  if (!result.suppressed) {
+    return abandonedCartHtmlResponse('Preference unavailable', 'We could not save this email preference.', 503);
+  }
+  return abandonedCartHtmlResponse(
+    'You are opted out',
+    'You will not receive optional or promotional Store emails. Receipts, tickets, security messages, and essential order updates are unaffected.'
+  );
 }
 
 async function handleAbandonedCartResume(request, env) {
@@ -7500,6 +7894,7 @@ async function handleStoreCheckIn(request, env, storedOrder = {}, item = {}, ite
       name: storedOrder.orderDraft?.customer?.name || ''
     },
     event,
+    launchTest: item.launchTest === true,
     generatedAt: new Date().toISOString()
   };
 
@@ -7850,6 +8245,9 @@ function buildAdminStoreOrderRecord(storedOrder = {}) {
 
   return {
     orderToken: storedOrder.orderToken || orderDraft.orderToken || '',
+    source: String(storedOrder.source || orderDraft.source || storedOrder.checkoutProvider || orderDraft.checkoutProvider || '').trim(),
+    imported: Boolean(storedOrder.importedAt) || String(storedOrder.source || orderDraft.source || '').trim().toLowerCase() === 'snipcart',
+    preferredLang: orderDraft.preferredLang || storedOrder.preferredLang || DEFAULT_I18N_LANG,
     status: storedOrder.status || orderDraft.status || STORE_ORDER_STATUS_DRAFT,
     fulfillmentReady,
     createdAt: storedOrder.createdAt || orderDraft.createdAt || '',
@@ -8495,6 +8893,7 @@ function adminStoreEventDetailsSummary(source = {}) {
     address: compactAdminStoreEventAddress(event.address || ''),
     ticketDelivery: String(event.ticket_delivery || event.ticketDelivery || '').trim(),
     ics: event.ics !== false,
+    followupEnabled: event.followupEnabled === true || storeEventFollowupEnabled(event),
     registration: normalizedRegistration.configured && normalizedRegistration.errors.length === 0
       ? normalizedRegistration.config
       : null
@@ -8569,6 +8968,7 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}) {
     eventVenue: eventDetails.venue,
     eventAddress: eventDetails.address,
     eventIcs: eventDetails.ics,
+    eventFollowupEnabled: eventDetails.followupEnabled === true,
     rsvpRegistrationEnabled: Boolean(eventDetails.registration),
     rsvpRegistrationOpensAt: eventDetails.registration?.opensAt || '',
     rsvpRegistrationClosesAt: eventDetails.registration?.closesAt || '',
@@ -8807,6 +9207,8 @@ function serializeAdminStoreEventDetailsYaml(eventDetails = {}) {
   yamlAdminMaybeLine(lines, 'address', event.address, '  ');
   yamlAdminMaybeLine(lines, 'ticket_delivery', event.ticketDelivery, '  ');
   yamlAdminMaybeLine(lines, 'ics', event.ics, '  ');
+  lines.push('  followup:');
+  lines.push(`    enabled: ${event.followupEnabled === true ? 'true' : 'false'}`);
   if (event.registration) {
     const registration = event.registration;
     lines.push('  registration:');
@@ -9170,7 +9572,7 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     'rsvpRequireAttendeeNames',
     'rsvpQuestions'
   ];
-  const eventFieldKeys = ['eventStartsAt', 'eventEndsAt', 'eventVenue', 'eventAddress', 'eventIcs', ...registrationFieldKeys];
+  const eventFieldKeys = ['eventStartsAt', 'eventEndsAt', 'eventVenue', 'eventAddress', 'eventIcs', 'eventFollowupEnabled', ...registrationFieldKeys];
   const eventFieldsSubmitted = eventFieldKeys.some((fieldKey) => hasAdminStoreProductPatchField(fields, fieldKey));
   if (!eventProduct) {
     if (product?.event_details || eventFieldsSubmitted) {
@@ -9192,6 +9594,11 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     if (hasAdminStoreProductPatchField(fields, 'eventIcs')) {
       const normalized = normalizeAdminStoreBooleanField(fields.eventIcs, 'Calendar file');
       if (normalized.ok) eventDetails.ics = normalized.value;
+      else errors.push(normalized.error);
+    }
+    if (hasAdminStoreProductPatchField(fields, 'eventFollowupEnabled')) {
+      const normalized = normalizeAdminStoreBooleanField(fields.eventFollowupEnabled, 'Post-event follow-up');
+      if (normalized.ok) eventDetails.followupEnabled = normalized.value;
       else errors.push(normalized.error);
     }
     if (nextFulfillmentType !== 'rsvp') {
@@ -9869,6 +10276,7 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
     hasAdminStoreProductPatchField(fields, 'eventVenue') ||
     hasAdminStoreProductPatchField(fields, 'eventAddress') ||
     hasAdminStoreProductPatchField(fields, 'eventIcs') ||
+    hasAdminStoreProductPatchField(fields, 'eventFollowupEnabled') ||
     hasAdminStoreProductPatchField(fields, 'rsvpRegistrationEnabled') ||
     hasAdminStoreProductPatchField(fields, 'rsvpRegistrationOpensAt') ||
     hasAdminStoreProductPatchField(fields, 'rsvpRegistrationClosesAt') ||
@@ -9884,6 +10292,9 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
     if (hasAdminStoreProductPatchField(fields, 'eventAddress')) eventDetails.address = compactAdminStoreEventAddress(fields.eventAddress || '');
     if (hasAdminStoreProductPatchField(fields, 'eventIcs')) {
       eventDetails.ics = fields.eventIcs === true || String(fields.eventIcs || '').trim().toLowerCase() === 'true';
+    }
+    if (hasAdminStoreProductPatchField(fields, 'eventFollowupEnabled')) {
+      eventDetails.followupEnabled = fields.eventFollowupEnabled === true || String(fields.eventFollowupEnabled || '').trim().toLowerCase() === 'true';
     }
     const rsvpProduct = String(preview.fulfillment_type || preview.type || '').trim().toLowerCase() === 'rsvp';
     let registrationEnabled = rsvpProduct && Boolean(eventDetails.registration);
@@ -9934,6 +10345,7 @@ function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
       address: eventDetails.address,
       ticket_delivery: eventDetails.ticketDelivery,
       ics: eventDetails.ics,
+      followup: { enabled: eventDetails.followupEnabled === true },
       ...(eventDetails.registration ? { registration: eventDetails.registration } : {})
     };
   }
@@ -12007,6 +12419,313 @@ async function handleAdminStoreOrders(request, env, ctx = null) {
   );
 }
 
+function normalizeAdminStoreEventFollowupProductId(value) {
+  const productId = String(value || '').trim();
+  return /^[a-z0-9][a-z0-9._-]{0,119}$/i.test(productId) ? productId : '';
+}
+
+async function buildAdminStoreEventFollowupAudience(env, productId, { ctx = null } = {}) {
+  const normalizedProductId = normalizeAdminStoreEventFollowupProductId(productId);
+  if (!normalizedProductId) return { ok: false, status: 400, error: 'Choose a valid event product.' };
+  const product = getCurrentStoreEventFollowupProduct(env, normalizedProductId);
+  if (!product) return { ok: false, status: 404, error: 'Event product not found in the current Store catalog.' };
+  const fulfillmentType = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
+  if (!isAdminStoreEventFulfillmentType(fulfillmentType)) {
+    return { ok: false, status: 422, error: 'Post-event follow-up is available only for ticket and RSVP products.' };
+  }
+  const event = summarizeStoreEventDetails(product.event_details);
+  const endsAtMs = parseTimestampMs(event?.endsAt);
+  if (!Number.isFinite(endsAtMs)) return { ok: false, status: 422, error: 'The event needs a valid end date and time.' };
+  if (!storeEventFollowupEnabled(product.event_details)) {
+    return { ok: false, status: 409, error: 'Enable the post-event email on this product before previewing or queueing it.' };
+  }
+  if (product.launch_test === true) {
+    return { ok: false, status: 409, error: 'Launch-test products cannot queue customer post-event email.' };
+  }
+
+  const scanned = await readAdminStoreOrderScan(env, { force: true, ctx });
+  if (!scanned.ok) return { ok: false, status: scanned.status || 503, error: scanned.error || 'Unable to read Store orders.' };
+  const grouped = new Map();
+  const exclusions = {
+    unconfirmedOrders: 0,
+    importedOrders: 0,
+    testOrders: 0,
+    invalidEmailOrders: 0,
+    suppressedRecipients: 0,
+    alreadyProcessedRecipients: 0
+  };
+  let matchingOrders = 0;
+  let matchingTicketQuantity = 0;
+  for (const order of scanned.orders || []) {
+    const matchingItems = (Array.isArray(order.items) ? order.items : []).filter((item) => (
+      String(item.productId || '').trim() === normalizedProductId &&
+      isAdminStoreEventFulfillmentType(item.fulfillmentType)
+    ));
+    if (!matchingItems.length) continue;
+    matchingOrders += 1;
+    const quantity = matchingItems.reduce((sum, item) => sum + Math.max(1, Number(item.quantity || 1) || 1), 0);
+    matchingTicketQuantity += quantity;
+    if (order.fulfillmentReady !== true || String(order.status || '').trim().toLowerCase() !== STORE_ORDER_STATUS_CONFIRMED) {
+      exclusions.unconfirmedOrders += 1;
+      continue;
+    }
+    if (order.imported === true || String(order.source || '').trim().toLowerCase() === 'snipcart') {
+      exclusions.importedOrders += 1;
+      continue;
+    }
+    if (matchingItems.some((item) => item.launchTest === true)) {
+      exclusions.testOrders += 1;
+      continue;
+    }
+    const email = normalizeAbandonedCartEmail(order.customer?.email);
+    if (!email) {
+      exclusions.invalidEmailOrders += 1;
+      continue;
+    }
+    const languageSelectedAt = getStoreEventFollowupLanguageSelectionTime(order);
+    const existing = grouped.get(email) || {
+      email,
+      preferredLang: order.preferredLang || DEFAULT_I18N_LANG,
+      preferredLangSelectedAt: languageSelectedAt,
+      orderTokens: [],
+      orderCount: 0,
+      ticketQuantity: 0
+    };
+    if (shouldReplaceStoreEventFollowupLanguage(existing.preferredLangSelectedAt, languageSelectedAt)) {
+      existing.preferredLang = order.preferredLang || DEFAULT_I18N_LANG;
+      existing.preferredLangSelectedAt = languageSelectedAt;
+    }
+    existing.orderTokens.push(order.orderToken);
+    existing.orderCount += 1;
+    existing.ticketQuantity += quantity;
+    grouped.set(email, existing);
+  }
+
+  const recipients = [];
+  const suppressed = [];
+  const alreadyProcessed = [];
+  for (const recipient of grouped.values()) {
+    const emailHash = await sha256HexString(recipient.email);
+    if (await isEmailOutboxRecipientSuppressed(env, 'store_event_followup', recipient.email)) {
+      exclusions.suppressedRecipients += 1;
+      suppressed.push({ ...recipient, emailHash });
+      continue;
+    }
+    if (await env.STORE_STATE.get(getStoreEventFollowupSentKey(normalizedProductId, emailHash))) {
+      exclusions.alreadyProcessedRecipients += 1;
+      alreadyProcessed.push({ ...recipient, emailHash });
+      continue;
+    }
+    recipients.push({ ...recipient, emailHash });
+  }
+  recipients.sort((a, b) => a.email.localeCompare(b.email));
+  const settings = getStoreEventFollowupSettings(env);
+  const eligibleAt = new Date(endsAtMs + getStoreEventFollowupDelayMs(env)).toISOString();
+  const digest = await sha256HexString(stableJsonStringify({
+    copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+    productId: normalizedProductId,
+    eventTitle: product.name || normalizedProductId,
+    endsAt: event.endsAt,
+    eligibleAt,
+    recipients: recipients.map((recipient) => ({
+      emailHash: recipient.emailHash,
+      orderTokens: recipient.orderTokens.slice().sort(),
+      preferredLang: recipient.preferredLang,
+      ticketQuantity: recipient.ticketQuantity
+    })),
+    settings
+  }));
+  const previewUnsubscribeUrl = getStoreEventFollowupUnsubscribeUrl(env, 'recipient-specific-token');
+  const message = await buildStoreEventFollowupEmailMessage(env, {
+    email: recipients[0]?.email || 'preview@example.invalid',
+    eventTitle: product.name || normalizedProductId,
+    preferredLang: recipients[0]?.preferredLang || DEFAULT_I18N_LANG,
+    unsubscribeUrl: previewUnsubscribeUrl,
+    ...settings
+  });
+  return {
+    ok: true,
+    product: {
+      productId: normalizedProductId,
+      name: String(product.name || normalizedProductId),
+      status: String(product.status || ''),
+      fulfillmentType,
+      endsAt: event.endsAt,
+      eligibleAt,
+      eligibleNow: Date.now() >= Date.parse(eligibleAt)
+    },
+    audience: {
+      matchingOrders,
+      matchingTicketQuantity,
+      uniquePurchasersBeforeSuppression: grouped.size,
+      duplicatePurchasersCollapsed: Math.max(0, Array.from(grouped.values()).reduce((sum, recipient) => sum + recipient.orderCount, 0) - grouped.size),
+      eligibleRecipientCount: recipients.length,
+      recipients,
+      suppressed,
+      alreadyProcessed,
+      exclusions
+    },
+    preview: {
+      copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+      digest,
+      from: message.from,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+      configurationReady: message.valid && storeEventFollowupConfigurationReady(env)
+    },
+    scan: {
+      scanned: scanned.scanned,
+      indexed: scanned.indexed,
+      truncated: scanned.truncated === true,
+      generatedAt: scanned.generatedAt || '',
+      watermark: scanned.watermark || ''
+    }
+  };
+}
+
+async function requireSuperAdminEventFollowup(request, env, { requireCsrf = false } = {}) {
+  const auth = await requireAdminSession(request, env, 'settings:publish', {
+    accessScope: STORE_ADMIN_SCOPE,
+    requireCsrf
+  });
+  if (!auth.ok) return auth;
+  if (auth.user.role !== 'super_admin') {
+    return { ok: false, response: privateJsonResponse({ error: 'Forbidden' }, 403, env) };
+  }
+  return auth;
+}
+
+async function handleAdminStoreEventFollowupProducts(request, env) {
+  const auth = await requireSuperAdminEventFollowup(request, env);
+  if (!auth.ok) return auth.response;
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  const products = catalog.products.flatMap((product) => {
+    const fulfillmentType = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
+    if (!isAdminStoreEventFulfillmentType(fulfillmentType)) return [];
+    const event = summarizeStoreEventDetails(product.event_details);
+    if (!event?.endsAt) return [];
+    return [{
+      productId: String(product.id || ''),
+      name: String(product.name || product.id || ''),
+      status: String(product.status || ''),
+      fulfillmentType,
+      eventEndsAt: event.endsAt,
+      eventFollowupEnabled: storeEventFollowupEnabled(product.event_details),
+      launchTest: product.launch_test === true
+    }];
+  });
+  return privateJsonResponse({
+    success: true,
+    scope: STORE_ADMIN_SCOPE,
+    products,
+    writeBudget: adminReadBudget({ kvListExpected: 0 })
+  }, 200, env);
+}
+
+async function handleAdminStoreEventFollowupPreview(request, env, ctx = null) {
+  const auth = await requireSuperAdminEventFollowup(request, env);
+  if (!auth.ok) return auth.response;
+  const productId = new URL(request.url).searchParams.get('productId');
+  const built = await buildAdminStoreEventFollowupAudience(env, productId, { ctx });
+  if (!built.ok) return privateJsonResponse({ success: false, error: built.error }, built.status || 422, env);
+  return privateJsonResponse({
+    success: true,
+    scope: STORE_ADMIN_SCOPE,
+    ...built,
+    queueAcknowledgement: STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT,
+    writeBudget: adminReadBudget({
+      kvReadsExpected: Number(built.scan.scanned || 0) + Number(built.audience.uniquePurchasersBeforeSuppression || 0) * 2,
+      kvListExpected: 1
+    })
+  }, 200, env);
+}
+
+async function handleAdminStoreEventFollowupQueue(request, env, body = {}, ctx = null) {
+  const auth = await requireSuperAdminEventFollowup(request, env, { requireCsrf: true });
+  if (!auth.ok) return auth.response;
+  if (String(body.acknowledgement || '').trim() !== STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT) {
+    return privateJsonResponse({ error: `Type ${STORE_EVENT_FOLLOWUP_QUEUE_ACKNOWLEDGEMENT} to queue this audience.` }, 422, env);
+  }
+  const built = await buildAdminStoreEventFollowupAudience(env, body.productId, { ctx });
+  if (!built.ok) return privateJsonResponse({ success: false, error: built.error }, built.status || 422, env);
+  if (built.scan.truncated) {
+    return privateJsonResponse({ error: 'The fresh order scan was truncated; queueing is blocked.' }, 409, env);
+  }
+  if (!built.product.eligibleNow) {
+    return privateJsonResponse({ error: `This event is not eligible until ${built.product.eligibleAt}.` }, 409, env);
+  }
+  if (!built.preview.configurationReady) {
+    return privateJsonResponse({ error: 'Post-event email settings, postal address, support links, or unsubscribe signing are incomplete.' }, 409, env);
+  }
+  const expectedCount = Number(body.expectedRecipientCount);
+  if (
+    String(body.previewDigest || '').trim() !== built.preview.digest ||
+    !Number.isInteger(expectedCount) ||
+    expectedCount !== built.audience.eligibleRecipientCount
+  ) {
+    return privateJsonResponse({
+      error: 'The audience or email configuration changed. Refresh the preview before queueing.',
+      currentDigest: built.preview.digest,
+      currentRecipientCount: built.audience.eligibleRecipientCount
+    }, 409, env);
+  }
+  if (!built.audience.recipients.length) {
+    return privateJsonResponse({ error: 'There are no eligible recipients to queue.' }, 409, env);
+  }
+  const now = new Date();
+  const records = built.audience.recipients.map((recipient) => ({
+    version: 1,
+    status: 'pending',
+    copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+    manualBackfill: true,
+    productId: built.product.productId,
+    eventTitle: built.product.name,
+    endsAt: built.product.endsAt,
+    email: recipient.email,
+    emailHash: recipient.emailHash,
+    preferredLang: recipient.preferredLang || DEFAULT_I18N_LANG,
+    preferredLangSelectedAt: recipient.preferredLangSelectedAt || '',
+    orderToken: recipient.orderTokens[0] || '',
+    orderTokens: recipient.orderTokens,
+    orderCount: recipient.orderCount,
+    ticketQuantity: recipient.ticketQuantity,
+    sendAfter: now.toISOString(),
+    createdAt: now.toISOString(),
+    attempts: 0,
+    lastError: ''
+  }));
+  const queued = await queueStoreEventFollowupRecords(env, records);
+  const auditKey = await recordAdminAuditEvent(env, {
+    action: 'store_event_followup:queue',
+    adminEmail: auth.user.email,
+    adminRole: auth.user.role,
+    productId: built.product.productId,
+    copyVersion: STORE_EVENT_FOLLOWUP_COPY_VERSION,
+    previewDigest: built.preview.digest,
+    recipientCount: built.audience.eligibleRecipientCount,
+    queuedCount: queued.queued,
+    skippedCount: queued.skipped
+  });
+  return privateJsonResponse({
+    success: true,
+    productId: built.product.productId,
+    previewDigest: built.preview.digest,
+    recipientCount: built.audience.eligibleRecipientCount,
+    queuedCount: queued.queued,
+    skippedCount: queued.skipped,
+    nextDueAt: queued.nextDueAt,
+    auditKey,
+    message: `Queued ${queued.queued} deduplicated post-event email${queued.queued === 1 ? '' : 's'}.`,
+    writeBudget: adminWriteBudget({
+      readOnly: false,
+      kvReadsExpected: Number(built.scan.scanned || 0) + Number(built.audience.uniquePurchasersBeforeSuppression || 0) * 2,
+      kvWritesExpected: queued.queued + (auditKey ? 1 : 0) + 1,
+      kvListExpected: 1
+    })
+  }, 202, env);
+}
+
 function incrementStoreAnalyticsBreakdown(map, key, quantity = 1, revenueCents = 0) {
   const normalizedKey = String(key || 'Unknown').trim() || 'Unknown';
   const existing = map.get(normalizedKey) || {
@@ -13944,6 +14663,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     queueStoreOrderEmailIndexUpsert(ctx, env, storedOrder);
     queueStoreOrderEmailDeliveries(ctx, env, storedOrder);
     queueStoreEventRemindersQuietly(ctx, env, storedOrder);
+    queueStoreEventFollowupsQuietly(ctx, env, storedOrder);
 
     return privateJsonResponse({
       ok: true,
@@ -14348,6 +15068,7 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   queueStoreOrderEmailIndexUpsert(ctx, env, updatedOrder);
   queueStoreOrderEmailDeliveries(ctx, env, updatedOrder);
   queueStoreEventRemindersQuietly(ctx, env, updatedOrder);
+  queueStoreEventFollowupsQuietly(ctx, env, updatedOrder);
 
   return {
     ok: true,
@@ -15503,6 +16224,18 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['description', { label: 'Site description', input: 'textarea' }],
   ['platform.orders_email_from', { label: 'Orders email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
   ['platform.updates_email_from', { label: 'Updates email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
+  ['email.event_followup.delay_hours', { label: 'Post-event delay hours', type: 'number', input: 'integer', min: 1, max: 720, step: 1, layoutGroup: 'event-followup-timing', help: 'Delay after the configured event end before the one-time follow-up is eligible to send.' }],
+  ['email.event_followup.mission', { label: 'Post-event mission statement', input: 'textarea', help: 'Brand mission used in the thank-you email. Keep it concise and reusable across events; wrap a short phrase in **double asterisks** for bold emphasis.' }],
+  ['email.event_followup.postal_address', { label: 'Commercial email postal address', input: 'textarea', help: 'Physical postal address shown in the footer of the post-event commercial email.' }],
+  ['email.event_followup.organization_url', { label: 'Organization URL', input: 'url', layoutGroup: 'event-followup-brand-links', help: 'Public organization site used by the post-event logo and organization-name link.' }],
+  ['email.event_followup.shop_url', { label: 'Merch shop URL', input: 'url', layoutGroup: 'event-followup-brand-links' }],
+  ['email.event_followup.project_support_url', { label: 'Project-support URL', input: 'url', layoutGroup: 'event-followup-project-link' }],
+  ['email.event_followup.project_support_name', { label: 'Project-support name', layoutGroup: 'event-followup-project-link' }],
+  ['email.event_followup.support_one_time_url', { label: 'One-time support URL', input: 'url', layoutGroup: 'event-followup-support-links' }],
+  ['email.event_followup.support_one_time_suggested_usd', { label: 'Suggested one-time support (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-support-amounts' }],
+  ['email.event_followup.support_monthly_url', { label: 'Monthly support URL', input: 'url', layoutGroup: 'event-followup-support-links' }],
+  ['email.event_followup.support_monthly_usd', { label: 'Monthly support amount (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-support-amounts' }],
+  ['email.event_followup.newsletter_url', { label: 'Newsletter opt-in URL', input: 'url', help: 'Separate opt-in destination for recipients who are not ready to provide financial support.' }],
   ['platform.logo_path', { label: 'Logo', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site header and platform emails. Upload a square PNG, JPEG, or WebP under 512 KB, or paste an existing asset path.' }],
   ['platform.footer_logo_path', { label: 'Footer logo', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site footer. Upload an image or paste an existing asset path.' }],
   ['platform.favicon_path', { label: 'Favicon', input: 'image-upload', layoutGroup: 'brand-favicon-social-image', help: 'Small browser-tab icon for the site. Use a simple square image for the most reliable display.' }],
@@ -16362,6 +17095,20 @@ async function handleAdminSettings(request, env) {
         ['Add-ons Enabled', addOnsEnabled, editableAdminSetting('add_ons.enabled', 'boolean')],
         ['Add-on product count', addOnProductCount, editableAdminSetting('add_ons.product_count', 'number')],
         ['App mode', env.APP_MODE, readOnlyAdminSettingHelp('The runtime environment mode currently used by the Worker, such as live or test.')]
+      ]),
+      adminSettingsSection('Post-event email', [
+        ['Post-event delay hours', Number(env.EVENT_FOLLOWUP_DELAY_HOURS || 24), editableAdminSetting('email.event_followup.delay_hours', 'number')],
+        ['Post-event mission statement', env.EVENT_FOLLOWUP_MISSION || '', editableAdminSetting('email.event_followup.mission')],
+        ['Commercial email postal address', env.EVENT_FOLLOWUP_POSTAL_ADDRESS || '', editableAdminSetting('email.event_followup.postal_address')],
+        ['Organization URL', env.EVENT_FOLLOWUP_ORGANIZATION_URL || '', editableAdminSetting('email.event_followup.organization_url')],
+        ['Merch shop URL', env.EVENT_FOLLOWUP_SHOP_URL || env.SITE_BASE || '', editableAdminSetting('email.event_followup.shop_url')],
+        ['Project-support URL', env.EVENT_FOLLOWUP_PROJECT_SUPPORT_URL || '', editableAdminSetting('email.event_followup.project_support_url')],
+        ['Project-support name', env.EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME || '', editableAdminSetting('email.event_followup.project_support_name')],
+        ['One-time support URL', env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL || '', editableAdminSetting('email.event_followup.support_one_time_url')],
+        ['Suggested one-time support (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD || 10), editableAdminSetting('email.event_followup.support_one_time_suggested_usd', 'number')],
+        ['Monthly support URL', env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL || '', editableAdminSetting('email.event_followup.support_monthly_url')],
+        ['Monthly support amount (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD || 5), editableAdminSetting('email.event_followup.support_monthly_usd', 'number')],
+        ['Newsletter opt-in URL', env.EVENT_FOLLOWUP_NEWSLETTER_URL || '', editableAdminSetting('email.event_followup.newsletter_url')]
       ]),
       adminSettingsSection('Brand & SEO', [
         ['Logo', platformLogoPath, editableAdminSetting('platform.logo_path')],
@@ -18332,6 +19079,7 @@ export {
   applyAdminStoreProductPatchToMarkdown,
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
+  buildAdminStoreEventFollowupAudience,
   buildAdminStoreFulfillmentRow,
   buildAdminStoreOrderRecord,
   buildAdminStoreOrdersCacheRequest,
@@ -18356,6 +19104,8 @@ export {
   workersCacheEnabledForAdminStoreOrders,
   storeOrderReconciliationRowsCsv,
   processStoreEventReminders,
+  processStoreEventFollowups,
+  queueStoreEventFollowups,
   queueStoreEventReminders,
   signStoreFulfillmentToken
 };

@@ -43,6 +43,7 @@ Settings is available to `super_admin` users only. It reads from `/admin/setting
 Current Settings sections:
 
 - Platform: site title, platform name, company, author, timezone, support/order/update email addresses, add-ons enabled, add-on product count, and read-only app mode.
+- Post-event email: delay, mission statement, commercial postal address, one-time/monthly support URLs and amounts, and newsletter opt-in URL.
 - Brand & SEO: logo, footer logo, favicon, default social image, X handle, social image alt text, same-as links, and merchant return policy controls for Product/Organization JSON-LD.
 - Canonical URLs: production site URL and production Worker URL.
 - Checkout: Stripe publishable key.
@@ -213,6 +214,7 @@ Current behavior:
 - Revoke or refresh digital download access from a compact row control.
 - Load additional pages when pagination is available.
 - Explicitly refresh Orders. When the first-page filter has not changed, the dashboard reuses its in-memory payload and announces that no new orders were found.
+- Super admins can preview an elapsed event's commercial post-event email and deduplicated purchaser audience. This workflow forces a fresh order scan, displays recipients and exclusions, and renders the exact email in a sandboxed frame. Queueing is blocked unless the event is enabled and eligible, configuration is complete, the scan is untruncated, the preview digest/count still match, and the operator supplies the exact acknowledgement. Preview never sends.
 
 Performance/cache behavior:
 
@@ -243,6 +245,8 @@ Order support endpoints:
 - `POST /admin/store/orders/import-snipcart`
 - `POST /admin/store/orders/check-in`
 - `POST /admin/store/orders/download-access`
+- `GET /admin/store/marketing/event-followup/preview`
+- `POST /admin/store/marketing/event-followup/queue`
 
 ## Analytics
 

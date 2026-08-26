@@ -68,6 +68,8 @@
   var storeOrderLoadTimer = null;
   var storeOrderRenderTimer = null;
   var storeOrderLoadRequestCounter = 0;
+  var storeEventFollowupProductsLoaded = false;
+  var storeEventFollowupPreview = null;
   var adminFieldIdCounter = 0;
   var storeProductDescriptionEditorCounter = 0;
   var storeProductDescriptionUploadCounter = 0;
@@ -1028,6 +1030,7 @@
       loadStoreMarketingData();
     }
     if (key === 'store-orders' && !storeOrdersLoaded) loadStoreOrders();
+    if (key === 'store-orders' && currentUser && currentUser.role === 'super_admin') loadStoreEventFollowupProducts();
     if (key === 'store-products' && !storeProductsLoaded) loadStoreProducts();
     if (key === 'store-coupons' && !storeCouponsLoaded) loadStoreCoupons();
     if (key === 'store-downloads' && !storeDownloadsLoaded) loadStoreDownloads();
@@ -1036,6 +1039,9 @@
 
   function configureTabsForRole(user) {
     var isSuperAdmin = user && user.role === 'super_admin';
+    $all('[data-super-admin-only]').forEach(function(element) {
+      element.hidden = !isSuperAdmin;
+    });
     ['settings'].forEach(function(key) {
       var tab = $('[data-admin-tab="' + key + '"]');
       var panel = $('[data-admin-tab-panel="' + key + '"]');
@@ -4219,6 +4225,185 @@
     });
   }
 
+  function resetStoreEventFollowupPreview() {
+    storeEventFollowupPreview = null;
+    var summary = $('#admin-store-event-followup-summary');
+    var recipients = $('#admin-store-event-followup-recipients');
+    var recipientList = $('#admin-store-event-followup-recipient-list');
+    var emailPreview = $('#admin-store-event-followup-email-preview');
+    var frame = $('#admin-store-event-followup-email-frame');
+    var queueControls = $('#admin-store-event-followup-queue-controls');
+    var acknowledgement = $('#admin-store-event-followup-ack');
+    var queueButton = $('#admin-store-event-followup-queue');
+    if (summary) summary.textContent = '';
+    if (recipients) recipients.hidden = true;
+    if (recipientList) recipientList.textContent = '';
+    if (emailPreview) emailPreview.hidden = true;
+    if (frame) frame.srcdoc = '';
+    if (queueControls) queueControls.hidden = true;
+    if (acknowledgement) acknowledgement.value = '';
+    if (queueButton) queueButton.disabled = true;
+  }
+
+  function loadStoreEventFollowupProducts(force) {
+    if (!currentUser || currentUser.role !== 'super_admin') return Promise.resolve(null);
+    if (storeEventFollowupProductsLoaded && !force) return Promise.resolve(null);
+    var select = $('#admin-store-event-followup-product');
+    var status = $('#admin-store-event-followup-status');
+    if (!select) return Promise.resolve(null);
+    setStatus(status, localizedAdminText('eventFollowupLoadingProducts'));
+    return requestJson('/admin/store/marketing/event-followup/products').then(function(data) {
+      var previous = select.value;
+      var products = (data.products || []).filter(function(product) {
+        var type = String(product.fulfillmentType || '').toLowerCase();
+        return (type === 'ticket' || type === 'rsvp') && product.eventEndsAt;
+      }).sort(function(a, b) {
+        return (Date.parse(b.eventEndsAt || '') || 0) - (Date.parse(a.eventEndsAt || '') || 0);
+      });
+      select.textContent = '';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = localizedAdminText('eventFollowupChooseProduct');
+      select.appendChild(placeholder);
+      products.forEach(function(product) {
+        var option = document.createElement('option');
+        option.value = product.productId;
+        option.textContent = [
+          product.name || product.productId,
+          product.eventEndsAt ? formatDate(product.eventEndsAt) : '',
+          localizedAdminText(product.eventFollowupEnabled ? 'eventFollowupEnabled' : 'eventFollowupDisabled')
+        ].filter(Boolean).join(' · ');
+        select.appendChild(option);
+      });
+      if (previous && products.some(function(product) { return product.productId === previous; })) select.value = previous;
+      storeEventFollowupProductsLoaded = true;
+      setStatus(status, products.length ? '' : localizedAdminText('eventFollowupNoProducts'));
+      return data;
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+      return null;
+    });
+  }
+
+  function renderStoreEventFollowupPreview(data) {
+    storeEventFollowupPreview = data;
+    var audience = data.audience || {};
+    var exclusions = audience.exclusions || {};
+    var product = data.product || {};
+    var preview = data.preview || {};
+    var summary = $('#admin-store-event-followup-summary');
+    var recipientDetails = $('#admin-store-event-followup-recipients');
+    var recipientList = $('#admin-store-event-followup-recipient-list');
+    var emailPreview = $('#admin-store-event-followup-email-preview');
+    var emailMeta = $('#admin-store-event-followup-email-meta');
+    var frame = $('#admin-store-event-followup-email-frame');
+    var queueControls = $('#admin-store-event-followup-queue-controls');
+    if (summary) {
+      summary.textContent = [
+        localizedAdminText('eventFollowupAudienceSummary', {
+          recipients: audience.eligibleRecipientCount || 0,
+          orders: audience.matchingOrders || 0,
+          spots: audience.matchingTicketQuantity || 0,
+          duplicates: audience.duplicatePurchasersCollapsed || 0,
+          imported: exclusions.importedOrders || 0,
+          suppressed: exclusions.suppressedRecipients || 0,
+          processed: exclusions.alreadyProcessedRecipients || 0
+        }),
+        product.eligibleNow
+          ? localizedAdminText('eventFollowupEligibleNow')
+          : localizedAdminText('eventFollowupEligibleAt', { date: formatDate(product.eligibleAt) }),
+        localizedAdminText(preview.configurationReady ? 'eventFollowupConfigurationReady' : 'eventFollowupConfigurationIncomplete')
+      ].join(' · ');
+    }
+    if (recipientList) {
+      recipientList.textContent = '';
+      (audience.recipients || []).forEach(function(recipient) {
+        var recipientSummary = localizedAdminText('eventFollowupRecipientSummary', {
+          email: recipient.email,
+          spots: recipient.ticketQuantity || 0,
+          orders: recipient.orderCount || 0
+        });
+        recipientList.appendChild(createElement('li', '', recipientSummary));
+      });
+    }
+    if (recipientDetails) recipientDetails.hidden = !(audience.recipients || []).length;
+    if (emailMeta) emailMeta.textContent = localizedAdminText('eventFollowupEmailMeta', {
+      from: preview.from || '',
+      subject: preview.subject || '',
+      copy: preview.copyVersion || ''
+    });
+    if (frame) frame.srcdoc = String(preview.html || '');
+    if (emailPreview) emailPreview.hidden = !preview.html;
+    var canQueue = Boolean(
+      product.eligibleNow &&
+      preview.configurationReady &&
+      Number(audience.eligibleRecipientCount || 0) > 0 &&
+      !(data.scan && data.scan.truncated)
+    );
+    if (queueControls) queueControls.hidden = !canQueue;
+    var acknowledgement = $('#admin-store-event-followup-ack');
+    var queueButton = $('#admin-store-event-followup-queue');
+    if (acknowledgement) acknowledgement.value = '';
+    if (queueButton) queueButton.disabled = true;
+  }
+
+  function previewStoreEventFollowup() {
+    var select = $('#admin-store-event-followup-product');
+    var button = $('#admin-store-event-followup-preview');
+    var status = $('#admin-store-event-followup-status');
+    var productId = String(select && select.value || '').trim();
+    if (!productId) {
+      setStatus(status, localizedAdminText('eventFollowupChooseFirst'), true);
+      return;
+    }
+    resetStoreEventFollowupPreview();
+    if (button) button.disabled = true;
+    setStatus(status, localizedAdminText('eventFollowupScanning'));
+    requestJson('/admin/store/marketing/event-followup/preview', {
+      params: { productId: productId }
+    }).then(function(data) {
+      renderStoreEventFollowupPreview(data);
+      setStatus(status, localizedAdminText('eventFollowupPreviewReady'));
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+    }).finally(function() {
+      if (button) button.disabled = false;
+    });
+  }
+
+  function queueStoreEventFollowup() {
+    var data = storeEventFollowupPreview;
+    var status = $('#admin-store-event-followup-status');
+    var button = $('#admin-store-event-followup-queue');
+    var acknowledgement = $('#admin-store-event-followup-ack');
+    if (!data || !data.preview || !data.product) {
+      setStatus(status, localizedAdminText('eventFollowupRefreshBeforeQueue'), true);
+      return;
+    }
+    var count = Number(data.audience && data.audience.eligibleRecipientCount || 0);
+    if (!window.confirm(localizedAdminText('eventFollowupConfirmQueue', {
+      count: count,
+      event: data.product.name || data.product.productId
+    }))) return;
+    if (button) button.disabled = true;
+    setStatus(status, localizedAdminText('eventFollowupRechecking'));
+    requestJson('/admin/store/marketing/event-followup/queue', {
+      method: 'POST',
+      body: {
+        productId: data.product.productId,
+        previewDigest: data.preview.digest,
+        expectedRecipientCount: count,
+        acknowledgement: acknowledgement ? acknowledgement.value : ''
+      }
+    }).then(function(result) {
+      setStatus(status, result.message || localizedAdminText('eventFollowupQueued'));
+      resetStoreEventFollowupPreview();
+    }).catch(function(error) {
+      setStatus(status, formatError(error), true);
+      if (button) button.disabled = false;
+    });
+  }
+
   function setupStoreOrdersEvents() {
     setupStoreOrdersFieldHelp();
     var refresh = $('#admin-store-orders-refresh');
@@ -4226,6 +4411,18 @@
       refresh.addEventListener('click', function() {
         loadStoreOrders({ force: true });
       });
+    }
+    var followupProduct = $('#admin-store-event-followup-product');
+    if (followupProduct) followupProduct.addEventListener('change', resetStoreEventFollowupPreview);
+    var followupPreview = $('#admin-store-event-followup-preview');
+    if (followupPreview) followupPreview.addEventListener('click', previewStoreEventFollowup);
+    var followupAcknowledgement = $('#admin-store-event-followup-ack');
+    var followupQueue = $('#admin-store-event-followup-queue');
+    if (followupAcknowledgement && followupQueue) {
+      followupAcknowledgement.addEventListener('input', function() {
+        followupQueue.disabled = followupAcknowledgement.value.trim() !== 'QUEUE EVENT FOLLOW-UP';
+      });
+      followupQueue.addEventListener('click', queueStoreEventFollowup);
     }
     var filters = $('#admin-store-order-filters');
     if (filters) {
@@ -4603,6 +4800,7 @@
     downloadFileKey: 'Existing download file delivered after checkout for digital products.',
     eventStartsAt: 'Event start date and time used for tickets, product pages, and calendar files.',
     eventEndsAt: 'Optional event end date and time used by calendar files when present.',
+    eventFollowupEnabled: 'Sends one optional thank-you and support email 24 hours after the event ends. Existing products stay off until explicitly enabled.',
     eventVenue: 'Public venue name shown on event products, confirmations, and tickets.',
     eventAddress: 'Optional event address shown on the product page and embedded in calendar files.',
     eventIcs: 'Adds an iCalendar file link to event order confirmations when a start time is set.',
@@ -5192,6 +5390,7 @@
       taxCategory: 'standard',
       inventoryTracking: false,
       inventory: '',
+      eventFollowupEnabled: true,
       variants: [],
       isNew: true
     };
@@ -7960,6 +8159,9 @@
     }));
     eventDetails.appendChild(productField('Starts at', 'eventStartsAt', product.eventStartsAt || product.eventDetails?.startsAt || '', 'datetime-local'));
     eventDetails.appendChild(productField('Ends at', 'eventEndsAt', product.eventEndsAt || product.eventDetails?.endsAt || '', 'datetime-local'));
+    eventDetails.appendChild(productField('Post-event email', 'eventFollowupEnabled', product.eventFollowupEnabled ? 'true' : 'false', 'select', {
+      options: [['true', 'Yes — send after 24 hours'], ['false', 'No']]
+    }));
     eventDetails.appendChild(productField('Venue', 'eventVenue', product.eventVenue || product.eventDetails?.venue || '', 'text'));
     eventDetails.appendChild(createStoreProductEventAddressField(product));
     eventDetails.appendChild(productField('RSVP registration', 'rsvpRegistrationEnabled', product.rsvpRegistrationEnabled ? 'true' : 'false', 'select', {
@@ -8111,6 +8313,7 @@
     setStoreProductFieldVisible(form, 'eventVenue', eventProduct);
     setStoreProductFieldVisible(form, 'eventAddress', eventProduct);
     setStoreProductFieldVisible(form, 'eventIcs', eventProduct);
+    setStoreProductFieldVisible(form, 'eventFollowupEnabled', eventProduct);
     setStoreProductFieldVisible(form, 'rsvpRegistrationEnabled', rsvpProduct);
     setStoreProductFieldVisible(form, 'rsvpRegistrationOpensAt', registrationFieldsVisible);
     setStoreProductFieldVisible(form, 'rsvpRegistrationClosesAt', registrationFieldsVisible);
@@ -8471,7 +8674,7 @@
       if (key === 'price') fields[key] = Number(input.value || 0);
       else if (key === 'inventory' || key === 'rsvpMaxPartySize') fields[key] = input.value === '' ? '' : Number(input.value);
       else if (key === 'inventoryTracking') fields[key] = input.value === 'true';
-      else if (key === 'eventIcs' || key === 'rsvpRegistrationEnabled' || key === 'rsvpRequireContactName' || key === 'rsvpRequireAttendeeNames') fields[key] = input.value === 'true';
+      else if (key === 'eventIcs' || key === 'eventFollowupEnabled' || key === 'rsvpRegistrationEnabled' || key === 'rsvpRequireContactName' || key === 'rsvpRequireAttendeeNames') fields[key] = input.value === 'true';
       else if (key === 'eventStartsAt' || key === 'eventEndsAt' || key === 'rsvpRegistrationOpensAt' || key === 'rsvpRegistrationClosesAt') fields[key] = storeProductDateTimePublishValue(input);
       else if (key === 'downloadFileKey') {
         fields[key] = input.value;
@@ -8785,6 +8988,7 @@
   function refreshStoreProductsAfterDeployment(deployment, options) {
     var opts = options || {};
     var operation = normalizeStoreProductDeploymentOperation(opts.operation);
+    storeEventFollowupProductsLoaded = false;
     return loadStoreProducts().finally(function() {
       if (!deployment) {
         setStatus($('#admin-store-products-status'), opts.fallbackMessage || 'Product changes published.');

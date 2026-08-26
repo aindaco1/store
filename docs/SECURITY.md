@@ -233,6 +233,7 @@ Human review should also reject misleading availability, pricing, policy, event-
 - Admin, checkout, API, Worker, tokenized, order lookup, Order Success, and sensitive query routes are blocked from prefetch.
 - Cart recovery is limited to cart, checkout, and Order Success flows.
 - Abandoned-checkout resume/unsubscribe links are signed, scoped, expiring URLs and should not be crawled or logged with tokens intact.
+- Post-event email opt-out links are signed, scoped, expiring URLs. The resulting hashed promotional-email suppression is durable, applies only to optional/promotional Store email, and must be restored before optional email processing resumes.
 - `robots.txt` disallows admin and API routes.
 - Order lookup and Order Success routes are not listed in `robots.txt`; their HTML stays crawlable only so crawlers can observe `noindex,nofollow`, and they remain out of the sitemap.
 - `sitemap.xml` includes public active/sold-out product URLs and excludes admin, archived/private products, tokenized routes, and private pages.

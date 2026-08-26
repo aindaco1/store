@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## v1.3.0 - 2026-08-26
+
+### Post-event thank-you and support email
+
+- Added an event-level post-event follow-up that defaults on for newly created
+  ticket and RSVP products, remains opt-in for existing products, and becomes
+  eligible 24 hours after the configured event end.
+- Added a fresh super-admin preview and queue flow that shows the exact branded
+  email and deduplicated confirmed-purchaser audience before any backfill is
+  queued. Imported, launch-test, invalid, suppressed, and already-processed
+  recipients remain excluded.
+- Added a multipart Dust Wave thank-you email with linked brand identity,
+  merchandise and active-project paths, two-column one-time/monthly support
+  options, a separate newsletter opt-in, postal address, visible promotional
+  opt-out, and one-click unsubscribe headers.
+- Kept delivery independent of order truth through the durable outbox, stable
+  provider idempotency, bounded retries, and bounce/complaint suppression.
+  Receipts, tickets, security mail, and essential fulfillment updates remain
+  outside promotional suppression.
+- Added English/Spanish copy, fork-facing configuration, data-inventory and
+  recovery documentation, ethical-risk review, audience/delivery unit coverage,
+  and desktop/mobile admin regressions.
+
 ## v1.2.3 - 2026-08-25
 
 ### Product availability and deployment progress

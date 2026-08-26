@@ -12,6 +12,7 @@ function registrationFields() {
     eventEndsAt: '2026-12-19T04:00:00.000Z',
     eventVenue: 'DUST WAVE',
     eventIcs: true,
+    eventFollowupEnabled: true,
     rsvpRegistrationEnabled: true,
     rsvpRegistrationOpensAt: '2026-08-01T06:00:00.000Z',
     rsvpRegistrationClosesAt: '2026-12-18T06:59:00.000Z',
@@ -65,6 +66,7 @@ Existing body.
     const applied = applyAdminStoreProductPatchToMarkdown(source, normalized.patch);
     expect(applied.ok).toBe(true);
     expect(applied.content).toContain('  registration:');
+    expect(applied.content).toContain('  followup:\n    enabled: true');
     expect(applied.content).toContain('    max_party_size: 4');
     expect(applied.content).toContain('      - id: "accessibility_needs"');
     expect(applied.content).toContain('        scope: "attendee"');
@@ -101,5 +103,20 @@ Existing body.
     expect(normalized.ok).toBe(true);
     const eventPatch = normalized.patch.frontMatter.find((entry) => entry.key === 'event_details');
     expect(eventPatch?.replacement).not.toContain('registration:');
+  });
+
+  it('keeps legacy event follow-up disabled unless the admin explicitly enables it', () => {
+    const normalized = normalizeAdminStoreProductPublishBody({
+      intent: 'publish',
+      productId: 'ticket-1',
+      fields: {
+        fulfillmentType: 'ticket',
+        eventEndsAt: '2026-12-19T04:00:00.000Z'
+      }
+    });
+
+    expect(normalized.ok).toBe(true);
+    const eventPatch = normalized.patch.frontMatter.find((entry) => entry.key === 'event_details');
+    expect(eventPatch?.replacement).toContain('  followup:\n    enabled: false');
   });
 });

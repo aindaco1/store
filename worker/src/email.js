@@ -50,6 +50,10 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function renderSafeInlineEmphasis(value) {
+  return escapeHtml(value).replace(/\*\*([^*\n]+)\*\*/g, '<strong style="font-weight: 700;">$1</strong>');
+}
+
 function decodeHtmlEntities(value) {
   return String(value ?? '')
     .replace(/&nbsp;/gi, ' ')
@@ -255,9 +259,17 @@ function getEmailFooterStyle(theme) {
   return `border-top: 1px solid ${theme.borderColor}; padding-top: 20px; font-size: 12px; color: ${theme.mutedTextColor};`;
 }
 
-function renderEmailHeader(theme, heading, { emoji = '', headingColor = '' } = {}) {
+function renderEmailHeader(theme, heading, {
+  emoji = '',
+  headingColor = '',
+  logoHref = '',
+  logoAlt = '',
+  logoMaxSize = 88
+} = {}) {
+  const safeLogoHref = safeExternalUrl(logoHref, theme.siteBase) || theme.siteHomeUrl;
+  const safeLogoSize = Math.max(48, Math.min(180, Number(logoMaxSize) || 88));
   const logo = theme.logoUrl
-    ? `<p style="margin: 0 0 16px 0;"><a href="${escapeHtml(theme.siteHomeUrl)}" style="text-decoration: none;"><img src="${escapeHtml(theme.logoUrl)}" alt="${escapeHtml(theme.platformName)}" style="display: inline-block; max-width: 88px; max-height: 88px; width: auto; height: auto;"></a></p>`
+    ? `<p style="margin: 0 0 16px 0;"><a href="${escapeHtml(safeLogoHref)}" style="text-decoration: none;"><img src="${escapeHtml(theme.logoUrl)}" alt="${escapeHtml(logoAlt || theme.platformName)}" style="display: inline-block; max-width: ${safeLogoSize}px; max-height: ${safeLogoSize}px; width: auto; height: auto;"></a></p>`
     : '';
   const emojiBlock = emoji ? `<div style="font-size: 48px; margin-bottom: 16px;">${emoji}</div>` : '';
   const resolvedHeadingColor = headingColor ? ` color: ${headingColor};` : '';
@@ -849,6 +861,180 @@ export async function sendStoreEventReminderEmail(env, {
     return { sent: true };
   } catch (error) {
     return { sent: false, reason: error?.message || 'Failed to send event reminder email' };
+  }
+}
+
+export async function buildStoreEventFollowupEmailMessage(env, {
+  email,
+  eventTitle = '',
+  mission = '',
+  organizationUrl = '',
+  shopUrl = '',
+  projectSupportUrl = '',
+  projectSupportName = '',
+  oneTimeSupportUrl = '',
+  monthlySupportUrl = '',
+  newsletterUrl = '',
+  unsubscribeUrl = '',
+  postalAddress = '',
+  preferredLang
+} = {}) {
+  const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
+  const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
+  const companyName = safeEmailHeaderText(theme.companyName) || platformName;
+  const recipient = safeEmailHeaderText(email);
+  const title = safeEmailHeaderText(eventTitle) || t('store_event_followup.fallback_title', 'your event');
+  const safeOrganizationUrl = safeExternalUrl(organizationUrl, theme.siteBase) || theme.siteHomeUrl;
+  const safeShopUrl = safeExternalUrl(shopUrl, theme.siteBase) || theme.siteHomeUrl;
+  const safeProjectSupportUrl = safeExternalUrl(projectSupportUrl, theme.siteBase);
+  const safeProjectSupportName = safeEmailHeaderText(projectSupportName) || t('store_event_followup.project_fallback_name', 'the project page');
+  const safeOneTimeUrl = safeExternalUrl(oneTimeSupportUrl, theme.siteBase);
+  const safeMonthlyUrl = safeExternalUrl(monthlySupportUrl, theme.siteBase);
+  const safeNewsletterUrl = safeExternalUrl(newsletterUrl, theme.siteBase);
+  const safeUnsubscribeUrl = safeExternalUrl(unsubscribeUrl, theme.siteBase);
+  const unsubscribeHeaders = emailListUnsubscribeHeaders(safeUnsubscribeUrl, theme.siteBase);
+  const safeMission = String(mission || '').trim() || t(
+    'store_event_followup.mission_fallback',
+    'We make films, put on screenings, and try to clear a little more room for ambitious work outside the usual industry machinery. We’re proud practitioners of DIY -- but even **DIY ain\'t cheap.** Just by showing up, you helped.',
+    { company: companyName }
+  );
+  const addressLines = String(postalAddress || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const subject = buildEmailSubject(
+    t('subjects.store_event_followup', 'Thanks for showing up for %{event}', { event: title }),
+    platformName
+  );
+  const supportOptions = [
+    safeOneTimeUrl ? {
+      label: t('store_event_followup.one_time_label', 'Pitch in once'),
+      detail: t('store_event_followup.one_time_detail', 'Give whatever amount feels right. It isn’t tied to a specific campaign; it helps with whatever comes next.'),
+      cta: t('store_event_followup.one_time_cta', 'Support once'),
+      url: safeOneTimeUrl
+    } : null,
+    safeMonthlyUrl ? {
+      label: t('store_event_followup.monthly_label', 'Keep it going each month'),
+      detail: t('store_event_followup.monthly_detail', 'Monthly support helps with the unglamorous stuff and gives the next strange idea a little room to become real.'),
+      cta: t('store_event_followup.monthly_cta', 'Support monthly'),
+      url: safeMonthlyUrl
+    } : null
+  ].filter(Boolean);
+  const projectSupportListItem = safeProjectSupportUrl
+    ? `<li style="margin-bottom: 7px;"><a href="${escapeHtml(safeProjectSupportUrl)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(t('store_event_followup.project_link', 'Back an active project on %{platform}', { platform: safeProjectSupportName }))}</a></li>`
+    : '';
+  const supportHtml = supportOptions.length ? `
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 14px 0; font-size: 18px; font-weight: 700; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.support_heading', 'Want to help keep this thing going?'))}</p>
+    <p style="margin: 0 0 14px 0; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.support_body', 'Movies cost money. So do rooms, equipment, insurance, crew meals, and the thousand unglamorous things between “what if?” and “we made it.”'))}</p>
+    <p style="margin: 0 0 8px 0; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.support_ways_intro', 'There’s not one right way to help (but here are some suggestions):'))}</p>
+    <ul style="margin: 0 0 14px 0; padding-left: 22px; color: ${theme.textColor};">
+      <li style="margin-bottom: 7px;"><a href="${escapeHtml(safeShopUrl)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(t('store_event_followup.shop_link', 'Pick up something from the %{company} Shop', { company: companyName }))}</a></li>
+      ${projectSupportListItem}
+      <li>${escapeHtml(t('store_event_followup.direct_link', 'Support %{company} directly below', { company: companyName }))}</li>
+    </ul>
+    <p style="margin: 0; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.support_ways_close', 'Any of it helps us stay independent and keep making ambitious work with people we believe in.'))}</p>
+  </div>
+  <table role="presentation" class="store-event-followup-support-grid" style="border-collapse: separate; border-spacing: 0; table-layout: fixed; width: 100%; margin: 0 0 12px 0;">
+    <tr>
+      ${supportOptions.map((option, index) => `
+      <td class="store-event-followup-support-column" width="50%" valign="top" style="box-sizing: border-box; padding: 0 ${index === 0 ? '6px' : '0'} 12px ${index === 0 ? '0' : '6px'}; width: 50%;">
+        <div style="${getEmailCardStyle(theme, 'box-sizing: border-box; height: 100%; margin-bottom: 0;')}">
+          <p style="margin: 0 0 7px 0; font-size: 16px; font-weight: 700; color: ${theme.textColor};">${escapeHtml(option.label)}</p>
+          <p style="margin: 0 0 16px 0; color: ${theme.mutedTextColor};">${escapeHtml(option.detail)}</p>
+          <p style="margin: 0;"><a href="${escapeHtml(option.url)}" style="${getEmailPrimaryButtonStyle(theme, 'padding-left: 18px; padding-right: 18px;')}">${escapeHtml(option.cta)}</a></p>
+        </div>
+      </td>`).join('')}
+    </tr>
+  </table>
+  <p style="margin: 0 0 24px 0; font-size: 12px; color: ${theme.mutedTextColor};">${escapeHtml(t('store_event_followup.support_disclosure', 'Support payments are processed by Stripe and are not tax-deductible charitable contributions.'))}</p>` : '';
+  const newsletterHtml = safeNewsletterUrl ? `
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 10px 0; font-size: 17px; font-weight: 700; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.newsletter_heading', 'Money not in the cards right now? No sweat.'))}</p>
+    <p style="margin: 0 0 16px 0; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.newsletter_body', 'The newsletter is where we share new films, screenings, behind-the-scenes experiments, and assorted Dust Wave shenanigans.'))}</p>
+    <p style="margin: 0;"><a href="${escapeHtml(safeNewsletterUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('store_event_followup.newsletter_cta', 'Keep up with the shenanigans'))}</a></p>
+  </div>` : '';
+  const unsubscribeHtml = safeUnsubscribeUrl
+    ? `<p style="margin: 10px 0 0 0;"><a href="${escapeHtml(safeUnsubscribeUrl)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${escapeHtml(t('store_event_followup.unsubscribe', 'Opt out of optional Store emails'))}</a></p>`
+    : '';
+  const addressHtml = addressLines.length
+    ? `<p style="margin: 10px 0 0 0;">${addressLines.map(escapeHtml).join('<br>')}</p>`
+    : '';
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    @media only screen and (max-width: 620px) {
+      .store-event-followup-support-column { display: block !important; padding: 0 0 12px 0 !important; width: 100% !important; }
+    }
+  </style>
+</head>
+<body style="${getEmailBodyStyle(theme)}">
+  <span style="display: none !important; font-size: 1px; line-height: 1px; max-height: 0; max-width: 0; opacity: 0; overflow: hidden;">${escapeHtml(t('store_event_followup.preheader', 'Thanks for showing up for independent film and helping Dust Wave keep going.'))}</span>
+  ${renderEmailHeader(
+    theme,
+    escapeHtml(t('store_event_followup.heading', 'You showed up -- and that matters.')),
+    { logoHref: safeOrganizationUrl, logoAlt: companyName, logoMaxSize: 128 }
+  )}
+
+  <div style="${getEmailCardStyle(theme)}">
+    <p style="margin: 0 0 12px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.thanks', 'Thanks for coming to %{event}. Seriously.', { event: title }))}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.gathering', 'A roomful of people choosing to experience weird, handmade, independent work together -- that’s the whole point.'))}</p>
+    <p style="margin: 0 0 12px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.mission_link_intro', 'Every ticket and RSVP helps'))} <a href="${escapeHtml(safeOrganizationUrl)}" style="color: ${theme.primaryColor}; font-weight: 700; text-decoration: underline;">${escapeHtml(companyName)}</a> ${escapeHtml(t('store_event_followup.mission_link_tail', 'keep going.'))}</p>
+    <p style="margin: 0; font-size: 15px; color: ${theme.textColor};">${renderSafeInlineEmphasis(safeMission)}</p>
+  </div>
+
+  ${supportHtml}
+  ${newsletterHtml}
+
+  <div style="${getEmailFooterStyle(theme)}">
+    <p style="margin: 0;">${escapeHtml(t('store_event_followup.single_message', 'This is the only post-event email we will send you about %{event}.', { event: title }))}</p>
+    <p style="margin: 10px 0 0 0;">${escapeHtml(t('store_event_followup.commercial_disclosure', 'This message includes optional ways to financially support %{company}.', { company: companyName }))}</p>
+    ${addressHtml}
+    ${unsubscribeHtml}
+  </div>
+</body>
+</html>`.trim();
+
+  return {
+    valid: Boolean(recipient && supportOptions.length > 0 && addressLines.length > 0 && safeUnsubscribeUrl),
+    from: getUpdatesEmailFrom(env) || getOrdersEmailFrom(env),
+    to: recipient,
+    subject,
+    html,
+    text: buildPlainTextFromHtml(html),
+    headers: unsubscribeHeaders
+  };
+}
+
+export async function sendStoreEventFollowupEmail(env, payload = {}) {
+  configureEmailLogging(env);
+  if (!env?.RESEND_API_KEY && !emailDryRunEnabled(env)) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  const message = await buildStoreEventFollowupEmailMessage(env, payload);
+  if (!message.valid) {
+    return { sent: false, reason: 'Event follow-up requires a recipient, support link, postal address, and unsubscribe URL' };
+  }
+  try {
+    const result = await sendResendEmail(env, {
+      from: message.from,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+      ...(Object.keys(message.headers).length ? { headers: message.headers } : {})
+    }, {
+      errorLabel: 'Resend error (store event follow-up)',
+      failureLabel: `Failed to send ${safeEmailHeaderText(getEmailPlatformDisplayName(env)) || 'Store'} event follow-up email`
+    });
+    return { sent: true, dryRun: result?.dryRun === true };
+  } catch (error) {
+    return { sent: false, reason: error?.message || 'Failed to send event follow-up email' };
   }
 }
 
