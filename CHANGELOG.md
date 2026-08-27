@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.4 - 2026-08-27
+
+- Added a settled-order **Tip Revenue** card to Analytics using the canonical
+  persisted tip amount. Product-scoped Analytics allocates mixed-order tips in
+  proportion to the selected product's persisted line-item subtotal instead of
+  crediting the full tip to every product.
+- Kept the Orders CSV and attendee export actions on one responsive row across
+  desktop and mobile layouts without introducing horizontal overflow.
+
 ## v1.3.3 - 2026-08-27
 
 - Expanded both post-event mission editors with constrained bold, italic,

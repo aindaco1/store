@@ -12980,6 +12980,15 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
     ? (rowRevenueByOrder.get(String(order?.orderToken || '')) || 0)
     : Math.max(0, Number(order?.totals?.totalCents || 0) || 0);
   const revenueCents = orders.reduce((sum, order) => sum + orderRevenueCents(order), 0);
+  const orderTipRevenueCents = (order) => {
+    const tipAmountCents = Math.max(0, Number(order?.totals?.tipAmountCents || 0) || 0);
+    if (!productFiltered || tipAmountCents === 0) return tipAmountCents;
+    const orderSubtotalCents = Math.max(0, Number(order?.totals?.subtotalCents || 0) || 0);
+    const selectedSubtotalCents = rowRevenueByOrder.get(String(order?.orderToken || '')) || 0;
+    if (orderSubtotalCents === 0 || selectedSubtotalCents === 0) return 0;
+    return Math.round(tipAmountCents * Math.min(selectedSubtotalCents, orderSubtotalCents) / orderSubtotalCents);
+  };
+  const tipRevenueCents = orders.reduce((sum, order) => sum + orderTipRevenueCents(order), 0);
   const itemQuantity = rows.reduce((sum, row) => sum + Math.max(0, Number(row.quantity || 0) || 0), 0);
   const ticketRows = rows.filter(isAdminStoreAnalyticsTicketRow);
   const ticketQuantity = ticketRows.reduce((sum, row) => sum + Math.max(0, Number(row.quantity || 0) || 0), 0);
@@ -13014,6 +13023,7 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
       fulfillmentRows: rows.length,
       itemQuantity,
       revenueCents,
+      tipRevenueCents,
       itemSubtotalCents,
       averageOrderCents: orders.length ? Math.round(revenueCents / orders.length) : 0,
       physicalQuantity: rows.filter((row) => row.shippable || row.fulfillmentType === 'physical').reduce((sum, row) => sum + Number(row.quantity || 0), 0),

@@ -71,19 +71,19 @@ describe('Store admin analytics', () => {
         {
           orderToken: 'store-order-confirmed',
           status: 'confirmed',
-          totals: { totalCents: 5232 },
+          totals: { subtotalCents: 5000, tipAmountCents: 232, totalCents: 5232 },
           payment: { required: true, status: 'succeeded' }
         },
         {
           orderToken: 'store-order-pending-a',
           status: 'payment_pending',
-          totals: { totalCents: 5232 },
+          totals: { subtotalCents: 5000, tipAmountCents: 232, totalCents: 5232 },
           payment: { required: true, status: 'requires_payment_method' }
         },
         {
           orderToken: 'store-order-pending-b',
           status: 'payment_pending',
-          totals: { totalCents: 5232 },
+          totals: { subtotalCents: 5000, tipAmountCents: 232, totalCents: 5232 },
           payment: { required: true, status: 'requires_payment_method' }
         }
       ],
@@ -114,6 +114,7 @@ describe('Store admin analytics', () => {
 
     expect(payload.totals.orders).toBe(1);
     expect(payload.totals.revenueCents).toBe(5232);
+    expect(payload.totals.tipRevenueCents).toBe(232);
     expect(payload.totals.physicalQuantity).toBe(1);
     expect(payload.excluded.unsettledOrders).toBe(2);
     expect(payload.breakdowns.status).toEqual([
@@ -131,7 +132,7 @@ describe('Store admin analytics', () => {
       orders: [{
         orderToken: 'store-order-mixed',
         status: 'confirmed',
-        totals: { totalCents: 4200 },
+        totals: { subtotalCents: 4000, tipAmountCents: 400, totalCents: 4400 },
         payment: { status: 'succeeded' },
         attribution: { ref: 'poster' }
       }],
@@ -146,6 +147,7 @@ describe('Store admin analytics', () => {
     });
 
     expect(payload.totals.revenueCents).toBe(2400);
+    expect(payload.totals.tipRevenueCents).toBe(240);
     expect(payload.totals.averageOrderCents).toBe(2400);
     expect(payload.breakdowns.status[0].revenueCents).toBe(2400);
     expect(payload.breakdowns.referral[0].revenueCents).toBe(2400);

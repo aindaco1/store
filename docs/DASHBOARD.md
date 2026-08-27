@@ -253,13 +253,14 @@ Order support endpoints:
 
 ## Analytics
 
-Analytics reads order data from `/admin/store/analytics`, refreshes on tab load, and can be scoped to one canonical product. Product-filtered revenue uses the matching persisted line-item subtotals instead of attributing the entire mixed-product order to the selected product.
+Analytics reads order data from `/admin/store/analytics`, refreshes on tab load, and can be scoped to one canonical product. Product-filtered revenue uses the matching persisted line-item subtotals instead of attributing the entire mixed-product order to the selected product. Tip revenue sums persisted tips from settled orders only. When one product is selected, a mixed order's tip is allocated in proportion to that product's share of the persisted order subtotal.
 
 Current dashboard cards and tables cover:
 
 - Orders
 - Fulfillment rows
 - Revenue
+- Tip revenue
 - Average order value
 - Physical, digital, ticket, and RSVP quantities
 - Check-in totals and check-in rate
