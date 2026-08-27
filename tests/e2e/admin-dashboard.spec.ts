@@ -1472,6 +1472,7 @@ function storeAnalyticsPayload(params: Record<string, string> = {}) {
         fulfillmentRows: quantity,
         itemQuantity: quantity,
         revenueCents,
+        tipRevenueCents: ticketSelected ? 120 : (revenueCents ? 50 : 0),
         itemSubtotalCents: revenueCents,
         averageOrderCents: revenueCents,
         physicalQuantity: 0,
@@ -1505,6 +1506,7 @@ function storeAnalyticsPayload(params: Record<string, string> = {}) {
       fulfillmentRows: 2,
       itemQuantity: 2,
       revenueCents: 1700,
+      tipRevenueCents: 170,
       itemSubtotalCents: 1700,
       averageOrderCents: 850,
       physicalQuantity: 0,
@@ -2329,6 +2331,8 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.storeAnalytics.length).toBe(1);
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Revenue');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('$17');
+    const tipRevenueCard = page.locator('#admin-store-analytics-results .admin-stat-card').filter({ hasText: 'Tip Revenue' });
+    await expect(tipRevenueCard).toContainText('$1.70');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Fronteras Screening');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Referral codes');
 	    await expect(page.locator('#admin-store-analytics-results')).toContainText('Flyer Crew (flyer-crew)');
@@ -2355,6 +2359,7 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-store-analytics-product').selectOption('fronteras-ticket');
     await expect.poll(() => calls.storeAnalytics.some((call) => call.product === 'fronteras-ticket')).toBe(true);
     await expect(page.locator('#admin-store-analytics-results')).toContainText('$12');
+    await expect(tipRevenueCard).toContainText('$1.20');
     await expect(page.locator('#admin-store-analytics-results')).toContainText('Fronteras Screening');
     await expect(page.locator('#admin-store-analytics-results')).not.toContainText('Fronteras Download');
     await page.locator('#admin-store-analytics-results').getByRole('button', { name: 'Export CSV' }).click();
@@ -2521,6 +2526,10 @@ test.describe('Admin Dashboard', () => {
 
     await selectAdminSection(page, 'Orders');
     await expect(page.locator('#admin-panel-store-orders')).toBeVisible();
+    await expect.poll(() => page.locator('.admin-store-orders__export-group').evaluate((group: HTMLElement) => {
+      const buttons = Array.from(group.querySelectorAll<HTMLElement>('.admin-store-orders__export'));
+      return buttons.length === 2 && Math.abs(buttons[0].getBoundingClientRect().top - buttons[1].getBoundingClientRect().top) <= 1;
+    })).toBe(true);
     await expect(page.locator('#admin-store-event-followup')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'About Import Snipcart CSV' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Status' })).toBeVisible();
@@ -3850,6 +3859,12 @@ test.describe('Admin Dashboard', () => {
 
     await selectAdminSection(page, 'Orders');
     await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => page.locator('.admin-store-orders__export-group').evaluate((group: HTMLElement) => {
+      const buttons = Array.from(group.querySelectorAll<HTMLElement>('.admin-store-orders__export'));
+      return buttons.length === 2 &&
+        Math.abs(buttons[0].getBoundingClientRect().top - buttons[1].getBoundingClientRect().top) <= 1 &&
+        buttons.every((button) => button.getBoundingClientRect().right <= window.innerWidth + 1);
+    })).toBe(true);
     const ordersResults = page.locator('#admin-store-orders-results');
     await expect(ordersResults).toContainText(TICKET_ORDER_TOKEN);
     await expect(ordersResults).toContainText('Fronteras Download');

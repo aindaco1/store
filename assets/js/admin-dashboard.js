@@ -3271,6 +3271,7 @@
     var summary = createElement('div', 'admin-stat-grid admin-store-analytics__summary');
     [
       ['Revenue', moneyFromCents(totals.revenueCents || 0)],
+      ['Tip Revenue', moneyFromCents(totals.tipRevenueCents || 0)],
       ['Orders', formatNumber(totals.orders || 0)],
       ['Average order', moneyFromCents(totals.averageOrderCents || 0)],
       ['Items', formatNumber(totals.itemQuantity || 0)],

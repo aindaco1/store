@@ -1716,11 +1716,12 @@ textarea.admin-settings__input--readonly {
 .admin-store-orders__export-group {
   align-self: end;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
 }
 
 .admin-store-orders__export {
+  padding-inline: 12px;
   white-space: nowrap;
 }
 
