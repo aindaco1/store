@@ -80,6 +80,14 @@
               <p class="admin-app__muted">{% include t.html key="admin.store_analytics_intro" lang=current_lang platform=admin_platform_name %}</p>
             </div>
           </div>
+          <form id="admin-store-analytics-filters" class="admin-store-analytics__filters">
+            <div class="admin-store-orders__field">
+              <label for="admin-store-analytics-product">{% include t.html key="admin.filter_product" lang=current_lang %}</label>
+              <select id="admin-store-analytics-product" class="admin-settings__input" name="product" data-all-products-label="{% include t.html key='admin.filter_all_products' lang=current_lang %}">
+                <option value="">{% include t.html key="admin.filter_all_products" lang=current_lang %}</option>
+              </select>
+            </div>
+          </form>
           <div id="admin-store-analytics-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
           <div id="admin-store-analytics-results" class="admin-store-analytics__results"></div>
         </section>
@@ -209,6 +217,19 @@
                 <option value="rsvp">RSVP</option>
                 <option value="unchecked">Not checked in</option>
                 <option value="checked_in">Checked in</option>
+              </select>
+            </div>
+
+            <div class="admin-store-orders__field">
+              <label
+                for="admin-store-order-product"
+                data-store-orders-help
+                data-store-orders-help-label="Product"
+                data-store-orders-help-path="store-orders-product"
+                data-store-orders-help-text="Show only order and fulfillment information for one canonical Store product."
+              >{% include t.html key="admin.filter_product" lang=current_lang %}</label>
+              <select id="admin-store-order-product" class="admin-settings__input" name="product" data-all-products-label="{% include t.html key='admin.filter_all_products' lang=current_lang %}">
+                <option value="">{% include t.html key="admin.filter_all_products" lang=current_lang %}</option>
               </select>
             </div>
 

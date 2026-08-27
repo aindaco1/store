@@ -21,6 +21,7 @@ admin:
   login_local_ready: El enlace local de inicio de sesión está listo.
   login_open: Abrir administración
   login_sending: Enviando enlace de inicio de sesión...
+  session_expired: Tu sesión de administración venció. Inicia sesión de nuevo.
   value_unavailable: No disponible
   value_unknown: Desconocido
   sessions_refresh: Actualizar sesiones
@@ -168,6 +169,8 @@ admin:
   store_order_status: Estado
   store_order_fulfillment: Cumplimiento
   filter_all: Todos
+  filter_product: Producto
+  filter_all_products: Todos los productos
   search_label: Buscar
   export_csv: Exportar CSV
   export_attendees: Exportar asistentes

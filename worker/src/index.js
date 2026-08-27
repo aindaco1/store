@@ -8471,6 +8471,8 @@ function adminStoreOrderMatchesFilters(order = {}, filters = {}) {
 }
 
 function adminStoreFulfillmentMatchesFilter(item = {}, filters = {}) {
+  const productId = String(filters.productId || '').trim();
+  if (productId && String(item.productId || '').trim() !== productId) return false;
   const filter = String(filters.fulfillment || 'all').toLowerCase();
   if (!filter || filter === 'all') return true;
   const type = String(item.fulfillmentType || '').toLowerCase();
@@ -8483,6 +8485,50 @@ function adminStoreFulfillmentMatchesFilter(item = {}, filters = {}) {
   if (filter === 'checked_in') return item.checkInAvailable === true && item.checkIn?.checkedIn === true;
   if (filter === 'unchecked') return item.checkInAvailable === true && item.checkIn?.checkedIn !== true;
   return true;
+}
+
+function buildAdminStoreProductFilterOptions(orders = [], catalogProducts = []) {
+  const products = new Map();
+  for (const product of Array.isArray(catalogProducts) ? catalogProducts : []) {
+    const productId = String(product?.id || '').trim();
+    if (!productId) continue;
+    products.set(productId, {
+      productId,
+      name: String(product?.name || productId).trim() || productId
+    });
+  }
+  for (const order of Array.isArray(orders) ? orders : []) {
+    for (const item of Array.isArray(order?.items) ? order.items : []) {
+      const productId = String(item?.productId || '').trim();
+      if (!productId) continue;
+      const name = String(item?.name || productId).trim() || productId;
+      const existing = products.get(productId);
+      if (!existing || existing.name === productId) products.set(productId, { productId, name });
+    }
+  }
+  return Array.from(products.values()).sort((a, b) => (
+    a.name.localeCompare(b.name) || a.productId.localeCompare(b.productId)
+  ));
+}
+
+function scopeAdminStoreOrderToProduct(order = {}, filters = {}) {
+  const productId = String(filters.productId || '').trim();
+  if (!productId) return order;
+  const items = (Array.isArray(order.items) ? order.items : [])
+    .filter((item) => String(item?.productId || '').trim() === productId);
+  return {
+    ...order,
+    counts: {
+      ...(order.counts || {}),
+      fulfillmentRows: items.length,
+      physicalItems: items.filter((item) => item.shippable || item.fulfillmentType === 'physical').reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      digitalItems: items.filter((item) => item.fulfillmentType === 'digital').reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      ticketItems: items.filter((item) => isAdminStoreAnalyticsTicketRow(item)).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+      checkedInItems: items.filter((item) => item.checkInAvailable).reduce((sum, item) => sum + Number(item.checkIn?.quantity || 0), 0)
+    },
+    fulfillmentTypes: Array.from(new Set(items.map((item) => item.fulfillmentType).filter(Boolean))).sort(),
+    items
+  };
 }
 
 function buildAdminStoreFulfillmentRow(order = {}, item = {}) {
@@ -12285,10 +12331,16 @@ async function handleAdminStoreInventoryRecoveryReconciliation(request, env, bod
   }
 }
 
+function normalizeAdminStoreOrderProductId(value) {
+  const productId = String(value || '').trim();
+  return /^[a-z0-9][a-z0-9._:-]{0,159}$/i.test(productId) ? productId : '';
+}
+
 function storeAdminOrderFiltersFromUrl(url) {
   return {
     status: String(url.searchParams.get('status') || 'all').trim().toLowerCase(),
     fulfillment: String(url.searchParams.get('fulfillment') || 'all').trim().toLowerCase(),
+    productId: normalizeAdminStoreOrderProductId(url.searchParams.get('product')),
     query: String(url.searchParams.get('q') || '').trim().toLowerCase()
   };
 }
@@ -12324,6 +12376,10 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
 
   const url = new URL(request.url);
   const filters = storeAdminOrderFiltersFromUrl(url);
+  const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
+  const filterOptions = {
+    products: buildAdminStoreProductFilterOptions(scannedOrders.orders, catalog.products)
+  };
   const requestState = {
     since: url.searchParams.get('since'),
     watermark: url.searchParams.get('watermark')
@@ -12356,6 +12412,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
           watermark: scannedOrders.watermark || ''
         },
         filters,
+        filterOptions,
         writeBudget: adminStoreOrderScanReadBudget(scannedOrders),
         generatedAt: new Date().toISOString()
       }
@@ -12373,9 +12430,10 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
   const matchedOrders = orders.filter((order) => matchedOrderTokens.has(order.orderToken));
   const paginate = options.paginate !== false;
   const limit = paginate ? clampAdminPageLimit(url.searchParams.get('limit')) : matchedOrders.length || 0;
-  const pageOrders = paginate
+  const unscopedPageOrders = paginate
     ? matchedOrders.slice(cursorOffset, cursorOffset + limit)
     : matchedOrders;
+  const pageOrders = unscopedPageOrders.map((order) => scopeAdminStoreOrderToProduct(order, filters));
   const pageOrderTokens = new Set(pageOrders.map((order) => order.orderToken));
   const fulfillmentRows = paginate
     ? allFulfillmentRows.filter((row) => pageOrderTokens.has(row.orderToken))
@@ -12398,7 +12456,9 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
       totals: {
         orders: matchedOrders.length,
         fulfillmentRows: allFulfillmentRows.length,
-        totalCents: matchedOrders.reduce((sum, order) => sum + Number(order.totals?.totalCents || 0), 0),
+        totalCents: filters.productId
+          ? allFulfillmentRows.reduce((sum, row) => sum + Number(row.subtotalCents || 0), 0)
+          : matchedOrders.reduce((sum, order) => sum + Number(order.totals?.totalCents || 0), 0),
         ticketQuantity: allFulfillmentRows.filter(isAdminStoreAnalyticsTicketRow).reduce((sum, row) => sum + Number(row.quantity || 0), 0),
         checkedInQuantity: allFulfillmentRows.filter((row) => row.checkInAvailable).reduce((sum, row) => sum + Number(row.checkedInQuantity || 0), 0),
         physicalQuantity: allFulfillmentRows.filter((row) => row.shippable || row.fulfillmentType === 'physical').reduce((sum, row) => sum + Number(row.quantity || 0), 0),
@@ -12421,6 +12481,7 @@ async function buildAdminStoreOrdersPayload(request, env, options = {}) {
         watermark: scannedOrders.watermark || ''
       },
       filters,
+      filterOptions,
       writeBudget: adminStoreOrderScanReadBudget(scannedOrders),
       generatedAt: new Date().toISOString()
     }
@@ -12908,18 +12969,27 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
   const utmMediumBreakdown = new Map();
   const utmCampaignBreakdown = new Map();
   const utmContentBreakdown = new Map();
-  const revenueCents = orders.reduce((sum, order) => sum + Math.max(0, Number(order?.totals?.totalCents || 0) || 0), 0);
   const itemSubtotalCents = rows.reduce((sum, row) => sum + Math.max(0, Number(row.subtotalCents || 0) || 0), 0);
+  const productFiltered = Boolean(String(ordersPayload.filters?.productId || '').trim());
+  const rowRevenueByOrder = rows.reduce((map, row) => {
+    const token = String(row.orderToken || '');
+    map.set(token, (map.get(token) || 0) + Math.max(0, Number(row.subtotalCents || 0) || 0));
+    return map;
+  }, new Map());
+  const orderRevenueCents = (order) => productFiltered
+    ? (rowRevenueByOrder.get(String(order?.orderToken || '')) || 0)
+    : Math.max(0, Number(order?.totals?.totalCents || 0) || 0);
+  const revenueCents = orders.reduce((sum, order) => sum + orderRevenueCents(order), 0);
   const itemQuantity = rows.reduce((sum, row) => sum + Math.max(0, Number(row.quantity || 0) || 0), 0);
   const ticketRows = rows.filter(isAdminStoreAnalyticsTicketRow);
   const ticketQuantity = ticketRows.reduce((sum, row) => sum + Math.max(0, Number(row.quantity || 0) || 0), 0);
   const checkedInQuantity = ticketRows.reduce((sum, row) => sum + Math.max(0, Number(row.checkedInQuantity || 0) || 0), 0);
 
   orders.forEach((order) => {
-    incrementStoreAnalyticsBreakdown(statusBreakdown, order.status || 'unknown', 1, order.totals?.totalCents || 0);
-    incrementStoreAnalyticsBreakdown(paymentBreakdown, order.payment?.status || 'unknown', 1, order.totals?.totalCents || 0);
+    const orderRevenue = orderRevenueCents(order);
+    incrementStoreAnalyticsBreakdown(statusBreakdown, order.status || 'unknown', 1, orderRevenue);
+    incrementStoreAnalyticsBreakdown(paymentBreakdown, order.payment?.status || 'unknown', 1, orderRevenue);
     const attribution = normalizeAdminStoreOrderAttribution(order.attribution || {});
-    const orderRevenue = order.totals?.totalCents || 0;
     incrementStoreAnalyticsBreakdown(referralBreakdown, attribution.ref || 'direct', 1, orderRevenue);
     incrementStoreAnalyticsBreakdown(utmSourceBreakdown, attribution.utmSource || 'none', 1, orderRevenue);
     incrementStoreAnalyticsBreakdown(utmMediumBreakdown, attribution.utmMedium || 'none', 1, orderRevenue);
@@ -12966,6 +13036,7 @@ function buildAdminStoreAnalyticsPayload(ordersPayload = {}) {
     },
     page: ordersPayload.page || null,
     filters: ordersPayload.filters || {},
+    filterOptions: ordersPayload.filterOptions || { products: [] },
     excluded: {
       unsettledOrders: Math.max(0, allOrders.length - orders.length)
     },
@@ -16370,17 +16441,17 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['platform.orders_email_from', { label: 'Orders email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
   ['platform.updates_email_from', { label: 'Updates email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
   ['email.event_followup.delay_hours', { label: 'Post-event delay hours', type: 'number', input: 'integer', min: 1, max: 720, step: 1, layoutGroup: 'event-followup-timing-compliance', help: 'Delay after the configured event end before the one-time follow-up is eligible to send.' }],
-  ['email.event_followup.mission', { label: 'Post-event mission statement (English)', input: 'rich-text', layoutGroup: 'event-followup-missions', help: 'English brand mission used in the thank-you email. The editor supports bold emphasis without requiring Markdown.' }],
-  ['email.event_followup.mission_es', { label: 'Post-event mission statement (Spanish)', input: 'rich-text', layoutGroup: 'event-followup-missions', help: 'Spanish brand mission used when the purchaser checked out in Spanish. Store does not translate this field automatically.' }],
+  ['email.event_followup.mission', { label: 'Post-event mission statement (English)', input: 'rich-text', layoutGroup: 'event-followup-missions', help: 'English brand mission used in the thank-you email. The editor supports bold, italic, underline, and links without requiring Markdown.' }],
+  ['email.event_followup.mission_es', { label: 'Post-event mission statement (Spanish)', input: 'rich-text', layoutGroup: 'event-followup-missions', help: 'Spanish brand mission used when the purchaser checked out in Spanish. The editor supports bold, italic, underline, and links. Store does not translate this field automatically.' }],
   ['email.event_followup.postal_address', { label: 'Commercial email postal address', input: 'textarea', layoutGroup: 'event-followup-timing-compliance', help: 'Physical postal address shown in the footer of the post-event commercial email.' }],
   ['email.event_followup.organization_url', { label: 'Organization URL', input: 'url', layoutGroup: 'event-followup-brand-links', help: 'Public organization site used by the post-event logo and organization-name link.' }],
   ['email.event_followup.shop_url', { label: 'Merch shop URL', input: 'url', layoutGroup: 'event-followup-brand-links' }],
   ['email.event_followup.project_support_url', { label: 'Project-support URL', input: 'url', layoutGroup: 'event-followup-project-link' }],
   ['email.event_followup.project_support_name', { label: 'Project-support name', layoutGroup: 'event-followup-project-link' }],
   ['email.event_followup.support_one_time_url', { label: 'One-time support URL', input: 'url', layoutGroup: 'event-followup-one-time' }],
-  ['email.event_followup.support_one_time_suggested_usd', { label: 'Suggested one-time support (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-one-time' }],
+  ['email.event_followup.support_one_time_suggested_usd', { label: 'Suggested amount (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-one-time' }],
   ['email.event_followup.support_monthly_url', { label: 'Monthly support URL', input: 'url', layoutGroup: 'event-followup-monthly' }],
-  ['email.event_followup.support_monthly_usd', { label: 'Monthly support amount (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-monthly' }],
+  ['email.event_followup.support_monthly_usd', { label: 'Monthly amount (USD)', type: 'number', min: 0, step: 1, layoutGroup: 'event-followup-monthly' }],
   ['email.event_followup.newsletter_url', { label: 'Newsletter opt-in URL', input: 'url', help: 'Separate opt-in destination for recipients who are not ready to provide financial support.' }],
   ['platform.logo_path', { label: 'Logo', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site header and platform emails. Upload a square PNG, JPEG, or WebP under 512 KB, or paste an existing asset path.' }],
   ['platform.footer_logo_path', { label: 'Footer logo', input: 'image-upload', layoutGroup: 'brand-logo-footer-logo', help: 'Logo image used in the site footer. Upload an image or paste an existing asset path.' }],
@@ -17243,8 +17314,8 @@ async function handleAdminSettings(request, env) {
         ['App mode', env.APP_MODE, readOnlyAdminSettingHelp('The runtime environment mode currently used by the Worker, such as live or test.')]
       ]),
       adminSettingsSection('Post-event email', [
-        ['Post-event delay hours', Number(env.EVENT_FOLLOWUP_DELAY_HOURS || 24), editableAdminSetting('email.event_followup.delay_hours', 'number')],
         ['Commercial email postal address', env.EVENT_FOLLOWUP_POSTAL_ADDRESS || '', editableAdminSetting('email.event_followup.postal_address')],
+        ['Post-event delay hours', Number(env.EVENT_FOLLOWUP_DELAY_HOURS || 24), editableAdminSetting('email.event_followup.delay_hours', 'number')],
         ['Post-event mission statement (English)', env.EVENT_FOLLOWUP_MISSION || '', editableAdminSetting('email.event_followup.mission')],
         ['Post-event mission statement (Spanish)', env.EVENT_FOLLOWUP_MISSION_ES || '', editableAdminSetting('email.event_followup.mission_es')],
         ['Organization URL', env.EVENT_FOLLOWUP_ORGANIZATION_URL || '', editableAdminSetting('email.event_followup.organization_url')],
@@ -17252,9 +17323,9 @@ async function handleAdminSettings(request, env) {
         ['Project-support URL', env.EVENT_FOLLOWUP_PROJECT_SUPPORT_URL || '', editableAdminSetting('email.event_followup.project_support_url')],
         ['Project-support name', env.EVENT_FOLLOWUP_PROJECT_SUPPORT_NAME || '', editableAdminSetting('email.event_followup.project_support_name')],
         ['One-time support URL', env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_URL || '', editableAdminSetting('email.event_followup.support_one_time_url')],
-        ['Suggested one-time support (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD || 10), editableAdminSetting('email.event_followup.support_one_time_suggested_usd', 'number')],
+        ['Suggested amount (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_ONE_TIME_SUGGESTED_USD || 10), editableAdminSetting('email.event_followup.support_one_time_suggested_usd', 'number')],
         ['Monthly support URL', env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_URL || '', editableAdminSetting('email.event_followup.support_monthly_url')],
-        ['Monthly support amount (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD || 5), editableAdminSetting('email.event_followup.support_monthly_usd', 'number')],
+        ['Monthly amount (USD)', Number(env.EVENT_FOLLOWUP_SUPPORT_MONTHLY_USD || 5), editableAdminSetting('email.event_followup.support_monthly_usd', 'number')],
         ['Newsletter opt-in URL', env.EVENT_FOLLOWUP_NEWSLETTER_URL || '', editableAdminSetting('email.event_followup.newsletter_url')],
         ['Email preview', '', { input: 'event-followup-preview', hideLabel: true }]
       ]),
@@ -17963,6 +18034,9 @@ function normalizeAdminSettingsValue(value, schema = {}) {
     }
     return { ok: true, value: text };
   }
+  if (schema.input === 'rich-text' || schema.input === 'rich-text-inline') {
+    return normalizeAdminRichTextStorageValue(value, label, { maxLength: 2000 });
+  }
   if (schema.type === 'list') {
     const items = Array.isArray(value)
       ? value
@@ -18044,9 +18118,6 @@ function normalizeAdminSettingsValue(value, schema = {}) {
   }
   if (schema.input === 'stripe-publishable-key') {
     return { ok: true, value: text };
-  }
-  if (schema.input === 'rich-text-inline') {
-    return normalizeAdminRichTextStorageValue(text, label, { maxLength: 2000 });
   }
   if (schema.path === 'design.font_body' || schema.path === 'design.font_display') {
     return normalizeAdminCssFontStack(text, label);
@@ -19223,10 +19294,12 @@ function corsResponse(env = null, isPublic = false) {
 }
 
 export {
+  adminStoreFulfillmentMatchesFilter,
   adminStoreEventDetailsSummary,
   applyAdminStoreProductPatchToMarkdown,
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
+  buildAdminStoreProductFilterOptions,
   buildAdminStoreEventFollowupAudience,
   buildAdminStoreEventFollowupPreviewProducts,
   buildAdminStoreFulfillmentRow,
@@ -19249,6 +19322,7 @@ export {
   readAdminStoreOrdersWorkersCacheProps,
   normalizeAdminStoreProductPublishBody,
   serializeAdminStoreEventDetailsYaml,
+  scopeAdminStoreOrderToProduct,
   storeAttendeeRowsCsv,
   workersCacheEnabledForAdminStoreOrders,
   storeOrderReconciliationRowsCsv,

@@ -129,6 +129,15 @@ These items extend the shipped v1.2.0 registration foundation. They are plans, n
   - Use aggregate operational metrics rather than cross-event guest profiles, fingerprinting, or engagement scores. Small sensitive answer groups should be suppressed or coarsened, and raw exports remain deliberate authenticated actions.
   - Define metric names, time zones, test-order handling, retention, cache bounds, and CSV parity before presenting dashboards as decision-grade.
 
+### Email authoring and reporting
+
+- [ ] Customizable content for more Store emails
+  - Extend the current previewable post-event customization pattern to additional transactional and lifecycle emails without allowing arbitrary scripts or weakening delivery idempotency, suppression, plain-text parity, localization, or required order and fulfillment facts.
+  - Define approved editable regions per email, preserve safe on-brand defaults for new forks, and require representative preview and test-send coverage before an email can be published.
+- [ ] Analytics delivery-type filtering
+  - Add a server-side Analytics filter for physical, digital, ticket, and RSVP delivery types, with the same scope reflected in summary cards, breakdowns, cached reads, and CSV output.
+  - Keep product and delivery filters composable and derive both from canonical persisted order rows rather than browser-only filtering.
+
 ### Store-wide platform work
 
 - [ ] Guided setup TUI wrapper

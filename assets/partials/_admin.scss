@@ -1704,7 +1704,13 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-store-orders__filters {
-  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
+  grid-template-columns: repeat(4, minmax(125px, 1fr)) auto;
+}
+
+.admin-store-analytics__filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 22rem);
+  margin-top: 16px;
 }
 
 .admin-store-orders__export-group {
@@ -4628,7 +4634,11 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-orders__filters {
-    grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .admin-store-orders__export-group {
+    grid-column: 1 / -1;
   }
 
   .admin-store-orders__import {
@@ -5229,6 +5239,10 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-store-orders__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-store-analytics__filters {
     grid-template-columns: 1fr;
   }
 

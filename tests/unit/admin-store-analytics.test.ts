@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildAdminStoreAnalyticsPayload } from '../../worker/src/index.js';
+import {
+  adminStoreFulfillmentMatchesFilter,
+  buildAdminStoreAnalyticsPayload,
+  buildAdminStoreProductFilterOptions,
+  scopeAdminStoreOrderToProduct
+} from '../../worker/src/index.js';
 
 describe('Store admin analytics', () => {
   it('counts every ticket-like product row in ticket totals', () => {
@@ -117,5 +122,61 @@ describe('Store admin analytics', () => {
     expect(payload.breakdowns.payment).toEqual([
       { key: 'succeeded', count: 1, quantity: 1, revenueCents: 5232 }
     ]);
+  });
+
+  it('scopes product analytics to matching line-item revenue in mixed orders', () => {
+    const payload = buildAdminStoreAnalyticsPayload({
+      filters: { productId: 'film-ticket' },
+      filterOptions: { products: [{ productId: 'film-ticket', name: 'Film Ticket' }] },
+      orders: [{
+        orderToken: 'store-order-mixed',
+        status: 'confirmed',
+        totals: { totalCents: 4200 },
+        payment: { status: 'succeeded' },
+        attribution: { ref: 'poster' }
+      }],
+      fulfillments: [{
+        orderToken: 'store-order-mixed',
+        productId: 'film-ticket',
+        itemName: 'Film Ticket',
+        fulfillmentType: 'ticket',
+        quantity: 2,
+        subtotalCents: 2400
+      }]
+    });
+
+    expect(payload.totals.revenueCents).toBe(2400);
+    expect(payload.totals.averageOrderCents).toBe(2400);
+    expect(payload.breakdowns.status[0].revenueCents).toBe(2400);
+    expect(payload.breakdowns.referral[0].revenueCents).toBe(2400);
+    expect(payload.filterOptions.products).toEqual([{ productId: 'film-ticket', name: 'Film Ticket' }]);
+  });
+
+  it('builds stable product options and removes unrelated items from product-scoped orders', () => {
+    const orders = [{
+      orderToken: 'store-order-mixed',
+      counts: { fulfillmentRows: 2 },
+      items: [
+        { productId: 'zine', name: 'Zine', fulfillmentType: 'physical', quantity: 1 },
+        { productId: 'film-ticket', name: 'Film Ticket', fulfillmentType: 'ticket', quantity: 2 }
+      ]
+    }, {
+      items: [{ productId: 'film-ticket', name: 'Film Ticket', fulfillmentType: 'ticket', quantity: 1 }]
+    }];
+
+    expect(buildAdminStoreProductFilterOptions(orders, [{ id: 'poster', name: 'Poster' }])).toEqual([
+      { productId: 'film-ticket', name: 'Film Ticket' },
+      { productId: 'poster', name: 'Poster' },
+      { productId: 'zine', name: 'Zine' }
+    ]);
+    expect(adminStoreFulfillmentMatchesFilter(
+      { productId: 'zine', fulfillmentType: 'physical' },
+      { productId: 'film-ticket', fulfillment: 'all' }
+    )).toBe(false);
+    const scoped = scopeAdminStoreOrderToProduct(orders[0], { productId: 'film-ticket' });
+    expect(scoped.items).toHaveLength(1);
+    expect(scoped.items[0].productId).toBe('film-ticket');
+    expect(scoped.fulfillmentTypes).toEqual(['ticket']);
+    expect(scoped.counts.fulfillmentRows).toBe(1);
   });
 });

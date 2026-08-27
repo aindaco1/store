@@ -383,6 +383,23 @@
     }
   }
 
+  function returnToAdminLoginAfterSessionExpiry() {
+    var app = $('#admin-app');
+    var hadActiveSession = Boolean(currentUser || (app && !app.hidden));
+    if (!hadActiveSession) return false;
+    csrfToken = '';
+    currentUser = null;
+    if (window.history && window.history.replaceState) {
+      var url = new URL(window.location.href);
+      url.searchParams.delete('admin_login');
+      window.history.replaceState({}, '', url.toString());
+    }
+    showAuth(localizedAdminText('adminSessionExpired'));
+    var email = $('#admin-email');
+    if (email) email.focus();
+    return true;
+  }
+
   function requestJson(path, options) {
     var opts = options || {};
     var method = String(opts.method || 'GET').toUpperCase();
@@ -405,6 +422,7 @@
       return response.text().then(function(text) {
         var data = text ? parseJsonSafely(text) : {};
         if (!response.ok) {
+          if (response.status === 401) returnToAdminLoginAfterSessionExpiry();
           var message = data.error || data.message || 'Request failed.';
           throw Object.assign(new Error(message), { status: response.status, data: data });
         }
@@ -441,6 +459,9 @@
         maximumBytes: 16 * 1024 * 1024,
         allowedContentTypes: ['text/csv']
       });
+    }).catch(function(error) {
+      if (error && error.status === 401) returnToAdminLoginAfterSessionExpiry();
+      throw error;
     });
   }
 
@@ -501,6 +522,7 @@
         adminLoginLocalReady: 'Local login link ready.',
         adminLoginOpen: 'Open admin',
         adminLoginSending: 'Sending login link...',
+        adminSessionExpired: 'Your admin session expired. Sign in again.',
         adminSessionsLoading: 'Loading admin sessions...',
         adminAuditLoading: 'Loading audit events...',
         ordersUnchanged: 'No order changes since the last refresh.',
@@ -572,6 +594,7 @@
         adminLoginLocalReady: 'El enlace local de inicio de sesion esta listo.',
         adminLoginOpen: 'Abrir administracion',
         adminLoginSending: 'Enviando enlace de inicio de sesion...',
+        adminSessionExpired: 'Tu sesion de administracion vencio. Inicia sesion de nuevo.',
         adminSessionsLoading: 'Cargando sesiones de administracion...',
         adminAuditLoading: 'Cargando eventos de auditoria...',
         ordersUnchanged: 'No hay cambios en los pedidos desde la ultima actualizacion.',
@@ -1056,7 +1079,7 @@
     var app = $('#admin-app');
     if (authPanel) authPanel.hidden = false;
     if (app) app.hidden = true;
-    if (message) setStatus($('#admin-auth-status'), message);
+    setStatus($('#admin-auth-status'), message || '');
     loadAdminTurnstileForAuth();
   }
 
@@ -1556,14 +1579,22 @@
   }
 
   function storeEventFollowupMissionHtml(value) {
-    var paragraphs = String(value || '')
+    var underlines = [];
+    var source = String(value || '').replace(/<u>([\s\S]*?)<\/u>/gi, function(_match, inner) {
+      var token = '\uE000store-mission-underline-' + underlines.length + '\uE001';
+      underlines.push(renderStoreProductInlineMarkdown(inner));
+      return token;
+    });
+    var paragraphs = source
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .split(/\n{2,}/)
       .map(function(paragraph) {
-        var html = escapeStoreProductEditorHtml(paragraph.trim())
-          .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        var html = renderStoreProductInlineMarkdown(paragraph.trim())
           .replace(/\n/g, '<br>');
+        underlines.forEach(function(inner, index) {
+          html = html.replace('\uE000store-mission-underline-' + index + '\uE001', '<u>' + inner + '</u>');
+        });
         return html ? '<p>' + html + '</p>' : '';
       })
       .filter(Boolean);
@@ -1577,7 +1608,13 @@
     var tag = node.tagName.toLowerCase();
     if (tag === 'br') return '\n';
     var inner = Array.from(node.childNodes).map(storeEventFollowupMissionNodeToMarkdown).join('');
+    if (tag === 'a') {
+      var href = node.getAttribute('href') || '';
+      return isSafeStoreProductEditorHref(href) ? '[' + inner + '](' + href + ')' : inner;
+    }
     if (tag === 'strong' || tag === 'b') return wrapStoreProductMarkdownInline(inner, '**', '**');
+    if (tag === 'em' || tag === 'i') return wrapStoreProductMarkdownInline(inner, '*', '*');
+    if (tag === 'u') return '<u>' + inner + '</u>';
     if (['p', 'div'].includes(tag)) return inner.trim() + '\n\n';
     return inner;
   }
@@ -1598,11 +1635,23 @@
     var toolbar = createElement('div', 'admin-settings__rich-inline-toolbar');
     toolbar.setAttribute('role', 'toolbar');
     toolbar.setAttribute('aria-label', (row.label || 'Mission statement') + ' formatting');
-    var bold = createElement('button', 'btn btn--secondary btn--small admin-settings__rich-inline-button', 'B');
-    bold.type = 'button';
-    bold.setAttribute('aria-label', 'Bold');
-    bold.setAttribute('aria-pressed', 'false');
-    bold.addEventListener('mousedown', function(event) { event.preventDefault(); });
+    var formatButtons = {};
+
+    function createFormatButton(action, label, text) {
+      var button = createElement('button', 'btn btn--secondary btn--small admin-settings__rich-inline-button admin-event-followup-mission-editor__' + action, text);
+      button.type = 'button';
+      button.dataset.eventFollowupMissionFormat = action;
+      button.setAttribute('aria-label', label);
+      if (action !== 'link') button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('mousedown', function(event) { event.preventDefault(); });
+      formatButtons[action] = button;
+      return button;
+    }
+
+    var bold = createFormatButton('bold', 'Bold', 'B');
+    var italic = createFormatButton('italic', 'Italic', 'I');
+    var underline = createFormatButton('underline', 'Underline', 'U');
+    var link = createFormatButton('link', 'Link', 'Link');
     var editor = createElement('div', 'admin-settings__rich-inline-editor');
     editor.id = 'admin-setting-editor-' + String(row.path || '').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
     editor.contentEditable = 'true';
@@ -1616,17 +1665,39 @@
 
     function sync() {
       syncStoreEventFollowupMissionEditor(textarea, editor);
-      try {
-        bold.setAttribute('aria-pressed', document.queryCommandState('bold') ? 'true' : 'false');
-      } catch (_error) {
-        bold.setAttribute('aria-pressed', 'false');
-      }
+      ['bold', 'italic', 'underline'].forEach(function(action) {
+        try {
+          formatButtons[action].setAttribute('aria-pressed', document.queryCommandState(action) ? 'true' : 'false');
+        } catch (_error) {
+          formatButtons[action].setAttribute('aria-pressed', 'false');
+        }
+      });
     }
 
-    bold.addEventListener('click', function() {
+    [bold, italic, underline].forEach(function(button) {
+      button.addEventListener('click', function() {
+        editor.focus();
+        try {
+          document.execCommand(button.dataset.eventFollowupMissionFormat, false, null);
+        } catch (_error) {
+        }
+        sync();
+      });
+    });
+    link.addEventListener('click', function() {
       editor.focus();
+      var href = window.prompt('Link URL', 'https://');
+      if (!href || !isSafeStoreProductEditorHref(href)) {
+        sync();
+        return;
+      }
       try {
-        document.execCommand('bold', false, null);
+        var selection = window.getSelection && window.getSelection();
+        if (selection && selection.rangeCount && selection.isCollapsed) {
+          insertStoreProductEditorHtml(editor, '<a href="' + escapeStoreProductEditorAttribute(href) + '">' + escapeStoreProductEditorHtml(href) + '</a>', true);
+        } else {
+          document.execCommand('createLink', false, href);
+        }
       } catch (_error) {
       }
       sync();
@@ -1643,6 +1714,9 @@
     });
     textarea.hidden = true;
     toolbar.appendChild(bold);
+    toolbar.appendChild(italic);
+    toolbar.appendChild(underline);
+    toolbar.appendChild(link);
     wrapper.appendChild(toolbar);
     wrapper.appendChild(editor);
     wrapper.appendChild(textarea);
@@ -2271,9 +2345,45 @@
     return {
       status: ($('#admin-store-order-status') || {}).value || 'confirmed',
       fulfillment: ($('#admin-store-order-fulfillment') || {}).value || 'all',
+      product: ($('#admin-store-order-product') || {}).value || '',
       q: (($('#admin-store-order-query') || {}).value || '').trim(),
       cursor: cursor || 0,
       limit: 25
+    };
+  }
+
+  function syncStoreProductFilterOptions(select, filterOptions) {
+    var products = filterOptions && Array.isArray(filterOptions.products)
+      ? filterOptions.products
+      : null;
+    if (!select || !products) return;
+    var selected = String(select.value || '');
+    var allLabel = select.dataset.allProductsLabel || 'All products';
+    clear(select);
+    var allOption = document.createElement('option');
+    allOption.value = '';
+    allOption.textContent = allLabel;
+    select.appendChild(allOption);
+    products.forEach(function(product) {
+      var productId = String(product && product.productId || '').trim();
+      if (!productId) return;
+      var option = document.createElement('option');
+      option.value = productId;
+      option.textContent = String(product.name || productId);
+      select.appendChild(option);
+    });
+    if (selected && !$all('option', select).some(function(option) { return option.value === selected; })) {
+      var selectedOption = document.createElement('option');
+      selectedOption.value = selected;
+      selectedOption.textContent = selected;
+      select.appendChild(selectedOption);
+    }
+    select.value = selected;
+  }
+
+  function storeAnalyticsFilters() {
+    return {
+      product: ($('#admin-store-analytics-product') || {}).value || ''
     };
   }
 
@@ -2282,6 +2392,7 @@
     return JSON.stringify({
       status: String(source.status || 'confirmed'),
       fulfillment: String(source.fulfillment || 'all'),
+      product: String(source.product || ''),
       q: String(source.q || '').trim().toLowerCase(),
       cursor: Number(source.cursor || 0) || 0,
       limit: Number(source.limit || 25) || 25
@@ -2856,12 +2967,10 @@
     senderAddress.dataset.eventFollowupPreviewSenderAddress = 'true';
     senderCopy.appendChild(senderName);
     senderCopy.appendChild(senderAddress);
-    var recipient = createElement('span', 'admin-event-followup-preview__recipient', currentLang.indexOf('es') === 0 ? 'para destinatario de vista previa' : 'to preview recipient');
     var subject = createElement('h4', 'admin-event-followup-preview__subject', '');
     subject.dataset.eventFollowupPreviewSubject = 'true';
     envelope.appendChild(senderBadge);
     envelope.appendChild(senderCopy);
-    envelope.appendChild(recipient);
     envelope.appendChild(subject);
     var frame = document.createElement('iframe');
     frame.className = 'admin-event-followup-preview__frame';
@@ -3192,8 +3301,9 @@
   function loadStoreAnalytics() {
     var status = $('#admin-store-analytics-status');
     setStatus(status, 'Loading Store analytics...');
-    return requestJson('/admin/store/analytics').then(function(data) {
+    return requestJson('/admin/store/analytics', { params: storeAnalyticsFilters() }).then(function(data) {
       storeAnalyticsLoaded = true;
+      syncStoreProductFilterOptions($('#admin-store-analytics-product'), data.filterOptions);
       renderStoreAnalytics(data);
       setStatus(status, '');
     }).catch(function(error) {
@@ -3878,6 +3988,16 @@
   function setupStoreAnalyticsEvents() {
     var root = $('#admin-store-analytics-results');
     if (!root) return;
+    var filters = $('#admin-store-analytics-filters');
+    if (filters) {
+      filters.addEventListener('submit', function(event) {
+        event.preventDefault();
+        loadStoreAnalytics();
+      });
+      filters.addEventListener('change', function(event) {
+        if (event.target && event.target.name === 'product') loadStoreAnalytics();
+      });
+    }
     root.addEventListener('click', function(event) {
       var button = event.target.closest('[data-store-analytics-export]');
       if (!button) return;
@@ -4348,6 +4468,7 @@
   function renderCurrentStoreOrders() {
     var status = $('#admin-store-orders-status');
     var query = getStoreOrderSearchQuery();
+    var productId = String(($('#admin-store-order-product') || {}).value || '');
     var source = currentStoreOrdersPayload || {
       orders: [],
       fulfillments: [],
@@ -4362,7 +4483,7 @@
     renderStoreOrders(normalized, false);
     var next = $('#admin-store-orders-next');
     if (next) next.hidden = storeOrderNextCursor === null || storeOrderNextCursor === undefined;
-    if (query) {
+    if (query || productId) {
       var visible = Array.isArray(normalized.orders) ? normalized.orders.length : 0;
       var matched = source.page && source.page.matchedOrders !== undefined
         ? Number(source.page.matchedOrders || 0)
@@ -4397,6 +4518,10 @@
     setStatus(status, opts.append ? 'Loading more orders...' : 'Loading Store orders...');
     return requestJson('/admin/store/orders', { params: params }).then(function(data) {
       if (requestId !== storeOrderLoadRequestCounter) return data;
+      syncStoreProductFilterOptions(
+        $('#admin-store-order-product'),
+        data.filterOptions || (cachedPayload && cachedPayload.filterOptions)
+      );
       if (data && data.unchanged === true && cachedPayload) {
         var refreshed = Object.assign({}, cachedPayload, {
           generatedAt: data.generatedAt || cachedPayload.generatedAt,

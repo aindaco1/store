@@ -525,6 +525,84 @@ describe('Workers Cache admin endpoints', () => {
     expect(secondBody.fulfillments).toBeUndefined();
   });
 
+  it('applies one canonical product scope to Orders and Analytics', async () => {
+    const env = buildEnv({
+      WORKERS_CACHE_ENABLED: 'false',
+      STORE_CATALOG_JSON: JSON.stringify({
+        products: [
+          { id: 'film-ticket', name: 'Film Ticket' },
+          { id: 'zine', name: 'Zine' }
+        ]
+      })
+    });
+    env.STORE_STATE.store.set('orders:store-order-mixed', JSON.stringify({
+      orderToken: 'store-order-mixed',
+      status: 'confirmed',
+      createdAt: '2026-07-09T12:00:00.000Z',
+      updatedAt: '2026-07-09T12:02:00.000Z',
+      payment: { required: true, status: 'succeeded', amountCents: 4200, currency: 'USD' },
+      orderDraft: {
+        status: 'confirmed',
+        customer: { email: 'buyer@example.com', name: 'Private Buyer' },
+        items: [
+          {
+            id: 'line-ticket',
+            productId: 'film-ticket',
+            sku: 'film-ticket-general',
+            name: 'Film Ticket',
+            quantity: 2,
+            unitPriceCents: 1200,
+            subtotalCents: 2400,
+            fulfillmentType: 'ticket'
+          },
+          {
+            id: 'line-zine',
+            productId: 'zine',
+            sku: 'zine',
+            name: 'Zine',
+            quantity: 1,
+            unitPriceCents: 1800,
+            subtotalCents: 1800,
+            fulfillmentType: 'physical',
+            shippable: true
+          }
+        ],
+        totals: { subtotalCents: 4200, totalCents: 4200, itemCount: 3, currency: 'USD' }
+      }
+    }));
+    const ctx = buildCtx();
+    const session = await createAdminSession(env, ctx);
+    const headers = { Cookie: session.cookie, Origin: SITE_BASE, 'CF-Connecting-IP': requestIp() };
+
+    const ordersResponse = await worker.fetch(new Request(
+      `${WORKER_BASE}/admin/store/orders?status=all&product=film-ticket`,
+      { headers }
+    ), env, ctx);
+    const ordersBody = await ordersResponse.json();
+    expect(ordersResponse.status).toBe(200);
+    expect(ordersBody.filters.productId).toBe('film-ticket');
+    expect(ordersBody.filterOptions.products).toEqual([
+      { productId: 'film-ticket', name: 'Film Ticket' },
+      { productId: 'zine', name: 'Zine' }
+    ]);
+    expect(ordersBody.orders[0].items).toHaveLength(1);
+    expect(ordersBody.orders[0].items[0].productId).toBe('film-ticket');
+    expect(ordersBody.fulfillments).toHaveLength(1);
+    expect(ordersBody.totals.totalCents).toBe(2400);
+
+    const analyticsResponse = await worker.fetch(new Request(
+      `${WORKER_BASE}/admin/store/analytics?product=film-ticket`,
+      { headers: { ...headers, 'CF-Connecting-IP': requestIp() } }
+    ), env, ctx);
+    const analyticsBody = await analyticsResponse.json();
+    expect(analyticsResponse.status).toBe(200);
+    expect(analyticsBody.totals.revenueCents).toBe(2400);
+    expect(analyticsBody.totals.itemQuantity).toBe(2);
+    expect(analyticsBody.breakdowns.products).toEqual([
+      { key: 'Film Ticket', count: 1, quantity: 2, revenueCents: 2400 }
+    ]);
+  });
+
   it('reuses one shared cached index across immediate Orders query variants', async () => {
     const env = buildEnv();
     for (let index = 0; index < 417; index += 1) {

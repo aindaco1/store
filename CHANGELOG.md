@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.3.3 - 2026-08-27
+
+- Expanded both post-event mission editors with constrained bold, italic,
+  underline, and safe-link controls; balanced the settings layout and kept the
+  live delivery-faithful preview on a white email background.
+- Redirected expired authenticated admin sessions to the existing sign-in panel
+  with clear localized guidance instead of exposing the Worker's Unauthorized
+  response.
+- Added server-enforced product filters to Orders, fulfillment and attendee CSV
+  exports, and Analytics. Product-scoped analytics now attributes only matching
+  persisted line-item revenue in mixed-product orders.
+- Added roadmap plans for customizing more Store email content and filtering
+  Analytics by delivery type.
+
 ## v1.3.2 - 2026-08-26
 
 - Made the Post-event email preview automatic and visually faithful to the

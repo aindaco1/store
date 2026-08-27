@@ -128,7 +128,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     storeDownloadUploads: [],
     storeDownloadCreates: [],
     storeDownloadDeletes: [],
-    storeInventoryWrites: []
+    storeInventoryWrites: [],
+    expireSession: false
   };
   const requestedDeployment = {
     state: 'requested',
@@ -209,6 +210,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
         'set-cookie': 'store_admin_session=session-test; Path=/admin; HttpOnly; SameSite=Lax'
       });
     }
+    if (calls.expireSession) {
+      return fulfillJson({ error: 'Unauthorized' }, 401);
+    }
     if (url.pathname === '/admin/dashboard/summary') {
       calls.summary.push({ method });
       return fulfillJson({
@@ -238,8 +242,9 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
       });
     }
     if (url.pathname === '/admin/store/analytics' && method === 'GET') {
-      calls.storeAnalytics.push(Object.fromEntries(url.searchParams.entries()));
-      return fulfillJson(storeAnalyticsPayload());
+      const params = Object.fromEntries(url.searchParams.entries());
+      calls.storeAnalytics.push(params);
+      return fulfillJson(storeAnalyticsPayload(params));
     }
     if (url.pathname === '/admin/store/marketing/referrals' && method === 'GET') {
       calls.storeMarketingReferrals.push({ method });
@@ -874,8 +879,8 @@ function storeSettingsSections(lang = 'en') {
   }, {
     title: 'Post-event email',
     rows: [
-      settingsRow({ label: 'Post-event delay hours', value: '24', rawValue: 24, editable: true, path: 'email.event_followup.delay_hours', type: 'number', input: 'integer', layoutGroup: 'event-followup-timing-compliance' }),
       settingsRow({ label: 'Commercial email postal address', value: '709 Haines Avenue NW', rawValue: '709 Haines Avenue NW\nAlbuquerque, NM 87102', editable: true, path: 'email.event_followup.postal_address', type: 'string', input: 'textarea', layoutGroup: 'event-followup-timing-compliance' }),
+      settingsRow({ label: 'Post-event delay hours', value: '24', rawValue: 24, editable: true, path: 'email.event_followup.delay_hours', type: 'number', input: 'integer', layoutGroup: 'event-followup-timing-compliance' }),
       settingsRow({ label: 'Post-event mission statement (English)', value: 'Dust Wave makes **independent film.**', rawValue: 'Dust Wave makes **independent film.**', editable: true, path: 'email.event_followup.mission', type: 'string', input: 'rich-text', layoutGroup: 'event-followup-missions' }),
       settingsRow({ label: 'Post-event mission statement (Spanish)', value: 'Dust Wave hace **cine independiente.**', rawValue: 'Dust Wave hace **cine independiente.**', editable: true, path: 'email.event_followup.mission_es', type: 'string', input: 'rich-text', layoutGroup: 'event-followup-missions' }),
       settingsRow({ label: 'Organization URL', value: 'https://dustwave.xyz', rawValue: 'https://dustwave.xyz', editable: true, path: 'email.event_followup.organization_url', type: 'string', input: 'url', layoutGroup: 'event-followup-brand-links' }),
@@ -883,9 +888,9 @@ function storeSettingsSections(lang = 'en') {
       settingsRow({ label: 'Project-support URL', value: 'https://pool.dustwave.xyz', rawValue: 'https://pool.dustwave.xyz', editable: true, path: 'email.event_followup.project_support_url', type: 'string', input: 'url', layoutGroup: 'event-followup-project-link' }),
       settingsRow({ label: 'Project-support name', value: 'The Pool', rawValue: 'The Pool', editable: true, path: 'email.event_followup.project_support_name', type: 'string', input: 'text', layoutGroup: 'event-followup-project-link' }),
       settingsRow({ label: 'One-time support URL', value: 'https://buy.stripe.com/one-time', rawValue: 'https://buy.stripe.com/one-time', editable: true, path: 'email.event_followup.support_one_time_url', type: 'string', input: 'url', layoutGroup: 'event-followup-one-time' }),
-      settingsRow({ label: 'Suggested one-time support (USD)', value: '10', rawValue: 10, editable: true, path: 'email.event_followup.support_one_time_suggested_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-one-time' }),
+      settingsRow({ label: 'Suggested amount (USD)', value: '10', rawValue: 10, editable: true, path: 'email.event_followup.support_one_time_suggested_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-one-time' }),
       settingsRow({ label: 'Monthly support URL', value: 'https://buy.stripe.com/monthly', rawValue: 'https://buy.stripe.com/monthly', editable: true, path: 'email.event_followup.support_monthly_url', type: 'string', input: 'url', layoutGroup: 'event-followup-monthly' }),
-      settingsRow({ label: 'Monthly support amount (USD)', value: '5', rawValue: 5, editable: true, path: 'email.event_followup.support_monthly_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-monthly' }),
+      settingsRow({ label: 'Monthly amount (USD)', value: '5', rawValue: 5, editable: true, path: 'email.event_followup.support_monthly_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-monthly' }),
       settingsRow({ label: 'Newsletter opt-in URL', value: 'https://dustwave.xyz/newsletter.html', rawValue: 'https://dustwave.xyz/newsletter.html', editable: true, path: 'email.event_followup.newsletter_url', type: 'string', input: 'url' }),
       settingsRow({ label: 'Email preview', value: '', rawValue: '', input: 'event-followup-preview', hideLabel: true })
     ]
@@ -1064,24 +1069,28 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       fulfillmentTypes: ['digital', 'physical', 'rsvp', 'ticket'],
       items: [{
         id: 'demo-shirt',
+        productId: 'demo-shirt',
         name: 'Demo Physical Shirt',
         variantLabel: 'Black / M',
         quantity: 1,
         fulfillmentType: 'physical'
       }, {
         id: DEMO_DIGITAL_ITEM_ID,
+        productId: 'demo-digital-download',
         name: 'Demo Digital Download',
         variantLabel: '',
         quantity: 1,
         fulfillmentType: 'digital'
       }, {
         id: DEMO_TICKET_ITEM_ID,
+        productId: 'demo-event-ticket',
         name: 'Demo Event Ticket',
         variantLabel: 'General Admission',
         quantity: 2,
         fulfillmentType: 'ticket'
       }, {
         id: DEMO_RSVP_ITEM_ID,
+        productId: 'demo-rsvp',
         name: 'Demo RSVP',
         variantLabel: '',
         quantity: 2,
@@ -1105,6 +1114,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       fulfillmentTypes: ['ticket'],
       items: [{
         id: TICKET_ITEM_ID,
+        productId: 'fronteras-ticket',
         name: 'Fronteras Screening',
         variantLabel: 'General Admission',
         quantity: 1,
@@ -1128,6 +1138,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       fulfillmentTypes: ['digital'],
       items: [{
         id: DIGITAL_ITEM_ID,
+        productId: 'fronteras-download',
         name: 'Fronteras Download',
         variantLabel: '',
         quantity: 1,
@@ -1141,6 +1152,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       customerName: DEMO_BUYER_NAME,
       customerEmail: DEMO_BUYER_EMAIL,
       itemId: DEMO_DIGITAL_ITEM_ID,
+      productId: 'demo-digital-download',
       itemName: 'Demo Digital Download',
       variantLabel: '',
       sku: DEMO_DIGITAL_ITEM_ID,
@@ -1172,6 +1184,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       customerName: DEMO_BUYER_NAME,
       customerEmail: DEMO_BUYER_EMAIL,
       itemId: DEMO_TICKET_ITEM_ID,
+      productId: 'demo-event-ticket',
       itemName: 'Demo Event Ticket',
       variantLabel: 'General Admission',
       sku: DEMO_TICKET_ITEM_ID,
@@ -1193,6 +1206,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       customerName: DEMO_BUYER_NAME,
       customerEmail: DEMO_BUYER_EMAIL,
       itemId: DEMO_RSVP_ITEM_ID,
+      productId: 'demo-rsvp',
       itemName: 'Demo RSVP',
       variantLabel: '',
       sku: DEMO_RSVP_ITEM_ID,
@@ -1248,6 +1262,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       customerName: TICKET_BUYER_NAME,
       customerEmail: TICKET_BUYER_EMAIL,
       itemId: TICKET_ITEM_ID,
+      productId: 'fronteras-ticket',
       itemName: 'Fronteras Screening',
       variantLabel: 'General Admission',
       sku: TICKET_ITEM_ID,
@@ -1269,6 +1284,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       customerName: DIGITAL_BUYER_NAME,
       customerEmail: DIGITAL_BUYER_EMAIL,
       itemId: DIGITAL_ITEM_ID,
+      productId: 'fronteras-download',
       itemName: 'Fronteras Download',
       variantLabel: '',
       sku: DIGITAL_ITEM_ID,
@@ -1311,18 +1327,38 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
       checkedInBy: checkedIn ? SUPER_ADMIN_EMAIL : ''
     };
   });
+  const filterOptions = {
+    products: Array.from(new Map(allOrders.flatMap((order) => order.items || []).map((item) => [
+      item.productId,
+      { productId: item.productId, name: item.name }
+    ])).values()).sort((a, b) => a.name.localeCompare(b.name))
+  };
   const query = String(params.q || '').trim().toLowerCase();
+  const productId = String(params.product || '').trim();
   const rowsByToken = new Map<string, typeof allFulfillments>();
   for (const row of allFulfillments) {
     const rows = rowsByToken.get(row.orderToken) || [];
     rows.push(row);
     rowsByToken.set(row.orderToken, rows);
   }
-  const orders = query
+  const queryOrders = query
     ? allOrders.filter((order) => JSON.stringify([order, rowsByToken.get(order.orderToken) || []]).toLowerCase().includes(query))
     : allOrders;
+  const productFulfillments = productId
+    ? allFulfillments.filter((row) => row.productId === productId)
+    : allFulfillments;
+  const productOrderTokens = new Set(productFulfillments.map((row) => row.orderToken));
+  const orders = queryOrders
+    .filter((order) => productOrderTokens.has(order.orderToken))
+    .map((order) => productId ? {
+      ...order,
+      items: order.items.filter((item) => item.productId === productId),
+      fulfillmentTypes: Array.from(new Set(order.items
+        .filter((item) => item.productId === productId)
+        .map((item) => item.fulfillmentType)))
+    } : order);
   const orderTokens = new Set(orders.map((order) => order.orderToken));
-  const fulfillments = allFulfillments.filter((row) => orderTokens.has(row.orderToken));
+  const fulfillments = productFulfillments.filter((row) => orderTokens.has(row.orderToken));
   const ticketRows = fulfillments.filter((row) => row.fulfillmentType === 'ticket');
   const fronterasCheckedInQuantity = ticketRows
     .filter((row) => row.itemId === TICKET_ITEM_ID)
@@ -1379,6 +1415,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
         watermark,
         latestKnownUpdatedAt: '2026-06-11T12:10:00.000Z'
       },
+      filterOptions,
       writeBudget: { readOnly: true, kvWritesExpected: 0 }
     };
   }
@@ -1388,6 +1425,7 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
     latestKnownUpdatedAt: '2026-06-11T12:10:00.000Z',
     watermark,
     orders,
+    filterOptions,
     totals: {
       orders: orders.length,
       fulfillmentRows: fulfillments.length,
@@ -1412,9 +1450,56 @@ function storeOrdersPayload(params: Record<string, string> = {}, checkIns: Recor
   };
 }
 
-function storeAnalyticsPayload() {
+function storeAnalyticsPayload(params: Record<string, string> = {}) {
+  const filterOptions = {
+    products: [
+      { productId: 'fronteras-download', name: 'Fronteras Download' },
+      { productId: 'fronteras-ticket', name: 'Fronteras Screening' }
+    ]
+  };
+  if (params.product) {
+    const ticketSelected = params.product === 'fronteras-ticket';
+    const revenueCents = ticketSelected ? 1200 : (params.product === 'fronteras-download' ? 500 : 0);
+    const productName = ticketSelected ? 'Fronteras Screening - General Admission' : 'Fronteras Download';
+    const fulfillment = ticketSelected ? 'ticket' : 'digital';
+    const quantity = revenueCents ? 1 : 0;
+    return {
+      scope: 'store',
+      filters: { productId: params.product },
+      filterOptions,
+      totals: {
+        orders: quantity,
+        fulfillmentRows: quantity,
+        itemQuantity: quantity,
+        revenueCents,
+        itemSubtotalCents: revenueCents,
+        averageOrderCents: revenueCents,
+        physicalQuantity: 0,
+        digitalQuantity: ticketSelected ? 0 : quantity,
+        ticketQuantity: ticketSelected ? quantity : 0,
+        checkedInQuantity: 0,
+        uncheckedQuantity: ticketSelected ? quantity : 0,
+        checkedInRate: 0
+      },
+      breakdowns: {
+        fulfillment: quantity ? [{ key: fulfillment, count: 1, quantity: 1, revenueCents }] : [],
+        status: quantity ? [{ key: 'confirmed', count: 1, quantity: 1, revenueCents }] : [],
+        payment: quantity ? [{ key: 'paid', count: 1, quantity: 1, revenueCents }] : [],
+        referral: quantity ? [{ key: ticketSelected ? 'flyer-crew' : 'direct', count: 1, quantity: 1, revenueCents }] : [],
+        utmSource: [],
+        utmMedium: [],
+        utmCampaign: [],
+        utmContent: [],
+        products: quantity ? [{ key: productName, count: 1, quantity: 1, revenueCents }] : []
+      },
+      referralLabels: { 'flyer-crew': 'Flyer Crew' },
+      generatedAt: '2026-06-11T12:10:00.000Z',
+      writeBudget: { readOnly: true, kvWritesExpected: 0 }
+    };
+  }
   return {
     scope: 'store',
+    filterOptions,
     totals: {
       orders: 2,
       fulfillmentRows: 2,
@@ -2068,16 +2153,44 @@ test.describe('Admin Dashboard', () => {
     await expect(followupSettings.locator('[data-event-followup-preview-product] option')).toHaveCount(1);
     await expect(followupSettings.locator('[data-event-followup-preview-frame]')).toBeVisible();
     await expect(followupSettings.locator('[data-event-followup-preview-refresh]')).toHaveCount(0);
+    await expect(followupSettings.locator('.admin-event-followup-preview__recipient')).toHaveCount(0);
+    await expect(followupSettings.getByText('to preview recipient')).toHaveCount(0);
+    const timingGrid = followupSettings.locator('[data-settings-layout-group="event-followup-timing-compliance"]');
+    await expect(timingGrid.locator('.admin-settings__field-grid-item').nth(0)).toHaveAttribute('data-settings-row-label', 'Commercial email postal address');
+    await expect(timingGrid.locator('.admin-settings__field-grid-item').nth(1)).toHaveAttribute('data-settings-row-label', 'Post-event delay hours');
+    await expect.poll(async () => {
+      const timingBoxes = await timingGrid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
+      return timingBoxes[0] / timingBoxes[1];
+    }).toBeGreaterThan(1.8);
     const oneTimeGrid = followupSettings.locator('[data-settings-layout-group="event-followup-one-time"]');
     await expect.poll(async () => {
       const oneTimeBoxes = await oneTimeGrid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
       return oneTimeBoxes[0] / oneTimeBoxes[1];
-    }).toBeGreaterThan(2.5);
+    }).toBeGreaterThan(1.4);
+    for (const label of ['Suggested amount (USD)', 'Monthly amount (USD)']) {
+      const labelControl = followupSettings.locator(`[data-settings-row-label="${label}"] .admin-settings__row-header > label`);
+      await expect.poll(() => labelControl.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getClientRects().length;
+      })).toBe(1);
+    }
     const englishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission"]');
     await expect(englishMissionEditor.locator('strong')).toContainText('independent film.');
-    await englishMissionEditor.fill('An unpublished mission draft.');
-    await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.mission).toBe('An unpublished mission draft.');
+    const englishMissionToolbar = englishMissionEditor.locator('..').getByRole('toolbar');
+    for (const format of ['Bold', 'Italic', 'Underline', 'Link']) {
+      await expect(englishMissionToolbar.getByRole('button', { name: format })).toBeVisible();
+    }
+    await englishMissionEditor.evaluate((editor) => {
+      editor.innerHTML = '<p><strong>Bold</strong> <em>Italic</em> <u>Underline</u> <a href="https://dustwave.xyz/mission">Link</a></p>';
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.mission).toBe('**Bold** *Italic* <u>Underline</u> [Link](https://dustwave.xyz/mission)');
     const spanishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission_es"]');
+    const spanishMissionToolbar = spanishMissionEditor.locator('..').getByRole('toolbar');
+    for (const format of ['Bold', 'Italic', 'Underline', 'Link']) {
+      await expect(spanishMissionToolbar.getByRole('button', { name: format })).toBeVisible();
+    }
     await spanishMissionEditor.fill('Una misión española sin publicar.');
     await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.missionEs).toBe('Una misión española sin publicar.');
     await followupSettings.locator('[data-event-followup-preview-language]').selectOption('es');
@@ -2088,6 +2201,16 @@ test.describe('Admin Dashboard', () => {
     await expect(emailPreview.locator('h1')).toContainText('You showed up -- and that matters.');
     await expect(emailPreview.locator('p')).toHaveCSS('font-weight', '700');
     await expect(emailPreview.locator('body')).toHaveCSS('max-width', '600px');
+    await expect(emailPreview.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    const desktopViewport = page.viewportSize() || { width: 1280, height: 720 };
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectNoHorizontalOverflow(page);
+    for (const grid of [timingGrid, oneTimeGrid]) {
+      const itemTops = await grid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
+      expect(Math.abs(itemTops[0] - itemTops[1])).toBeGreaterThan(8);
+    }
+    await expect(englishMissionToolbar.getByRole('button', { name: 'Link' })).toBeVisible();
+    await page.setViewportSize(desktopViewport);
 
     await selectSettingsSection(page, 'Brand & SEO');
     const brandPanel = page.locator('[data-settings-section-panel="Brand & SEO"]');
@@ -2212,6 +2335,12 @@ test.describe('Admin Dashboard', () => {
 	    expect(Date.now() - analyticsStartedAt).toBeLessThanOrEqual(performanceBudgets.tableRenderMs);
     await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Top products' })).toBeVisible();
+    await expect(page.locator('#admin-store-analytics-product')).toHaveValue('');
+    await expect(page.locator('#admin-store-analytics-product option')).toHaveText([
+      'All products',
+      'Fronteras Download',
+      'Fronteras Screening'
+    ]);
     const topProductsHeadingStyle = await page.locator('.admin-store-analytics__table-actions .admin-report-heading').filter({ hasText: 'Top products' }).first().evaluate((element: HTMLElement) => {
       const style = getComputedStyle(element);
       return {
@@ -2220,9 +2349,14 @@ test.describe('Admin Dashboard', () => {
         fontWeight: style.fontWeight,
         letterSpacing: style.letterSpacing,
         lineHeight: style.lineHeight,
-        textTransform: style.textTransform
-      };
+      textTransform: style.textTransform
+    };
     });
+    await page.locator('#admin-store-analytics-product').selectOption('fronteras-ticket');
+    await expect.poll(() => calls.storeAnalytics.some((call) => call.product === 'fronteras-ticket')).toBe(true);
+    await expect(page.locator('#admin-store-analytics-results')).toContainText('$12');
+    await expect(page.locator('#admin-store-analytics-results')).toContainText('Fronteras Screening');
+    await expect(page.locator('#admin-store-analytics-results')).not.toContainText('Fronteras Download');
     await page.locator('#admin-store-analytics-results').getByRole('button', { name: 'Export CSV' }).click();
     await expect(page.locator('#admin-store-analytics-status')).toContainText('Analytics CSV download started.');
 
@@ -2391,6 +2525,7 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: 'About Import Snipcart CSV' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Status' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Fulfillment' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'About Product' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Search' })).toBeVisible();
     await expect.poll(() => calls.storeOrders.length).toBeGreaterThanOrEqual(1);
     await expect(page.locator('#admin-store-orders-results')).toContainText(DEMO_ORDER_TOKEN);
@@ -2470,12 +2605,20 @@ test.describe('Admin Dashboard', () => {
     await page.locator('#admin-store-order-query').fill(TICKET_BUYER_NAME);
     await page.waitForTimeout(450);
     expect(calls.storeOrders).toHaveLength(storeOrderCallsAfterSearch);
+    await page.locator('#admin-store-order-query').fill('');
+    await page.waitForTimeout(450);
+    await page.locator('#admin-store-order-product').selectOption('fronteras-ticket');
+    await expect.poll(() => calls.storeOrders.some((call) => call.product === 'fronteras-ticket')).toBe(true);
+    await expect(page.locator('#admin-store-orders-results')).toContainText(TICKET_ORDER_TOKEN);
+    await expect(page.locator('#admin-store-orders-results')).toContainText('Fronteras Screening');
+    await expect(page.locator('#admin-store-orders-results')).not.toContainText('Fronteras Download');
     await page.locator('#admin-store-attendees-export').click();
     await expect.poll(() => calls.storeAttendeeCsv.length).toBe(1);
-    expect(calls.storeAttendeeCsv[0]).toMatchObject({ q: TICKET_BUYER_NAME });
+    expect(calls.storeAttendeeCsv[0]).toMatchObject({ product: 'fronteras-ticket' });
     await expect(page.locator('#admin-store-orders-status')).toContainText('Attendee CSV download started.');
     await page.locator('#admin-store-orders-export').click();
     await expect.poll(() => calls.storeOrderCsv.length).toBe(1);
+    expect(calls.storeOrderCsv[0]).toMatchObject({ product: 'fronteras-ticket' });
     await expect(page.locator('#admin-store-orders-status')).toContainText('Order CSV download started.');
     await page.locator('#admin-store-orders-snipcart-file').setInputFiles({
       name: 'snipcart-orders.csv',
@@ -3287,6 +3430,21 @@ test.describe('Admin Dashboard', () => {
       await expect.poll(() => calls.storeProducts.length).toBe(2);
       expect(calls.storeProductEvents.slice(-3)).toEqual(['publish', 'deployment', 'products']);
     });
+  });
+
+  test('returns an expired authenticated session to the admin login', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await gotoDomReady(page, '/admin/?admin_login=expired-session-test');
+    await expect(page.locator('#admin-app')).toBeVisible();
+
+    calls.expireSession = true;
+    await selectAdminSection(page, 'Orders');
+
+    await expect(page.locator('#admin-auth-panel')).toBeVisible();
+    await expect(page.locator('#admin-app')).toBeHidden();
+    await expect(page.locator('#admin-auth-status')).toContainText('Your admin session expired. Sign in again.');
+    await expect(page.locator('#admin-auth-status')).not.toContainText('Unauthorized');
+    await expect(page.locator('#admin-email')).toBeFocused();
   });
 
   test('keeps the sold out edit visible when its saved deployment fails', async ({ page }) => {
