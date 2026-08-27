@@ -2069,8 +2069,10 @@ test.describe('Admin Dashboard', () => {
     await expect(followupSettings.locator('[data-event-followup-preview-frame]')).toBeVisible();
     await expect(followupSettings.locator('[data-event-followup-preview-refresh]')).toHaveCount(0);
     const oneTimeGrid = followupSettings.locator('[data-settings-layout-group="event-followup-one-time"]');
-    const oneTimeBoxes = await oneTimeGrid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
-    expect(oneTimeBoxes[0]).toBeGreaterThan(oneTimeBoxes[1] * 2.5);
+    await expect.poll(async () => {
+      const oneTimeBoxes = await oneTimeGrid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
+      return oneTimeBoxes[0] / oneTimeBoxes[1];
+    }).toBeGreaterThan(2.5);
     const englishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission"]');
     await expect(englishMissionEditor.locator('strong')).toContainText('independent film.');
     await englishMissionEditor.fill('An unpublished mission draft.');
