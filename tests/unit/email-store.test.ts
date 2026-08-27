@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildStoreEventFollowupEmailMessage,
   sendAdminLoginEmail,
   sendAdminUserCreatedEmail,
   sendStoreAbandonedCartEmail,
@@ -490,6 +491,29 @@ describe('Store email integration', () => {
       filename: 'dancewave-check-in-qr.svg',
       content: 'PHN2Zz48L3N2Zz4='
     }]);
+  });
+
+  it('renders safe inline formatting in post-event mission copy', async () => {
+    const message = await buildStoreEventFollowupEmailMessage(env, {
+      email: 'customer@example.com',
+      eventTitle: 'Film Fatale',
+      mission: '**Bold** *italic* <u>underlined</u> [our mission](https://dustwave.xyz/mission) [unsafe](javascript:alert(1))',
+      organizationUrl: 'https://dustwave.xyz',
+      shopUrl: 'https://shop.test',
+      oneTimeSupportUrl: 'https://buy.stripe.com/one-time',
+      postalAddress: '709 Haines Avenue NW\nAlbuquerque, NM 87102',
+      unsubscribeUrl: 'https://shop.test/email/preferences?token=test',
+      preferredLang: 'en'
+    });
+
+    expect(message.valid).toBe(true);
+    expect(message.html).toContain('<strong style="font-weight: 700;">Bold</strong>');
+    expect(message.html).toContain('<em style="font-style: italic;">italic</em>');
+    expect(message.html).toContain('<u style="text-decoration: underline;">underlined</u>');
+    expect(message.html).toContain('<a href="https://dustwave.xyz/mission"');
+    expect(message.html).toContain('>our mission</a>');
+    expect(message.html).not.toContain('href="javascript:');
+    expect(message.text).toContain('our mission (https://dustwave.xyz/mission)');
   });
 
   it('sends admin access emails with direct instructions and footer copy', async () => {

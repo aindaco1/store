@@ -36,6 +36,8 @@ Roles:
 
 Mutations are protected by admin session, CSRF, and Worker rate limiting.
 
+When an authenticated dashboard request returns `401`, the browser clears its in-memory admin state and returns to the existing admin sign-in panel with an expired-session message. Initial unsigned visits still open the same sign-in panel without presenting the Worker response text as an error.
+
 ## Settings
 
 Settings is available to `super_admin` users only. It reads from `/admin/settings` and publishes changes through `/admin/settings/publish`.
@@ -43,7 +45,7 @@ Settings is available to `super_admin` users only. It reads from `/admin/setting
 Current Settings sections:
 
 - Platform: site title, platform name, company, author, timezone, support/order/update email addresses, add-ons enabled, add-on product count, and read-only app mode.
-- Post-event email: compact timing/compliance, bilingual mission, destination, and 3:1 support URL/amount groups plus a sandboxed preview that automatically follows unsaved values, renders the delivered email styling, and switches enabled sample events between English and Spanish.
+- Post-event email: compact timing/compliance, bilingual mission, destination, and balanced support URL/amount groups plus a sandboxed preview that automatically follows unsaved values, renders the delivered email styling, and switches enabled sample events between English and Spanish.
 - Brand & SEO: logo, footer logo, favicon, default social image, X handle, social image alt text, same-as links, and merchant return policy controls for Product/Organization JSON-LD.
 - Canonical URLs: production site URL and production Worker URL.
 - Checkout: Stripe publishable key.
@@ -101,7 +103,7 @@ Editor behavior:
 - Preview renders a sandboxed static product page preview. It mirrors the public product page layout, including full-image display, product-detail spacing, responsive product copy order, compact event address formatting, and Google Maps address links. Scripts, inline event handlers, and `javascript:` URLs are stripped before the preview is injected; the frame retains an opaque origin and does not request stylesheets outside the production Content Security Policy.
 - Event Address is a multiline field so street and locality lines remain distinct. **Find address** stays in the same row at desktop widths and stacks below the field on narrow screens.
 - Ticket and RSVP editors place Starts at, Ends at, and Post-event email in one three-column desktop row and stack them on narrow screens. New event products default the post-event setting to Yes. Once the configured end plus global delay has passed, the control is read-only; the Worker enforces the same cutoff. Earlier confirmed purchasers are reconciled automatically at send time, with one message per normalized email address.
-- The global **Post-event delay hours** setting actively determines each enabled event's send time and lock cutoff. English and Spanish mission statements use visual rich-text controls; Store does not translate authored mission copy. The email preview refreshes automatically, displays sender and subject like a mail client, renders the exact inline email design in an isolated frame, and offers only enabled non-test event products.
+- The global **Post-event delay hours** setting actively determines each enabled event's send time and lock cutoff. English and Spanish mission statements use compact bold, italic, underline, and link controls; Store does not translate authored mission copy. The email preview refreshes automatically, displays sender and subject like a mail client, renders the exact inline email design in an isolated frame, and offers only enabled non-test event products.
 - Publish/Create is disabled until actual changes are present and disabled again when changes are undone.
 - Publish/Create and Cancel stay in a sticky editor header so status changes and other edits always retain a visible save action. Selecting Archived, Draft, Sold out, or Active is still a pending form change until the explicitly labeled publish action succeeds.
 - Successful production publishes return the saved commit and deployment request. One operation-aware controller handles ordinary product edits, Active, Draft, Archived, and Sold out transitions, bulk status changes, and Save order. It shows an accessible **Saved → Deploying → Deployed** indicator, the exact GitHub run state, operation-specific copy, and elapsed save-to-deploy time. The editor or arranged rows and prior product list remain in place until that run succeeds, then the dashboard refreshes from the newly deployed Worker catalog. A failed or unobservable run leaves the saved state explicit, preserves the prior list instead of presenting it as current, and links the GitHub run when available.
@@ -205,9 +207,9 @@ Orders is the fulfillment and customer support view. It reads from `/admin/store
 
 Current behavior:
 
-- Filter by order status, fulfillment type, ticket check-in state, or search query.
+- Filter by order status, fulfillment type, canonical product, ticket check-in state, or search query. Product-scoped reads return only that product's item and fulfillment rows while retaining the canonical order identity.
 - Export fulfillment CSV.
-- Export attendee CSV for ticket/RSVP products. Configured registrations expand to one row per named attendee with canonical party/attendee responses; legacy orders remain one row per item.
+- Export attendee CSV for ticket/RSVP products. Both exports inherit the current product filter. Configured registrations expand to one row per named attendee with canonical party/attendee responses; legacy orders remain one row per item.
 - Import historical Snipcart CSV exports into production Store order storage.
 - View order totals and fulfillment rows.
 - Mark legacy ticket/RSVP rows checked in or unchecked. Named RSVP registrations expose one independently audited check-in control per attendee, and partial check-ins roll up to the existing attendance totals.
@@ -251,7 +253,7 @@ Order support endpoints:
 
 ## Analytics
 
-Analytics reads order data from `/admin/store/analytics` and refreshes on tab load.
+Analytics reads order data from `/admin/store/analytics`, refreshes on tab load, and can be scoped to one canonical product. Product-filtered revenue uses the matching persisted line-item subtotals instead of attributing the entire mixed-product order to the selected product.
 
 Current dashboard cards and tables cover:
 

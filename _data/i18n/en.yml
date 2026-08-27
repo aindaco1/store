@@ -21,6 +21,7 @@ admin:
   login_local_ready: Local login link ready.
   login_open: Open admin
   login_sending: Sending login link...
+  session_expired: Your admin session expired. Sign in again.
   value_unavailable: Unavailable
   value_unknown: Unknown
   sessions_refresh: Refresh sessions
@@ -168,6 +169,8 @@ admin:
   store_order_status: Status
   store_order_fulfillment: Fulfillment
   filter_all: All
+  filter_product: Product
+  filter_all_products: All products
   search_label: Search
   export_csv: Export CSV
   export_attendees: Export attendees

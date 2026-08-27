@@ -32,7 +32,7 @@ import {
 
 describe('Workers Cache policy helpers', () => {
   it('builds canonical cache requests without credentials, search PII, or unknown fields', () => {
-    const request = new Request('https://checkout.dustwave.xyz/admin/store/orders?watermark=ORDERS-V2-0123456789ABCDEF&fulfillment=Ticket&status=Confirmed&cursor=12&limit=250&q=buyer@example.com&locale=ES&ignored=1', {
+    const request = new Request('https://checkout.dustwave.xyz/admin/store/orders?watermark=ORDERS-V2-0123456789ABCDEF&fulfillment=Ticket&product=film-ticket&status=Confirmed&cursor=12&limit=250&q=buyer@example.com&locale=ES&ignored=1', {
       headers: {
         Authorization: 'Bearer secret',
         Cookie: 'store_admin_session=session-token',
@@ -41,7 +41,7 @@ describe('Workers Cache policy helpers', () => {
     });
     const cacheRequest = buildAdminStoreOrdersCacheRequest(request);
     const equivalent = buildAdminStoreReadCacheRequest(new Request(
-      'https://checkout.dustwave.xyz/admin/store/orders?locale=es&limit=100&cursor=12&status=confirmed&fulfillment=ticket&watermark=orders-v2-0123456789abcdef'
+      'https://checkout.dustwave.xyz/admin/store/orders?locale=es&limit=100&cursor=12&status=confirmed&fulfillment=ticket&product=film-ticket&watermark=orders-v2-0123456789abcdef'
     ), 'orders');
     const url = new URL(cacheRequest.url);
 
@@ -50,6 +50,7 @@ describe('Workers Cache policy helpers', () => {
     expect(url.pathname).toBe('/admin/store/orders');
     expect(url.searchParams.get('status')).toBe('confirmed');
     expect(url.searchParams.get('fulfillment')).toBe('ticket');
+    expect(url.searchParams.get('product')).toBe('film-ticket');
     expect(url.searchParams.get('cursor')).toBe('12');
     expect(url.searchParams.get('limit')).toBe('100');
     expect(url.searchParams.get('locale')).toBe('es');

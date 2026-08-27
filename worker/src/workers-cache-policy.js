@@ -22,7 +22,7 @@ export const ADMIN_STORE_READ_CACHE_POLICIES = Object.freeze({
     routeId: 'orders',
     path: '/admin/store/orders',
     enabledVar: 'WORKERS_CACHE_ADMIN_ORDERS_ENABLED',
-    allowedParams: Object.freeze(['status', 'fulfillment', 'limit', 'cursor', 'lang', 'locale', 'since', 'watermark']),
+    allowedParams: Object.freeze(['status', 'fulfillment', 'product', 'limit', 'cursor', 'lang', 'locale', 'since', 'watermark']),
     cacheControl: 'public, max-age=15, stale-if-error=0',
     tags: Object.freeze([...COMMON_TAGS, 'admin-orders', 'orders', 'order-index']),
     domains: Object.freeze(['orders', 'order-index']),
@@ -32,7 +32,7 @@ export const ADMIN_STORE_READ_CACHE_POLICIES = Object.freeze({
     routeId: 'analytics',
     path: '/admin/store/analytics',
     enabledVar: 'WORKERS_CACHE_ADMIN_ANALYTICS_ENABLED',
-    allowedParams: Object.freeze(['status', 'fulfillment', 'lang', 'locale']),
+    allowedParams: Object.freeze(['status', 'fulfillment', 'product', 'lang', 'locale']),
     cacheControl: 'public, max-age=60, stale-while-revalidate=120, stale-if-error=0',
     tags: Object.freeze([...COMMON_TAGS, 'admin-analytics', 'orders', 'order-index', 'analytics', 'marketing']),
     domains: Object.freeze(['orders', 'order-index', 'analytics', 'marketing']),
@@ -134,6 +134,9 @@ export function sanitizeAdminStoreReadCacheParam(key, value) {
   if (key === 'watermark') {
     const normalized = text.toLowerCase();
     return WATERMARK_PATTERN.test(normalized) ? normalized : '';
+  }
+  if (key === 'product') {
+    return text.replace(/[^a-z0-9._:-]/gi, '').slice(0, 160);
   }
   return text.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
 }

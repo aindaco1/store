@@ -50,8 +50,38 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function renderSafeInlineEmphasis(value) {
-  return escapeHtml(value).replace(/\*\*([^*\n]+)\*\*/g, '<strong style="font-weight: 700;">$1</strong>');
+function renderSafeInlineFormatting(value, theme) {
+  const placeholders = [];
+  const hold = (html) => {
+    const token = `\uE000store-email-inline-${placeholders.length}\uE001`;
+    placeholders.push(html);
+    return token;
+  };
+  const restore = (html) => placeholders.reduce(
+    (output, replacement, index) => output.replaceAll(`\uE000store-email-inline-${index}\uE001`, replacement),
+    html
+  );
+  const renderSegment = (segment, allowLinks = true) => {
+    let source = String(segment ?? '');
+    if (allowLinks) {
+      source = source.replace(/\[([^\]\n]+)\]\(([^)\n]+)\)/g, (match, label, href) => {
+        const safeHref = safeExternalUrl(href, theme.siteBase);
+        if (!safeHref) return match;
+        return hold(`<a href="${escapeHtml(safeHref)}" style="color: ${theme.primaryColor}; text-decoration: underline;">${renderSegment(label, false)}</a>`);
+      });
+    }
+    source = source.replace(/<u>([\s\S]*?)<\/u>/gi, (_match, inner) => (
+      hold(`<u style="text-decoration: underline;">${renderSegment(inner, allowLinks)}</u>`)
+    ));
+    let html = escapeHtml(source);
+    html = html.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong style="font-weight: 700;"><em style="font-style: italic;">$1</em></strong>');
+    html = html.replace(/___([^_\n]+)___/g, '<strong style="font-weight: 700;"><em style="font-style: italic;">$1</em></strong>');
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<strong style="font-weight: 700;">$1</strong>');
+    html = html.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em style="font-style: italic;">$2</em>');
+    html = html.replace(/(^|[^_])_([^_\n]+)_/g, '$1<em style="font-style: italic;">$2</em>');
+    return restore(html.replace(/\r\n|\r|\n/g, '<br>'));
+  };
+  return renderSegment(value);
 }
 
 function decodeHtmlEntities(value) {
@@ -990,7 +1020,7 @@ export async function buildStoreEventFollowupEmailMessage(env, {
     <p style="margin: 0 0 12px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.thanks', 'Thanks for coming to %{event}. Seriously.', { event: title }))}</p>
     <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.gathering', 'A roomful of people choosing to experience weird, handmade, independent work together -- that’s the whole point.'))}</p>
     <p style="margin: 0 0 12px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('store_event_followup.mission_link_intro', 'Every ticket and RSVP helps'))} <a href="${escapeHtml(safeOrganizationUrl)}" style="color: ${theme.primaryColor}; font-weight: 700; text-decoration: underline;">${escapeHtml(companyName)}</a> ${escapeHtml(t('store_event_followup.mission_link_tail', 'keep going.'))}</p>
-    <p style="margin: 0; font-size: 15px; color: ${theme.textColor};">${renderSafeInlineEmphasis(safeMission)}</p>
+    <p style="margin: 0; font-size: 15px; color: ${theme.textColor};">${renderSafeInlineFormatting(safeMission, theme)}</p>
   </div>
 
   ${supportHtml}
