@@ -868,6 +868,7 @@ export async function buildStoreEventFollowupEmailMessage(env, {
   email,
   eventTitle = '',
   mission = '',
+  missionEs = '',
   organizationUrl = '',
   shopUrl = '',
   projectSupportUrl = '',
@@ -880,6 +881,7 @@ export async function buildStoreEventFollowupEmailMessage(env, {
   preferredLang
 } = {}) {
   const { t } = await getEmailTranslator(env, preferredLang);
+  const normalizedLang = normalizeStoreLang(preferredLang);
   const theme = getEmailTheme(env);
   const platformName = safeEmailHeaderText(theme.platformName) || 'Store';
   const companyName = safeEmailHeaderText(theme.companyName) || platformName;
@@ -894,7 +896,8 @@ export async function buildStoreEventFollowupEmailMessage(env, {
   const safeNewsletterUrl = safeExternalUrl(newsletterUrl, theme.siteBase);
   const safeUnsubscribeUrl = safeExternalUrl(unsubscribeUrl, theme.siteBase);
   const unsubscribeHeaders = emailListUnsubscribeHeaders(safeUnsubscribeUrl, theme.siteBase);
-  const safeMission = String(mission || '').trim() || t(
+  const localizedMission = normalizedLang === 'es' ? missionEs : mission;
+  const safeMission = String(localizedMission || '').trim() || t(
     'store_event_followup.mission_fallback',
     'We make films, put on screenings, and try to clear a little more room for ambitious work outside the usual industry machinery. We’re proud practitioners of DIY -- but even **DIY ain\'t cheap.** Just by showing up, you helped.',
     { company: companyName }

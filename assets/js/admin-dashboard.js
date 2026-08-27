@@ -69,6 +69,7 @@
   var storeOrderRenderTimer = null;
   var storeOrderLoadRequestCounter = 0;
   var storeEventFollowupPreviewTimer = null;
+  var storeEventFollowupPreviewRequestCounter = 0;
   var adminFieldIdCounter = 0;
   var storeProductDescriptionEditorCounter = 0;
   var storeProductDescriptionUploadCounter = 0;
@@ -1554,6 +1555,101 @@
     return normalizeInputValue(raw);
   }
 
+  function storeEventFollowupMissionHtml(value) {
+    var paragraphs = String(value || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .split(/\n{2,}/)
+      .map(function(paragraph) {
+        var html = escapeStoreProductEditorHtml(paragraph.trim())
+          .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n/g, '<br>');
+        return html ? '<p>' + html + '</p>' : '';
+      })
+      .filter(Boolean);
+    return paragraphs.join('');
+  }
+
+  function storeEventFollowupMissionNodeToMarkdown(node) {
+    if (!node) return '';
+    if (node.nodeType === Node.TEXT_NODE) return String(node.textContent || '').replace(/\u00a0/g, ' ');
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    var tag = node.tagName.toLowerCase();
+    if (tag === 'br') return '\n';
+    var inner = Array.from(node.childNodes).map(storeEventFollowupMissionNodeToMarkdown).join('');
+    if (tag === 'strong' || tag === 'b') return wrapStoreProductMarkdownInline(inner, '**', '**');
+    if (['p', 'div'].includes(tag)) return inner.trim() + '\n\n';
+    return inner;
+  }
+
+  function syncStoreEventFollowupMissionEditor(textarea, editor) {
+    textarea.value = Array.from(editor.childNodes)
+      .map(storeEventFollowupMissionNodeToMarkdown)
+      .join('')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    editor.dataset.empty = textarea.value ? 'false' : 'true';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function createStoreEventFollowupMissionEditor(row, textarea) {
+    var wrapper = createElement('div', 'admin-settings__rich-inline admin-event-followup-mission-editor');
+    var toolbar = createElement('div', 'admin-settings__rich-inline-toolbar');
+    toolbar.setAttribute('role', 'toolbar');
+    toolbar.setAttribute('aria-label', (row.label || 'Mission statement') + ' formatting');
+    var bold = createElement('button', 'btn btn--secondary btn--small admin-settings__rich-inline-button', 'B');
+    bold.type = 'button';
+    bold.setAttribute('aria-label', 'Bold');
+    bold.setAttribute('aria-pressed', 'false');
+    bold.addEventListener('mousedown', function(event) { event.preventDefault(); });
+    var editor = createElement('div', 'admin-settings__rich-inline-editor');
+    editor.id = 'admin-setting-editor-' + String(row.path || '').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
+    editor.contentEditable = 'true';
+    editor.spellcheck = true;
+    editor.dataset.settingsRichTextEditor = row.path || '';
+    editor.dataset.placeholder = row.placeholder || 'Write the reusable mission statement.';
+    editor.setAttribute('role', 'textbox');
+    editor.setAttribute('aria-multiline', 'true');
+    editor.innerHTML = storeEventFollowupMissionHtml(textarea.value);
+    editor.dataset.empty = textarea.value.trim() ? 'false' : 'true';
+
+    function sync() {
+      syncStoreEventFollowupMissionEditor(textarea, editor);
+      try {
+        bold.setAttribute('aria-pressed', document.queryCommandState('bold') ? 'true' : 'false');
+      } catch (_error) {
+        bold.setAttribute('aria-pressed', 'false');
+      }
+    }
+
+    bold.addEventListener('click', function() {
+      editor.focus();
+      try {
+        document.execCommand('bold', false, null);
+      } catch (_error) {
+      }
+      sync();
+    });
+    editor.addEventListener('input', sync);
+    editor.addEventListener('keyup', sync);
+    editor.addEventListener('mouseup', sync);
+    editor.addEventListener('paste', function(event) {
+      var text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+      if (!text) return;
+      event.preventDefault();
+      insertStoreProductEditorHtml(editor, escapeStoreProductEditorHtml(text).replace(/\r\n|\r|\n/g, '<br>'), true);
+      sync();
+    });
+    textarea.hidden = true;
+    toolbar.appendChild(bold);
+    wrapper.appendChild(toolbar);
+    wrapper.appendChild(editor);
+    wrapper.appendChild(textarea);
+    wrapper.primaryControl = editor;
+    return wrapper;
+  }
+
   function submitValueForControl(control, row) {
     if (!control) return undefined;
     if (row.input === 'boolean' || row.type === 'boolean') return control.value === 'true';
@@ -1614,7 +1710,7 @@
         control.appendChild(opt);
       });
       control.value = value;
-    } else if (row.input === 'textarea' || row.input === 'add-on-products' || row.type === 'list' || row.type === 'add_on_products') {
+    } else if (row.input === 'textarea' || row.input === 'rich-text' || row.input === 'add-on-products' || row.type === 'list' || row.type === 'add_on_products') {
       control = document.createElement('textarea');
       control.rows = row.input === 'add-on-products' || row.type === 'add_on_products' ? 12 : 4;
       control.value = value;
@@ -1735,10 +1831,14 @@
         body.appendChild(createImageUploadField(row, control));
       } else if (row.input === 'color') {
         body.appendChild(createColorField(row, control));
+      } else if (row.input === 'rich-text') {
+        var richText = createStoreEventFollowupMissionEditor(row, control);
+        body.appendChild(richText);
+        label.setAttribute('for', richText.primaryControl.id);
       } else {
         body.appendChild(control);
       }
-	      var help = createHelp(helpRow, control);
+	      var help = createHelp(helpRow, row.input === 'rich-text' ? richText.primaryControl : control);
 	      if (help) header.appendChild(help);
 	    } else {
 	      body.appendChild(createElement('p', 'admin-settings__value', Array.isArray(row.value) ? row.value.join(', ') : row.value));
@@ -1757,6 +1857,7 @@
         var grid = createElement('div', 'admin-settings__field-grid admin-settings__field-grid--count-' + String(row.rows.length));
         grid.dataset.settingsRowLabel = row.label || '';
         grid.dataset.settingsScope = scope || 'settings';
+        grid.dataset.settingsLayoutGroup = row.layoutGroup || '';
         row.rows.forEach(function(childRow) {
           grid.appendChild(renderSettingRow(childRow, originalMap, scope, { fieldGridItem: true }));
         });
@@ -2695,6 +2796,7 @@
   function storeEventFollowupDraftSettings(root) {
     var fields = {
       mission: 'email.event_followup.mission',
+      missionEs: 'email.event_followup.mission_es',
       postalAddress: 'email.event_followup.postal_address',
       organizationUrl: 'email.event_followup.organization_url',
       shopUrl: 'email.event_followup.shop_url',
@@ -2714,14 +2816,15 @@
   }
 
   function createStoreEventFollowupSettingsPreview() {
+    ensureStoreEventFollowupPreviewStyles();
     var root = createElement('section', 'admin-event-followup-preview admin-store-products__preview admin-section-panel');
     root.dataset.eventFollowupSettingsPreview = 'true';
     var header = createElement('div', 'admin-store-products__preview-header');
     var copy = document.createElement('div');
     copy.appendChild(createElement('h3', 'admin-card-heading', currentLang.indexOf('es') === 0 ? 'Vista previa del correo' : 'Email preview'));
     copy.appendChild(createElement('p', 'admin-app__muted', currentLang.indexOf('es') === 0
-      ? 'Usa los valores sin publicar de arriba. Cambia el evento y el idioma para revisar ambas versiones.'
-      : 'Uses the unpublished values above. Change the sample event and language to review both versions.'));
+      ? 'Se actualiza automáticamente con los valores sin publicar de arriba.'
+      : 'Updates automatically from the unpublished values above.'));
     header.appendChild(copy);
     var controls = createElement('div', 'admin-settings__actions');
     var product = document.createElement('select');
@@ -2739,33 +2842,59 @@
       language.appendChild(option);
     });
     language.value = currentLang.indexOf('es') === 0 ? 'es' : 'en';
-    var refresh = createElement('button', 'btn btn--secondary btn--small', currentLang.indexOf('es') === 0 ? 'Actualizar' : 'Refresh');
-    refresh.type = 'button';
-    refresh.dataset.eventFollowupPreviewRefresh = 'true';
     controls.appendChild(product);
     controls.appendChild(language);
-    controls.appendChild(refresh);
     header.appendChild(controls);
-    var meta = createElement('p', 'admin-app__muted admin-event-followup-preview__meta', '');
-    meta.dataset.eventFollowupPreviewMeta = 'true';
+    var envelope = createElement('section', 'admin-event-followup-preview__envelope');
+    envelope.setAttribute('aria-label', currentLang.indexOf('es') === 0 ? 'Encabezado del correo' : 'Email header');
+    var senderBadge = createElement('span', 'admin-event-followup-preview__sender-badge', '');
+    senderBadge.setAttribute('aria-hidden', 'true');
+    var senderCopy = createElement('div', 'admin-event-followup-preview__sender-copy');
+    var senderName = createElement('strong', 'admin-event-followup-preview__sender-name', '');
+    senderName.dataset.eventFollowupPreviewSenderName = 'true';
+    var senderAddress = createElement('span', 'admin-event-followup-preview__sender-address', '');
+    senderAddress.dataset.eventFollowupPreviewSenderAddress = 'true';
+    senderCopy.appendChild(senderName);
+    senderCopy.appendChild(senderAddress);
+    var recipient = createElement('span', 'admin-event-followup-preview__recipient', currentLang.indexOf('es') === 0 ? 'para destinatario de vista previa' : 'to preview recipient');
+    var subject = createElement('h4', 'admin-event-followup-preview__subject', '');
+    subject.dataset.eventFollowupPreviewSubject = 'true';
+    envelope.appendChild(senderBadge);
+    envelope.appendChild(senderCopy);
+    envelope.appendChild(recipient);
+    envelope.appendChild(subject);
     var frame = document.createElement('iframe');
     frame.className = 'admin-event-followup-preview__frame';
     frame.title = currentLang.indexOf('es') === 0 ? 'Vista previa del correo posterior al evento' : 'Post-event email preview';
-    frame.setAttribute('sandbox', '');
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.src = '/assets/email-preview-frame.html';
     frame.dataset.eventFollowupPreviewFrame = 'true';
     var status = createElement('p', 'admin-dashboard__status admin-store-products__preview-status', '');
     status.dataset.eventFollowupPreviewStatus = 'true';
     status.setAttribute('role', 'status');
     status.setAttribute('aria-live', 'polite');
     root.appendChild(header);
-    root.appendChild(meta);
+    root.appendChild(envelope);
     root.appendChild(frame);
     root.appendChild(status);
     [product, language].forEach(function(control) {
       control.addEventListener('change', function() { refreshStoreEventFollowupSettingsPreview(root); });
     });
-    refresh.addEventListener('click', function() { refreshStoreEventFollowupSettingsPreview(root); });
     return root;
+  }
+
+  function ensureStoreEventFollowupPreviewStyles() {
+    if (document.querySelector('link[data-admin-event-followup-styles]')) return;
+    var version = '';
+    try {
+      version = new URL(script.src, window.location.href).searchParams.get('v') || '';
+    } catch (_error) {
+    }
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/assets/admin-event-followup.css' + (version ? '?v=' + encodeURIComponent(version) : '');
+    link.dataset.adminEventFollowupStyles = 'true';
+    document.head.appendChild(link);
   }
 
   function scheduleStoreEventFollowupSettingsPreview(root) {
@@ -2781,12 +2910,11 @@
     var product = $('[data-event-followup-preview-product]', root);
     var language = $('[data-event-followup-preview-language]', root);
     var frame = $('[data-event-followup-preview-frame]', root);
-    var meta = $('[data-event-followup-preview-meta]', root);
     var status = $('[data-event-followup-preview-status]', root);
-    var refresh = $('[data-event-followup-preview-refresh]', root);
     if (!product || !product.value) return Promise.resolve(null);
-    if (refresh) refresh.disabled = true;
-    setStatus(status, currentLang.indexOf('es') === 0 ? 'Actualizando vista previa...' : 'Refreshing preview...');
+    var requestId = String(++storeEventFollowupPreviewRequestCounter);
+    root.dataset.eventFollowupPreviewRequest = requestId;
+    root.setAttribute('aria-busy', 'true');
     return requestJson('/admin/store/marketing/event-followup/preview', {
       method: 'POST',
       body: {
@@ -2795,19 +2923,61 @@
         settings: storeEventFollowupDraftSettings(root.closest('[data-settings-section-panel]') || document)
       }
     }).then(function(data) {
+      if (root.dataset.eventFollowupPreviewRequest !== requestId) return data;
       var preview = data.preview || {};
-      if (frame) frame.srcdoc = String(preview.html || '');
-      if (meta) meta.textContent = [preview.from || '', preview.subject || '', preview.copyVersion || ''].filter(Boolean).join(' · ');
+      updateStoreEventFollowupPreviewEnvelope(root, preview);
+      postStoreEventFollowupPreviewFrame(frame, String(preview.html || ''));
       setStatus(status, preview.configurationReady
-        ? (currentLang.indexOf('es') === 0 ? 'Vista previa actualizada.' : 'Preview updated.')
-        : (currentLang.indexOf('es') === 0 ? 'Vista previa actualizada. La configuración de envío todavía está incompleta.' : 'Preview updated. Sending configuration is still incomplete.'), !preview.configurationReady);
+        ? ''
+        : (currentLang.indexOf('es') === 0 ? 'La configuración de envío todavía está incompleta.' : 'Sending configuration is still incomplete.'), !preview.configurationReady);
       return data;
     }).catch(function(error) {
+      if (root.dataset.eventFollowupPreviewRequest !== requestId) return null;
       setStatus(status, formatError(error), true);
       return null;
     }).finally(function() {
-      if (refresh) refresh.disabled = false;
+      if (root.dataset.eventFollowupPreviewRequest === requestId) root.removeAttribute('aria-busy');
     });
+  }
+
+  function storeEventFollowupSenderParts(value) {
+    var text = String(value || '').trim();
+    var match = text.match(/^(.+?)\s*<([^>]+)>$/);
+    return match
+      ? { name: match[1].trim().replace(/^"|"$/g, ''), address: match[2].trim() }
+      : { name: text || 'Store', address: '' };
+  }
+
+  function updateStoreEventFollowupPreviewEnvelope(root, preview) {
+    var sender = storeEventFollowupSenderParts(preview.from);
+    var name = $('[data-event-followup-preview-sender-name]', root);
+    var address = $('[data-event-followup-preview-sender-address]', root);
+    var subject = $('[data-event-followup-preview-subject]', root);
+    var badge = $('.admin-event-followup-preview__sender-badge', root);
+    if (name) name.textContent = sender.name;
+    if (address) {
+      address.textContent = sender.address ? '<' + sender.address + '>' : '';
+      address.hidden = !sender.address;
+    }
+    if (subject) subject.textContent = preview.subject || '';
+    if (badge) badge.textContent = (sender.name || 'S').trim().charAt(0).toUpperCase();
+  }
+
+  function postStoreEventFollowupPreviewFrame(frame, html) {
+    if (!frame) return;
+    frame.__storeEventFollowupPreviewHtml = String(html || '');
+    var post = function() {
+      if (!frame.contentWindow || !frame.__storeEventFollowupPreviewHtml) return;
+      frame.contentWindow.postMessage({
+        type: 'store-event-followup-email-preview',
+        html: frame.__storeEventFollowupPreviewHtml
+      }, '*');
+    };
+    if (frame.dataset.eventFollowupPreviewLoadAttached !== 'true') {
+      frame.dataset.eventFollowupPreviewLoadAttached = 'true';
+      frame.addEventListener('load', post);
+    }
+    post();
   }
 
   function loadStoreEventFollowupSettingsPreview(root) {
@@ -2818,7 +2988,8 @@
     setStatus(status, currentLang.indexOf('es') === 0 ? 'Cargando eventos...' : 'Loading events...');
     requestJson('/admin/store/marketing/event-followup/products').then(function(data) {
       var products = (data.products || []).filter(function(item) {
-        return ['ticket', 'rsvp'].includes(String(item.fulfillmentType || '').toLowerCase());
+        return ['ticket', 'rsvp'].includes(String(item.fulfillmentType || '').toLowerCase()) &&
+          item.eventFollowupEnabled === true && item.launchTest !== true;
       }).sort(function(a, b) {
         return (Date.parse(b.eventEndsAt || '') || 0) - (Date.parse(a.eventEndsAt || '') || 0);
       });
@@ -2834,6 +3005,9 @@
         empty.value = '';
         empty.textContent = currentLang.indexOf('es') === 0 ? 'No hay eventos disponibles' : 'No events available';
         product.appendChild(empty);
+        product.disabled = true;
+        var language = $('[data-event-followup-preview-language]', root);
+        if (language) language.disabled = true;
         setStatus(status, empty.textContent, true);
         return;
       }

@@ -197,6 +197,7 @@ Required protections:
 - strict media upload validation for type, size, destination, filename, and path traversal
 - no inline scripts in the static admin shell
 - restrictive admin CSP and no public social/structured metadata
+- post-event email previews remain authenticated, recipient-free admin reads; the generated message is passed to a sandboxed helper frame without `allow-same-origin`, which verifies the parent origin, removes active elements and event handlers, and disables link navigation before rendering the email's inline styles
 - no `unsafe-eval`, `eval`, string-built `Function`, or string-based timer execution in first-party admin scripts
 - runtime admin users stored in KV, not `_config.yml`
 - local dashboard navigation persistence limited to non-sensitive tab identifiers

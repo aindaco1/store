@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## v1.3.2 - 2026-08-26
+
+- Made the Post-event email preview automatic and visually faithful to the
+  delivered email, including its inline styling and responsive support cards.
+- Added separate English and Spanish mission editors with visual bold controls,
+  limited the sample-event selector to enabled non-test events, and replaced the
+  internal copy-version label with an email-style sender and subject header.
+- Gave support URLs three quarters of their desktop row and compacted the
+  adjacent suggested-amount controls to one quarter.
 
 ## v1.3.1 - 2026-08-26
 
