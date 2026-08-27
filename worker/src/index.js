@@ -4482,6 +4482,7 @@ function shouldReplaceStoreEventFollowupLanguage(existingSelectedAt = '', candid
 function getStoreEventFollowupSettings(env = {}) {
   return {
     mission: String(env.EVENT_FOLLOWUP_MISSION || '').trim(),
+    missionEs: String(env.EVENT_FOLLOWUP_MISSION_ES || '').trim(),
     postalAddress: String(env.EVENT_FOLLOWUP_POSTAL_ADDRESS || '').trim(),
     organizationUrl: String(env.EVENT_FOLLOWUP_ORGANIZATION_URL || '').trim(),
     shopUrl: String(env.EVENT_FOLLOWUP_SHOP_URL || env.SITE_BASE || '').trim(),
@@ -12760,13 +12761,12 @@ async function requireSuperAdminEventFollowup(request, env, { requireCsrf = fals
   return auth;
 }
 
-async function handleAdminStoreEventFollowupProducts(request, env) {
-  const auth = await requireSuperAdminEventFollowup(request, env);
-  if (!auth.ok) return auth.response;
+function buildAdminStoreEventFollowupPreviewProducts(env, now = Date.now()) {
   const catalog = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env));
-  const products = catalog.products.flatMap((product) => {
+  return catalog.products.flatMap((product) => {
     const fulfillmentType = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
     if (!isAdminStoreEventFulfillmentType(fulfillmentType)) return [];
+    if (!storeEventFollowupEnabled(product.event_details) || product.launch_test === true) return [];
     const event = summarizeStoreEventDetails(product.event_details);
     if (!event?.endsAt) return [];
     return [{
@@ -12778,10 +12778,16 @@ async function handleAdminStoreEventFollowupProducts(request, env) {
       eventFollowupScheduledAt: getStoreEventFollowupScheduledAt(env, product.event_details),
       eventFollowupEnabled: storeEventFollowupEnabled(product.event_details),
       eventFollowupLocked: Number.isFinite(parseTimestampMs(getStoreEventFollowupScheduledAt(env, product.event_details))) &&
-        parseTimestampMs(getStoreEventFollowupScheduledAt(env, product.event_details)) <= Date.now(),
+        parseTimestampMs(getStoreEventFollowupScheduledAt(env, product.event_details)) <= now,
       launchTest: product.launch_test === true
     }];
   });
+}
+
+async function handleAdminStoreEventFollowupProducts(request, env) {
+  const auth = await requireSuperAdminEventFollowup(request, env);
+  if (!auth.ok) return auth.response;
+  const products = buildAdminStoreEventFollowupPreviewProducts(env);
   return privateJsonResponse({
     success: true,
     scope: STORE_ADMIN_SCOPE,
@@ -12806,6 +12812,7 @@ function normalizeAdminStoreEventFollowupPreviewSettings(env, draft = {}) {
   const amount = (key, fallback) => Math.max(0, Math.min(1000000, Number(draft?.[key] ?? fallback) || 0));
   return {
     mission: text('mission', defaults.mission),
+    missionEs: text('missionEs', defaults.missionEs),
     postalAddress: text('postalAddress', defaults.postalAddress, 500),
     organizationUrl: url('organizationUrl', defaults.organizationUrl),
     shopUrl: url('shopUrl', defaults.shopUrl),
@@ -12828,6 +12835,9 @@ async function handleAdminStoreEventFollowupPreview(request, env, body = {}) {
   const fulfillmentType = String(product.fulfillment_type || product.type || '').trim().toLowerCase();
   if (!isAdminStoreEventFulfillmentType(fulfillmentType)) {
     return privateJsonResponse({ success: false, error: 'Choose a ticket or RSVP product.' }, 422, env);
+  }
+  if (!storeEventFollowupEnabled(product.event_details) || product.launch_test === true) {
+    return privateJsonResponse({ success: false, error: 'Choose an event product with automatic post-event email enabled.' }, 409, env);
   }
   const settings = normalizeAdminStoreEventFollowupPreviewSettings(env, body.settings);
   const message = await buildStoreEventFollowupEmailMessage(env, {
@@ -16360,7 +16370,8 @@ const ADMIN_PLATFORM_SETTING_SCHEMA = new Map([
   ['platform.orders_email_from', { label: 'Orders email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
   ['platform.updates_email_from', { label: 'Updates email from', input: 'email-sender', layoutGroup: 'platform-email-from' }],
   ['email.event_followup.delay_hours', { label: 'Post-event delay hours', type: 'number', input: 'integer', min: 1, max: 720, step: 1, layoutGroup: 'event-followup-timing-compliance', help: 'Delay after the configured event end before the one-time follow-up is eligible to send.' }],
-  ['email.event_followup.mission', { label: 'Post-event mission statement', input: 'textarea', help: 'Brand mission used in the thank-you email. Keep it concise and reusable across events; wrap a short phrase in **double asterisks** for bold emphasis.' }],
+  ['email.event_followup.mission', { label: 'Post-event mission statement (English)', input: 'rich-text', layoutGroup: 'event-followup-missions', help: 'English brand mission used in the thank-you email. The editor supports bold emphasis without requiring Markdown.' }],
+  ['email.event_followup.mission_es', { label: 'Post-event mission statement (Spanish)', input: 'rich-text', layoutGroup: 'event-followup-missions', help: 'Spanish brand mission used when the purchaser checked out in Spanish. Store does not translate this field automatically.' }],
   ['email.event_followup.postal_address', { label: 'Commercial email postal address', input: 'textarea', layoutGroup: 'event-followup-timing-compliance', help: 'Physical postal address shown in the footer of the post-event commercial email.' }],
   ['email.event_followup.organization_url', { label: 'Organization URL', input: 'url', layoutGroup: 'event-followup-brand-links', help: 'Public organization site used by the post-event logo and organization-name link.' }],
   ['email.event_followup.shop_url', { label: 'Merch shop URL', input: 'url', layoutGroup: 'event-followup-brand-links' }],
@@ -17234,7 +17245,8 @@ async function handleAdminSettings(request, env) {
       adminSettingsSection('Post-event email', [
         ['Post-event delay hours', Number(env.EVENT_FOLLOWUP_DELAY_HOURS || 24), editableAdminSetting('email.event_followup.delay_hours', 'number')],
         ['Commercial email postal address', env.EVENT_FOLLOWUP_POSTAL_ADDRESS || '', editableAdminSetting('email.event_followup.postal_address')],
-        ['Post-event mission statement', env.EVENT_FOLLOWUP_MISSION || '', editableAdminSetting('email.event_followup.mission')],
+        ['Post-event mission statement (English)', env.EVENT_FOLLOWUP_MISSION || '', editableAdminSetting('email.event_followup.mission')],
+        ['Post-event mission statement (Spanish)', env.EVENT_FOLLOWUP_MISSION_ES || '', editableAdminSetting('email.event_followup.mission_es')],
         ['Organization URL', env.EVENT_FOLLOWUP_ORGANIZATION_URL || '', editableAdminSetting('email.event_followup.organization_url')],
         ['Merch shop URL', env.EVENT_FOLLOWUP_SHOP_URL || env.SITE_BASE || '', editableAdminSetting('email.event_followup.shop_url')],
         ['Project-support URL', env.EVENT_FOLLOWUP_PROJECT_SUPPORT_URL || '', editableAdminSetting('email.event_followup.project_support_url')],
@@ -19216,6 +19228,7 @@ export {
   attemptStoreOrderAdminNotificationDelivery,
   buildAdminStoreAnalyticsPayload,
   buildAdminStoreEventFollowupAudience,
+  buildAdminStoreEventFollowupPreviewProducts,
   buildAdminStoreFulfillmentRow,
   buildAdminStoreOrderRecord,
   buildAdminStoreOrdersCacheRequest,

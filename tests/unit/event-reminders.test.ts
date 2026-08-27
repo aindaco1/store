@@ -118,6 +118,7 @@ function buildEnv(storeState = new MockKVNamespace()) {
     EMAIL_LOGO_PATH: '/assets/images/defaults/dust-wave-square.png',
     I18N_CATALOG_JSON: JSON.stringify({ en: { email: {} } }),
     EVENT_FOLLOWUP_MISSION: "We make films, put on screenings, and try to clear a little more room for ambitious work outside the usual industry machinery. We’re proud practitioners of DIY -- but even **DIY ain't cheap.** Just by showing up, you helped.",
+    EVENT_FOLLOWUP_MISSION_ES: 'Hacemos películas y organizamos proyecciones. Hasta el **DIY cuesta.**',
     EVENT_FOLLOWUP_POSTAL_ADDRESS: '709 Haines Avenue NW\nAlbuquerque, NM 87102',
     EVENT_FOLLOWUP_ORGANIZATION_URL: 'https://dustwave.xyz',
     EVENT_FOLLOWUP_SHOP_URL: 'https://shop.dustwave.xyz',
@@ -284,5 +285,7 @@ describe('Store event email attachments and reminders', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.subject).toBe('Gracias por acompañarnos en DANCEWAVE | Dust Wave Shop');
     expect(payload.html).toContain('Viniste -- y eso importa.');
+    expect(payload.html).toContain('Hacemos películas y organizamos proyecciones. Hasta el <strong style="font-weight: 700;">DIY cuesta.</strong>');
+    expect(payload.html).not.toContain("DIY ain&#39;t cheap");
   });
 });

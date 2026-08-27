@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildAdminStoreEventFollowupAudience,
+  buildAdminStoreEventFollowupPreviewProducts,
   reconcileStoreEventFollowupAudiences
 } from '../../worker/src/index.js';
 import { suppressPromotionalEmail } from '../../worker/src/email-outbox.js';
@@ -71,6 +72,33 @@ function order(
 }
 
 describe('Store event follow-up audience', () => {
+  it('lists only enabled, non-test event products for settings preview', () => {
+    const baseEvent = {
+      ends_at: '2026-08-22T15:00:00-06:00',
+      followup: { enabled: true, enabled_at: '2026-08-01T12:00:00.000Z' }
+    };
+    const products = buildAdminStoreEventFollowupPreviewProducts({
+      EVENT_FOLLOWUP_DELAY_HOURS: '24',
+      STORE_CATALOG_JSON: JSON.stringify({
+        version: 1,
+        products: [
+          { id: 'enabled-ticket', name: 'Enabled ticket', fulfillment_type: 'ticket', event_details: baseEvent },
+          { id: 'disabled-ticket', name: 'Disabled ticket', fulfillment_type: 'ticket', event_details: { ...baseEvent, followup: { enabled: false } } },
+          { id: 'launch-test-ticket', name: 'Launch test', fulfillment_type: 'ticket', launch_test: true, event_details: baseEvent },
+          { id: 'physical-product', name: 'Merch', fulfillment_type: 'physical', event_details: baseEvent }
+        ]
+      })
+    } as any, Date.parse('2026-08-24T16:00:00.000Z'));
+
+    expect(products).toHaveLength(1);
+    expect(products[0]).toMatchObject({
+      productId: 'enabled-ticket',
+      eventFollowupEnabled: true,
+      eventFollowupLocked: true,
+      launchTest: false
+    });
+  });
+
   it('uses a fresh confirmed-order scan, deduplicates normalized email, and excludes imported, invalid, suppressed, and processed recipients', async () => {
     const kv = new MemoryKV();
     const orders = [
@@ -98,6 +126,7 @@ describe('Store event follow-up audience', () => {
       PLATFORM_COMPANY_NAME: 'Dust Wave',
       UPDATES_EMAIL_FROM: 'Dust Wave Shop <updates@shop.test>',
       EVENT_FOLLOWUP_MISSION: 'Dust Wave makes independent films and gatherings.',
+      EVENT_FOLLOWUP_MISSION_ES: 'Dust Wave hace cine independiente y crea encuentros.',
       EVENT_FOLLOWUP_POSTAL_ADDRESS: '709 Haines Avenue NW\nAlbuquerque, NM 87102',
       EVENT_FOLLOWUP_ORGANIZATION_URL: 'https://dustwave.xyz',
       EVENT_FOLLOWUP_SHOP_URL: 'https://shop.dustwave.xyz',

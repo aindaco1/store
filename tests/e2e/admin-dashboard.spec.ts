@@ -304,6 +304,14 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
           eventEndsAt: '2026-08-22T15:00:00-06:00',
           eventFollowupEnabled: true,
           launchTest: false
+        }, {
+          productId: 'ticket-disabled',
+          name: 'Disabled follow-up event',
+          status: 'active',
+          fulfillmentType: 'ticket',
+          eventEndsAt: '2026-08-23T15:00:00-06:00',
+          eventFollowupEnabled: false,
+          launchTest: false
         }],
         writeBudget: { readOnly: true, kvWritesExpected: 0 }
       });
@@ -320,7 +328,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
           subject: body.preferredLang === 'es'
             ? 'Gracias por acompañarnos en DUST WAVE Event Ticket | Dust Wave Shop'
             : 'Thanks for showing up for DUST WAVE Event Ticket | Dust Wave Shop',
-          html: '<!doctype html><html><body><h1>You showed up -- and that matters.</h1></body></html>',
+          html: '<!doctype html><html><head><style>@media only screen and (max-width: 620px) { .store-event-followup-support-column { display: block !important; } }</style></head><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><h1 style="color: #4b3cf0;">You showed up -- and that matters.</h1><p style="font-weight: 700;">Styled email body</p></body></html>',
           text: 'You showed up -- and that matters.',
           configurationReady: true
         },
@@ -868,7 +876,8 @@ function storeSettingsSections(lang = 'en') {
     rows: [
       settingsRow({ label: 'Post-event delay hours', value: '24', rawValue: 24, editable: true, path: 'email.event_followup.delay_hours', type: 'number', input: 'integer', layoutGroup: 'event-followup-timing-compliance' }),
       settingsRow({ label: 'Commercial email postal address', value: '709 Haines Avenue NW', rawValue: '709 Haines Avenue NW\nAlbuquerque, NM 87102', editable: true, path: 'email.event_followup.postal_address', type: 'string', input: 'textarea', layoutGroup: 'event-followup-timing-compliance' }),
-      settingsRow({ label: 'Post-event mission statement', value: 'Dust Wave makes independent film.', rawValue: 'Dust Wave makes independent film.', editable: true, path: 'email.event_followup.mission', type: 'string', input: 'textarea' }),
+      settingsRow({ label: 'Post-event mission statement (English)', value: 'Dust Wave makes **independent film.**', rawValue: 'Dust Wave makes **independent film.**', editable: true, path: 'email.event_followup.mission', type: 'string', input: 'rich-text', layoutGroup: 'event-followup-missions' }),
+      settingsRow({ label: 'Post-event mission statement (Spanish)', value: 'Dust Wave hace **cine independiente.**', rawValue: 'Dust Wave hace **cine independiente.**', editable: true, path: 'email.event_followup.mission_es', type: 'string', input: 'rich-text', layoutGroup: 'event-followup-missions' }),
       settingsRow({ label: 'Organization URL', value: 'https://dustwave.xyz', rawValue: 'https://dustwave.xyz', editable: true, path: 'email.event_followup.organization_url', type: 'string', input: 'url', layoutGroup: 'event-followup-brand-links' }),
       settingsRow({ label: 'Merch shop URL', value: 'https://shop.dustwave.xyz', rawValue: 'https://shop.dustwave.xyz', editable: true, path: 'email.event_followup.shop_url', type: 'string', input: 'url', layoutGroup: 'event-followup-brand-links' }),
       settingsRow({ label: 'Project-support URL', value: 'https://pool.dustwave.xyz', rawValue: 'https://pool.dustwave.xyz', editable: true, path: 'email.event_followup.project_support_url', type: 'string', input: 'url', layoutGroup: 'event-followup-project-link' }),
@@ -2053,16 +2062,32 @@ test.describe('Admin Dashboard', () => {
 
     await selectSettingsSection(page, 'Post-event email');
     const followupSettings = page.locator('[data-settings-section-panel="Post-event email"]');
-    await expect(followupSettings.locator('.admin-settings__field-grid')).toHaveCount(5);
+    await expect(followupSettings.locator('.admin-settings__field-grid')).toHaveCount(6);
     await expect.poll(() => calls.storeEventFollowupProducts.length).toBe(1);
     await expect.poll(() => calls.storeEventFollowupPreviews.length).toBeGreaterThanOrEqual(1);
     await expect(followupSettings.locator('[data-event-followup-preview-product] option')).toHaveCount(1);
     await expect(followupSettings.locator('[data-event-followup-preview-frame]')).toBeVisible();
-    await followupSettings.locator('[data-settings-path="email.event_followup.mission"]').fill('An unpublished mission draft.');
+    await expect(followupSettings.locator('[data-event-followup-preview-refresh]')).toHaveCount(0);
+    const oneTimeGrid = followupSettings.locator('[data-settings-layout-group="event-followup-one-time"]');
+    await expect.poll(async () => {
+      const oneTimeBoxes = await oneTimeGrid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
+      return oneTimeBoxes[0] / oneTimeBoxes[1];
+    }).toBeGreaterThan(2.5);
+    const englishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission"]');
+    await expect(englishMissionEditor.locator('strong')).toContainText('independent film.');
+    await englishMissionEditor.fill('An unpublished mission draft.');
     await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.mission).toBe('An unpublished mission draft.');
+    const spanishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission_es"]');
+    await spanishMissionEditor.fill('Una misión española sin publicar.');
+    await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.missionEs).toBe('Una misión española sin publicar.');
     await followupSettings.locator('[data-event-followup-preview-language]').selectOption('es');
     await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.preferredLang).toBe('es');
-    await expect(followupSettings.locator('[data-event-followup-preview-meta]')).toContainText('Gracias por acompañarnos');
+    await expect(followupSettings.locator('[data-event-followup-preview-subject]')).toContainText('Gracias por acompañarnos');
+    await expect(followupSettings.locator('[data-event-followup-preview-sender-name]')).toHaveText('Dust Wave Shop');
+    const emailPreview = followupSettings.frameLocator('[data-event-followup-preview-frame]');
+    await expect(emailPreview.locator('h1')).toContainText('You showed up -- and that matters.');
+    await expect(emailPreview.locator('p')).toHaveCSS('font-weight', '700');
+    await expect(emailPreview.locator('body')).toHaveCSS('max-width', '600px');
 
     await selectSettingsSection(page, 'Brand & SEO');
     const brandPanel = page.locator('[data-settings-section-panel="Brand & SEO"]');
