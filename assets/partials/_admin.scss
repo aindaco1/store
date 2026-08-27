@@ -1713,19 +1713,6 @@ textarea.admin-settings__input--readonly {
   margin-top: 16px;
 }
 
-.admin-store-analytics__field {
-  display: grid;
-  gap: 6px;
-
-  label {
-    @include admin-label;
-  }
-
-  select {
-    min-width: 0;
-  }
-}
-
 .admin-store-orders__export-group {
   align-self: end;
   display: flex;
