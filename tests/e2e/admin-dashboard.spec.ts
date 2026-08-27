@@ -888,9 +888,9 @@ function storeSettingsSections(lang = 'en') {
       settingsRow({ label: 'Project-support URL', value: 'https://pool.dustwave.xyz', rawValue: 'https://pool.dustwave.xyz', editable: true, path: 'email.event_followup.project_support_url', type: 'string', input: 'url', layoutGroup: 'event-followup-project-link' }),
       settingsRow({ label: 'Project-support name', value: 'The Pool', rawValue: 'The Pool', editable: true, path: 'email.event_followup.project_support_name', type: 'string', input: 'text', layoutGroup: 'event-followup-project-link' }),
       settingsRow({ label: 'One-time support URL', value: 'https://buy.stripe.com/one-time', rawValue: 'https://buy.stripe.com/one-time', editable: true, path: 'email.event_followup.support_one_time_url', type: 'string', input: 'url', layoutGroup: 'event-followup-one-time' }),
-      settingsRow({ label: 'Suggested one-time support (USD)', value: '10', rawValue: 10, editable: true, path: 'email.event_followup.support_one_time_suggested_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-one-time' }),
+      settingsRow({ label: 'Suggested amount (USD)', value: '10', rawValue: 10, editable: true, path: 'email.event_followup.support_one_time_suggested_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-one-time' }),
       settingsRow({ label: 'Monthly support URL', value: 'https://buy.stripe.com/monthly', rawValue: 'https://buy.stripe.com/monthly', editable: true, path: 'email.event_followup.support_monthly_url', type: 'string', input: 'url', layoutGroup: 'event-followup-monthly' }),
-      settingsRow({ label: 'Monthly support amount (USD)', value: '5', rawValue: 5, editable: true, path: 'email.event_followup.support_monthly_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-monthly' }),
+      settingsRow({ label: 'Monthly amount (USD)', value: '5', rawValue: 5, editable: true, path: 'email.event_followup.support_monthly_usd', type: 'number', input: 'number', layoutGroup: 'event-followup-monthly' }),
       settingsRow({ label: 'Newsletter opt-in URL', value: 'https://dustwave.xyz/newsletter.html', rawValue: 'https://dustwave.xyz/newsletter.html', editable: true, path: 'email.event_followup.newsletter_url', type: 'string', input: 'url' }),
       settingsRow({ label: 'Email preview', value: '', rawValue: '', input: 'event-followup-preview', hideLabel: true })
     ]
@@ -2167,7 +2167,7 @@ test.describe('Admin Dashboard', () => {
       const oneTimeBoxes = await oneTimeGrid.locator('.admin-settings__field-grid-item').evaluateAll((items) => items.map((item) => item.getBoundingClientRect().width));
       return oneTimeBoxes[0] / oneTimeBoxes[1];
     }).toBeGreaterThan(1.4);
-    for (const label of ['Suggested one-time support (USD)', 'Monthly support amount (USD)']) {
+    for (const label of ['Suggested amount (USD)', 'Monthly amount (USD)']) {
       const labelControl = followupSettings.locator(`[data-settings-row-label="${label}"] .admin-settings__row-header > label`);
       await expect.poll(() => labelControl.evaluate((element) => {
         const range = document.createRange();
