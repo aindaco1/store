@@ -26,6 +26,30 @@ function explicitHttpsOrigin(value = '') {
   }
 }
 
+function providerEvidenceCounts(evidence = {}) {
+  if (Array.isArray(evidence.results)) {
+    return {
+      failCount: evidence.results.filter((entry) => String(entry?.status || '').toUpperCase() === 'FAIL').length,
+      warnCount: evidence.results.filter((entry) => String(entry?.status || '').toUpperCase() === 'WARN').length,
+      skipCount: evidence.results.filter((entry) => String(entry?.status || '').toUpperCase() === 'SKIP').length
+    };
+  }
+  const summary = evidence.summary || {};
+  const count = (name, legacyName) => Math.max(0, Number(summary[name] ?? evidence[name] ?? evidence[legacyName] ?? 0) || 0);
+  return {
+    failCount: count('failCount', 'fail_count'),
+    warnCount: count('warnCount', 'warn_count'),
+    skipCount: count('skipCount', 'skip_count')
+  };
+}
+
+function providerVerificationDetail({ warnCount, skipCount }) {
+  const details = [];
+  if (warnCount > 0) details.push(`${warnCount} optional provider warning${warnCount === 1 ? '' : 's'}`);
+  if (skipCount > 0) details.push(`${skipCount} optional live-provider check${skipCount === 1 ? '' : 's'} not run`);
+  return `${details.join('; ')}; required production secrets and bindings are checked separately`;
+}
+
 export function auditProductionPosture({ config, inventory, wranglerConfig = {}, secrets = [], providerEvidence = null }) {
   const checks = [];
   const add = (id, status, detail) => checks.push({ id, status, detail });
@@ -60,12 +84,16 @@ export function auditProductionPosture({ config, inventory, wranglerConfig = {},
   const webhookUrl = workerOrigin ? `${workerOrigin}${config.expectedStripeWebhookPath || '/webhooks/stripe'}` : '';
   add('stripe:webhook-expected', webhookUrl ? 'manual' : 'action', webhookUrl || 'Unable to derive expected webhook endpoint');
   if (providerEvidence) {
-    const providerFailures = Array.isArray(providerEvidence.results)
-      ? providerEvidence.results.filter((entry) => String(entry.status || '').toUpperCase() === 'FAIL').length
-      : Number(providerEvidence.failCount || providerEvidence.fail_count || 0);
-    add('providers:readiness', providerFailures > 0 ? 'action' : 'ok', `${providerFailures} provider evidence failures`);
+    const providerCounts = providerEvidenceCounts(providerEvidence);
+    if (providerCounts.failCount > 0) {
+      add('providers:verification', 'action', `${providerCounts.failCount} provider verification failure${providerCounts.failCount === 1 ? '' : 's'}`);
+    } else if (providerCounts.warnCount > 0 || providerCounts.skipCount > 0) {
+      add('providers:verification', 'manual', providerVerificationDetail(providerCounts));
+    } else {
+      add('providers:verification', 'ok', 'All supplied provider verification checks passed');
+    }
   } else {
-    add('providers:readiness', 'warning', 'Provider evidence was not supplied');
+    add('providers:verification', 'warning', 'Provider verification evidence was not supplied');
   }
   return {
     schemaVersion: 1,
@@ -78,8 +106,13 @@ export function auditProductionPosture({ config, inventory, wranglerConfig = {},
 }
 
 export function productionPostureIssue(evidence) {
+  const heading = evidence.status === 'action'
+    ? 'Production configuration posture drift was detected.'
+    : evidence.status === 'warning'
+      ? 'Production configuration posture requires review.'
+      : 'Production configuration posture passed.';
   const lines = [
-    'Production configuration posture drift was detected.',
+    heading,
     '',
     `Generated: ${evidence.generatedAt}`,
     '',
@@ -89,7 +122,7 @@ export function productionPostureIssue(evidence) {
   for (const check of evidence.checks.filter((entry) => entry.status !== 'ok')) {
     lines.push(`| ${check.id} | ${check.status} | ${String(check.detail || '').replace(/\|/g, '\\|')} |`);
   }
-  lines.push('', 'This report contains secret names and status only, never secret values. Review before changing production state.', '');
+  lines.push('', 'This report contains secret names and status only, never secret values. Optional checks marked manual were not used to infer live provider verification.', '');
   return lines.join('\n');
 }
 

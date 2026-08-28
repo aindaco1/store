@@ -49,9 +49,10 @@ jobs:
             printf '[]\n' > worker-secrets.json
           fi
 
-      - name: Collect provider posture
+      - name: Collect optional provider verification
+        id: providers
         continue-on-error: true
-        run: npm run release:providers -- --strict --no-dev-vars --json-output=provider-evidence.json
+        run: npm run release:providers -- --no-dev-vars --json-output=provider-evidence.json
 
       - name: Audit production posture
         id: posture
@@ -64,7 +65,7 @@ jobs:
           --issue-output=production-posture-issue.md
 
       - name: Open or update posture issue
-        if: steps.posture.outcome == 'failure'
+        if: steps.providers.outcome == 'failure' || steps.posture.outcome == 'failure'
         run: |
           title='Production configuration posture drift'
           issue_number="$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number // empty')"
@@ -87,5 +88,5 @@ jobs:
           retention-days: 90
 
       - name: Enforce posture gate
-        if: steps.posture.outcome == 'failure'
+        if: steps.providers.outcome == 'failure' || steps.posture.outcome == 'failure'
         run: exit 1

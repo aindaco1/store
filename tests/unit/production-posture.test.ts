@@ -32,10 +32,70 @@ describe('Store production posture audit', () => {
   it('reports names and statuses without secret values', () => {
     const { config, inventory, wranglerConfig } = productionConfig();
     const allSecrets = [...config.requiredSecrets, ...config.recommendedSecrets].map((name: string) => ({ name, type: 'secret_text' }));
-    const evidence = auditProductionPosture({ config, inventory, wranglerConfig, secrets: allSecrets, providerEvidence: { failCount: 0 } });
+    const evidence = auditProductionPosture({
+      config,
+      inventory,
+      wranglerConfig,
+      secrets: allSecrets,
+      providerEvidence: { summary: { failCount: 0, warnCount: 0, skipCount: 0 } }
+    });
     expect(evidence.status).not.toBe('action');
+    expect(evidence.checks).toContainEqual({
+      id: 'providers:verification',
+      status: 'ok',
+      detail: 'All supplied provider verification checks passed'
+    });
     expect(evidence.containsCredentials).toBe(false);
     expect(productionPostureIssue(evidence)).not.toContain('secret_text');
+  });
+
+  it('passes configured production posture while recording optional provider checks as not run', () => {
+    const { config, inventory, wranglerConfig } = productionConfig();
+    const allSecrets = [...config.requiredSecrets, ...config.recommendedSecrets].map((name: string) => ({ name }));
+    const evidence = auditProductionPosture({
+      config,
+      inventory,
+      wranglerConfig,
+      secrets: allSecrets,
+      providerEvidence: {
+        results: [
+          { status: 'SKIP', label: 'Stripe production webhook endpoint' },
+          { status: 'SKIP', label: 'Stripe test webhook endpoint' },
+          { status: 'SKIP', label: 'Resend domain API' },
+          { status: 'SKIP', label: 'USPS quote smoke' }
+        ]
+      }
+    });
+
+    expect(evidence.status).toBe('ok');
+    expect(evidence.checks).toContainEqual({
+      id: 'providers:verification',
+      status: 'manual',
+      detail: '4 optional live-provider checks not run; required production secrets and bindings are checked separately'
+    });
+    expect(productionPostureIssue(evidence)).toContain('Production configuration posture passed.');
+    expect(productionPostureIssue(evidence)).toContain('| providers:verification | manual |');
+  });
+
+  it('fails configured production posture when an attempted provider verification fails', () => {
+    const { config, inventory, wranglerConfig } = productionConfig();
+    const allSecrets = [...config.requiredSecrets, ...config.recommendedSecrets].map((name: string) => ({ name }));
+    const evidence = auditProductionPosture({
+      config,
+      inventory,
+      wranglerConfig,
+      secrets: allSecrets,
+      providerEvidence: {
+        results: [{ status: 'FAIL', label: 'Stripe production webhook endpoint' }]
+      }
+    });
+
+    expect(evidence.status).toBe('action');
+    expect(evidence.checks).toContainEqual({
+      id: 'providers:verification',
+      status: 'action',
+      detail: '1 provider verification failure'
+    });
   });
 
   it('fails closed when required production secrets are absent', () => {

@@ -232,6 +232,8 @@ Use an existing recording instead with `--screen-reader-audio-file <recording>`.
 
 `npm run release:providers` is read-only. It checks public DNS and, when credentials or authenticated CLIs are present, GitHub deploy secret names, Cloudflare API/KV/R2/DNS records, Stripe webhook endpoints, Resend domains, and USPS quote fixtures. The probe uses `gh`, `wrangler`, and `stripe` CLI auth as fallback evidence without printing secrets. Stripe endpoint reads require a successful captured `stripe whoami`; a signed-out CLI is skipped without starting interactive login, and raw auth output is never included in evidence. `npm run release:payment-smoke` always runs payment contract checks; the release-grade mutation path is the direct local signed-webhook matrix with `PAYMENT_SMOKE_ALLOW_MUTATION=1`.
 
+Scheduled **Production Posture** runs provider verification without local development variables and without strict skip enforcement. Required production secret names, bindings, origins, and runtime settings remain the configuration gate. Credential-dependent provider checks that cannot run in that workflow are retained in the sanitized artifact as `manual` / not run and do not turn configured production posture into a failure; an explicit provider `FAIL` or provider-command failure still fails the workflow. This is configuration evidence, not a claim that every provider API was contacted.
+
 Store also maintains a persistent provider-originated Stripe test path at
 `https://store-worker-staging.jogo.workers.dev/webhooks/stripe`. Its Wrangler
 environment has isolated KV/R2 state, no route or cron, no production provider

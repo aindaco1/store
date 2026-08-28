@@ -151,6 +151,10 @@ describe('workflow security posture', () => {
     expect(syncIndex).toBeGreaterThan(0);
     expect(providersIndex).toBeGreaterThan(syncIndex);
     expect(postureIndex).toBeGreaterThan(providersIndex);
+    expect(workflow).toContain('id: providers');
+    expect(workflow).toContain('npm run release:providers -- --no-dev-vars --json-output=provider-evidence.json');
+    expect(workflow).not.toContain('npm run release:providers -- --strict --no-dev-vars --json-output=provider-evidence.json');
+    expect(workflow).toContain("if: steps.providers.outcome == 'failure' || steps.posture.outcome == 'failure'");
     expect(workflow).not.toMatch(/wrangler deploy|deploy:worker|purge_cache|contents: write|pull-requests: write/);
   });
 
