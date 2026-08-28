@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3.6 - 2026-08-28
+
+- Made required production secret names, bindings, origins, and runtime
+  configuration the explicit Production Posture pass/fail gate.
+- Kept credential-dependent Stripe, Resend, and USPS probes visible as
+  manual/not-run when the workflow cannot execute them, without treating those
+  skips as either provider failures or verified provider passes.
+- Preserved actionable workflow failure for explicit provider probe failures
+  and provider-command errors, with regression coverage for both paths.
+
 ## v1.3.5 - 2026-08-27
 
 - Changed newly added admin notifications into direct, 15-minute, one-time
