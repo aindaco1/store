@@ -521,6 +521,7 @@ describe('Store email integration', () => {
 
     await expect(sendAdminUserCreatedEmail(env, {
       email: 'new-admin@example.com',
+      loginUrl: 'https://shop.test/admin/?admin_login=invitation-token&tab=store-orders',
       name: 'Ada',
       role: 'limited_admin',
       accessNames: ['Products', 'Orders'],
@@ -531,7 +532,8 @@ describe('Store email integration', () => {
     const payload = getEmailPayload(fetchMock);
     expect(payload.subject).toBe('Admin access added | Simply Store');
     expect(payload.html).toContain('You now have limited admin access to Simply Store.');
-    expect(payload.html).toContain('To sign in, open admin and enter this email address. We will send you a magic link.');
+    expect(payload.html).toContain('Use the secure link below to open the admin dashboard. It works for 15 minutes and can be used once.');
+    expect(payload.html).toContain('href="https://shop.test/admin/?admin_login=invitation-token&amp;tab=store-orders"');
     expect(payload.html).toContain('Not expecting this access? Ignore this email or contact the site owner.');
   });
 
@@ -546,6 +548,17 @@ describe('Store email integration', () => {
     })).resolves.toEqual({
       sent: false,
       reason: 'RESEND_API_KEY not configured'
+    });
+  });
+
+  it('does not send an admin access notice without its one-time login link', async () => {
+    await expect(sendAdminUserCreatedEmail(env, {
+      email: 'new-admin@example.com',
+      role: 'limited_admin',
+      accessNames: ['Store']
+    })).resolves.toEqual({
+      sent: false,
+      reason: 'Admin login link not provided'
     });
   });
 });

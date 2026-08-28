@@ -18383,8 +18383,23 @@ async function notifyNewAdminUsers(env, users = [], previousUsers = [], options 
   const results = [];
 
   for (const user of newUsers) {
+    const loginUrl = await createAdminLoginUrl(env, {
+      email: user.email,
+      preferredLang: options.lang || 'en',
+      params: { tab: 'store-orders' },
+      source: 'admin_user_invitation'
+    });
+    if (!loginUrl) {
+      results.push({
+        email: user.email,
+        sent: false,
+        reason: 'Admin login link could not be created'
+      });
+      continue;
+    }
     const result = await sendAdminUserCreatedEmail(env, {
       email: user.email,
+      loginUrl,
       name: user.name || '',
       role: user.role,
       accessNames: accessNamesForAdminUser(user),

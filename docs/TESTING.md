@@ -187,7 +187,7 @@ The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, soci
 npm run test:premerge
 ```
 
-The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, Podman Worker smoke, asset minification checks, and the Podman headless Playwright suite. When host Jekyll gems are unavailable it falls back to a Podman-backed build path. On macOS/Windows, its strict Podman doctor phase requires a stable machine with at least 6 GiB before container-heavy checks begin.
+The pre-merge script runs secret/content audits, i18n completeness, syntax checks, focused Store unit tests, full unit tests, generated-site build artifact checks, SEO audit, Worker security tests, Podman Worker smoke, asset minification checks, and the Podman headless Playwright suite. When host Jekyll gems are unavailable it falls back to a Podman-backed build path. On macOS/Windows, its strict Podman doctor phase requires a stable engine with at least 6 GiB before container-heavy checks begin. If another task already owns the active VM slot, set `CONTAINER_CONNECTION=<connection-name>`; the wrapper will use that engine without starting or restarting `podman-machine-default`.
 
 For changes that trigger [ETHICAL_RISK.md](ETHICAL_RISK.md), record the review result in the PR before merge. Automated checks can prove many mitigations, such as private/no-store routes, consent state, suppression, access control, content safety, i18n completeness, and accessibility. Residual risks that require human review should name the owner/date in the PR or release evidence.
 

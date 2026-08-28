@@ -1,8 +1,11 @@
 .admin-event-followup-mission-editor .admin-settings__rich-inline-editor {
+  box-sizing: border-box;
   color: var(--store-ink-default, #252930);
   font-size: 14px;
   font-weight: 400;
+  height: 9rem;
   line-height: 1.55;
+  overflow-y: auto;
 }
 
 .admin-event-followup-mission-editor .admin-settings__rich-inline-editor p {
@@ -26,7 +29,12 @@
 }
 
 .admin-event-followup-mission-editor__link {
-  padding-inline: 12px;
+  padding-inline: 0;
+}
+
+.admin-event-followup-mission-editor__link .admin-content-block__icon {
+  height: 1.25rem;
+  width: 1.25rem;
 }
 
 .admin-event-followup-mission-editor .admin-settings__rich-inline-editor a {

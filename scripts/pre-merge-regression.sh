@@ -54,9 +54,13 @@ stabilize_podman_connection() {
   prefer_podman_path || return 0
   command -v podman >/dev/null 2>&1 || return 0
 
+  if [[ -n "${CONTAINER_CONNECTION:-}" ]]; then
+    unset CONTAINER_HOST
+    return 0
+  fi
+
   socket_path="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
   if [[ -n "${socket_path}" && -S "${socket_path}" ]]; then
-    unset CONTAINER_CONNECTION
     export CONTAINER_HOST="unix://${socket_path}"
   fi
 }

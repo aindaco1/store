@@ -613,7 +613,7 @@ email:
     heading: Admin access added
     greeting: Hi %{name},
     intro: You now have %{role} access to %{platform}.
-    instructions: To sign in, open admin and enter this email address. We will send you a magic link.
+    instructions: Use the secure link below to open the admin dashboard. It works for 15 minutes and can be used once.
     cta: Open admin
     role_super_admin: super admin
     role_limited_admin: limited admin

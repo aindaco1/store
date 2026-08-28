@@ -550,9 +550,10 @@ export async function sendAdminLoginEmail(env, { email, loginUrl, lang } = {}) {
   }
 }
 
-export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 'limited_admin', accessNames = [], createdBy = '', lang } = {}) {
+export async function sendAdminUserCreatedEmail(env, { email, loginUrl = '', name = '', role = 'limited_admin', accessNames = [], createdBy = '', lang } = {}) {
   configureEmailLogging(env);
   if (!env?.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
+  if (!String(loginUrl || '').trim()) return { sent: false, reason: 'Admin login link not provided' };
 
   const { t } = await getEmailTranslator(env, lang);
   const theme = getEmailTheme(env);
@@ -561,7 +562,7 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
   const roleLabel = role === 'super_admin'
     ? t('admin_user_created.role_super_admin', 'super admin')
     : t('admin_user_created.role_limited_admin', 'limited admin');
-  const adminUrl = safeSiteUrl(`${getLocalizedPath('/admin/', lang)}?tab=store-orders`, theme.siteBase);
+  const adminUrl = safeSiteUrl(loginUrl, theme.siteBase);
   const displayName = String(name || '').trim() || email;
   const accessList = Array.isArray(accessNames)
     ? accessNames.map((accessName) => String(accessName || '').trim()).filter(Boolean)
@@ -582,7 +583,7 @@ export async function sendAdminUserCreatedEmail(env, { email, name = '', role = 
   <div style="${getEmailCardStyle(theme)}">
     <p style="margin: 0 0 8px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.greeting', 'Hi %{name},', { name: displayName }))}</p>
     <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.intro', 'You now have %{role} access to %{platform}.', { role: roleLabel, platform: platformName }))}</p>
-    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.instructions', 'To sign in, open admin and enter this email address. We will send you a magic link.'))}</p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: ${theme.textColor};">${escapeHtml(t('admin_user_created.instructions', 'Use the secure link below to open the admin dashboard. It works for 15 minutes and can be used once.'))}</p>
     <p style="margin: 0;"><a href="${escapeHtml(adminUrl)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('admin_user_created.cta', 'Open admin'))}</a></p>
     ${accessBlock}
     ${createdByLine}

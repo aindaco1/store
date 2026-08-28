@@ -1637,11 +1637,16 @@
     toolbar.setAttribute('aria-label', (row.label || 'Mission statement') + ' formatting');
     var formatButtons = {};
 
-    function createFormatButton(action, label, text) {
-      var button = createElement('button', 'btn btn--secondary btn--small admin-settings__rich-inline-button admin-event-followup-mission-editor__' + action, text);
+    function createFormatButton(action, label, content) {
+      var button = createElement('button', 'btn btn--secondary btn--small admin-settings__rich-inline-button admin-event-followup-mission-editor__' + action, '');
       button.type = 'button';
       button.dataset.eventFollowupMissionFormat = action;
       button.setAttribute('aria-label', label);
+      if (typeof content === 'string') {
+        button.textContent = content;
+      } else if (content) {
+        button.appendChild(content);
+      }
       if (action !== 'link') button.setAttribute('aria-pressed', 'false');
       button.addEventListener('mousedown', function(event) { event.preventDefault(); });
       formatButtons[action] = button;
@@ -1651,7 +1656,7 @@
     var bold = createFormatButton('bold', 'Bold', 'B');
     var italic = createFormatButton('italic', 'Italic', 'I');
     var underline = createFormatButton('underline', 'Underline', 'U');
-    var link = createFormatButton('link', 'Link', 'Link');
+    var link = createFormatButton('link', 'Link', storeProductDescriptionCreateIcon('link'));
     var editor = createElement('div', 'admin-settings__rich-inline-editor');
     editor.id = 'admin-setting-editor-' + String(row.path || '').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
     editor.contentEditable = 'true';
@@ -1865,7 +1870,9 @@
     wrapper.dataset.settingsScope = scope || 'settings';
     applyVisibleWhenDataset(wrapper, row);
     var header = createElement('div', 'admin-settings__row-header');
-    var label = document.createElement('label');
+    var richTextLabel = row.input === 'rich-text';
+    var label = document.createElement(richTextLabel ? 'span' : 'label');
+    if (richTextLabel) label.dataset.settingsLabel = 'true';
     label.textContent = row.label || row.path || 'Setting';
     header.appendChild(label);
     var body = createElement('div', 'admin-settings__row-body');
@@ -1900,7 +1907,7 @@
 	      var control = createSettingControl(row, originalMap);
       var controlId = 'admin-setting-' + String(row.path || '').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
       control.id = controlId;
-      if (row.input !== 'image-upload') label.setAttribute('for', controlId);
+      if (row.input !== 'image-upload' && row.input !== 'rich-text') label.setAttribute('for', controlId);
       if (row.input === 'image-upload') {
         body.appendChild(createImageUploadField(row, control));
       } else if (row.input === 'color') {
@@ -1908,7 +1915,8 @@
       } else if (row.input === 'rich-text') {
         var richText = createStoreEventFollowupMissionEditor(row, control);
         body.appendChild(richText);
-        label.setAttribute('for', richText.primaryControl.id);
+        label.id = richText.primaryControl.id + '-label';
+        richText.primaryControl.setAttribute('aria-labelledby', label.id);
       } else {
         body.appendChild(control);
       }
@@ -2976,7 +2984,7 @@
     frame.className = 'admin-event-followup-preview__frame';
     frame.title = currentLang.indexOf('es') === 0 ? 'Vista previa del correo posterior al evento' : 'Post-event email preview';
     frame.setAttribute('sandbox', 'allow-scripts');
-    frame.src = '/assets/email-preview-frame.html';
+    frame.src = '/admin/email-preview-frame/';
     frame.dataset.eventFollowupPreviewFrame = 'true';
     var status = createElement('p', 'admin-dashboard__status admin-store-products__preview-status', '');
     status.dataset.eventFollowupPreviewStatus = 'true';

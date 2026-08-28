@@ -278,6 +278,8 @@ Settings publish writes GitHub-backed config changes and triggers deploy. Runtim
 
 Super-admin order notification emails use this same exchange but are source-tagged as order notifications. Those links open `tab=store-orders`, expire after 5 minutes, are consumed on first successful exchange, and create a 30-minute admin session. They remain bearer links until consumed or expired, so forwarded unused emails can still delegate access.
 
+New-admin access emails also use this exchange and open `tab=store-orders` directly. Their links use the standard 15-minute login lifetime, are consumed on first successful exchange, and re-check the current admin-user list before creating a session. Removing an invited user before redemption therefore invalidates the link. An expired invitation can still use the normal email magic-link flow.
+
 ## Worker Storage Map
 
 | Key / Binding | Purpose |

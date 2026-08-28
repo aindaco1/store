@@ -37,6 +37,7 @@ describe('Cloudflare admin response rule', () => {
     expect(rule.ref).toBe(ADMIN_RESPONSE_RULE_REF);
     expect(rule.expression).toContain('http.host eq "shop.dustwave.xyz"');
     expect(rule.expression).toContain('http.request.uri.path eq "/admin"');
+    expect(rule.expression).toContain('starts_with(http.request.uri.path, "/admin/")');
     expect(rule.expression).toContain('http.request.uri.path eq "/es/admin"');
     expect(rule.action_parameters).toMatchObject({
       'max-age': { operation: 'set', value: 0 },

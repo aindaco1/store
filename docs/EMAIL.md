@@ -27,7 +27,7 @@ Sent to effective `super_admin` users after a new Store order is confirmed.
 
 Sent when an admin user is added from the dashboard and notification delivery is enabled for that action.
 
-The email tells the user what access was added and points them to the admin sign-in page. It does not include a password.
+The email tells the user what access was added and includes a one-time admin login link, so the invited user can open the dashboard without requesting a second email. The link expires after 15 minutes, is consumed on first successful exchange, and still requires the email address to remain in the current admin-user list when it is redeemed. An expired invitation falls back to the normal admin sign-in flow. It does not include a password.
 
 ### Admin Magic Link
 
@@ -133,7 +133,7 @@ Local `./scripts/dev.sh` checkout keeps `EMAIL_OUTBOX_ENABLED=false` in the gene
 
 Each `email-outbox:v1:*` record has a deterministic job ID, a frozen Resend payload/content hash, a stable `store/<job-id>` idempotency key, bounded exponential backoff, and a 10-minute processing lease. Payloads expire after 30 days. Provider acceptance and signed delivery outcomes are minimized into `email-delivery:v1:*` for 400 days. Ambiguous outcomes stop for operator review rather than risking a duplicate send outside Resend's retry window.
 
-Admin sign-in, super-admin order notifications containing five-minute one-time admin links, and customer order-lookup messages containing 15-minute one-time lookup links remain immediate. Delaying those security-sensitive messages behind a background queue would consume a material part of their validity window. Explicit admin test sends also remain immediate.
+Admin sign-in, new-admin access notices containing 15-minute one-time links, super-admin order notifications containing five-minute one-time admin links, and customer order-lookup messages containing 15-minute one-time lookup links remain immediate. Delaying those security-sensitive messages behind a background queue would consume a material part of their validity window. Explicit admin test sends also remain immediate.
 
 Create a Resend webhook at:
 
