@@ -473,7 +473,8 @@ $admin-section-gap: clamp(16px, 2vw, 24px);
   min-width: 0;
 }
 
-.admin-settings__row-header label {
+.admin-settings__row-header label,
+.admin-settings__row-header [data-settings-label] {
   overflow-wrap: anywhere;
 }
 

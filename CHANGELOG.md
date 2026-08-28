@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.3.5 - 2026-08-27
+
+- Changed newly added admin notifications into direct, 15-minute, one-time
+  dashboard invitations while preserving role checks at redemption and the
+  normal sign-in fallback after expiry.
+- Replaced the post-event mission editor's text Link control with the existing
+  chain-link icon and gave the English and Spanish editors equal fixed heights
+  with internal scrolling for longer copy.
+- Moved the sandboxed email-preview shell under the protected admin path so it
+  inherits Cloudflare's private, no-store, no-transform policy and avoids
+  injected Rocket Loader and Web Analytics cross-origin errors.
+- Honored explicit Podman connections throughout the doctor, development, and
+  pre-merge wrappers without starting or restarting a different VM, while
+  retaining the release-memory gate for the selected engine.
+
 ## v1.3.4 - 2026-08-27
 
 - Added a settled-order **Tip Revenue** card to Analytics using the canonical

@@ -44,6 +44,7 @@ function resolvePodmanCommand() {
       podmanCommandCache = candidate;
       return candidate;
     } catch {
+      if (env.CONTAINER_CONNECTION?.trim()) continue;
       try {
         execFileSync(candidate, ['machine', 'start', 'podman-machine-default'], {
           cwd: repoRoot,
@@ -74,6 +75,11 @@ function resolvePodmanEnvironment(podmanCommand: string) {
   if (podmanEnvironmentCache) return podmanEnvironmentCache;
 
   const env: NodeJS.ProcessEnv = { ...process.env };
+  if (env.CONTAINER_CONNECTION?.trim()) {
+    delete env.CONTAINER_HOST;
+    podmanEnvironmentCache = env;
+    return podmanEnvironmentCache;
+  }
   try {
     const socketPath = execFileSync(
       podmanCommand,

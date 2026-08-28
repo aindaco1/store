@@ -95,6 +95,81 @@ describe('admin auth links', () => {
     expect(options).toMatchObject({ expirationTtl: 300 });
   });
 
+  it('builds one-time admin invitation links with the standard login lifetime', async () => {
+    const storeState = {
+      get: vi.fn(async (key: string, options?: { type?: string }) => {
+        if (key !== 'admin-users:v1') return null;
+        const value = JSON.stringify({
+          users: [{
+            email: 'new-admin@example.com',
+            role: 'limited_admin',
+            accessScopes: ['store']
+          }]
+        });
+        return options?.type === 'json' ? JSON.parse(value) : value;
+      }),
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined)
+    };
+    const loginUrl = await createAdminLoginUrl({
+      SITE_BASE: 'https://shop.test',
+      ADMIN_SESSION_SECRET: 'test_admin_session_secret',
+      STORE_STATE: storeState
+    }, {
+      email: 'new-admin@example.com',
+      preferredLang: 'en',
+      params: { tab: 'store-orders' },
+      source: 'admin_user_invitation'
+    });
+
+    const parsed = new URL(loginUrl);
+    expect(parsed.pathname).toBe('/admin/');
+    expect(parsed.searchParams.get('admin_login')).toBeTruthy();
+    expect(parsed.searchParams.get('tab')).toBe('store-orders');
+    const loginPut = storeState.put.mock.calls.find(([key]) => String(key).startsWith('admin-login:'));
+    expect(loginPut?.[2]).toMatchObject({ expirationTtl: 900 });
+    expect(JSON.parse(String(loginPut?.[1] || '{}'))).toMatchObject({
+      email: 'new-admin@example.com',
+      role: 'limited_admin',
+      accessScopes: ['store'],
+      source: 'admin_user_invitation'
+    });
+  });
+
+  it('rejects an unredeemed invitation after the invited user is removed', async () => {
+    const storeState = new MockKVNamespace();
+    await storeState.put('admin-users:v1', JSON.stringify({
+      users: [{
+        email: 'new-admin@example.com',
+        role: 'limited_admin',
+        accessScopes: ['store']
+      }]
+    }));
+    const env = {
+      SITE_BASE: 'https://shop.test',
+      ADMIN_SESSION_SECRET: 'test_admin_session_secret',
+      STORE_STATE: storeState
+    };
+    const loginUrl = await createAdminLoginUrl(env, {
+      email: 'new-admin@example.com',
+      source: 'admin_user_invitation'
+    });
+    const token = new URL(loginUrl).searchParams.get('admin_login') || '';
+    await storeState.put('admin-users:v1', JSON.stringify({
+      users: [{ email: 'owner@example.com', role: 'super_admin', accessScopes: [] }]
+    }));
+
+    const response = await handleAdminAuthExchange(
+      new Request('https://checkout.test/admin/auth/exchange', { method: 'POST' }),
+      env,
+      { token }
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: 'Unauthorized' });
+    expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-session:'))).toHaveLength(0);
+  });
+
   it('consumes authenticated order notification links once and creates a shorter admin session', async () => {
     const storeState = new MockKVNamespace();
     const env = {

@@ -154,6 +154,21 @@ describe('package test scripts', () => {
     expect(podmanDev).not.toContain('kill "${STRIPE_LISTEN_PID:-0}"');
   });
 
+  it('preserves an explicitly selected Podman connection across local wrappers', () => {
+    const paths = [
+      'scripts/dev-podman.sh',
+      'scripts/podman-doctor.sh',
+      'scripts/pre-merge-regression.sh'
+    ];
+
+    for (const path of paths) {
+      const script = readFileSync(join(repoRoot, path), 'utf8');
+      expect(script, path).toContain('CONTAINER_CONNECTION');
+      expect(script, path).toContain('unset CONTAINER_HOST');
+      expect(script, path).not.toContain('unset CONTAINER_CONNECTION');
+    }
+  });
+
   it('lets host test harnesses disable Stripe forwarding without provider access', () => {
     const hostDev = readFileSync(join(repoRoot, 'scripts/dev.sh'), 'utf8');
 

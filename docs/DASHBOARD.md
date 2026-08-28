@@ -54,7 +54,7 @@ Current Settings sections:
 - Shipping: origin, fallback fee, default shipping option, USPS settings, cache TTLs, and cooldowns.
 - Marketing: default UTM/referral/share values used by the marketing link builder.
 - Design: layout width, fonts, color tokens, and button radius.
-- Users: admin users, roles, and access scopes. Newly added users can receive notification email.
+- Users: admin users, roles, and access scopes. Newly added users receive a notification email with a 15-minute, one-time link that opens the dashboard directly; expired links fall back to the normal sign-in flow.
 - Store readiness: launch/runtime checks, audit CSV export, and reconciliation CSV export.
 - Plan usage: Cloudflare and Resend quota/usage posture.
 - Advanced performance: intent prefetch, live inventory cache controls, the global Workers Cache switch, and per-route Orders, Analytics, inventory, and download-readiness switches.

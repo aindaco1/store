@@ -2154,6 +2154,7 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => calls.storeEventFollowupPreviews.length).toBeGreaterThanOrEqual(1);
     await expect(followupSettings.locator('[data-event-followup-preview-product] option')).toHaveCount(1);
     await expect(followupSettings.locator('[data-event-followup-preview-frame]')).toBeVisible();
+    await expect(followupSettings.locator('[data-event-followup-preview-frame]')).toHaveAttribute('src', '/admin/email-preview-frame/');
     await expect(followupSettings.locator('[data-event-followup-preview-refresh]')).toHaveCount(0);
     await expect(followupSettings.locator('.admin-event-followup-preview__recipient')).toHaveCount(0);
     await expect(followupSettings.getByText('to preview recipient')).toHaveCount(0);
@@ -2178,6 +2179,10 @@ test.describe('Admin Dashboard', () => {
       })).toBe(1);
     }
     const englishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission"]');
+    const englishMissionLabelId = await englishMissionEditor.getAttribute('aria-labelledby');
+    expect(englishMissionLabelId).toBeTruthy();
+    await expect(followupSettings.locator(`#${englishMissionLabelId}`)).toHaveAttribute('data-settings-label', 'true');
+    await expect(followupSettings.locator(`label[for="${await englishMissionEditor.getAttribute('id')}"]`)).toHaveCount(0);
     await expect(englishMissionEditor.locator('strong')).toContainText('independent film.');
     const englishMissionToolbar = englishMissionEditor.locator('..').getByRole('toolbar');
     for (const format of ['Bold', 'Italic', 'Underline', 'Link']) {
@@ -2189,10 +2194,34 @@ test.describe('Admin Dashboard', () => {
     });
     await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.mission).toBe('**Bold** *Italic* <u>Underline</u> [Link](https://dustwave.xyz/mission)');
     const spanishMissionEditor = followupSettings.locator('[data-settings-rich-text-editor="email.event_followup.mission_es"]');
+    const spanishMissionLabelId = await spanishMissionEditor.getAttribute('aria-labelledby');
+    expect(spanishMissionLabelId).toBeTruthy();
+    await expect(followupSettings.locator(`#${spanishMissionLabelId}`)).toHaveAttribute('data-settings-label', 'true');
+    await expect(followupSettings.locator(`label[for="${await spanishMissionEditor.getAttribute('id')}"]`)).toHaveCount(0);
     const spanishMissionToolbar = spanishMissionEditor.locator('..').getByRole('toolbar');
     for (const format of ['Bold', 'Italic', 'Underline', 'Link']) {
       await expect(spanishMissionToolbar.getByRole('button', { name: format })).toBeVisible();
     }
+    const linkButton = spanishMissionToolbar.getByRole('button', { name: 'Link' });
+    await expect(linkButton).toHaveText('');
+    await expect(linkButton.locator('svg')).toHaveAttribute('aria-hidden', 'true');
+    await expect.poll(async () => {
+      const [boldWidth, linkWidth] = await Promise.all([
+        spanishMissionToolbar.getByRole('button', { name: 'Bold' }).evaluate((button) => button.getBoundingClientRect().width),
+        linkButton.evaluate((button) => button.getBoundingClientRect().width)
+      ]);
+      return Math.abs(boldWidth - linkWidth);
+    }).toBeLessThanOrEqual(1);
+    await spanishMissionEditor.evaluate((editor) => {
+      editor.innerHTML = Array.from({ length: 12 }, (_, index) => `<p>Spanish mission line ${index + 1}</p>`).join('');
+    });
+    await expect.poll(async () => {
+      const [englishHeight, spanishHeight] = await Promise.all([
+        englishMissionEditor.evaluate((editor) => editor.getBoundingClientRect().height),
+        spanishMissionEditor.evaluate((editor) => editor.getBoundingClientRect().height)
+      ]);
+      return Math.abs(englishHeight - spanishHeight);
+    }).toBeLessThanOrEqual(1);
     await spanishMissionEditor.fill('Una misión española sin publicar.');
     await expect.poll(() => calls.storeEventFollowupPreviews.at(-1)?.settings?.missionEs).toBe('Una misión española sin publicar.');
     await followupSettings.locator('[data-event-followup-preview-language]').selectOption('es');

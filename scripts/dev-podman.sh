@@ -22,6 +22,7 @@ WORKER_NODE_MODULES_VOLUME="store-dev-worker-node-modules"
 SKIP_STRIPE="${SKIP_STRIPE:-false}"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_SOCKET=""
+PODMAN_CONNECTION_NAME="${CONTAINER_CONNECTION:-}"
 PODMAN_DETACH="${PODMAN_DETACH:-false}"
 PODMAN_SUPERVISE_INTERVAL="${PODMAN_SUPERVISE_INTERVAL:-2}"
 PODMAN_SUPERVISE_LOG_LINES="${PODMAN_SUPERVISE_LOG_LINES:-30}"
@@ -36,8 +37,18 @@ detect_podman_socket() {
   podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
 }
 
+using_explicit_podman_connection() {
+  [ -n "${PODMAN_CONNECTION_NAME:-}" ]
+}
+
 configure_podman_connection() {
   local socket_path="${1:-}"
+
+  if using_explicit_podman_connection; then
+    PODMAN_SOCKET=""
+    unset CONTAINER_HOST
+    return 0
+  fi
 
   if [ -z "$socket_path" ]; then
     socket_path="$(detect_podman_socket)"
@@ -45,7 +56,6 @@ configure_podman_connection() {
 
   PODMAN_SOCKET="$socket_path"
   if [ -n "$socket_path" ]; then
-    unset CONTAINER_CONNECTION
     export CONTAINER_HOST="unix://${socket_path}"
   fi
 }
@@ -323,7 +333,10 @@ ensure_podman_ready() {
   local os_family
   os_family="$(detect_os_family)"
 
-  if [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
+  if { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; } && using_explicit_podman_connection; then
+    configure_podman_connection
+    echo "✅ Using Podman connection: ${PODMAN_CONNECTION_NAME}"
+  elif [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; then
     local machine_vmtype=""
     machine_vmtype="$(podman machine info 2>/dev/null | awk '/vmtype:/ {print $2}' | head -n 1 || true)"
     if [ "$os_family" = "macos" ] && [ -n "$machine_vmtype" ] && [ "$machine_vmtype" = "applehv" ]; then
@@ -358,7 +371,7 @@ ensure_podman_ready() {
       ready=1
       break
     fi
-    if [ "$ready" != "1" ] && [ "$attempted_restart" = "0" ] && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
+    if [ "$ready" != "1" ] && [ "$attempted_restart" = "0" ] && ! using_explicit_podman_connection && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
       local machine_state=""
       machine_state="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
       if [ "$machine_state" = "running" ]; then
@@ -373,7 +386,10 @@ ensure_podman_ready() {
   done
 
   if [ "$ready" != "1" ]; then
-    if [ "$os_family" = "linux" ]; then
+    if using_explicit_podman_connection; then
+      echo "❌ Podman connection '${PODMAN_CONNECTION_NAME}' did not become ready."
+      echo "   Check: podman system connection list"
+    elif [ "$os_family" = "linux" ]; then
       echo "❌ Podman API did not become ready."
     else
       echo "❌ Podman machine did not become ready."
@@ -391,7 +407,9 @@ ensure_podman_ready() {
         exit 1
       fi
     fi
-    if [ "$os_family" = "linux" ]; then
+    if using_explicit_podman_connection; then
+      echo "   Store will not start or restart the VM behind an explicitly selected connection."
+    elif [ "$os_family" = "linux" ]; then
       echo "   Try: podman info"
       echo "   If that fails, restart your rootless Podman service/session and rerun this command."
     else
@@ -468,7 +486,7 @@ recover_podman_stack_start() {
   cleanup_pod
 
   os_family="$(detect_os_family)"
-  if [ "$attempt" -ge 2 ] && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
+  if [ "$attempt" -ge 2 ] && ! using_explicit_podman_connection && { [ "$os_family" = "macos" ] || [ "$os_family" = "windows" ]; }; then
     echo "🔄 Restarting Podman machine to clear stale libpod state..."
     podman machine stop podman-machine-default >/tmp/store-podman-machine-stop.log 2>&1 || true
     podman machine start --quiet --no-info podman-machine-default >/tmp/store-podman-machine-start.log 2>&1 || true

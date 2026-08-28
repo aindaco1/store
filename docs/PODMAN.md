@@ -49,6 +49,15 @@ Not included:
 
 On macOS and Windows, `./scripts/dev.sh --podman` will initialize/start the default `podman machine` when needed. On Linux, it talks directly to the local rootless Podman engine.
 
+When another task already owns the active macOS/Windows VM slot, select its registered Podman connection explicitly instead of asking Store to start or restart `podman-machine-default`:
+
+```bash
+CONTAINER_CONNECTION=<connection-name> npm run podman:doctor
+CONTAINER_CONNECTION=<connection-name> npm run test:premerge
+```
+
+An explicit `CONTAINER_CONNECTION` is authoritative across the doctor, dev stack, and pre-merge wrapper. Store checks that engine but does not manage the selected VM's lifecycle. The strict release check still verifies the 6 GiB configured-memory baseline, allowing for the guest operating system's reserved memory when only engine-reported capacity is available.
+
 Release and pre-merge suites require at least 6 GiB of Podman machine memory on macOS and Windows. Browser traces, Jekyll, Wrangler/Miniflare, and the production-like Worker can exhaust a 4 GiB VM during repeated full-suite runs even when individual focused tests pass. Configure the machine while it is stopped:
 
 ```bash

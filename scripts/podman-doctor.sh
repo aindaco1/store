@@ -38,15 +38,23 @@ detect_podman_socket() {
   podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true
 }
 
+using_explicit_podman_connection() {
+  [ -n "${PODMAN_CONNECTION_NAME:-}" ]
+}
+
 configure_podman_connection() {
   local socket_path="${1:-}"
+
+  if using_explicit_podman_connection; then
+    unset CONTAINER_HOST
+    return 0
+  fi
 
   if [ -z "$socket_path" ]; then
     socket_path="$(detect_podman_socket)"
   fi
 
   if [ -n "$socket_path" ]; then
-    unset CONTAINER_CONNECTION
     export CONTAINER_HOST="unix://${socket_path}"
   fi
 }
@@ -65,6 +73,7 @@ fail() { printf '❌ %s\n' "$1"; exit 1; }
 
 PODMAN_RELEASE_MIN_MEMORY_MIB="${PODMAN_RELEASE_MIN_MEMORY_MIB:-6144}"
 PODMAN_REQUIRE_RELEASE_RESOURCES="${PODMAN_REQUIRE_RELEASE_RESOURCES:-false}"
+PODMAN_CONNECTION_NAME="${CONTAINER_CONNECTION:-}"
 
 prefer_podman_path || true
 
@@ -83,42 +92,36 @@ fi
 pass "Podman CLI is available"
 
 if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
-  if ! podman machine inspect >/dev/null 2>&1; then
-    fail "No Podman machine found. Run: podman machine init --now"
-  fi
+  if using_explicit_podman_connection; then
+    configure_podman_connection
+    pass "Using Podman connection: ${PODMAN_CONNECTION_NAME}"
+  else
+    if ! podman machine inspect >/dev/null 2>&1; then
+      fail "No Podman machine found. Run: podman machine init --now"
+    fi
 
-  MACHINE_STATE="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
-  if [ "$MACHINE_STATE" != "running" ]; then
-    warn "Podman machine is not running. Attempting to start it once..."
-    podman machine start podman-machine-default >/tmp/store-podman-doctor-start.log 2>&1 || true
     MACHINE_STATE="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
     if [ "$MACHINE_STATE" != "running" ]; then
-      LOG_PATH="$(podman_machine_log_path)"
-      if [ -f /tmp/store-podman-doctor-start.log ]; then
-        echo "   Podman start log: /tmp/store-podman-doctor-start.log"
+      warn "Podman machine is not running. Attempting to start it once..."
+      podman machine start podman-machine-default >/tmp/store-podman-doctor-start.log 2>&1 || true
+      MACHINE_STATE="$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)"
+      if [ "$MACHINE_STATE" != "running" ]; then
+        LOG_PATH="$(podman_machine_log_path)"
+        if [ -f /tmp/store-podman-doctor-start.log ]; then
+          echo "   Podman start log: /tmp/store-podman-doctor-start.log"
+        fi
+        if [ -n "${LOG_PATH:-}" ] && [ -f "$LOG_PATH" ]; then
+          echo "   Podman machine log: $LOG_PATH"
+        fi
+        fail "Podman machine did not stay running after startup."
       fi
-      if [ -n "${LOG_PATH:-}" ] && [ -f "$LOG_PATH" ]; then
-        echo "   Podman machine log: $LOG_PATH"
-      fi
-      fail "Podman machine did not stay running after startup."
     fi
-  fi
-  pass "Podman machine is running"
-  configure_podman_connection
+    pass "Podman machine is running"
+    configure_podman_connection
 
-  MACHINE_MEMORY_MIB="$(podman machine inspect --format '{{.Resources.Memory}}' podman-machine-default 2>/dev/null || true)"
-  if [[ "$MACHINE_MEMORY_MIB" =~ ^[0-9]+$ ]]; then
-    if [ "$MACHINE_MEMORY_MIB" -lt "$PODMAN_RELEASE_MIN_MEMORY_MIB" ]; then
-      if [ "$PODMAN_REQUIRE_RELEASE_RESOURCES" = "true" ]; then
-        fail "Podman machine memory is ${MACHINE_MEMORY_MIB} MiB; release/pre-merge suites require at least ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB. Stop the machine, run 'podman machine set --memory ${PODMAN_RELEASE_MIN_MEMORY_MIB}', then restart it."
-      fi
-      warn "Podman machine memory is ${MACHINE_MEMORY_MIB} MiB; use at least ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB for release/pre-merge suites."
-    else
-      pass "Podman machine memory: ${MACHINE_MEMORY_MIB} MiB"
-    fi
   fi
 
-  if [ "$OS_FAMILY" = "macos" ]; then
+  if [ "$OS_FAMILY" = "macos" ] && ! using_explicit_podman_connection; then
     MACHINE_VMTYPE="$(podman machine info 2>/dev/null | awk '/vmtype:/ {print $2}' | head -n 1 || true)"
     if [ "$MACHINE_VMTYPE" = "applehv" ]; then
       warn "Podman is using applehv on macOS."
@@ -132,7 +135,7 @@ if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
 fi
 
 if ! podman info >/dev/null 2>&1; then
-  if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
+  if { [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; } && ! using_explicit_podman_connection; then
     warn "Podman machine looks running but the API is stale. Restarting it once..."
     podman machine stop podman-machine-default >/tmp/store-podman-doctor-stop.log 2>&1 || true
     podman machine start podman-machine-default >/tmp/store-podman-doctor-start.log 2>&1 || true
@@ -141,12 +144,54 @@ if ! podman info >/dev/null 2>&1; then
 fi
 
 if ! podman info >/dev/null 2>&1; then
+  if using_explicit_podman_connection; then
+    fail "Podman connection '${PODMAN_CONNECTION_NAME}' is not reachable. Check 'podman system connection list' and the VM that owns that connection."
+  fi
   if [ "$OS_FAMILY" = "linux" ]; then
     fail "Podman engine is not ready. Try running 'podman info' directly and fix the local service/session first."
   fi
   fail "Podman engine is not ready. Try: podman machine stop && podman machine start"
 fi
 pass "Podman engine is reachable"
+
+if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
+  MEMORY_COMPARISON_MIN_MIB="$PODMAN_RELEASE_MIN_MEMORY_MIB"
+  MEMORY_IS_GUEST_AVAILABLE="false"
+  if using_explicit_podman_connection; then
+    MACHINE_MEMORY_MIB="$(podman machine inspect --format '{{.Resources.Memory}}' "$PODMAN_CONNECTION_NAME" 2>/dev/null || true)"
+    if ! [[ "$MACHINE_MEMORY_MIB" =~ ^[0-9]+$ ]]; then
+      MACHINE_MEMORY_BYTES="$(podman info --format '{{.Host.MemTotal}}' 2>/dev/null || true)"
+      if [[ "$MACHINE_MEMORY_BYTES" =~ ^[0-9]+$ ]]; then
+        MACHINE_MEMORY_MIB="$((MACHINE_MEMORY_BYTES / 1024 / 1024))"
+        MEMORY_COMPARISON_MIN_MIB="$((PODMAN_RELEASE_MIN_MEMORY_MIB * 9 / 10))"
+        MEMORY_IS_GUEST_AVAILABLE="true"
+      else
+        MACHINE_MEMORY_MIB=""
+      fi
+    fi
+  else
+    MACHINE_MEMORY_MIB="$(podman machine inspect --format '{{.Resources.Memory}}' podman-machine-default 2>/dev/null || true)"
+  fi
+  if [[ "$MACHINE_MEMORY_MIB" =~ ^[0-9]+$ ]]; then
+    if [ "$MACHINE_MEMORY_MIB" -lt "$MEMORY_COMPARISON_MIN_MIB" ]; then
+      if [ "$MEMORY_IS_GUEST_AVAILABLE" = "true" ]; then
+        MEMORY_DETAIL="Podman engine reports ${MACHINE_MEMORY_MIB} MiB available; the selected connection does not meet the ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB configured-memory baseline"
+      else
+        MEMORY_DETAIL="Podman engine memory is ${MACHINE_MEMORY_MIB} MiB; release/pre-merge suites require at least ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB"
+      fi
+      if [ "$PODMAN_REQUIRE_RELEASE_RESOURCES" = "true" ]; then
+        fail "${MEMORY_DETAIL}. Resize the selected machine before retrying."
+      fi
+      warn "${MEMORY_DETAIL}."
+    else
+      if [ "$MEMORY_IS_GUEST_AVAILABLE" = "true" ]; then
+        pass "Podman engine available memory supports the ${PODMAN_RELEASE_MIN_MEMORY_MIB} MiB configured-memory baseline"
+      else
+        pass "Podman engine memory: ${MACHINE_MEMORY_MIB} MiB"
+      fi
+    fi
+  fi
+fi
 
 if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
   STABILITY_CHECKS=3
@@ -164,7 +209,11 @@ if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
     fi
     sleep 1
   done
-  pass "Podman machine stays reachable after startup"
+  if using_explicit_podman_connection; then
+    pass "Selected Podman connection stays reachable"
+  else
+    pass "Podman machine stays reachable after startup"
+  fi
 fi
 
 ROOTLESS="$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null || echo false)"

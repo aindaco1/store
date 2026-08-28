@@ -613,7 +613,7 @@ email:
     heading: Acceso de administración agregado
     greeting: 'Hola %{name}:'
     intro: Ahora tienes acceso de %{role} a %{platform}.
-    instructions: Para iniciar sesión, abre administración e ingresa este correo. Te enviaremos un enlace mágico.
+    instructions: Usa el enlace seguro a continuación para abrir el panel de administración. Funciona durante 15 minutos y solo se puede usar una vez.
     cta: Abrir administración
     role_super_admin: superadministrador
     role_limited_admin: administrador limitado
