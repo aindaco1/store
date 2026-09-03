@@ -56,6 +56,9 @@ jobs:
 
       - name: Run read-only Cloudflare provider evidence
         run: npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars --json-output=provider-evidence.json
+        env:
+          SITE_BASE: https://shop.dustwave.xyz
+          WORKER_BASE: https://checkout.dustwave.xyz
 
       - name: Run representative Podman restore rehearsal
         run: npm run restore:rehearse -- --output=recovery-rehearsal.json

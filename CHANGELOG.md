@@ -14,6 +14,8 @@
   with responsive media, preserving the operator-entered inventory of 100.
 - Select public SEO release probes from the public catalog so private drafts
   do not cause false missing-structured-data failures.
+- Scope recovery-readiness DNS evidence to production domains while retaining
+  isolated localhost targets for synthetic restore probes.
 
 ## v1.3.6 - 2026-08-28
 
