@@ -10,8 +10,8 @@
   Include Ruby in the Podman Worker image for the local generator.
 - Expose service fulfillment consistently in the dashboard, storefront,
   content validation, and operator documentation.
-- Add the operator-authored A Night in Paradiso ticket draft and poster with
-  responsive media. Deployment does not activate the draft or change inventory.
+- Publish the operator-approved A Night in Paradiso $20 event ticket and poster
+  with responsive media, preserving the operator-entered inventory of 100.
 - Select public SEO release probes from the public catalog so private drafts
   do not cause false missing-structured-data failures.
 

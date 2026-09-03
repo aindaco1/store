@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, digital downloads, and services. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.3.7`. The preceding `v1.3.6` release remains independently reversible. Local product editing now regenerates the canonical Worker snapshot and waits for the running Worker to load the saved catalog before refreshing the dashboard. Service fulfillment is supported consistently, and the operator-authored Paradiso ticket remains a draft. Production Posture still separates required configuration gates from unavailable optional provider probes. Durable delivery, promotional suppression, provider verification, and canonical order and fulfillment truth remain separate. Store pins Platform v0.34.1 and the separate Jekyll Template v0.1.0; Store retains local build copies, configuration, content, production origins, credentials, deployment, and rollback authority.
+Current release: `v1.3.7`. The preceding `v1.3.6` release remains independently reversible. Local product editing now regenerates the canonical Worker snapshot and waits for the running Worker to load the saved catalog before refreshing the dashboard. Service fulfillment is supported consistently, and the operator-approved Paradiso ticket is active for public purchase. Production Posture still separates required configuration gates from unavailable optional provider probes. Durable delivery, promotional suppression, provider verification, and canonical order and fulfillment truth remain separate. Store pins Platform v0.34.1 and the separate Jekyll Template v0.1.0; Store retains local build copies, configuration, content, production origins, credentials, deployment, and rollback authority.
 
 The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent and no-payment checkout, opt-in RSVP forms, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, named attendee check-in, private response review, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
 
@@ -25,7 +25,7 @@ The current repository is production-ready from a code-path perspective: public 
 At this sweep the source catalog contains:
 
 - 51 product records in `_products/`
-- 25 active products, 25 archived products, and 1 draft product
+- 26 active products and 25 archived products
 - 25 physical products, 24 ticket products, 1 digital product, and 1 free RSVP product
 - launch-test fixtures for controlled direct-link checkout/download/check-in smoke tests
 

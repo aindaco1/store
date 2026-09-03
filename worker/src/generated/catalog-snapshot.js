@@ -93,7 +93,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso/",
       "type": "ticket",
       "fulfillment_type": "ticket",
-      "status": "draft",
+      "status": "active",
       "public": true,
       "launch_test": false,
       "order": 9.0,
@@ -2943,7 +2943,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "e856218cc7f750dbf04c8734d1d7d904a715f09ff522f04632386fdf865b9ed2"
+  "source_hash": "a2643cd207844f3633af0665530b4cd441c12a963d849fdc42468b2e3823e645"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
