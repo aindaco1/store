@@ -241,6 +241,9 @@ admin:
   load_more: Load more
   store_products_intro: Review %{platform} catalog products, variants, prices, fulfillment, status, and inventory posture from the generated product snapshot.
   deployment_saved: Saved
+  local_catalog_updating: Saved locally. Waiting for the Worker catalog to reload.
+  local_catalog_failed: Saved locally, but the Worker catalog could not be refreshed. Your edits remain visible; check the local build before reloading.
+  local_catalog_ready: Saved locally. The dashboard and Worker catalog are up to date.
   deployment_deploying: Deploying
   deployment_deployed: Deployed
   deployment_archive_requested: Archive saved. Waiting for the deployment to start - %{elapsed} elapsed.

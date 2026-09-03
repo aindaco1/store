@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.3.7 - 2026-09-03
+
+- Regenerate the canonical Worker catalog at local startup, after dashboard
+  saves, and when repository products/configuration change, including renames.
+- Wait for the running Worker's saved catalog hash before refreshing the local
+  product editor. Preserve edits and report saved-but-not-refreshed failures.
+- Write generated snapshots atomically and avoid unnecessary Worker reloads.
+  Include Ruby in the Podman Worker image for the local generator.
+- Expose service fulfillment consistently in the dashboard, storefront,
+  content validation, and operator documentation.
+- Add the operator-authored A Night in Paradiso ticket draft and poster with
+  responsive media. Deployment does not activate the draft or change inventory.
+- Select public SEO release probes from the public catalog so private drafts
+  do not cause false missing-structured-data failures.
+
 ## v1.3.6 - 2026-08-28
 
 - Made required production secret names, bindings, origins, and runtime

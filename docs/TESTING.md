@@ -75,6 +75,15 @@ Local services:
 - Storefront: `http://127.0.0.1:4002`
 - Worker: `http://127.0.0.1:8989`
 
+Local admin product saves also require the repository sidecar on port `8799`; use
+`./scripts/dev.sh` (or `--podman`) to start the complete stack. Startup and local
+source changes regenerate the Worker catalog. The dashboard waits for the saved
+catalog hash before refreshing after a publish. `npm run catalog:generate` is the
+manual recovery/diagnostic command for malformed YAML or stale catalog state.
+The `local-catalog-sync` and `local-admin-publish` unit suites cover real temporary
+repository writes, regeneration, and Worker readiness without touching the shop's
+product files or external providers.
+
 ## Browser Coverage
 
 Default Playwright specs:

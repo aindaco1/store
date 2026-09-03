@@ -74,6 +74,63 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
   },
   "products": [
     {
+      "id": "a-night-in-paradiso",
+      "slug": "a-night-in-paradiso",
+      "sku": "a-night-in-paradiso",
+      "name": "A Night in Paradiso",
+      "description": "A Night in Paradiso, an October 24, 2026 live benefit at FUSION in Albuquerque supporting the short film Paradiso.",
+      "body_description": "## A Night in Paradiso\n\nPresented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only live benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).\n\n*Paradiso* follows a lonely young woman whose obsession with a doomed film antihero - and the niche actor behind him - becomes a waking nightmare as the boundary between the movie she loves and the life she is living dissolves.\n\nThe live event is a **retro-1970s-inspired variety broadcast and immersive theatre experience** with Albuquerque talent, a Bob Barker-inspired host, scripted horror interruptions, handmade commercial breaks, and more surprises!",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "## A Night in Paradiso\n\nPresented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only live benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).\n\n*Paradiso* follows a lonely young woman whose obsession with a doomed film antihero - and the niche actor behind him - becomes a waking nightmare as the boundary between the movie she loves and the life she is living dissolves.\n\nThe live event is a **retro-1970s-inspired variety broadcast and immersive theatre experience** with Albuquerque talent, a Bob Barker-inspired host, scripted horror interruptions, handmade commercial breaks, and more surprises!\n"
+        }
+      ],
+      "price": 20.0,
+      "price_cents": 2000,
+      "currency": "USD",
+      "image": "/assets/images/products/product-a-night-in-paradiso-20260903-204215.png",
+      "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "draft",
+      "public": true,
+      "launch_test": false,
+      "order": 9.0,
+      "collection": "dustwave",
+      "category": "support",
+      "localized_paths": {
+        "en": "/products/a-night-in-paradiso/",
+        "es": "/es/products/a-night-in-paradiso/"
+      },
+      "variant_option_name": "Sponsorship Tier",
+      "inventory_tracking": true,
+      "inventory": 100,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-10-24T19:00:00-06:00",
+        "ends_at": "2026-10-24T21:00:00-06:00",
+        "venue": "The Cell Theatre at FUSION",
+        "address": "708 1st St NW\nAlbuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true,
+        "followup": {
+          "enabled": true,
+          "enabled_at": "2026-09-03T20:42:19.881Z"
+        }
+      },
+      "turnstile_required": false
+    },
+    {
       "id": "t-shirt-1",
       "slug": "dust-wave-t-shirt",
       "sku": "t-shirt-1",
@@ -2886,7 +2943,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": true
     }
   ],
-  "source_hash": "e0a343772f2376904ae8e0f6ab6f7f9149292bbfa54a77a6098eb81c44f6c2e8"
+  "source_hash": "e856218cc7f750dbf04c8734d1d7d904a715f09ff522f04632386fdf865b9ed2"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

@@ -266,6 +266,46 @@ describe('Store catalog snapshot and validation', () => {
     });
   });
 
+  it('keeps paid service products non-shippable and free of ticket or download fulfillment', () => {
+    const snapshot = {
+      version: 1,
+      source: 'test',
+      defaults: { currency: 'USD', tax_category: 'standard' },
+      products: [{
+        id: 'event-sponsorship',
+        sku: 'event-sponsorship',
+        name: 'Event sponsorship',
+        price_cents: 10000,
+        currency: 'USD',
+        fulfillment_type: 'service',
+        status: 'active',
+        inventory_tracking: false,
+        inventory: 0,
+        tax_category: 'standard',
+        variants: []
+      }]
+    };
+
+    const result = validateStoreOrderDraft({
+      items: [{ id: 'event-sponsorship', price: 100, quantity: 1 }]
+    }, { snapshot });
+
+    expect(result.valid).toBe(true);
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      productId: 'event-sponsorship',
+      fulfillmentType: 'service',
+      shippable: false,
+      shippingPreset: '',
+      shipping: null,
+      download: null,
+      eventDetails: null
+    }));
+    expect(result.totals).toMatchObject({
+      requiresPayment: true,
+      requiresShipping: false
+    });
+  });
+
   it('can fail closed on unavailable products and inventory when those checks are enabled', () => {
     const snapshot = {
       version: 1,

@@ -52,6 +52,8 @@ Each sellable item lives in `_products/*.md`. Product records should define:
 - event metadata for ticket/RSVP products
 - optional `store_collection` and `storefront_category` storefront taxonomy fields
 
+Use `fulfillment_type: service` for paid, non-shipping products such as sponsorships when checkout should create a canonical order and receipt without issuing a download, ticket, RSVP, calendar file, or check-in artifact. Keep any promised deliverables explicit in the product copy and confirm the applicable tax category before activation.
+
 The admin product editor separates visible product copy from metadata:
 
 - **Product page content** writes the visible product-detail body/blocks.

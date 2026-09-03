@@ -75,7 +75,7 @@ async function expectNoAxeViolations(page: any, selector = '') {
   ).toEqual([]);
 }
 
-async function routeAdminWorker(page: any, options: { role?: AdminRole; productStatus?: string } = {}) {
+async function routeAdminWorker(page: any, options: { role?: AdminRole; productStatus?: string; localCatalog?: boolean } = {}) {
   const role = options.role || 'super_admin';
   const calls: Record<string, any> = {
     authStart: [],
@@ -620,7 +620,19 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     if (url.pathname === '/admin/store/products' && method === 'GET') {
       calls.storeProducts.push({ method });
       calls.storeProductEvents.push('products');
-      return fulfillJson(storeProductsPayload(options.productStatus, calls.storeProductSavedOrder));
+      const payload = storeProductsPayload(options.productStatus, calls.storeProductSavedOrder);
+      if (options.localCatalog) {
+        Object.assign(payload.catalog, { sourceHash: (calls.localCatalogReady && !calls.localCatalogStaleReadback ? 'b' : 'a').repeat(64) });
+        if (calls.localCatalogReady) {
+          const saved = calls.storeProductPublishes.at(-1);
+          const product = payload.products.find((item: any) => item.productId === saved?.productId);
+          if (product && saved?.fields.name) {
+            product.name = saved.fields.name;
+            payload.rows.filter((item: any) => item.productId === saved.productId).forEach((item) => { item.label = saved.fields.name; });
+          }
+        }
+      }
+      return fulfillJson(payload);
     }
     if (url.pathname === '/admin/store/products/media' && method === 'GET') {
       calls.storeProductMedia.push(Object.fromEntries(url.searchParams.entries()));
@@ -657,6 +669,12 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     if (url.pathname === '/admin/store/products/publish' && method === 'POST') {
       calls.storeProductPublishes.push(body);
       calls.storeProductEvents.push('publish');
+      if (options.localCatalog) {
+        return fulfillJson({
+          success: true, published: true, productId: body.productId, repositoryMode: 'local', deployment: null,
+          rebuild: { ok: !calls.localCatalogFailure, sourceHash: calls.localCatalogFailure ? '' : 'b'.repeat(64) }
+        });
+      }
       return fulfillJson({
         success: true,
         published: true,
@@ -671,6 +689,13 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     if (url.pathname === '/admin/store/deployments/status' && method === 'GET') {
       calls.storeDeployments.push(Object.fromEntries(url.searchParams.entries()));
       calls.storeProductEvents.push('deployment');
+      if (options.localCatalog) {
+        return fulfillJson({ success: true, deployment: {
+          mode: 'local', sourceHash: 'b'.repeat(64),
+          status: calls.localCatalogReady ? 'completed' : 'in_progress',
+          conclusion: calls.localCatalogReady ? 'success' : null
+        } });
+      }
       if (calls.storeDeploymentDelayMs) {
         await new Promise((resolve) => setTimeout(resolve, calls.storeDeploymentDelayMs));
       }
@@ -3469,6 +3494,60 @@ test.describe('Admin Dashboard', () => {
       expect(calls.storeProductEvents.slice(-3)).toEqual(['publish', 'deployment', 'products']);
     });
   });
+
+  test('waits for the saved local catalog before refreshing and reopening a product', async ({ page }) => {
+    const calls = await routeAdminWorker(page, { localCatalog: true });
+    await gotoDomReady(page, '/admin/?admin_login=local-product-save');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Products');
+    const row = page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' });
+    await row.getByRole('button', { name: 'Edit', exact: true }).click();
+    const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+    await editor.locator('[data-store-product-field="name"]').fill('Locally edited poster');
+    await editor.locator('[data-store-product-publish]').click();
+
+    const status = page.locator('#admin-store-products-status');
+    await expect(status).toContainText('Saved locally. Waiting for the Worker catalog to reload.');
+    await expect(status.locator('progress')).toBeVisible();
+    await expect(editor).toBeVisible();
+    await expect(page.locator('#admin-store-products-refresh')).toBeDisabled();
+    await expect.poll(() => calls.storeDeployments.length).toBeGreaterThan(0);
+    expect(calls.storeDeployments[0]).toEqual({ sourceHash: 'b'.repeat(64) });
+    expect(calls.storeProducts).toHaveLength(1);
+    await expect(status.getByRole('link', { name: 'Open GitHub run' })).toHaveCount(0);
+
+    calls.localCatalogReady = true;
+    await expect(status).toContainText('Saved locally. The dashboard and Worker catalog are up to date.');
+    expect(calls.storeProducts).toHaveLength(2);
+    const savedRow = page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Locally edited poster' });
+    await savedRow.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(editor.locator('[data-store-product-field="name"]')).toHaveValue('Locally edited poster');
+    await expect(editor.locator('[data-store-product-publish]')).toBeDisabled();
+  });
+
+  for (const failure of ['rebuild', 'stale readback']) {
+    test(`preserves the local editor on ${failure} failure without claiming success`, async ({ page }) => {
+      const calls = await routeAdminWorker(page, { localCatalog: true });
+      calls.localCatalogFailure = failure === 'rebuild';
+      calls.localCatalogStaleReadback = failure === 'stale readback';
+      await gotoDomReady(page, '/admin/?admin_login=local-product-failure');
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await selectAdminSection(page, 'Products');
+      await page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' })
+        .getByRole('button', { name: 'Edit', exact: true }).click();
+      const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+      await editor.locator('[data-store-product-field="name"]').fill('Saved draft still visible');
+      calls.localCatalogReady = true;
+      await editor.locator('[data-store-product-publish]').click();
+      const status = page.locator('#admin-store-products-status');
+      await expect(status).toContainText('Saved locally, but the Worker catalog could not be refreshed.');
+      await expect(status).not.toContainText('are up to date');
+      await expect(status.locator('progress')).toHaveCount(0);
+      await expect(editor.locator('[data-store-product-field="name"]')).toHaveValue('Saved draft still visible');
+      await expect(page.locator('#admin-store-products-refresh')).toBeEnabled();
+      expect(calls.storeProducts).toHaveLength(failure === 'rebuild' ? 1 : 2);
+    });
+  }
 
   test('returns an expired authenticated session to the admin login', async ({ page }) => {
     const calls = await routeAdminWorker(page);

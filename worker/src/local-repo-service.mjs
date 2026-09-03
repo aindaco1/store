@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { createLocalCatalogSync } from './local-catalog-sync.mjs';
 
 const DEFAULT_PORT = 8799;
 const DEFAULT_MAX_BODY_BYTES = 140 * 1024 * 1024;
@@ -32,6 +33,7 @@ const repoRoot = path.resolve(process.env.ADMIN_LOCAL_REPO_ROOT || devVars.ADMIN
 const token = String(process.env.ADMIN_LOCAL_REPO_TOKEN || devVars.ADMIN_LOCAL_REPO_TOKEN || process.env.ADMIN_SECRET || devVars.ADMIN_SECRET || '').trim();
 const port = Number(process.env.ADMIN_LOCAL_REPO_SERVICE_PORT || devVars.ADMIN_LOCAL_REPO_SERVICE_PORT || DEFAULT_PORT) || DEFAULT_PORT;
 const maxBodyBytes = Number(process.env.ADMIN_LOCAL_REPO_MAX_BODY_BYTES || devVars.ADMIN_LOCAL_REPO_MAX_BODY_BYTES || DEFAULT_MAX_BODY_BYTES) || DEFAULT_MAX_BODY_BYTES;
+const catalogSync = createLocalCatalogSync({ repoRoot });
 
 function jsonResponse(res, status, payload) {
   res.writeHead(status, {
@@ -112,6 +114,11 @@ async function handleRequest(req, res) {
   if (!authorize(req, res)) return;
 
   const body = await readJsonBody(req);
+  if (req.url === '/rebuild') {
+    const result = await catalogSync.sync();
+    jsonResponse(res, result.ok ? 200 : result.status, result);
+    return;
+  }
   if (req.url === '/read') {
     const repoPath = normalizeRepoPath(body.path);
     const filePath = absolute(repoPath);
@@ -179,5 +186,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, '127.0.0.1', () => {
+  catalogSync.start();
   console.log(`Local repo service listening on 127.0.0.1:${port} for ${repoRoot}`);
 });
+server.on('close', () => catalogSync.stop());
