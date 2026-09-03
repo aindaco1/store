@@ -1,6 +1,6 @@
 # Contributing To Store
 
-Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, and digital downloads.
+Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, digital downloads, and services.
 
 ## Local Setup
 

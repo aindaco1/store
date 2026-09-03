@@ -241,6 +241,9 @@ admin:
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
   deployment_saved: Guardado
+  local_catalog_updating: Guardado localmente. Esperando que se recargue el catálogo del Worker.
+  local_catalog_failed: Guardado localmente, pero no se pudo actualizar el catálogo del Worker. Tus cambios siguen visibles; revisa la compilación local antes de recargar.
+  local_catalog_ready: Guardado localmente. El panel y el catálogo del Worker están actualizados.
   deployment_deploying: Desplegando
   deployment_deployed: Desplegado
   deployment_archive_requested: Archivo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.

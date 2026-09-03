@@ -50,4 +50,30 @@ describe('admin product status publishing', () => {
       'deployment: adminRepoDeployment(env, rebuild, committedProducts[0]?.commitSha)'
     );
   });
+
+  it('preserves service as the product type when an admin creates a service product', () => {
+    const normalized = normalizeAdminStoreProductPublishBody({
+      intent: 'publish',
+      createProduct: true,
+      productId: 'event-sponsorship',
+      fields: {
+        name: 'Event sponsorship',
+        price: 100,
+        status: 'draft',
+        fulfillmentType: 'service',
+        image: '/assets/images/products/event-sponsorship.png',
+        taxCategory: 'standard',
+        inventoryTracking: false,
+        inventory: 0
+      },
+      variants: []
+    });
+
+    expect(normalized.ok).toBe(true);
+    if (!normalized.ok) return;
+    expect(normalized.patch.frontMatter).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'fulfillment_type', replacement: 'fulfillment_type: "service"' }),
+      expect.objectContaining({ key: 'type', replacement: 'type: "service"' })
+    ]));
+  });
 });

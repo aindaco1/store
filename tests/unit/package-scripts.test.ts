@@ -7,6 +7,14 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = process.cwd();
 
 describe('package test scripts', () => {
+  it('regenerates the catalog before both local development startup paths', () => {
+    for (const file of ['scripts/dev.sh', 'scripts/dev-podman.sh']) {
+      const source = readFileSync(join(repoRoot, file), 'utf8');
+      expect(source).toContain('ruby ./scripts/generate-catalog-snapshot.rb');
+      expect(source.indexOf('ruby ./scripts/generate-catalog-snapshot.rb')).toBeLessThan(source.indexOf('configure-dev-secrets.sh'));
+    }
+    expect(readFileSync(join(repoRoot, 'worker/Containerfile.dev'), 'utf8')).toContain('    ruby \\');
+  });
   it('pins explicit Jekyll template check and write commands', () => {
     const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
     const command = 'node ./shared/dust-wave-jekyll-template/bin/sync-consumer.mjs --consumer-root .';

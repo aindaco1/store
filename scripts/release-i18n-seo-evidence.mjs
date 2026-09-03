@@ -142,14 +142,13 @@ function assertPrivateRoute(route, lang) {
   return problems.length ? fail(label, problems.join('; ')) : pass(label, `${lang} noindex/private metadata present`);
 }
 
-function firstRenderedProductRoute(prefix = 'products') {
-  const productsRoot = path.join(SITE_DIR, prefix);
-  if (!fs.existsSync(productsRoot)) return '';
-  const entries = fs.readdirSync(productsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(productsRoot, entry.name, 'index.html')))
-    .map((entry) => entry.name)
-    .sort();
-  return entries.length ? `/${prefix}/${entries[0]}/` : '';
+export function firstRenderedProductRoute(prefix = 'products', siteDir = SITE_DIR) {
+  // Draft/archived pages intentionally omit public structured data. Select the
+  // public metadata probe from the canonical public catalog, not directory order.
+  // The full SEO audit separately enforces private product crawl boundaries.
+  const catalog = JSON.parse(fs.readFileSync(path.join(siteDir, 'api/products.json'), 'utf8'));
+  const product = catalog.products.find((entry) => ['active', 'sold_out'].includes(entry.status));
+  return product ? `/${prefix}/${product.slug}/` : '';
 }
 
 function assertProductRoute(route, lang) {
@@ -208,6 +207,7 @@ function assertRouteCopy() {
   return problems.length ? fail('Rendered i18n route copy', problems.join('; ')) : pass('Rendered i18n route copy', 'English and Spanish route shells contain expected copy');
 }
 
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 console.log('Store release i18n/SEO evidence');
 console.log(`Generated: ${new Date().toISOString()}`);
 console.log('');
@@ -241,3 +241,4 @@ const skipCount = results.filter((entry) => entry.status === 'SKIP').length;
 console.log('');
 console.log(`Summary: ${failCount} fail, ${warnCount} warn, ${skipCount} skip`);
 if (failCount) process.exit(1);
+}

@@ -328,7 +328,8 @@ async function putAdminRepoBase64File(env, filePath, base64Content, message, sha
 
 async function triggerAdminRepoRebuild(env, reason = 'manual') {
   if (isLocalAdminRepoWritesEnabled(env)) {
-    return { triggered: false, mode: 'local', reason: 'Local repository write saved. Jekyll will rebuild in local dev.' };
+    const result = await callLocalAdminRepoService(env, '/rebuild');
+    return { ...result, triggered: result.ok === true, mode: 'local' };
   }
   return triggerSiteRebuild(env, reason);
 }
@@ -9264,7 +9265,7 @@ function adminStoreProductScalarLine(key, value, type = 'string') {
 
 function defaultAdminStoreProductType(fulfillmentType = 'physical') {
   const type = String(fulfillmentType || '').trim().toLowerCase();
-  if (type === 'digital' || type === 'ticket' || type === 'rsvp') return type;
+  if (type === 'digital' || type === 'ticket' || type === 'rsvp' || type === 'service') return type;
   return 'product';
 }
 
@@ -10812,6 +10813,19 @@ async function handleAdminStoreDeploymentStatus(request, env) {
   if (!auth.ok) return auth.response;
 
   const url = new URL(request.url);
+  if (isLocalAdminRepoWritesEnabled(env)) {
+    const expectedHash = String(url.searchParams.get('sourceHash') || '');
+    if (!/^[a-f0-9]{64}$/.test(expectedHash)) {
+      return privateJsonResponse({ success: false, error: 'A valid catalog source hash is required.' }, 400, env);
+    }
+    const sourceHash = normalizeStoreCatalogSnapshot(getStoreCatalogSnapshot(env)).sourceHash;
+    const ready = sourceHash === expectedHash;
+    return privateJsonResponse({
+      success: true,
+      deployment: { mode: 'local', sourceHash, status: ready ? 'completed' : 'in_progress', conclusion: ready ? 'success' : null },
+      writeBudget: adminReadBudget({ kvListExpected: 0 })
+    }, 200, env);
+  }
   const result = await getGitHubWorkflowRun(env, {
     commitSha: url.searchParams.get('commitSha') || '',
     runId: url.searchParams.get('runId') || '',
