@@ -3,6 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+source ./scripts/podman-connection.sh
+
 WORKER_PID=""
 JEKYLL_PID=""
 TEMP_DEV_VARS=""
@@ -53,6 +55,7 @@ stabilize_podman_connection() {
 
   prefer_podman_path || return 0
   command -v podman >/dev/null 2>&1 || return 0
+  store_select_podman_connection
 
   if [[ -n "${CONTAINER_CONNECTION:-}" ]]; then
     unset CONTAINER_HOST

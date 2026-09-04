@@ -47,14 +47,28 @@ Not included:
 - [Podman](https://podman.io/docs/installation)
 - optional [Stripe CLI](https://stripe.com/docs/stripe-cli) for local webhook forwarding
 
-On macOS and Windows, `./scripts/dev.sh --podman` will initialize/start the default `podman machine` when needed. On Linux, it talks directly to the local rootless Podman engine.
+On macOS and Windows, Store honors an explicit `CONTAINER_CONNECTION` first,
+then a non-default-machine connection selected with `podman system connection default`.
+The doctor, dev stack, and pre-merge gate share this selection helper and reuse
+that engine without starting or restarting its VM. When the selected connection
+is `podman-machine-default` (or none is configured), Store retains its existing
+default-machine startup behavior. On Linux, it talks directly to the local
+rootless Podman engine.
 
-When another task already owns the active macOS/Windows VM slot, select its registered Podman connection explicitly instead of asking Store to start or restart `podman-machine-default`:
+When another task already owns the active macOS/Windows VM slot, select its
+registered connection as Podman's default or use an explicit per-command override:
 
 ```bash
 CONTAINER_CONNECTION=<connection-name> npm run podman:doctor
 CONTAINER_CONNECTION=<connection-name> npm run test:premerge
 ```
+
+If startup reports that another VM is already running, this is VM contention,
+not evidence of a crash. Check `podman system connection list` and run the doctor
+against the existing engine. Machine listings are provider-specific: use
+`CONTAINERS_MACHINE_PROVIDER=applehv podman machine inspect <name>` for an Apple
+virtualization VM when the configured provider is libkrun. Resize a shared VM
+only after its workloads have stopped; keep its images and volumes intact.
 
 An explicit `CONTAINER_CONNECTION` is authoritative across the doctor, dev stack, and pre-merge wrapper. Store checks that engine but does not manage the selected VM's lifecycle. The strict release check still verifies the 6 GiB configured-memory baseline, allowing for the guest operating system's reserved memory when only engine-reported capacity is available.
 
@@ -167,6 +181,18 @@ npm run restore:rehearse
 `npm run test:security`, `npm run test:e2e`, and `npm run test:e2e:headless` are Podman-backed by default. Host-only aliases are available as `npm run test:security:host`, `npm run test:e2e:host`, and `npm run test:e2e:headless:host`.
 
 The Podman wrappers require both containers to be reachable and a real Store cart validation request to return `200` before they run tests. That catches Worker startup, rate-limit storage, catalog, and local networking failures earlier than simple port checks.
+
+Security, Worker smoke, and Playwright wrappers share a ten-minute startup
+deadline, configurable with `PODMAN_STACK_READY_TIMEOUT` in seconds. This includes
+cold image builds and dependency installation; a stopped launcher still fails
+immediately. Startup diagnostics end with the failure reason so the pre-merge
+log tail retains it. Test assertions and test timeouts are unchanged.
+
+Worker readiness uses the same startup budget by default because its first run
+installs dependencies in a named volume before launching Wrangler. Override that
+service wait with `PODMAN_WORKER_READY_TIMEOUT` if needed; the wrapper's overall
+deadline still applies. Failed startup includes container logs, including when
+the container is running but its HTTP service has not started.
 
 `npm run restore:rehearse` builds a checksum-verified synthetic snapshot, plans and executes its allowed restore into isolated local Wrangler state, proves quarantined records are excluded and derived order data is scheduled for repair, then probes the normal Podman Worker auth/cache headers. It contains no production customer or provider data and performs no production writes.
 

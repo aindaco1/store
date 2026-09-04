@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(cd "$(dirname "$0")" && pwd)/podman-connection.sh"
+
 prefer_podman_path() {
   local candidate=""
   for candidate in \
@@ -73,9 +75,10 @@ fail() { printf '❌ %s\n' "$1"; exit 1; }
 
 PODMAN_RELEASE_MIN_MEMORY_MIB="${PODMAN_RELEASE_MIN_MEMORY_MIB:-6144}"
 PODMAN_REQUIRE_RELEASE_RESOURCES="${PODMAN_REQUIRE_RELEASE_RESOURCES:-false}"
-PODMAN_CONNECTION_NAME="${CONTAINER_CONNECTION:-}"
 
 prefer_podman_path || true
+store_select_podman_connection
+PODMAN_CONNECTION_NAME="${CONTAINER_CONNECTION:-}"
 
 if ! command -v podman >/dev/null 2>&1; then
   fail "Podman is not on PATH. Install Podman first: https://podman.io/docs/installation"
@@ -109,11 +112,12 @@ if [ "$OS_FAMILY" = "macos" ] || [ "$OS_FAMILY" = "windows" ]; then
         LOG_PATH="$(podman_machine_log_path)"
         if [ -f /tmp/store-podman-doctor-start.log ]; then
           echo "   Podman start log: /tmp/store-podman-doctor-start.log"
+          tail -n 12 /tmp/store-podman-doctor-start.log
         fi
         if [ -n "${LOG_PATH:-}" ] && [ -f "$LOG_PATH" ]; then
           echo "   Podman machine log: $LOG_PATH"
         fi
-        fail "Podman machine did not stay running after startup."
+        fail "Podman machine failed to start; see the startup error above."
       fi
     fi
     pass "Podman machine is running"

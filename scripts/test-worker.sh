@@ -128,24 +128,9 @@ if [ "$USE_PODMAN" = "true" ]; then
     PODMAN_STARTED_BY_SCRIPT=true
 
     echo "⏳ Waiting for Podman-backed local services..."
-    PODMAN_READY=false
-    for _ in {1..60}; do
-      if podman_stack_ready; then
-        echo "✅ Podman dev stack is ready"
-        PODMAN_READY=true
-        break
-      fi
-      if ! kill -0 "$DEV_PID" 2>/dev/null; then
-        tail -n 80 "$PODMAN_DEV_LOG" >&2 || true
-        fail "Podman dev stack process exited before readiness"
-      fi
-      sleep 1
-    done
-
-    if [ "$PODMAN_READY" != "true" ]; then
-      tail -n 80 "$PODMAN_DEV_LOG" >&2 || true
-      fail "Podman dev stack did not become ready within 60 seconds"
-    fi
+    source "$(cd "$(dirname "$0")" && pwd)/podman-stack-ready.sh"
+    store_wait_for_podman_stack podman_stack_ready "$DEV_PID" "$PODMAN_DEV_LOG" || exit 1
+    echo "✅ Podman dev stack is ready"
   fi
 fi
 

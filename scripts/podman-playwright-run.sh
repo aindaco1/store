@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source "$ROOT_DIR/scripts/podman-stack-ready.sh"
+
 PLAYWRIGHT_VERSION="$(node -e '
   const lock = require("./package-lock.json");
   const version = lock.packages?.["node_modules/@playwright/test"]?.version;
@@ -95,23 +97,7 @@ if ! shared_stack_ready; then
   PODMAN_STACK_STARTED=true
 
   echo "⏳ Waiting for Podman-backed site and worker..." >&2
-  for _ in {1..60}; do
-    if shared_stack_ready; then
-      break
-    fi
-    if ! kill -0 "$DEV_PID" 2>/dev/null; then
-      echo "❌ Podman dev stack process exited before readiness" >&2
-      tail -n 80 "$PODMAN_PLAYWRIGHT_LOG" >&2 || true
-      exit 1
-    fi
-    sleep 1
-  done
-
-  if ! shared_stack_ready; then
-    echo "❌ Podman dev stack did not become ready within 60 seconds" >&2
-    tail -n 80 "$PODMAN_PLAYWRIGHT_LOG" >&2 || true
-    exit 1
-  fi
+  store_wait_for_podman_stack shared_stack_ready "$DEV_PID" "$PODMAN_PLAYWRIGHT_LOG" || exit 1
 fi
 
 if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$PLAYWRIGHT_IMAGE"; then

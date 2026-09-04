@@ -122,6 +122,9 @@ describe('package test scripts', () => {
     const workerSmoke = readFileSync(join(repoRoot, 'scripts/test-worker.sh'), 'utf8');
 
     for (const script of [stackRun, playwrightRun, workerSmoke]) {
+      expect(script).toContain('podman-stack-ready.sh');
+      expect(script).toContain('store_wait_for_podman_stack');
+      expect(script).not.toContain('for _ in {1..60}');
       expect(script).toContain('STOP_FILE="$(mktemp ');
       expect(script).toContain('PODMAN_STOP_FILE="$STOP_FILE" PODMAN_RESET_WRANGLER_STATE=true SKIP_STRIPE=true ./scripts/dev.sh --podman >');
       expect(script).toContain('DEV_PID=$!');
@@ -171,6 +174,8 @@ describe('package test scripts', () => {
 
     for (const path of paths) {
       const script = readFileSync(join(repoRoot, path), 'utf8');
+      expect(script, path).toContain('podman-connection.sh');
+      expect(script, path).toContain('store_select_podman_connection');
       expect(script, path).toContain('CONTAINER_CONNECTION');
       expect(script, path).toContain('unset CONTAINER_HOST');
       expect(script, path).not.toContain('unset CONTAINER_CONNECTION');
