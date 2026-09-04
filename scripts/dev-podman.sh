@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source "$ROOT_DIR/scripts/podman-stack-ready.sh"
+
 ruby ./scripts/sync-worker-config.rb
 ruby ./scripts/generate-catalog-snapshot.rb
 ./scripts/configure-dev-secrets.sh --non-interactive
@@ -30,7 +32,7 @@ PODMAN_SUPERVISE_LOG_LINES="${PODMAN_SUPERVISE_LOG_LINES:-30}"
 PODMAN_STACK_START_ATTEMPTS="${PODMAN_STACK_START_ATTEMPTS:-3}"
 PODMAN_STACK_RETRY_DELAY="${PODMAN_STACK_RETRY_DELAY:-3}"
 PODMAN_SITE_READY_TIMEOUT="${PODMAN_SITE_READY_TIMEOUT:-180}"
-PODMAN_WORKER_READY_TIMEOUT="${PODMAN_WORKER_READY_TIMEOUT:-60}"
+PODMAN_WORKER_READY_TIMEOUT="${PODMAN_WORKER_READY_TIMEOUT:-$PODMAN_STACK_READY_TIMEOUT}"
 PODMAN_RESET_WRANGLER_STATE="${PODMAN_RESET_WRANGLER_STATE:-false}"
 PODMAN_STOP_FILE="${PODMAN_STOP_FILE:-}"
 
@@ -584,8 +586,7 @@ wait_for_site_http() {
   for _ in $(seq 1 "$PODMAN_SITE_READY_TIMEOUT"); do
     if ! container_running "$SITE_CONTAINER"; then
       echo "❌ $label container stopped before it became ready"
-      echo "   Last $PODMAN_SUPERVISE_LOG_LINES $label log lines:"
-      podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$SITE_CONTAINER" 2>&1 | sed 's/^/   /' || true
+      store_print_podman_logs "$SITE_CONTAINER" "$label"
       return 1
     fi
     if curl -fsS "$url" >/dev/null 2>&1; then
@@ -596,8 +597,7 @@ wait_for_site_http() {
   done
 
   echo "❌ $label failed to start within ${PODMAN_SITE_READY_TIMEOUT}s"
-  echo "   Last $PODMAN_SUPERVISE_LOG_LINES $label log lines:"
-  podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$SITE_CONTAINER" 2>&1 | sed 's/^/   /' || true
+  store_print_podman_logs "$SITE_CONTAINER" "$label"
   return 1
 }
 
@@ -620,8 +620,7 @@ restart_dev_container() {
 
   status="$(container_status_summary "$container")"
   echo "⚠️  $label container stopped: $status"
-  echo "   Last $PODMAN_SUPERVISE_LOG_LINES $label log lines:"
-  podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$container" 2>&1 | sed 's/^/   /' || true
+  store_print_podman_logs "$container" "$label"
 
   echo "🔄 Restarting $label container..."
   if ! podman start "$container" >/dev/null; then
@@ -700,14 +699,14 @@ wait_for_worker_http() {
   local url="$1"
   local label="$2"
   local status=""
-  for _ in $(seq 1 "$PODMAN_WORKER_READY_TIMEOUT"); do
+  local deadline=$((SECONDS + PODMAN_WORKER_READY_TIMEOUT))
+  while [ "$SECONDS" -lt "$deadline" ]; do
     if ! container_running "$WORKER_CONTAINER"; then
       echo "❌ $label container stopped before it became ready"
-      echo "   Last $PODMAN_SUPERVISE_LOG_LINES $label log lines:"
-      podman logs --tail "$PODMAN_SUPERVISE_LOG_LINES" "$WORKER_CONTAINER" 2>&1 | sed 's/^/   /' || true
+      store_print_podman_logs "$WORKER_CONTAINER" "$label"
       return 1
     fi
-    status="$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)"
+    status="$(curl --max-time 5 -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || true)"
     if [ -n "$status" ] && [ "$status" != "000" ]; then
       echo "✅ $label ready"
       return 0
@@ -716,6 +715,7 @@ wait_for_worker_http() {
   done
 
   echo "❌ $label failed to start within ${PODMAN_WORKER_READY_TIMEOUT}s"
+  store_print_podman_logs "$WORKER_CONTAINER" "$label"
   return 1
 }
 

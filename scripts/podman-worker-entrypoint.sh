@@ -15,11 +15,13 @@ if [ ! -d node_modules ] || \
    [ ! -x node_modules/.bin/wrangler ] || \
    [ ! -d node_modules/sales-tax ] || \
    [ "$CURRENT_PACKAGE_LOCK_HASH" != "$INSTALLED_PACKAGE_LOCK_HASH" ]; then
+  echo "Installing Worker dependencies into the Podman volume..."
   npm ci
   mkdir -p node_modules
   printf '%s\n' "$CURRENT_PACKAGE_LOCK_HASH" > "$PACKAGE_LOCK_HASH_FILE"
 fi
 
+echo "Starting Worker services..."
 node src/local-repo-service.mjs &
 LOCAL_REPO_SERVICE_PID=$!
 
