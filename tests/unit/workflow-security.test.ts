@@ -137,6 +137,13 @@ describe('workflow security posture', () => {
     expect(workflow).toContain('npm run backup:readiness');
     expect(workflow).toContain('--cloudflare-dns-only --strict --no-dev-vars');
     expect(workflow).toContain('SKIP_STRIPE: "true"');
+    const providerStep = workflow.split('- name: Run read-only Cloudflare provider evidence')[1]
+      .split('- name: Run representative Podman restore rehearsal')[0];
+    expect(providerStep).toContain('SITE_BASE: https://shop.dustwave.xyz');
+    expect(providerStep).toContain('WORKER_BASE: https://checkout.dustwave.xyz');
+    const jobEnvironment = workflow.split('    steps:')[0];
+    expect(jobEnvironment).toContain('SITE_BASE: http://127.0.0.1:4002');
+    expect(jobEnvironment).toContain('WORKER_BASE: http://127.0.0.1:8989');
     expect(workflow).not.toMatch(/backup:snapshot|--kv-values|--r2-objects|wrangler deploy|contents: write|pull-requests: write/);
   });
 

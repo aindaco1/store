@@ -247,7 +247,7 @@ Important checkout fields include:
 The Worker rebuilds the order from trusted inputs:
 
 - product identifiers, variants, SKUs, statuses, and unit prices
-- fulfillment types: physical, digital, ticket, and RSVP
+- fulfillment types: physical, digital, ticket, RSVP, and service
 - coupon eligibility, status, date windows, and discount amount
 - configured tip bounds
 - shipping presets, USPS quotes, and fallback shipping policy
@@ -451,6 +451,7 @@ On confirmed orders:
 - Physical rows appear in admin Orders and CSV exports for fulfillment handoff.
 - Digital rows expose token-scoped signed download actions only while the order's entitlement remains active.
 - Ticket and RSVP rows expose QR/check-in and calendar actions.
+- Service rows remain non-shipping order items and do not expose download, ticket, RSVP, calendar, or check-in actions.
 - Customer order lookup indexes are updated by email hash.
 - Store-owned order confirmation emails link customers back to `/order-success/?orderToken=...`.
 - Event reminders are queued for ticket/RSVP items with valid event start times.

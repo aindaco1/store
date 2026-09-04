@@ -117,6 +117,7 @@ Fulfillment-aware fields:
 - Physical products show Shipping preset and inventory controls.
 - Non-physical products hide Shipping preset.
 - Digital products hide inventory controls.
+- Service products create an order and receipt without automatic shipping, download, ticket, RSVP, calendar, or check-in fulfillment.
 - Digital products show a File select when Variant Based is No.
 - Digital variant-based products hide the product-level File field and show a File column per variant.
 - RSVP products may enable registration and configure opening/closing timestamps, maximum party size, contact and attendee name requirements, and bounded party- or attendee-scoped questions. The guided question builder supports stable IDs, text/long-text/single-choice/multiple-choice/checkbox answers, party or per-attendee scope, required state, text limits, and 2–20 choice rows. Question IDs and choice values derive automatically from labels for new rows, are read-only like generated product and variant identifiers, and remain unchanged when an existing label is edited. Every builder field includes localized keyboard- and pointer-accessible help. The builder serializes into the existing product field; preview and publish still use the same Worker normalizer, so an invalid definition cannot be published through the dashboard.
@@ -324,9 +325,13 @@ Local repo write mode:
 
 - Enabled when `APP_MODE=test` and `ADMIN_LOCAL_REPO_WRITES_ENABLED` is truthy.
 - Worker calls `ADMIN_LOCAL_REPO_SERVICE`, defaulting to `http://127.0.0.1:8799`.
+- Startup regenerates the Worker catalog before serving requests. The sidecar watches `_products/*.md` and `_config.yml`, including file renames and deletions, and runs the existing catalog generator when those sources change. Generated output is atomic and unchanged output is not rewritten.
+- Existing Podman dev images need a one-time `PODMAN_REBUILD=1 ./scripts/dev.sh --podman` to include Ruby for the sidecar's catalog generator.
+- Local product saves explicitly request catalog regeneration. The dashboard retains the editor until the authenticated deployment-status endpoint confirms the running Worker has the saved catalog hash, then reloads the product list. Local progress is labeled as local; it never triggers GitHub or claims a production deployment.
+- If regeneration fails, the file is still saved, the previous valid catalog stays intact, and the dashboard preserves the editor with a saved-but-not-refreshed warning. Correct the YAML, run `npm run catalog:generate` for diagnostics if needed, then reload the dashboard. Do not recreate or overwrite an apparently missing product from stale editor data.
 - The sidecar only listens on `127.0.0.1`.
 - The sidecar requires bearer auth using `ADMIN_LOCAL_REPO_TOKEN` or `ADMIN_SECRET`.
-- Supported sidecar operations are `/read`, `/write`, `/write-base64`, and `/health`.
+- Supported sidecar operations are `/read`, `/list`, `/write`, `/write-base64`, `/rebuild`, and `/health`. `/rebuild` requires the same bearer auth as file operations and runs only the fixed repository catalog generator; it accepts no command or path from the browser.
 
 Primary write targets:
 

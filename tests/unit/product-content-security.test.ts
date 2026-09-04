@@ -49,11 +49,17 @@ describe('product content security audit', () => {
   });
 
   it('keeps the product metadata allowlists narrow', () => {
-    expect(Array.from(allowedFulfillmentTypes).sort()).toEqual(['digital', 'physical', 'rsvp', 'ticket']);
+    expect(Array.from(allowedFulfillmentTypes).sort()).toEqual(['digital', 'physical', 'rsvp', 'service', 'ticket']);
     expect(Array.from(allowedProductStatuses).sort()).toEqual(['active', 'archived', 'draft', 'sold_out']);
     expect(Array.from(allowedShippingPresets).sort()).toEqual(['mug', 'parcel', 'poster', 'sticker', 'ticket', 'tshirt']);
     expect(Array.from(allowedTaxCategories).sort()).toEqual(['admission', 'digital', 'exempt', 'standard']);
     expect(rawHtmlTagPattern).toBeInstanceOf(RegExp);
+  });
+
+  it('keeps service products on the non-shipping storefront path', () => {
+    const cardTemplate = fs.readFileSync(path.join(repoRoot, '_includes', 'product-card.html'), 'utf8');
+
+    expect(cardTemplate).toContain('product_type == "rsvp" or product_type == "service"');
   });
 
   it('rejects raw html and inline script surfaces in product content', () => {

@@ -52,7 +52,7 @@
   {%- assign resolved_shipping = site.shipping.presets[shipping_preset] -%}
 {%- endif -%}
 {%- assign is_nonshippable = false -%}
-{%- if product_type == "digital" or product_type == "ticket" or product_type == "rsvp" -%}
+{%- if product_type == "digital" or product_type == "ticket" or product_type == "rsvp" or product_type == "service" -%}
   {%- assign is_nonshippable = true -%}
 {%- endif -%}
 {%- assign selected_product_item_id = product_id -%}

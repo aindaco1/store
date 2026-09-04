@@ -541,6 +541,9 @@
         inventoryResetBaseline: 'Reset baseline',
         inventoryBaselineAria: 'Inventory baseline for %{label}',
         deploymentSaved: 'Saved',
+        localCatalogUpdating: 'Saved locally. Waiting for the Worker catalog to reload.',
+        localCatalogFailed: 'Saved locally, but the Worker catalog could not be refreshed. Your edits remain visible; check the local build before reloading.',
+        localCatalogReady: 'Saved locally. The dashboard and Worker catalog are up to date.',
         deploymentDeploying: 'Deploying',
         deploymentDeployed: 'Deployed',
         deploymentArchiveRequested: 'Archive saved. Waiting for the deployment to start - %{elapsed} elapsed.',
@@ -613,6 +616,9 @@
         inventoryResetBaseline: 'Restablecer base',
         inventoryBaselineAria: 'Base de inventario para %{label}',
         deploymentSaved: 'Guardado',
+        localCatalogUpdating: 'Guardado localmente. Esperando que se recargue el catálogo del Worker.',
+        localCatalogFailed: 'Guardado localmente, pero no se pudo actualizar el catálogo del Worker. Tus cambios siguen visibles; revisa la compilación local antes de recargar.',
+        localCatalogReady: 'Guardado localmente. El panel y el catálogo del Worker están actualizados.',
         deploymentDeploying: 'Desplegando',
         deploymentDeployed: 'Desplegado',
         deploymentArchiveRequested: 'Archivo guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
@@ -5070,7 +5076,7 @@
     sku: 'Legacy product SKU used for historical orders and grandfathered product IDs. Read-only.',
     price: 'Base product price in US dollars. Variants can override this when Variant Based is Yes.',
     status: 'Controls whether the product is public, draft-only, archived, or sold out.',
-    fulfillmentType: 'Determines whether this product ships, unlocks a download, creates a ticket, or records an RSVP.',
+    fulfillmentType: 'Determines whether this product ships, unlocks a download, creates a ticket, records an RSVP, or represents a service with no automatic fulfillment artifact.',
     shippingPreset: 'Package type used for shipping estimates. Hidden when the product does not ship.',
     taxCategory: 'Standard is taxable merchandise. Digital is downloads/files. Ticket / admission is event access or RSVPs. Tax exempt skips sales tax.',
     variantBased: 'Turns variant rows on or off for sizes, formats, ticket tiers, or other product options.',
@@ -8416,7 +8422,7 @@
       options: [['active', 'Active'], ['draft', 'Draft'], ['archived', 'Archived'], ['sold_out', 'Sold out']]
     }));
     basics.appendChild(productField('Fulfillment', 'fulfillmentType', fulfillmentValue, 'select', {
-      options: [['physical', 'Physical'], ['digital', 'Digital'], ['ticket', 'Ticket'], ['rsvp', 'RSVP']]
+      options: [['physical', 'Physical'], ['digital', 'Digital'], ['ticket', 'Ticket'], ['rsvp', 'RSVP'], ['service', 'Service']]
     }));
     commerce.appendChild(createStoreProductReadonlyField('SKU', 'sku', product.sku || product.productId || ''));
     commerce.appendChild(productField('File', 'downloadFileKey', product.downloadFileKey || '', 'select', {
@@ -9050,6 +9056,10 @@
     var status = $('#admin-store-products-status');
     setStatus(status, opts.loadingMessage || 'Loading Store products...');
     return requestJson('/admin/store/products').then(function(data) {
+      if (opts.expectedSourceHash && (!data.catalog || data.catalog.sourceHash !== opts.expectedSourceHash)) {
+        throw new Error(localizedAdminText('localCatalogFailed'));
+      }
+      if (opts.closeEditor) editingProductId = '';
       storeProductsLoaded = true;
       renderStoreProducts(data);
       setStatus(status, opts.successMessage || '');
@@ -9110,6 +9120,7 @@
         ? 'deploymentProgressUnavailable'
         : storeProductDeploymentOperationKey(operation, 'Failed'))
       : localizedAdminText(storeProductDeploymentMessageKey(deployment, operation), { elapsed: elapsed });
+    if (opts.local) message = localizedAdminText(failed ? 'localCatalogFailed' : 'localCatalogUpdating');
     var nextState = failed ? 'failed' : String(deployment && (deployment.status || deployment.state) || 'requested');
     var stateChanged = status.dataset.storeDeploymentState !== nextState;
 
@@ -9126,8 +9137,13 @@
     if (!failed) {
       var progress = createElement('progress', 'admin-store-products__deployment-progress');
       progress.max = 1;
-      progress.setAttribute('aria-label', localizedAdminText('deploymentDeploying'));
+      progress.setAttribute('aria-label', localizedAdminText(opts.local ? 'localCatalogUpdating' : 'deploymentDeploying'));
       content.appendChild(progress);
+    }
+
+    if (opts.local) {
+      status.appendChild(content);
+      return;
     }
 
     var steps = createElement('ol', 'admin-store-products__deployment-steps');
@@ -9157,7 +9173,18 @@
   function trackStoreProductDeployment(publishData, options) {
     var tracking = publishData && publishData.deployment;
     var opts = options || {};
-    if (!tracking || !tracking.commitSha || !tracking.requestedAt) {
+    var local = publishData && publishData.repositoryMode === 'local' && publishData.published !== false;
+    if (local) {
+      var rebuild = publishData.rebuild || {};
+      if (!rebuild.ok || !/^[a-f0-9]{64}$/.test(rebuild.sourceHash || '')) {
+        var localError = new Error(localizedAdminText('localCatalogFailed'));
+        localError.deploymentSaved = true;
+        renderStoreProductDeployment({}, { local: true, failed: true });
+        return Promise.reject(localError);
+      }
+      tracking = { sourceHash: rebuild.sourceHash, requestedAt: new Date().toISOString() };
+    }
+    if (!tracking || (!local && !tracking.commitSha) || !tracking.requestedAt) {
       if (publishData && publishData.published !== false && publishData.repositoryMode === 'github') {
         var untrackedError = new Error('Deployment progress is unavailable.');
         untrackedError.deploymentSaved = true;
@@ -9192,7 +9219,7 @@
       if (refresh) refresh.disabled = false;
     }
 
-    renderStoreProductDeployment(tracking, { operation: opts.operation, startedAt: startedAt });
+    renderStoreProductDeployment(tracking, { operation: opts.operation, startedAt: startedAt, local: local });
 
     return new Promise(function(resolve, reject) {
       function failTracking(message, deployment, progressUnavailable) {
@@ -9200,6 +9227,7 @@
         error.deploymentSaved = true;
         error.deployment = deployment || {};
         renderStoreProductDeployment(deployment || {}, {
+          local: local,
           operation: opts.operation,
           failed: true,
           progressUnavailable: progressUnavailable === true,
@@ -9216,13 +9244,13 @@
           resolve(null);
           return;
         }
-        if (Date.now() - startedAt > STORE_PRODUCT_DEPLOYMENT_TIMEOUT_MS) {
+        if (Date.now() - startedAt > (local ? 60000 : STORE_PRODUCT_DEPLOYMENT_TIMEOUT_MS)) {
           failTracking('Deployment tracking timed out.', { url: runUrl }, true);
           return;
         }
 
         requestJson('/admin/store/deployments/status', {
-          params: {
+          params: local ? { sourceHash: tracking.sourceHash } : {
             commitSha: tracking.commitSha,
             requestedAt: tracking.requestedAt,
             workflow: tracking.workflow || 'deploy.yml',
@@ -9245,14 +9273,15 @@
             return;
           }
           renderStoreProductDeployment(deployment, {
+            local: local,
             operation: opts.operation,
             startedAt: startedAt,
             runUrl: runUrl
           });
-          window.setTimeout(poll, STORE_PRODUCT_DEPLOYMENT_POLL_MS);
+          window.setTimeout(poll, local ? 500 : STORE_PRODUCT_DEPLOYMENT_POLL_MS);
         }).catch(function(error) {
           consecutiveErrors += 1;
-          if (consecutiveErrors >= 5) {
+          if (consecutiveErrors >= (local ? 20 : 5)) {
             failTracking(formatError(error), { url: runUrl }, true);
             return;
           }
@@ -9261,11 +9290,12 @@
             elapsedMs: Math.max(0, Date.now() - startedAt),
             url: runUrl
           }, {
+            local: local,
             operation: opts.operation,
             startedAt: startedAt,
             runUrl: runUrl
           });
-          window.setTimeout(poll, STORE_PRODUCT_DEPLOYMENT_POLL_MS);
+          window.setTimeout(poll, local ? 500 : STORE_PRODUCT_DEPLOYMENT_POLL_MS);
         });
       }
 
@@ -9276,7 +9306,15 @@
   function refreshStoreProductsAfterDeployment(deployment, options) {
     var opts = options || {};
     var operation = normalizeStoreProductDeploymentOperation(opts.operation);
-    return loadStoreProducts().finally(function() {
+    return loadStoreProducts({
+      closeEditor: opts.closeEditor,
+      expectedSourceHash: deployment && deployment.mode === 'local' ? deployment.sourceHash : ''
+    }).then(function(data) {
+      if (!data) return;
+      if (deployment && deployment.mode === 'local') {
+        setStatus($('#admin-store-products-status'), localizedAdminText('localCatalogReady'));
+        return;
+      }
       if (!deployment) {
         setStatus($('#admin-store-products-status'), opts.fallbackMessage || 'Product changes published.');
         return;
@@ -9604,8 +9642,8 @@
           operation: deploymentOperation,
           form: form
         }).then(function(deployment) {
-          editingProductId = '';
           return refreshStoreProductsAfterDeployment(deployment, {
+            closeEditor: true,
             operation: deploymentOperation,
             fallbackMessage: message
           });

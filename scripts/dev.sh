@@ -132,6 +132,7 @@ prefer_current_node_path || true
 prefer_stripe_path || true
 
 ruby ./scripts/sync-worker-config.rb
+ruby ./scripts/generate-catalog-snapshot.rb
 
 "$(cd "$(dirname "$0")" && pwd)/configure-dev-secrets.sh" --non-interactive
 

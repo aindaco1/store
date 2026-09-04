@@ -1,6 +1,6 @@
 # Store Products And Optional Add-Ons
 
-Store's primary catalog lives in `_products/`. Optional add-ons remain available as secondary cart upsells, but the default Store launch path should use first-class products for merch, tickets, RSVPs, and downloads.
+Store's primary catalog lives in `_products/`. Optional add-ons remain available as secondary cart upsells, but the default Store launch path should use first-class products for merch, tickets, RSVPs, downloads, and services.
 
 ## Primary Products
 
@@ -33,6 +33,9 @@ Supported fulfillment types:
 - `digital`
 - `ticket`
 - `rsvp`
+- `service`
+
+Use `service` for paid, non-shipping work or support that should produce an order receipt without a download, ticket, RSVP, calendar file, or check-in artifact. Service products remain subject to canonical Worker price, coupon, tax, order, email, and status validation.
 
 Optional storefront taxonomy fields:
 

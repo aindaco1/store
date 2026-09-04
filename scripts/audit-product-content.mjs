@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const allowedFulfillmentTypes = new Set(['digital', 'physical', 'rsvp', 'ticket']);
+export const allowedFulfillmentTypes = new Set(['digital', 'physical', 'rsvp', 'service', 'ticket']);
 export const allowedProductStatuses = new Set(['active', 'archived', 'draft', 'sold_out']);
 export const allowedShippingPresets = new Set(['mug', 'parcel', 'poster', 'sticker', 'ticket', 'tshirt']);
 export const allowedTaxCategories = new Set(['admission', 'digital', 'exempt', 'standard']);

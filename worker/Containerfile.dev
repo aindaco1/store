@@ -6,6 +6,7 @@ RUN apt-get update \
     ca-certificates \
     git \
     python3 \
+    ruby \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
