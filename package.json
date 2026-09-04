@@ -88,7 +88,7 @@
     "esbuild": "0.28.1",
     "jsdom": "^30.0.1",
     "lighthouse": "^13.4.1",
-    "smol-toml": "1.7.1",
+    "smol-toml": "1.8.0",
     "vitest": "^4.1.11"
   }
 }
