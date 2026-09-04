@@ -21,6 +21,13 @@ npx vitest run tests/unit/platform-pin.test.ts tests/unit/jekyll-template-pin.te
 npm run jekyll-template:check
 ```
 
+The root `esbuild` and `smol-toml` dependencies are exact pins matching Platform's
+build-core and release-core manifests. Upgrade them with the reviewed Platform
+gitlink, then update the root manifest and lockfile together. Dependabot excludes
+these two packages from standalone version updates; other development tools
+remain in its normal update group. The platform pin suite verifies the declared
+and resolved versions against the shared manifests.
+
 `npm run test:premerge` temporarily synchronizes Worker configuration for its
 release-shaped checks and restores the tracked `worker/wrangler.toml`
 byte-for-byte on success or failure. A focused unit regression exercises that

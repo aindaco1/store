@@ -85,10 +85,10 @@
     "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "^4.1.11",
     "axe-core": "^4.13.0",
-    "esbuild": "^0.28.2",
+    "esbuild": "0.28.1",
     "jsdom": "^30.0.1",
     "lighthouse": "^13.4.1",
-    "smol-toml": "^1.8.0",
-    "vitest": "^4.1.10"
+    "smol-toml": "1.7.1",
+    "vitest": "^4.1.11"
   }
 }
