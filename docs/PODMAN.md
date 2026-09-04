@@ -188,6 +188,12 @@ cold image builds and dependency installation; a stopped launcher still fails
 immediately. Startup diagnostics end with the failure reason so the pre-merge
 log tail retains it. Test assertions and test timeouts are unchanged.
 
+Worker readiness uses the same startup budget by default because its first run
+installs dependencies in a named volume before launching Wrangler. Override that
+service wait with `PODMAN_WORKER_READY_TIMEOUT` if needed; the wrapper's overall
+deadline still applies. Failed startup includes container logs, including when
+the container is running but its HTTP service has not started.
+
 `npm run restore:rehearse` builds a checksum-verified synthetic snapshot, plans and executes its allowed restore into isolated local Wrangler state, proves quarantined records are excluded and derived order data is scheduled for repair, then probes the normal Podman Worker auth/cache headers. It contains no production customer or provider data and performs no production writes.
 
 For focused admin browser coverage:

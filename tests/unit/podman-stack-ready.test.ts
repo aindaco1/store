@@ -14,6 +14,7 @@ function waitForStack({ readyAfter = 0, timeout = '', alive = true, probeSeconds
     }
     sleep() { SECONDS=$((SECONDS + 1)); }
     kill() { [ "$1" = "-0" ] && [ "$STORE_TEST_ALIVE" = "true" ]; }
+    podman() { echo "container startup log"; }
     store_wait_for_podman_stack ready 123 /dev/null
     echo "checks=$checks"
   `, 'podman-stack-ready-test', resolve('scripts/podman-stack-ready.sh')], {
@@ -45,6 +46,7 @@ describe('Podman stack startup deadline', () => {
     const result = waitForStack({ readyAfter: 100, timeout: '2' });
     expect(result.status).toBe(1);
     expect(result.stderr.trim()).toMatch(/did not become ready within 2 seconds$/);
+    expect(result.stderr).toContain('container startup log');
   });
 
   it('counts time spent in readiness probes toward the deadline', () => {
