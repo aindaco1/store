@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source "$ROOT_DIR/scripts/podman-connection.sh"
+store_select_podman_connection
+
 ruby ./scripts/sync-worker-config.rb
 ruby ./scripts/generate-catalog-snapshot.rb
 ./scripts/configure-dev-secrets.sh --non-interactive

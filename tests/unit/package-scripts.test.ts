@@ -174,6 +174,8 @@ describe('package test scripts', () => {
 
     for (const path of paths) {
       const script = readFileSync(join(repoRoot, path), 'utf8');
+      expect(script, path).toContain('podman-connection.sh');
+      expect(script, path).toContain('store_select_podman_connection');
       expect(script, path).toContain('CONTAINER_CONNECTION');
       expect(script, path).toContain('unset CONTAINER_HOST');
       expect(script, path).not.toContain('unset CONTAINER_CONNECTION');
