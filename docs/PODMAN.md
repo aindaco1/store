@@ -47,14 +47,28 @@ Not included:
 - [Podman](https://podman.io/docs/installation)
 - optional [Stripe CLI](https://stripe.com/docs/stripe-cli) for local webhook forwarding
 
-On macOS and Windows, `./scripts/dev.sh --podman` will initialize/start the default `podman machine` when needed. On Linux, it talks directly to the local rootless Podman engine.
+On macOS and Windows, Store honors an explicit `CONTAINER_CONNECTION` first,
+then a non-default-machine connection selected with `podman system connection default`.
+The doctor, dev stack, and pre-merge gate share this selection helper and reuse
+that engine without starting or restarting its VM. When the selected connection
+is `podman-machine-default` (or none is configured), Store retains its existing
+default-machine startup behavior. On Linux, it talks directly to the local
+rootless Podman engine.
 
-When another task already owns the active macOS/Windows VM slot, select its registered Podman connection explicitly instead of asking Store to start or restart `podman-machine-default`:
+When another task already owns the active macOS/Windows VM slot, select its
+registered connection as Podman's default or use an explicit per-command override:
 
 ```bash
 CONTAINER_CONNECTION=<connection-name> npm run podman:doctor
 CONTAINER_CONNECTION=<connection-name> npm run test:premerge
 ```
+
+If startup reports that another VM is already running, this is VM contention,
+not evidence of a crash. Check `podman system connection list` and run the doctor
+against the existing engine. Machine listings are provider-specific: use
+`CONTAINERS_MACHINE_PROVIDER=applehv podman machine inspect <name>` for an Apple
+virtualization VM when the configured provider is libkrun. Resize a shared VM
+only after its workloads have stopped; keep its images and volumes intact.
 
 An explicit `CONTAINER_CONNECTION` is authoritative across the doctor, dev stack, and pre-merge wrapper. Store checks that engine but does not manage the selected VM's lifecycle. The strict release check still verifies the 6 GiB configured-memory baseline, allowing for the guest operating system's reserved memory when only engine-reported capacity is available.
 
