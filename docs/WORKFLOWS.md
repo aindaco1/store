@@ -332,6 +332,8 @@ Public document prefetch is intentionally narrow:
 
 ## Local Development Workflow
 
+Follow [contributor setup](CONTRIBUTING.md#local-setup) for host/Podman startup and service URLs, and [configuration synchronization](CONTRIBUTING.md#configuration-and-product-changes) after catalog or settings edits. Use [Testing](TESTING.md) for commands and coverage, and the [merge smoke checklist](MERGE_SMOKE_CHECKLIST.md) for release sign-off.
+
 ### Media optimization workflow
 
 Repository sources under `assets/images/`, `assets/videos/`, and `assets/audio/` remain authoritative. `scripts/optimize-media.mjs` deterministically rebuilds `_data/media-optimization-manifest.json`, compresses/generates applicable derivatives, records intentionally skipped larger output, and fails checks on stale metadata or broken references.
@@ -345,34 +347,13 @@ Admin uploads dispatch **Optimize dashboard media** with `scope=changed`; a revi
 
 ### Durable email workflow
 
+See [Email delivery](EMAIL.md#durable-delivery) for the local background-send path, production outbox policy, and dry-run configuration.
+
 With `EMAIL_OUTBOX_ENABLED=true`, confirmed order email and due event/abandoned-cart reminders enqueue deterministic `email-outbox:v1:*` work. The minute scheduler consults `email-outbox-queue:v1`, acquires per-job leases, freezes the Resend payload, sends with stable provider idempotency, and records acceptance/delivery independently of order truth. Signed `POST /webhooks/resend` events update minimized delivery/suppression evidence. Security-sensitive one-time-link and explicit test messages remain immediate.
 
 ### Payment reconciliation workflow
 
 With `PAYMENT_RECONCILIATION_ENABLED=true`, scheduled work advances a daily cursor over the canonical admin order index in bounded batches and performs read-only Stripe PaymentIntent retrieval. It writes open/resolved discrepancy evidence, never scans the order namespace, and never mutates processor money. Super admins can invoke the same bounded operation through `POST /admin/store/reconciliation/run` with CSRF.
-
-Start local services:
-
-```bash
-npm run podman:doctor
-./scripts/dev.sh --podman
-```
-
-Current local URLs:
-
-- Storefront: `http://127.0.0.1:4002`
-- Worker: `http://127.0.0.1:8989`
-
-Useful checks:
-
-```bash
-npm run sync:worker-config
-npm run build
-npm run test:i18n
-npm run test:seo
-npx vitest run tests/unit/page-prefetch.test.ts tests/unit/cart-runtime-loader.test.ts tests/unit/seo-layouts.test.ts
-PLAYWRIGHT_EXTERNAL_SERVER=1 CI=1 npx playwright test --project=chromium --workers=1
-```
 
 ## Deployment Workflow
 

@@ -4,8 +4,7 @@ Cloudflare Worker API for Store checkout, fulfillment, admin operations, shippin
 
 ## Shared Platform Boundary
 
-Store `v1.2.3` pins Dust Wave Platform `v0.34.1` at exact commit
-`ae380c43a16af352ae946f47dd1b7aa4e5b093f0`. The Worker consumes the pinned
+The [project overview](../docs/PROJECT_OVERVIEW.md#shared-foundations-and-ownership) records the shared dependency pins and Store ownership boundary. See the [root README](../README.md#current-state) for the current Store release. The Worker consumes the pinned
 `worker-core`, `shipping-core`, `tax-core`, `inventory-core`, and `media-core`
 packages for characterized, runtime-neutral mechanics. Store retains every
 route, request schema, catalog/order model, Durable Object and KV policy,
@@ -18,11 +17,7 @@ generated public site.
 
 ## Local Development
 
-Preferred full-stack launch from the repo root:
-
-```bash
-./scripts/dev.sh
-```
+For full-stack setup, service URLs, and host or Podman startup, follow [contributor setup](../docs/CONTRIBUTING.md#local-setup).
 
 Worker-only launch:
 
@@ -31,13 +26,7 @@ cd worker
 npm run dev
 ```
 
-Both paths sync Worker config and generate the catalog snapshot first. `npm run dev` also starts `src/local-repo-service.mjs` before Wrangler so local admin publishes can write to the checkout when `APP_MODE=test` and `ADMIN_LOCAL_REPO_WRITES_ENABLED=true`.
-
-Local defaults:
-
-- Storefront: `http://127.0.0.1:4002`
-- Worker: `http://127.0.0.1:8989`
-- Local repo sidecar: `http://127.0.0.1:8799`
+The Worker-only command syncs Worker config and generates the catalog snapshot first. `npm run dev` also starts `src/local-repo-service.mjs` before Wrangler so local admin publishes can write to the checkout when `APP_MODE=test` and `ADMIN_LOCAL_REPO_WRITES_ENABLED=true`.
 
 ## Core Bindings
 

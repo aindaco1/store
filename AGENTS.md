@@ -122,25 +122,7 @@ Shared system strings belong in `_data/i18n/<lang>.yml`; product-authored copy r
 
 ## Documentation map
 
-- Product architecture: [docs/PROJECT_OVERVIEW.md](./docs/PROJECT_OVERVIEW.md)
-- Fork configuration: [docs/CUSTOMIZATION.md](./docs/CUSTOMIZATION.md)
-- Payments: [docs/PAYMENT_PROCESSOR.md](./docs/PAYMENT_PROCESSOR.md)
-- Add-ons and variant pricing: [docs/ADD_ON_PRODUCTS.md](./docs/ADD_ON_PRODUCTS.md)
-- Email: [docs/EMAIL.md](./docs/EMAIL.md)
-- Downloads: [docs/DOWNLOADS.md](./docs/DOWNLOADS.md)
-- Shipping and tax: [docs/SHIPPING.md](./docs/SHIPPING.md)
-- Dashboard: [docs/DASHBOARD.md](./docs/DASHBOARD.md)
-- RSVP registration: [docs/RSVP.md](./docs/RSVP.md)
-- Performance: [docs/PERFORMANCE.md](./docs/PERFORMANCE.md)
-- Security: [docs/SECURITY.md](./docs/SECURITY.md)
-- Backup and recovery: [docs/BACKUP_RESTORE.md](./docs/BACKUP_RESTORE.md)
-- Testing: [docs/TESTING.md](./docs/TESTING.md)
-- Workflows and deployment: [docs/WORKFLOWS.md](./docs/WORKFLOWS.md)
-- Localization: [docs/I18N.md](./docs/I18N.md)
-- SEO: [docs/SEO.md](./docs/SEO.md)
-- Ethical risk: [docs/ETHICAL_RISK.md](./docs/ETHICAL_RISK.md)
-- Merge and release checks: [docs/MERGE_SMOKE_CHECKLIST.md](./docs/MERGE_SMOKE_CHECKLIST.md)
-
+The [documentation index](./docs/README.md) groups contributor setup, architecture, product configuration, operations, testing, security, and release history. Use the focused guides listed there as the authority for their topics.
 ## Working style for coding agents
 
 - Read the implementation and nearby tests before structural changes.
