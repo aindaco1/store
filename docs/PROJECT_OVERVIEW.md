@@ -2,9 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, digital downloads, and services. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.3.7`. The preceding `v1.3.6` release remains independently reversible. Local product editing now regenerates the canonical Worker snapshot and waits for the running Worker to load the saved catalog before refreshing the dashboard. Service fulfillment is supported consistently, and the operator-approved Paradiso ticket is active for public purchase. Production Posture still separates required configuration gates from unavailable optional provider probes. Durable delivery, promotional suppression, provider verification, and canonical order and fulfillment truth remain separate. Store pins Platform v0.34.1 and the separate Jekyll Template v0.1.0; Store retains local build copies, configuration, content, production origins, credentials, deployment, and rollback authority.
-
-The current repository is production-ready from a code-path perspective: public browsing, cart validation, PaymentIntent and no-payment checkout, opt-in RSVP forms, free RSVP confirmation, webhook settlement, inventory reservation, signed fulfillment, named attendee check-in, private response review, email, admin publishing, coupons, marketing links, reminders, exports, readiness checks, and Podman/host test paths are implemented. Ongoing production work is operational account hygiene, smoke testing, reconciliation, and backup discipline.
+Current release: `v1.3.7`. See the [changelog](../CHANGELOG.md) for release changes and [release evidence](release-evidence/) for validation and rollback records. The [roadmap](ROADMAP.md) owns the current capability inventory and future work.
 
 ## Architecture
 
@@ -19,6 +17,45 @@ The current repository is production-ready from a code-path perspective: public 
 - Durable Objects serialize SKU inventory reservations and commit/release transitions.
 - `GET /api/store/inventory` exposes a sanitized, briefly cached confirmed-availability projection to inventory-tracked public pages. Static counts remain the failure fallback, and reservation-aware checkout remains authoritative.
 - GitHub-backed writes publish `_config.yml`, `_products/*.md`, and product/media assets in production; local dev can use the local repo sidecar instead.
+
+## Shared Foundations and Ownership
+
+Store pins Dust Wave Platform `v0.34.1` at exact commit
+`ae380c43a16af352ae946f47dd1b7aa4e5b093f0` and Dust Wave Jekyll Template
+`v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
+Platform supplies characterized Worker, admin, browser, design, build, release,
+shipping, tax, inventory, media, and test primitives. The Jekyll Template owns
+17 manifest-bound source-upgrade files whose runtime copies remain checked in.
+
+Store still owns its catalog and order models, routes, storage, content,
+localization, templates, credentials, provider policy, builds, deployment, and
+rollback. Neither shared repository follows a moving branch at build time.
+
+Verify the pins and generated/source copies with the [shared-dependency checks](TESTING.md#shared-dependency-checks).
+
+## Source Layout
+
+- `_products/` - repo-backed product catalog.
+- `api/products.json` and `api/add-ons.json` - static public catalog endpoints.
+- `_includes/product-card.html` and `_includes/product-taxonomy.html` - public product markup and derived filters.
+- `assets/js/cart-provider.js` - first-party cart, checkout, shipping/tax preview, coupon, add-on, and reminder-consent runtime.
+- `worker/src/event-registration.js` - shared RSVP registration schema normalization, submission validation, and stored snapshot bounds.
+- `assets/js/admin-dashboard.js` - admin dashboard client.
+- `worker/src/index.js` - Worker routes, checkout, admin, fulfillment, cron, and observability.
+- `worker/src/email-outbox.js`, `worker/src/payment-integrity.js`, and `worker/src/store-payment-reconciliation.js` - durable notification delivery and minimized payment/reconciliation evidence.
+- `_data/media-optimization-manifest.json` and `worker/src/media-catalog.js` - rebuildable repository media metadata and shared classification/budget rules.
+- `worker/src/admin-store-read-model.js`, `worker/src/workers-cache-policy.js`, and `worker/src/workers-cache-telemetry.js` - shared order snapshot, cache policy, and privacy-safe telemetry contracts.
+- `worker/src/generated/catalog-snapshot.js` - generated Worker catalog snapshot.
+- `assets/js/store-product-options.js` and `worker/src/store-inventory-projection.js` - public product-control synchronization and the sanitized confirmed-availability projection.
+- `worker/src/tier-inventory-do.js` - reservation-aware SKU inventory coordinator.
+- `worker/src/coupons.js` - coupon normalization, storage, and discount application.
+- `worker/src/local-repo-service.mjs` - local admin publish sidecar for dev.
+- `config/store-data-inventory.json` - canonical KV/R2/Durable Object backup and restore classification.
+- `scripts/store-backup.mjs`, `scripts/store-restore.mjs`, `scripts/recovery-reconciliation.mjs`, `scripts/backup-readiness.mjs`, and `scripts/backup-retention.mjs` - guarded snapshot, restore/readback/cleanup, reconciliation, readiness, and retention tooling.
+- `_config.yml`, `_config.local.yml`, and `_data/i18n/` - canonical settings, machine-local overrides, and shared translated copy.
+- `es/` and `_includes/storefront-home.html` - Spanish page shells and shared English/Spanish home rendering.
+- `assets/js/order-lookup.js` and `assets/js/order-success.js` - localized customer order runtimes.
+- `worker/src/catalog.js` and `worker/src/orders.js` - catalog validation, order drafts, and fulfillment shaping.
 
 ## Current Catalog
 
@@ -44,8 +81,7 @@ Store succeeds the old DUST WAVE Snipcart shop while keeping the repo-backed cat
 
 ## Local URLs
 
-- Storefront: `http://127.0.0.1:4002`
-- Worker: `http://127.0.0.1:8989`
+See [contributor setup](CONTRIBUTING.md#local-setup) for startup, service URLs, and configuration synchronization.
 
 ## Production URLs
 

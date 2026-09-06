@@ -1,20 +1,24 @@
 # Contributing To Store
 
-Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, digital downloads, and services.
+This guide covers contributor setup and change preparation. Use the [documentation index](README.md) to find feature and operator guides.
 
 ## Local Setup
+
+Run commands from the repository root. Initialize the recorded shared dependencies before installing or testing; clone with `--recurse-submodules` when possible. CI uses the recorded commits and never follows a moving submodule branch.
 
 Host flow:
 
 ```bash
+git submodule update --init --recursive
 npm ci
 bundle install
 ./scripts/dev.sh
 ```
 
-Podman flow:
+Podman flow (see [prerequisites and engine selection](PODMAN.md#prerequisites)):
 
 ```bash
+git submodule update --init --recursive
 npm run podman:doctor
 ./scripts/dev.sh --podman
 ```
@@ -24,6 +28,17 @@ Local URLs:
 - Storefront: `http://127.0.0.1:4002`
 - Worker: `http://127.0.0.1:8989`
 - Admin: `http://127.0.0.1:4002/admin/`
+- Local repository sidecar: `http://127.0.0.1:8799`
+
+`./scripts/dev.sh` starts the storefront, Worker, and repository sidecar, synchronizes Worker configuration, regenerates the catalog, and configures missing local secrets. It also attempts Stripe CLI webhook forwarding. The sidecar enables dashboard writes only with `APP_MODE=test` and `ADMIN_LOCAL_REPO_WRITES_ENABLED=true`.
+
+For a separately managed storefront, use:
+
+```bash
+bundle exec jekyll serve --config _config.yml,_config.local.yml --host 127.0.0.1 --port 4002
+```
+
+See the [Worker-only launch](../worker/README.md#local-development) for the API and sidecar. Local orders and inventory belong to the simulated Worker state. Local email behavior and dry-run flags are documented under [durable delivery](EMAIL.md#durable-delivery); webhook diagnosis is in [Payment Processor](PAYMENT_PROCESSOR.md#missed-local-webhook).
 
 ## Before Editing
 
@@ -53,71 +68,31 @@ Use the repository-root [`AGENTS.md`](../AGENTS.md) as the operating guide and p
 - Run the ethical risk review for changes that affect customer/admin data, access, automation, analytics, reminders, referrals, public tokens, signed links, pricing, coupons, product content, or external providers.
 - Do not add hidden tracking, manipulative urgency, unsuppressible reminders, or customer-data monetization. Collect only what Store needs for checkout, fulfillment, tax, support, security, and operations.
 
-## Product Changes
+## Configuration And Product Changes
 
-When editing `_products/`, shipping, tax, pricing, or canonical URL settings, regenerate Worker inputs:
+`_config.yml` owns public settings and Worker-mirrored defaults; `_config.local.yml` contains machine-local overrides. After changing products, shipping, tax, pricing, or canonical URLs, synchronize the Worker inputs:
 
 ```bash
 npm run sync:worker-config
 ```
 
-Then run:
+This runs `scripts/sync-worker-config.rb` and `scripts/generate-catalog-snapshot.rb`. The local stack regenerates the catalog at startup and when product/configuration sources change; dashboard saves wait for the running Worker to load the saved catalog before refreshing. Use `npm run catalog:generate` to diagnose malformed YAML or recover a stale snapshot. Restart a separately managed Worker after changing its configuration.
 
-```bash
-npm run test:seo
-npm run test:content-security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
-```
+Shared translated copy lives in `_data/i18n/<lang>.yml`, with locale configuration under `i18n` in `_config.yml`. Product-authored copy stays canonical unless a product defines a `localized.<lang>` override. See [Customization](CUSTOMIZATION.md), [product and variant configuration](ADD_ON_PRODUCTS.md), and [Localization](I18N.md) for the full contracts.
 
 ## Test Expectations
 
-Default confidence path:
+Use [Testing](TESTING.md) as the command and coverage reference. Start with focused checks; run the [pre-merge gate](TESTING.md#pre-merge) for substantial or release-facing work.
 
-```bash
-bundle exec jekyll build --quiet
-npm run test:seo
-npm run test:content-security
-npm run test:unit
-npm run test:unit:coverage
-npm run test:e2e:headless
-```
+Changes to checkout, fulfillment, admin, i18n, accessibility, SEO, Podman/release tooling, payment/webhooks, inventory, reminders, or catalog publishing also require [release smoke](TESTING.md#release-smoke) and the [merge smoke checklist](MERGE_SMOKE_CHECKLIST.md). Record each skipped external evidence item with an owner, date, and reason.
 
-For Worker/security changes:
+Default browser coverage is Store-only. Add new Playwright coverage to the Store public/admin specs unless a new Store surface warrants its own spec. Product/catalog changes require content and SEO checks; Worker/security changes require relevant security and Worker smoke coverage; UI changes require browser coverage.
 
-```bash
-npm run test:security
-SITE_URL=http://127.0.0.1:4002 WORKER_URL=http://127.0.0.1:8989 ./scripts/test-worker.sh --podman
-```
+## Pull Request Preparation
 
-For Podman:
+Use the [pull request template](PULL_REQUEST_TEMPLATE.md) for the summary and verification record. Include the problem, resulting behavior, relevant checks and evidence, and any limitations. Record triggered [ethical risk review](ETHICAL_RISK.md), or mark it `N/A` with a reason.
 
-```bash
-npm run podman:self-check
-```
-
-For branches that touch checkout, fulfillment, admin, i18n, accessibility, SEO, Podman/release tooling, payment/webhooks, inventory, reminders, or catalog publishing, run the release gate and record the evidence path:
-
-```bash
-npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
-```
-
-Default browser coverage is Store-only. Add new Playwright coverage to the Store public/admin specs unless the change introduces a new Store surface that deserves its own spec.
-
-## Pull Request Checklist
-
-- [ ] Product/catalog changes regenerate Worker config snapshots.
-- [ ] Product content audit passes.
-- [ ] Jekyll build passes.
-- [ ] Relevant unit tests pass.
-- [ ] Relevant Worker smoke/security checks pass.
-- [ ] Default Playwright suite passes for UI changes.
-- [ ] Admin changes preserve session, CSRF, role/scope, and audit behavior.
-- [ ] Coupon, lookup, reminder, or marketing changes include Worker tests or focused admin/browser coverage.
-- [ ] Ethical risk review is recorded for triggered changes, or marked `N/A` with a reason.
-- [ ] No secrets, tokens, customer data, or production export files are committed.
-- [ ] External GitHub Actions remain pinned to full commit SHAs; version bumps arrive through reviewed Dependabot pull requests.
-- [ ] Docs are updated when workflow or operator behavior changes.
-- [ ] `npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md` passes for release-impacting changes, or each skipped external evidence item has owner/date/reason.
+Keep secrets, tokens, customer data, and production exports out of the commit. Preserve session, CSRF, role/scope, and audit behavior in admin changes. Keep external GitHub Actions pinned to full commit SHAs and update them through reviewed Dependabot pull requests. Update operator documentation when behavior or workflows change.
 
 ## Branch Names
 

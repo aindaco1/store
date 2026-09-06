@@ -2,91 +2,21 @@
 
 Use this checklist for branches that touch checkout, fulfillment, admin, i18n, accessibility, SEO, Podman/release tooling, payment/webhooks, inventory, reminders, or catalog publishing.
 
+This checklist owns acceptance and sign-off. [Testing](TESTING.md) owns the commands, options, and evidence collection procedures.
+
 ## Environment
 
-Store does not maintain a separate staging environment. Use the local Podman path as the production-like rehearsal environment, with local defaults:
+Use the [local Podman stack](CONTRIBUTING.md#local-setup) as the production-like rehearsal environment. Store also has an isolated Stripe test Worker for provider-originated webhook evidence; its scope and explicit invocation are documented in [Testing](TESTING.md#release-smoke). It is not a complete storefront staging environment.
 
-- Storefront: `http://127.0.0.1:4002`
-- Worker: `http://127.0.0.1:8989`
-- Admin: `http://127.0.0.1:4002/admin/`
-
-The release gate should prefer Podman and local signed-webhook evidence over deployed-branch targets. Production-only provider state is verified through read-only provider probes and the GitHub Actions Cloudflare DNS evidence workflow.
+Prefer local signed-webhook evidence for the release gate. Verify production provider state through read-only probes and the **Release Provider Evidence** workflow. Do not point release smoke at production checkout domains.
 
 ## Local Rehearsal
 
-Run the DRY release smoke wrapper from the repository root:
+Run [release smoke](TESTING.md#release-smoke) from the repository root and retain the generated evidence file. That procedure documents focused reruns, Podman parity, local signed-webhook settlement, optional interactive checkout, and optional VoiceOver transcript evidence.
 
-```bash
-npm run release:smoke -- --evidence-file /tmp/store-release-smoke.md
-```
+For direct local settlement, configure the Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. Confirm the payment matrix reports customer/admin order email dry-run markers without Resend sends. Keep this evidence distinct from provider-originated Stripe delivery and actual email delivery.
 
-For an optional interactive local checkout rehearsal outside the release gate, run the headed helper directly:
-
-```bash
-SKIP_CHECKOUT_PROMPT=1 ./scripts/test-checkout.sh --podman
-```
-
-This helper is exploratory desktop/browser evidence. It is intentionally not a `release:smoke` phase because checkout/payment release risks are covered by automated payment, webhook, and fulfillment evidence.
-
-For Podman-only parity checks:
-
-```bash
-npm run podman:doctor
-./scripts/dev.sh --podman
-npm run test:e2e:headless:podman
-```
-
-For focused reruns of the automatable manual gates:
-
-```bash
-npm run release:a11y-evidence
-npm run release:screen-reader-evidence
-npm run release:i18n-seo-evidence
-npm run release:fulfillment-evidence
-npm run release:providers
-npm run release:payment-smoke
-npm run backup:readiness
-npm run restore:rehearse
-```
-
-`npm run release:providers` can use authenticated `gh`, `wrangler`, and `stripe` CLIs for read-only evidence. Record any remaining warnings or skips in the generated evidence file.
-
-GitHub Actions also has a read-only Cloudflare DNS evidence workflow for production DNS records. `Release Provider Evidence` runs `npm run release:providers -- --cloudflare-dns-only --strict --no-dev-vars` with `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE` or `CLOUDFLARE_ZONE_ID`, and a dedicated `CLOUDFLARE_DNS_API_TOKEN` injected by Actions. That token must have `Zone:DNS:Read` for the production `dustwave.xyz` zone; keep the deploy token separate so Worker deploy permissions do not need DNS record access. If `CLOUDFLARE_ZONE` is a zone name instead of an ID, the token also needs zone lookup access or the workflow should receive `CLOUDFLARE_ZONE_ID`. Manually dispatch it for release branches when local provider probes cannot read the GitHub-only zone id; it runs automatically on `main`.
-
-Provider and payment release probes read `worker/.dev.vars` by default, with shell environment values taking precedence. Use `--no-dev-vars` only for clean-shell CI probes. For local signed-webhook settlement without Stripe CLI forwarding:
-
-```bash
-PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook
-```
-
-Run the target Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true` for that direct path. The smoke fails when order email dry-run markers are missing, so it proves the customer/admin order emails would render without sending through Resend. The default direct matrix covers paid digital, paid physical, paid ticket, free RSVP, and failed-payment suppression.
-
-Rendered i18n/SEO and in-process fulfillment evidence are provider-free:
-
-```bash
-npm run release:i18n-seo-evidence
-npm run release:fulfillment-evidence
-```
-
-For transcript-assisted screen-reader evidence, record a VoiceOver smoke and run:
-
-```bash
-npm run release:screen-reader-evidence -- --audio-file <recording> --expect "Add to Cart" --expect "Order"
-```
-
-Or include it in the release smoke evidence file:
-
-```bash
-VOICEOVER_AUDIO_DEVICE=":0" VOICEOVER_CONTROL=ensure-on VOICEOVER_OPEN_APP=Safari \
-  npm run release:smoke -- --screen-reader-record-voiceover \
-  --screen-reader-url http://127.0.0.1:4002/ \
-  --screen-reader-expect "Shop" \
-  --evidence-file /tmp/store-release-smoke.md
-```
-
-On macOS, `--record-voiceover` can open a target URL and capture VoiceOver audio when `ffmpeg` and `VOICEOVER_AUDIO_DEVICE` are configured. Whisper transcript evidence helps verify spoken labels and state changes when a release explicitly requires assistive-technology speech evidence.
-
-For local test-mode PaymentIntent creation and signed-webhook settlement, use the direct local webhook matrix above. Do not point release smoke at production checkout domains.
+Use [production preflight](TESTING.md#production-preflight) for read-only DNS/admin response-policy evidence. Record every provider warning or credential-based skip with an owner, date, reason, and any supporting provider-console evidence.
 
 ## Test Data
 
@@ -174,12 +104,19 @@ Block merge or release when any of these fail:
 
 ## Checkout And Fulfillment
 
+- [ ] Add a physical product to the cart and change its quantity.
+- [ ] Set a test inventory baseline and confirm checkout respects it.
+- [ ] Confirm `/order-success/` shows the canonical order and fulfillment state.
+- [ ] Confirm order email dry-run evidence; record actual Resend delivery separately when a controlled provider test is in scope.
+
 - [ ] Paid physical checkout calculates tax/shipping and creates the expected order record.
 - [ ] Run `npm run release:fulfillment-evidence` for signed downloads, download revoke/refresh, ticket/RSVP check-in, and admin CSV export evidence.
 - [ ] Paid digital checkout confirms only after webhook settlement and shows a signed download action.
 - [ ] Paid ticket checkout produces attendee/ticket fulfillment and admin check-in works once.
 - [ ] Free RSVP checkout places Contact before RSVP details, omits tip/payment controls at `$0.00`, uses **Complete order**, does not load Stripe, and produces expected attendee/receipt behavior.
 - [ ] Paid or mixed checkout still renders payment controls and uses the PaymentIntent path.
+- [ ] A configured two-attendee RSVP retains the submitted roster; search for a named attendee, review historical response labels, export attendee CSV, and verify partial attendance totals through check-in and undo.
+- [ ] Replaying an equivalent signed Stripe test webhook does not duplicate order settlement or inventory changes.
 - [ ] Stripe success webhook settles paid orders; failed/canceled payment events release reservations.
 - [ ] Customer order lookup sends a generic request response and consumes only token-scoped links.
 - [ ] Abandoned-checkout and event reminder suppression/resume behavior is correct in a controlled test.
@@ -196,6 +133,41 @@ Block merge or release when any of these fail:
 - [ ] Analytics, referrals, marketing/reminder suppression, and historical Snipcart import panels remain usable.
 - [ ] Scoped Store admin users cannot access super-admin-only actions.
 - [ ] Spanish admin routes, tab/subtab persistence, and reload behavior remain intact.
+
+## Production Checklist
+
+Provider and runtime checks:
+
+- [ ] Cloudflare routes or custom domains serve `https://shop.dustwave.xyz` and `https://checkout.dustwave.xyz`.
+- [ ] `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` point at production Cloudflare resources.
+- [ ] Worker secrets are set in Cloudflare, not in Git, including Stripe, Resend, admin session/login, checkout intent, magic link, download/order lookup, Turnstile, and USPS secrets as applicable.
+- [ ] Production runtime config uses `SITE_BASE=https://shop.dustwave.xyz`, `WORKER_BASE=https://checkout.dustwave.xyz`, `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`, `TAX_PROVIDER=nm_grt`, `SHIPPING_ORIGIN_ZIP=87120`, `SHIPPING_ORIGIN_COUNTRY=US`, and `USPS_ENABLED=true` unless intentionally changed.
+- [ ] Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes at least to `payment_intent.succeeded` and `payment_intent.payment_failed`.
+- [ ] Stripe test webhook endpoint targets `https://store-worker-staging.jogo.workers.dev/webhooks/stripe`, subscribes to the same two events, and uses `STRIPE_WEBHOOK_SECRET_TEST` only in the isolated staging Worker.
+- [ ] Resend sender domains and `ORDERS_EMAIL_FROM` / `UPDATES_EMAIL_FROM` are verified.
+- [ ] Resend delivery webhook targets `https://checkout.dustwave.xyz/webhooks/resend`, subscribes to delivered/bounced/complained/failed/suppressed events, and its signing secret is stored as `RESEND_WEBHOOK_SECRET`.
+- [ ] `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` are present in the deployed production binding summary; the admin readiness checks report their dependencies as ready.
+- [ ] USPS live credentials and New Mexico GRT behavior are verified from the production origin address.
+- [ ] Real `STORE_DOWNLOADS` objects or approved Worker-only fallback URLs exist for active digital products.
+- [ ] Finite-stock products have true inventory baselines or `inventory_baseline_source` / `inventory_verified_at`; unlimited or made-to-order products use `inventory_tracking: false`.
+
+Production smoke:
+
+- [ ] Paid physical checkout works with tax and shipping.
+- [ ] Paid digital checkout produces a signed download action.
+- [ ] Paid ticket checkout produces ticket/check-in actions.
+- [ ] Free RSVP checkout collects configured attendee details, omits tip/payment controls at a zero total, and confirms without Stripe.
+- [ ] Paid and mixed checkout still renders the payment method and settles through Stripe.
+- [ ] Stripe webhooks confirm paid orders.
+- [ ] Failed payments release reservations.
+- [ ] Admin product publish triggers deploy.
+- [ ] On a harmless test product, selecting Archived remains visibly pending until **Archive product** is used; after publish succeeds, the repository records `status: archived` and the deployed catalog eventually removes the product from public listings.
+- [ ] Admin download replacement works on a non-public test product.
+- [ ] Admin coupon create/apply/delete works on a harmless test cart.
+- [ ] Admin user scopes are correct.
+- [ ] Customer order lookup links are generic on request and token-scoped on consume.
+- [ ] Reminder cron heartbeat and queue health are visible.
+- [ ] Store orders, audit, attendee, and reconciliation CSV exports download and match the expected production order state.
 
 ## Sign-Off Template
 
