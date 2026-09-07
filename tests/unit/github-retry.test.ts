@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getGitHubTextFile, getGitHubWorkflowRun, putGitHubTextFile } from '../../worker/src/github.js';
+import { getGitHubTextFile, getGitHubWorkflowRun, putGitHubTextFile, triggerSiteRebuild } from '../../worker/src/github.js';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -29,6 +29,30 @@ function buildEnv() {
 }
 
 describe('GitHub publish recovery', () => {
+  it('dispatches product publishing with its saved immutable revision', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await triggerSiteRebuild(buildEnv(), 'admin-store-product-publish:poster', { commitSha: 'a'.repeat(40) });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ inputs: { ref: 'a'.repeat(40) } });
+  });
+
+  it('tracks the requested revision when main advances and reports actual media phases', async () => {
+    const commitSha = 'a'.repeat(40);
+    const rawRun = { id: 42, head_sha: 'b'.repeat(40), display_title: `Deploy ${commitSha}`, path: '.github/workflows/deploy.yml', status: 'in_progress' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ workflow_runs: [rawRun] }))
+      .mockResolvedValueOnce(jsonResponse({ jobs: [{ name: 'prepare-media', status: 'in_progress', conclusion: null }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await getGitHubWorkflowRun(buildEnv(), { commitSha });
+    expect(result).toMatchObject({ ok: true, run: { runId: 42, phases: { media: { status: 'in_progress' }, build: { status: 'requested' } } } });
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/actions/runs/42/jobs?');
+  });
+
+  it('rejects a run for a different deployment input even when its branch SHA matches', async () => {
+    const commitSha = 'a'.repeat(40);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ id: 42, head_sha: commitSha, display_title: `Deploy ${'b'.repeat(40)}` })));
+    expect(await getGitHubWorkflowRun(buildEnv(), { commitSha, runId: 42 })).toMatchObject({ ok: false, code: 'github_workflow_commit_mismatch' });
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
@@ -137,7 +161,7 @@ describe('GitHub publish recovery', () => {
 
     const requestUrl = String(fetchMock.mock.calls[0][0]);
     expect(requestUrl).toContain('/actions/workflows/deploy.yml/runs?');
-    expect(requestUrl).toContain(`head_sha=${commitSha}`);
+    expect(requestUrl).not.toContain('head_sha=');
     expect(requestUrl).toContain('event=workflow_dispatch');
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET', redirect: 'manual' });
   });

@@ -102,6 +102,7 @@ admin:
   media_role_derived: derivado
   media_status_ready: optimizado
   media_status_missing_derivatives: faltan derivados
+  media_status_stale_derivatives: derivados desactualizados
   media_status_not_applicable: la optimización no aplica
   media_warning_image_source_oversized: Imagen de origen sobredimensionada
   media_warning_video_source_oversized: Video de origen sobredimensionado
@@ -241,6 +242,10 @@ admin:
   load_more: Cargar más
   store_products_intro: Revisa productos, variantes, precios, cumplimiento, estado e inventario de %{platform} desde la instantánea generada.
   deployment_saved: Guardado
+  deployment_media: Medios
+  deployment_media_running: Preparando medios - %{elapsed} transcurrido.
+  deployment_media_failed: No se pudieron preparar los medios. La tienda actual no ha cambiado. Corrige los medios o vuelve a publicar.
+  deployment_build_running: Generando la tienda - %{elapsed} transcurrido.
   local_catalog_updating: Guardado localmente. Esperando que se recargue el catálogo del Worker.
   local_catalog_failed: Guardado localmente, pero no se pudo actualizar el catálogo del Worker. Tus cambios siguen visibles; revisa la compilación local antes de recargar.
   local_catalog_ready: Guardado localmente. El panel y el catálogo del Worker están actualizados.

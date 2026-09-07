@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promi
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../../worker/src/index.js';
 import { createAdminLoginUrl } from '../../worker/src/admin-auth.js';
 
@@ -76,6 +76,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   if (sidecar && sidecar.exitCode === null) {
     const exited = once(sidecar, 'exit');
     sidecar.kill();
@@ -116,6 +117,33 @@ describe('local admin product publishing', () => {
     session.csrf = csrf;
     expect(await readFile(path.join(root, '_products/local-product.md'), 'utf8')).toBe(initialMarkdown);
     expect((await request('/admin/store/deployments/status?sourceHash=bad')).status).toBe(400);
+  });
+
+  it('dispatches media-only retries at the current repository commit without rewriting product content', async () => {
+    env.ADMIN_LOCAL_REPO_WRITES_ENABLED = 'false';
+    env.GITHUB_TOKEN = 'test-github-token';
+    env.GITHUB_OWNER = 'example';
+    env.GITHUB_REPO = 'store';
+    const sourceSha = 'c'.repeat(40);
+    const github = vi.fn(async (url: string, init: RequestInit = {}) => {
+      const endpoint = String(url);
+      if (endpoint.includes('/contents/_products/local-product.md') && init.method === 'GET') {
+        return new Response(JSON.stringify({ type: 'file', encoding: 'base64', content: Buffer.from(initialMarkdown).toString('base64'), sha: 'b'.repeat(40) }), { status: 200 });
+      }
+      if (endpoint.endsWith('/git/ref/heads/main')) return new Response(JSON.stringify({ object: { sha: sourceSha } }), { status: 200 });
+      if (endpoint.endsWith('/actions/workflows/deploy.yml/dispatches')) return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${init.method} ${endpoint}`);
+    });
+    vi.stubGlobal('fetch', github);
+    const body = { intent: 'publish', productId: 'local-product', prepareMedia: true, fields: {} };
+    expect([401, 403]).toContain((await request('/admin/store/products/publish', body, false)).status);
+    expect(github).not.toHaveBeenCalled();
+    const response = await request('/admin/store/products/publish', body);
+    const data = await response.json();
+    expect(response.status, JSON.stringify(data)).toBe(200);
+    expect(data).toMatchObject({ published: true, repositoryMode: 'github', deployment: { commitSha: sourceSha } });
+    expect(github.mock.calls.map(([, init]) => init.method)).toEqual(['GET', 'GET', 'POST']);
+    expect(JSON.parse(github.mock.calls[2][1].body as string)).toMatchObject({ inputs: { ref: sourceSha } });
   });
 
   it('distinguishes a saved file from failed regeneration', async () => {
