@@ -5066,19 +5066,6 @@ textarea.admin-settings__input--readonly {
     justify-content: flex-start;
   }
 
-  .admin-store-products__table tr.admin-store-products__editor-row {
-    border: 1px solid $border--default;
-    border-radius: $radius--sm;
-    display: block;
-    overflow: hidden;
-  }
-
-  .admin-store-products__table tr.admin-store-products__editor-row > td {
-    display: block;
-    padding: 0;
-    width: 100%;
-  }
-
   .admin-store-products__image-field {
     grid-template-columns: 1fr;
   }

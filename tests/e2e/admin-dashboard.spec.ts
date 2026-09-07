@@ -3544,8 +3544,11 @@ test.describe('Admin Dashboard', () => {
       await expectNoHorizontalOverflow(page);
       const header = editor.locator('.admin-store-products__editor-header');
       expect((await header.boundingBox())!.height).toBeLessThan(width < 500 ? 230 : 150);
-      await editor.locator('[data-store-product-field="name"]').scrollIntoViewIfNeeded();
-      expect((await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+      await editor.locator('[data-store-product-field="name"]').evaluate(node => {
+        window.scrollBy(0, node.getBoundingClientRect().top + 100);
+      });
+      await expect(header).toBeInViewport({ ratio: 1 });
+      expect((await header.boundingBox())!.y).toBeLessThanOrEqual(1);
       await page.screenshot({ path: testInfo.outputPath(`media-publishing-${width}.png`) });
       await expectNoAxeViolations(page, '[data-store-product-publish-status]');
       calls.storeDeploymentOverride.phases.media = { status: 'completed', conclusion: 'success' };
