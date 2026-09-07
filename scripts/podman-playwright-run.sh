@@ -100,6 +100,14 @@ if ! shared_stack_ready; then
   store_wait_for_podman_stack shared_stack_ready "$DEV_PID" "$PODMAN_PLAYWRIGHT_LOG" || exit 1
 fi
 
+# Browser fixtures import Worker modules. Reuse the running Worker's installed
+# dependencies instead of relying on worker/node_modules in the host checkout.
+WORKER_NODE_MODULES_VOLUME="$(podman inspect --format '{{range .Mounts}}{{if and (eq .Type "volume") (eq .Destination "/workspace/worker/node_modules")}}{{.Name}}{{end}}{{end}}' store-dev-worker)"
+if [ -z "$WORKER_NODE_MODULES_VOLUME" ]; then
+  echo "Cannot locate the running Worker's dependency volume for Playwright." >&2
+  exit 1
+fi
+
 if [ "$PODMAN_REBUILD" = "1" ] || ! podman image exists "$PLAYWRIGHT_IMAGE"; then
   echo "🔨 Building $PLAYWRIGHT_IMAGE..." >&2
   podman build \
@@ -116,6 +124,7 @@ podman run --rm \
   --pod store-dev-pod \
   -v "$ROOT_DIR:/workspace" \
   -v "$PLAYWRIGHT_NODE_MODULES_VOLUME:/workspace/node_modules" \
+  -v "$WORKER_NODE_MODULES_VOLUME:/workspace/worker/node_modules:ro" \
   -w /workspace \
   -e CI="${CI:-1}" \
   -e PLAYWRIGHT_EXTERNAL_SERVER=1 \
