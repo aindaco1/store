@@ -2591,8 +2591,7 @@ textarea.admin-settings__input--readonly {
 
   &:has(.admin-dashboard__status:empty) { display: none; }
 
-  .admin-dashboard__status,
-  .admin-dashboard__status[data-admin-prominent-status="true"] {
+  #admin-store-products-status {
     background: transparent;
     border: 0;
     box-shadow: none;
@@ -2671,12 +2670,6 @@ textarea.admin-settings__input--readonly {
 
   .admin-store-products__deployment-summary {
     grid-column: auto;
-  }
-}
-
-@container store-product-editor (max-width: 36rem) {
-  .admin-store-products__editor-header {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -3904,7 +3897,7 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-products__editor-actions {
   align-items: center;
-  display: grid;
+  display: flex;
   gap: 6px;
   grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
@@ -3912,6 +3905,16 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-products__editor-save-hint {
   grid-column: 1 / -1;
+}
+
+@container store-product-editor (max-width: 36rem) {
+  .admin-store-products__editor-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-store-products__editor-actions {
+    display: grid;
+  }
 }
 
 @media (max-width: 1024px) {
