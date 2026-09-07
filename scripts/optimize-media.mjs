@@ -86,6 +86,8 @@ function parseArgs(argv = []) {
     check: false,
     changed: false,
     manifestOnly: false,
+    publish: false,
+    publishCheck: false,
     files: []
   };
   for (const arg of argv) {
@@ -93,6 +95,8 @@ function parseArgs(argv = []) {
     else if (arg === '--check') args.check = true;
     else if (arg === '--changed') args.changed = true;
     else if (arg === '--manifest-only') args.manifestOnly = true;
+    else if (arg === '--publish') args.publish = true;
+    else if (arg === '--publish-check') args.publishCheck = true;
     else args.files.push(arg);
   }
   return args;
@@ -200,8 +204,7 @@ function isAudioFile(repoPath) {
 
 function isDashboardMediaFile(repoPath) {
   const normalized = normalizeRepoPath(repoPath);
-  return MEDIA_ROOTS.some((root) => normalized.startsWith(`${root}/`)) &&
-    (isImageFile(normalized) || isVideoSourceFile(normalized) || isAudioFile(normalized));
+  return Boolean(classifyMediaPath(normalized));
 }
 
 async function resolveMediaFiles(args) {
@@ -324,14 +327,17 @@ async function generateResponsiveWebpDerivative(repoPath, width, dimensions, arg
   const derivativeRepoPath = responsiveWebpDerivativePathForImage(repoPath, width);
   if (!derivativeRepoPath) return { repoPath, changed: false, skipped: 'not a responsive image source' };
   if (dimensions.width <= width) {
-    return { repoPath, changed: false, derivativeRepoPath, width, skipped: 'source not wider than variant' };
+    const exists = await fileExists(derivativeRepoPath);
+    if (args.write && exists) await fs.rm(derivativeRepoPath);
+    return { repoPath, changed: exists, derivativeRepoPath, width, skipped: 'source not wider than variant',
+      replacement: [publicAssetPathForRepoPath(derivativeRepoPath), publicAssetPathForRepoPath(repoPath)] };
   }
 
   const sourcePath = path.resolve(repoPath);
   const derivativePath = path.resolve(derivativeRepoPath);
   const sourceStat = await fs.stat(sourcePath).catch(() => null);
   const derivativeStat = await fs.stat(derivativePath).catch(() => null);
-  if (derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
+  if (!args.force && derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
     return { repoPath, changed: false, derivativeRepoPath, width, skipped: 'up to date' };
   }
 
@@ -406,10 +412,11 @@ async function generateWebmDerivative(repoPath, args, tools) {
   const derivativePath = path.resolve(derivativeRepoPath);
   const sourceStat = await fs.stat(sourcePath).catch(() => null);
   const derivativeStat = await fs.stat(derivativePath).catch(() => null);
-  if (derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
+  if (!args.force && derivativeStat && sourceStat && derivativeStat.mtimeMs >= sourceStat.mtimeMs) {
     return { repoPath, changed: false, derivativeRepoPath, skipped: 'up to date' };
   }
   if (args.write) {
+    const candidatePath = `${derivativePath}.candidate.webm`;
     await execFileAsync('ffmpeg', [
       '-y',
       '-i', sourcePath,
@@ -419,8 +426,15 @@ async function generateWebmDerivative(repoPath, args, tools) {
       '-row-mt', '1',
       '-c:a', 'libopus',
       '-b:a', '160k',
-      derivativePath
+      candidatePath
     ], { maxBuffer: 1024 * 1024 * 20 });
+    const optimized = await replaceDerivativeIfSmaller(sourcePath, derivativePath, candidatePath, true);
+    return {
+      repoPath, derivativeRepoPath, ...optimized,
+      replacement: optimized.skipped
+        ? [publicAssetPathForRepoPath(derivativeRepoPath), publicAssetPathForRepoPath(repoPath)]
+        : [publicAssetPathForRepoPath(repoPath), publicAssetPathForRepoPath(derivativeRepoPath)]
+    };
   }
   return {
     repoPath,
@@ -444,10 +458,11 @@ async function referenceFiles() {
   ));
 }
 
-async function rewriteRepositoryReferences(replacements, write) {
+async function rewriteRepositoryReferences(replacements, write, productOnly = false) {
   if (!replacements.size) return [];
   const changed = [];
   for (const filePath of await referenceFiles()) {
+    if (productOnly && !normalizeRepoPath(filePath).startsWith('_products/')) continue;
     const source = await fs.readFile(filePath, 'utf8');
     const rewritten = rewriteMediaReferences(source, replacements);
     if (rewritten === source) continue;
@@ -568,29 +583,38 @@ export async function buildMediaOptimizationManifest(tools = {}, { previousManif
 
   for (const source of sourceRows) {
     const sourceStat = await fs.stat(source.path);
-    const probedMetadata = await probeMediaMetadata(source.path, tools);
+    const sourceSha256 = await sha256File(source.path);
+    const previous = previousAssets.get(source.path) || {};
+    const probedMetadata = !tools.ffprobe && previous.sha256 === sourceSha256
+      ? previous
+      : await probeMediaMetadata(source.path, tools);
     const metadata = source.type === 'image'
       ? { ...(probedMetadata.width ? { width: probedMetadata.width } : {}), ...(probedMetadata.height ? { height: probedMetadata.height } : {}) }
       : source.type === 'audio'
         ? { ...(probedMetadata.durationMs ? { durationMs: probedMetadata.durationMs } : {}) }
         : probedMetadata;
-    const sourceSha256 = await sha256File(source.path);
     const expected = expectedMediaDerivativePaths(source.path, metadata);
     const derivatives = [];
-    for (const derivativePath of expected) {
+    // Include obsolete widths so a smaller replacement cannot hide stale files
+    // that the storefront's srcset helper would still discover on disk.
+    const derivativePaths = new Set([...expected, ...responsiveWebpDerivativePathsForImage(source.path)]);
+    for (const derivativePath of derivativePaths) {
       if (!knownPaths.has(derivativePath)) continue;
       const derivativeStat = await fs.stat(derivativePath);
       const derivative = classifyMediaPath(derivativePath, knownPaths);
+      const previousDerivative = (previous.derivatives || []).find((item) => item.path === derivativePath);
+      const regenerated = optimizerResults.some((result) => result.derivativeRepoPath === derivativePath && result.changed);
+      const derivativeSha256 = await sha256File(derivativePath);
       derivatives.push({
         path: derivativePath,
         publicPath: publicAssetPathForRepoPath(derivativePath),
         bytes: derivativeStat.size,
-        sha256: await sha256File(derivativePath),
-        sourceSha256,
+        sha256: derivativeSha256,
+        // A manifest-only refresh must not certify old bytes for a replaced source.
+        sourceSha256: regenerated ? sourceSha256 : previousDerivative?.sha256 === derivativeSha256 ? previousDerivative.sourceSha256 || '' : '',
         ...(derivative?.derivativeWidth ? { width: derivative.derivativeWidth } : {})
       });
     }
-    const previous = previousAssets.get(source.path) || {};
     const preservedExceptions = previous.sha256 === sourceSha256 && Array.isArray(previous.skippedDerivatives)
       ? previous.skippedDerivatives
       : [];
@@ -600,6 +624,7 @@ export async function buildMediaOptimizationManifest(tools = {}, { previousManif
     ])).filter((candidate) => expected.includes(candidate) && !knownPaths.has(candidate)).sort();
     const skippedSet = new Set(skippedDerivatives);
     const missingDerivatives = expected.filter((candidate) => !knownPaths.has(candidate) && !skippedSet.has(candidate));
+    const staleDerivatives = derivatives.filter((item) => !expected.includes(item.path) || item.sourceSha256 !== sourceSha256).map((item) => item.path);
     const referencedPaths = [source.path, ...derivatives.map((item) => item.path)];
     const references = referencedPaths.flatMap((repoPath) => referenceIndex.get(repoPath) || []);
     const warning = manifestWarningForSource(source, sourceStat.size);
@@ -614,9 +639,10 @@ export async function buildMediaOptimizationManifest(tools = {}, { previousManif
       bytes: sourceStat.size,
       sha256: sourceSha256,
       ...metadata,
-      optimizationStatus: missingDerivatives.length ? 'missing_derivatives' : (expected.length ? 'ready' : 'not_applicable'),
+      optimizationStatus: missingDerivatives.length ? 'missing_derivatives' : staleDerivatives.length ? 'stale_derivatives' : (expected.length ? 'ready' : 'not_applicable'),
       expectedDerivatives: expected,
       missingDerivatives,
+      ...(staleDerivatives.length ? { staleDerivatives } : {}),
       skippedDerivatives,
       derivatives,
       warnings: warning ? [warning] : [],
@@ -635,6 +661,29 @@ export async function buildMediaOptimizationManifest(tools = {}, { previousManif
     brokenReferences: referenceScan.brokenReferences,
     assets
   };
+}
+
+export function productMediaNeedingPreparation(manifest = {}, previousManifest = {}) {
+  const previousAssets = new Map((previousManifest.assets || []).map((asset) => [asset.path, asset]));
+  return (manifest.assets || []).filter((asset) => {
+    if (!(asset.references || []).some((reference) => reference.path.startsWith('_products/'))) return false;
+    const previous = previousAssets.get(asset.path);
+    return !previous || previous.sha256 !== asset.sha256 ||
+      (asset.missingDerivatives || []).length > 0 || (asset.staleDerivatives || []).length > 0;
+  }).map((asset) => asset.path);
+}
+
+export function assertProductMediaReady(manifest = {}) {
+  const broken = (manifest.brokenReferences || []).filter((item) =>
+    (item.references || []).some((reference) => reference.path.startsWith('_products/')));
+  const incomplete = (manifest.assets || []).filter((asset) =>
+    (asset.references || []).some((reference) => reference.path.startsWith('_products/')) &&
+    ((asset.missingDerivatives || []).length || (asset.staleDerivatives || []).length ||
+      (asset.type !== 'audio' && (!asset.width || !asset.height)) ||
+      (asset.type === 'audio' && !asset.durationMs)));
+  if (broken.length || incomplete.length) {
+    throw new Error(`Product media is not ready: ${[...broken, ...incomplete].map((item) => item.path).join(', ')}`);
+  }
 }
 
 async function syncMediaOptimizationManifest(tools, { write, check, optimizerResults = [] }) {
@@ -662,7 +711,7 @@ async function syncMediaOptimizationManifest(tools, { write, check, optimizerRes
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const write = args.write && !args.check;
-  const mediaFiles = await resolveMediaFiles(args);
+  let mediaFiles = await resolveMediaFiles(args);
   const tools = {
     oxipng: await commandExists('oxipng'),
     optipng: await commandExists('optipng'),
@@ -675,21 +724,46 @@ async function main() {
   const replacements = new Map();
   const results = [];
 
+  if (args.publishCheck) {
+    const previousManifest = JSON.parse(await fs.readFile(MEDIA_MANIFEST_PATH, 'utf8').catch(() => '{}'));
+    const currentManifest = await buildMediaOptimizationManifest(tools, { previousManifest });
+    assertProductMediaReady(currentManifest);
+    const pending = productMediaNeedingPreparation(currentManifest, previousManifest);
+    if (pending.length) throw new Error(`Product media must be prepared before deployment: ${pending.join(', ')}`);
+    console.log('Product media is ready for deployment.');
+    return;
+  }
+
+  if (args.publish) {
+    if (!write) throw new Error('--publish requires --write.');
+    if (!tools.ffprobe || !tools.cwebp || !tools.ffmpeg) throw new Error('Publishing media requires ffprobe, cwebp, and ffmpeg.');
+    const previousManifest = JSON.parse(await fs.readFile(MEDIA_MANIFEST_PATH, 'utf8').catch(() => '{}'));
+    const currentManifest = await buildMediaOptimizationManifest(tools, { previousManifest });
+    mediaFiles = productMediaNeedingPreparation(currentManifest, previousManifest);
+    args.force = true;
+  }
+
   for (const repoPath of args.manifestOnly ? [] : mediaFiles) {
     if (isImageFile(repoPath)) {
-      results.push(await optimizeImage(repoPath, { ...args, write }, tools));
+      // Publication derives display assets without modifying uploaded source bytes.
+      if (!args.publish) results.push(await optimizeImage(repoPath, { ...args, write }, tools));
       results.push(...await generateResponsiveWebpDerivatives(repoPath, { ...args, write }, tools));
     } else if (isVideoSourceFile(repoPath)) {
       const result = await generateWebmDerivative(repoPath, { ...args, write }, tools);
       results.push(result);
-      if (result.replacement && (!args.check || result.derivativeRepoPath)) {
-        replacements.set(result.replacement[0], result.replacement[1]);
-      }
+
     }
   }
 
-  const referenceChanges = write ? await rewriteRepositoryReferences(replacements, true) : [];
+  for (const result of results) {
+    if (result.replacement) replacements.set(...result.replacement);
+    else if (result.skipped === 'candidate not smaller than source' && result.derivativeRepoPath) {
+      replacements.set(publicAssetPathForRepoPath(result.derivativeRepoPath), publicAssetPathForRepoPath(result.repoPath));
+    }
+  }
+  const referenceChanges = write ? await rewriteRepositoryReferences(replacements, true, args.publish) : [];
   const manifest = await syncMediaOptimizationManifest(tools, { write, check: args.check, optimizerResults: results });
+  if (args.publish) assertProductMediaReady(JSON.parse(await fs.readFile(MEDIA_MANIFEST_PATH, 'utf8')));
   const changedCount = results.filter((result) => result.changed).length + referenceChanges.length + (manifest.changed ? 1 : 0);
   console.log(JSON.stringify({
     mode: write ? 'write' : 'check',

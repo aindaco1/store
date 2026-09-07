@@ -64,7 +64,12 @@ describe('workflow security posture', () => {
     expect(deploy).not.toContain("github.event_name == 'push'");
     expect(deploy).toContain("description: 'Reviewed release branch, tag, or commit'");
     expect(deploy).toContain("default: 'main'");
-    expect(deploy.match(/ref: \$\{\{ inputs\.ref \}\}/g)).toHaveLength(2);
+    expect(deploy.match(/ref: \$\{\{ inputs\.ref \}\}/g)).toHaveLength(1);
+    expect(deploy.match(/ref: \$\{\{ needs\.prepare-media\.outputs\.ref \|\| inputs\.ref \}\}/g)).toHaveLength(2);
+    expect(deploy).toContain("needs.prepare-media.result == 'success' || needs.prepare-media.result == 'skipped'");
+    expect(deploy).toContain("needs.build.result == 'success'");
+    expect(deploy).toContain('node ./scripts/optimize-media.mjs --write --publish');
+    expect(deploy).toContain('node ./scripts/optimize-media.mjs --publish-check');
     expect(deploy).toContain('npx wrangler deploy -c wrangler.toml --env=""');
     expect(deploy).toContain('actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5');
     expect(deploy).toContain('group: "production-operations"');

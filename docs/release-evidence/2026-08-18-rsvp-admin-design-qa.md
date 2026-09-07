@@ -1,5 +1,7 @@
 # Design QA: RSVP admin order layout and question builder
 
+Historical local review from 2026-08-18, associated with the [v1.2.0 release evidence](v1.2.0.md). Paths below identify the original machine-local captures; they are not portable repository assets or a fresh verification of the current UI. Current behavior and checks live in the [Dashboard](../DASHBOARD.md), [Accessibility](../ACCESSIBILITY.md), and [Testing](../TESTING.md) guides.
+
 ## Evidence
 
 ### Source visual truths

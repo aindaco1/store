@@ -1,8 +1,12 @@
 # Testing
 
+This guide owns test commands, coverage, and evidence collection procedures. Use [contributor setup](CONTRIBUTING.md#local-setup) to prepare the local stack and the [merge smoke checklist](MERGE_SMOKE_CHECKLIST.md) to record acceptance and release sign-off.
+
 The current gate covers deterministic repository media evidence, DRY add-on pricing, resumable Stripe processing and reconciliation, durable email delivery evidence, cache and protected-recovery closure, XML/text sitemap parity, deployed crawl verification, final-sale policy disclosure, localized admin review, and protected-recovery dependency posture.
 
 The default test path is Store-only. It covers product pages, cart behavior, first-party checkout, Store admin operations, coupons, order lookup, reminders, content safety, and Worker security.
+
+## Shared Dependency Checks
 
 `npm run jekyll-template:check` verifies that the 17 locally built Jekyll
 integration files still match the exact pinned golden-project template. The
@@ -10,10 +14,7 @@ pre-merge gate runs this check before builds and also rejects the template
 submodule from generated site output. `npm run jekyll-template:sync` is an
 explicit upgrade-branch operation, not a build step.
 
-Store `v1.3.1` records Platform `v0.34.1` and Jekyll Template `v0.1.0` as exact
-gitlinks. After cloning, switching branches, or reviewing a shared dependency
-upgrade, initialize the recorded commits and run the narrow pin/drift contract
-before broader tests:
+The [project overview](PROJECT_OVERVIEW.md#shared-foundations-and-ownership) records the shared dependency pins. After cloning, switching branches, or reviewing a shared dependency upgrade, initialize the recorded commits and run the narrow pin/drift contract before broader tests:
 
 ```bash
 git submodule update --init --recursive
@@ -40,6 +41,8 @@ site at port `4002`, Worker at port `8989`, and matching localhost CORS origin.
 ```bash
 bundle exec jekyll build --quiet
 npm run test:unit
+npm run test:unit:coverage
+npm run test:i18n
 npm run test:seo
 npm run test:content-security
 npm run test:security
@@ -78,19 +81,7 @@ deployment tracking, no premature catalog refresh, and measured completion.
 
 Lighthouse runs through `podman-stack-run.sh` by default. Production posture accepts Wrangler's secret-name JSON only and never reads secret values. Session/download/audit tests prove CSRF/role gates, data minimization, redaction, rate-limit thresholds, and audit behavior.
 
-Local services:
-
-- Storefront: `http://127.0.0.1:4002`
-- Worker: `http://127.0.0.1:8989`
-
-Local admin product saves also require the repository sidecar on port `8799`; use
-`./scripts/dev.sh` (or `--podman`) to start the complete stack. Startup and local
-source changes regenerate the Worker catalog. The dashboard waits for the saved
-catalog hash before refreshing after a publish. `npm run catalog:generate` is the
-manual recovery/diagnostic command for malformed YAML or stale catalog state.
-The `local-catalog-sync` and `local-admin-publish` unit suites cover real temporary
-repository writes, regeneration, and Worker readiness without touching the shop's
-product files or external providers.
+Use [contributor setup](CONTRIBUTING.md#local-setup) for service URLs and [configuration synchronization](CONTRIBUTING.md#configuration-and-product-changes) for local catalog recovery. The `local-catalog-sync` and `local-admin-publish` unit suites cover real temporary repository writes, regeneration, and Worker readiness without touching the shop's product files or external providers.
 
 ## Browser Coverage
 
@@ -103,6 +94,8 @@ Default Playwright specs:
 These cover public layout/accessibility, product-card and product-detail controls, one-request confirmed-inventory refresh on the homepage and product detail, storefront filters, localized product routes, cart quantity updates, keyboard add-to-cart flow, direct-link multi-attendee RSVP registration and storage privacy, zero-total checkout without payment UI, paid-checkout payment UI preservation, customer order lookup, Store admin login, Store readiness/audit/reconciliation export, Store order CSV/attendee CSV/check-in/download access flow, guided RSVP question creation and JSON serialization, desktop RSVP response/action containment, product preview address/link/layout parity, product publish and explicit archive confirmation, download replacement upload, coupon management, inventory baseline writes, explicit coordinator availability refresh, scoped Store admin access, responsive order action buttons, and Spanish admin tabs.
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
+
+Product publishing is checked at 320, 390, 768, 1024, and 1440 CSS pixels, plus Spanish and 200% text at tablet width. The shared browser fixture verifies matching status type sizes and line heights, single-line action labels at normal text size, 44px phone/tablet publishing controls, contained editor fields, unbroken elapsed durations, visible sticky status, upload previews, and phase transitions. Mobile coverage also exercises bulk publishing outside the editor.
 
 E2E navigation uses the shared `gotoDomReady` helper, then asserts the page-specific application state. Tests do not wait for every late asset before beginning interaction. Layout and text-scaling checks use a bounded font-readiness wait plus animation frames so an invalid or slow font cannot hang the suite; the visible layout/overflow assertions still determine pass or failure.
 
@@ -316,67 +309,24 @@ Payment-specific setup, webhook, and reconciliation checks are documented in [PA
 
 `npm run launch:readiness` checks repo-visible production inputs. `npm run release:providers` can verify external account state when read-only provider credentials are present. Anything skipped by that probe still needs provider-console evidence in the release notes.
 
-For production Cloudflare DNS and admin response-policy evidence, use the `Release Provider Evidence` GitHub Actions workflow. It runs the DNS probe with production credentials, then verifies the public English and Spanish admin responses contain the required `private`, `no-store`, `no-transform`, `max-age=0`, and `must-revalidate` directives, no Cloudflare JavaScript Detection/Web Analytics injection markers, and no unexpected `Content-Security-Policy-Report-Only` header. Strict DNS CI requires a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read`; the public admin verification needs no credential.
+For production Cloudflare DNS and admin response-policy evidence, use the `Release Provider Evidence` GitHub Actions workflow. It runs on `main` pushes and can be manually dispatched. It runs the DNS probe with production credentials, then verifies the public English and Spanish admin responses contain the required `private`, `no-store`, `no-transform`, `max-age=0`, and `must-revalidate` directives, no Cloudflare JavaScript Detection/Web Analytics injection markers, and no unexpected `Content-Security-Policy-Report-Only` header. Strict DNS CI requires `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE` or `CLOUDFLARE_ZONE_ID`, and a dedicated `CLOUDFLARE_DNS_API_TOKEN` with `Zone:DNS:Read` for the production zone. Keep DNS permissions separate from the deploy token. If supplying a zone name, the token also needs zone lookup access; otherwise supply the zone ID. The public admin verification needs no credential.
 
 When Chrome reports CSP issues that production verification cannot reproduce, clear the DevTools Issues and Console panels and reload in an extension-free profile. Check the violating script URL: extension-origin AutoConsent or privacy-tool code is not a first-party defect and must not be accommodated with `unsafe-eval`, `unsafe-inline`, or broader source allowlists.
 
 ## Manual Store Smoke
 
-After checkout, fulfillment, email, admin, inventory, or catalog changes:
-
-1. Add a physical product to cart.
-2. Change quantity in the cart.
-3. Complete a paid Stripe test checkout.
-4. Confirm `/order-success/` shows fulfillment state.
-5. Confirm the order email sends through Resend.
-6. Export Store audit CSV from **Settings -> Store readiness**.
-7. Export Store reconciliation CSV from **Settings -> Store readiness**.
-8. Export Store orders CSV from admin.
-9. Complete a configured free RSVP with two attendees; confirm Contact precedes RSVP details, no tip or payment method appears, **Complete order** succeeds without Stripe, and the order page shows the submitted roster.
-10. Search for a named RSVP attendee, review the historical response labels, and export attendee CSV from admin.
-11. Check in one attendee, confirm partial attendance totals, then check in or undo the remaining attendee from admin.
-12. Upload or replace a digital download in admin.
-13. Create and delete a reusable download library file.
-14. Revoke and refresh a confirmed digital fulfillment item from admin.
-15. Download a confirmed digital fulfillment item.
-16. Create, apply, and delete a coupon.
-17. Request an order lookup link and consume it.
-18. Verify abandoned-checkout reminder suppression/resume behavior in a controlled test.
-19. Set an inventory baseline and verify checkout respects it.
-20. Replay or send an equivalent Stripe webhook test event for paid settlement.
-21. Confirm failed/canceled payments release reservations.
+Use the [checkout and fulfillment](MERGE_SMOKE_CHECKLIST.md#checkout-and-fulfillment) and [admin dashboard](MERGE_SMOKE_CHECKLIST.md#admin-dashboard) sections of the merge smoke checklist for manual acceptance. Record the target environment, test records, evidence, and any provider sends separately from automated dry-run results.
 
 ## Production Checklist
 
-Provider and runtime checks:
+Production configuration and deployed behavior checks live in the [merge smoke checklist](MERGE_SMOKE_CHECKLIST.md#production-checklist). Test execution and provider evidence procedures remain above; deployment and rollback steps live in [Workflows](WORKFLOWS.md#deployment-workflow).
 
-- Cloudflare routes or custom domains serve `https://shop.dustwave.xyz` and `https://checkout.dustwave.xyz`.
-- `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` point at production Cloudflare resources.
-- Worker secrets are set in Cloudflare, not in Git, including Stripe, Resend, admin session/login, checkout intent, magic link, download/order lookup, Turnstile, and USPS secrets as applicable.
-- Production runtime config uses `SITE_BASE=https://shop.dustwave.xyz`, `WORKER_BASE=https://checkout.dustwave.xyz`, `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`, `TAX_PROVIDER=nm_grt`, `SHIPPING_ORIGIN_ZIP=87120`, `SHIPPING_ORIGIN_COUNTRY=US`, and `USPS_ENABLED=true` unless intentionally changed.
-- Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes at least to `payment_intent.succeeded` and `payment_intent.payment_failed`.
-- Stripe test webhook endpoint targets `https://store-worker-staging.jogo.workers.dev/webhooks/stripe`, subscribes to the same two events, and uses `STRIPE_WEBHOOK_SECRET_TEST` only in the isolated staging Worker.
-- Resend sender domains and `ORDERS_EMAIL_FROM` / `UPDATES_EMAIL_FROM` are verified.
-- Resend delivery webhook targets `https://checkout.dustwave.xyz/webhooks/resend`, subscribes to delivered/bounced/complained/failed/suppressed events, and its signing secret is stored as `RESEND_WEBHOOK_SECRET`.
-- `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` are present in the deployed production binding summary; the admin readiness checks report their dependencies as ready.
-- USPS live credentials and New Mexico GRT behavior are verified from the production origin address.
-- Real `STORE_DOWNLOADS` objects or approved Worker-only fallback URLs exist for active digital products.
-- Finite-stock products have true inventory baselines or `inventory_baseline_source` / `inventory_verified_at`; unlimited or made-to-order products use `inventory_tracking: false`.
+### Product media publishing regressions
 
-Production smoke:
+```bash
+npx vitest run tests/unit/product-media-preparation.test.ts tests/unit/commit-publish-media.test.ts tests/unit/github-retry.test.ts tests/unit/workflow-security.test.ts
+npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium
+node scripts/optimize-media.mjs --publish-check
+```
 
-- Paid physical checkout works with tax and shipping.
-- Paid digital checkout produces a signed download action.
-- Paid ticket checkout produces ticket/check-in actions.
-- Free RSVP checkout collects configured attendee details, omits tip/payment controls at a zero total, and confirms without Stripe.
-- Paid and mixed checkout still renders the payment method and settles through Stripe.
-- Stripe webhooks confirm paid orders.
-- Failed payments release reservations.
-- Admin product publish triggers deploy.
-- On a harmless test product, selecting Archived remains visibly pending until **Archive product** is used; after publish succeeds, the repository records `status: archived` and the deployed catalog eventually removes the product from public listings.
-- Admin download replacement works on a non-public test product.
-- Admin coupon create/apply/delete works on a harmless test cart.
-- Admin user scopes are correct.
-- Customer order lookup links are generic on request and token-scoped on consume.
-- Reminder cron heartbeat and queue health are visible.
-- Store orders, audit, attendee, and reconciliation CSV exports download and match the expected production order state.
+The preparation fixtures cover source preservation, same-path replacements, stale manifest provenance, failed encoders, broken references, larger-output skips, and concurrent repository edits. Browser fixtures deliberately return 404 for uploaded public URLs and verify both preview surfaces, compact mobile/desktop progress, and retry without reuploading. These checks do not perform a production deployment. Local repository mode continues to report local catalog regeneration separately from GitHub media/deployment jobs.

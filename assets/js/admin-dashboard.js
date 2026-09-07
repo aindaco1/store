@@ -58,9 +58,14 @@
   var storeProductAddressLookupCache = new Map();
   var storeProductPreviewRequestCounter = 0;
   var storeProductMediaCache = new Map();
+  // Display-only upload bytes stay in this tab; product fields retain repository paths.
+  var uploadedImagePreviews = new Map();
+  var storeProductsWithPendingMedia = new Set();
+  var activeStoreMediaUploads = 0;
+  var storeProductStatusAnchor = null;
   var storeProductDeploymentPollToken = 0;
   var STORE_PRODUCT_DEPLOYMENT_POLL_MS = 4000;
-  var STORE_PRODUCT_DEPLOYMENT_TIMEOUT_MS = 15 * 60 * 1000;
+  var STORE_PRODUCT_DEPLOYMENT_TIMEOUT_MS = 45 * 60 * 1000;
   var SNIPCART_IMPORT_MAX_CSV_BYTES = 1024 * 1024;
   var currentStoreOrdersPayload = null;
   var storeOrderPayloadCache = new Map();
@@ -245,12 +250,24 @@
   function mediaPreviewUrl(path) {
     var value = String(path || '').trim();
     if (!value) return '';
+    var uploaded = uploadedImagePreview(value);
+    if (uploaded) return uploaded;
     if (/^(?:https?:|data:|blob:)/i.test(value)) return value;
     if (value.charAt(0) === '/') return value;
     try {
       return new URL(value, window.location.origin + '/').toString();
     } catch (_error) {
       return value;
+    }
+  }
+
+  function uploadedImagePreview(value) {
+    try {
+      var url = new URL(value, window.location.origin);
+      var allowedOrigins = [window.location.origin, storeProductPreviewOrigin(storeMarketingBaseUrl())];
+      return allowedOrigins.indexOf(url.origin) >= 0 ? uploadedImagePreviews.get(url.pathname) || '' : '';
+    } catch (_error) {
+      return '';
     }
   }
 
@@ -561,9 +578,9 @@
         deploymentOrderRequested: 'Product order saved. Waiting for the deployment to start - %{elapsed} elapsed.',
         deploymentOrderQueued: 'Product order saved. Deployment queued - %{elapsed} elapsed.',
         deploymentOrderRunning: 'Product order saved. Updating the storefront - %{elapsed} elapsed.',
-        deploymentProductRequested: 'Product saved. Waiting for the deployment to start - %{elapsed} elapsed.',
-        deploymentProductQueued: 'Product saved. Deployment queued - %{elapsed} elapsed.',
-        deploymentProductRunning: 'Product saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentProductRequested: 'Waiting for deployment - %{elapsed} elapsed.',
+        deploymentProductQueued: 'Deployment queued - %{elapsed} elapsed.',
+        deploymentProductRunning: 'Updating checkout and storefront - %{elapsed} elapsed.',
         deploymentArchiveComplete: 'Archived and unavailable to shoppers. Deployment completed in %{elapsed}.',
         deploymentActiveComplete: 'Active status deployed in %{elapsed}.',
         deploymentDraftComplete: 'Saved as draft. Deployment completed in %{elapsed}.',
@@ -636,9 +653,9 @@
         deploymentOrderRequested: 'Orden de productos guardada. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
         deploymentOrderQueued: 'Orden de productos guardada. Despliegue en cola - %{elapsed} transcurrido.',
         deploymentOrderRunning: 'Orden de productos guardada. Actualizando la tienda - %{elapsed} transcurrido.',
-        deploymentProductRequested: 'Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
-        deploymentProductQueued: 'Producto guardado. Despliegue en cola - %{elapsed} transcurrido.',
-        deploymentProductRunning: 'Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentProductRequested: 'Esperando el despliegue - %{elapsed} transcurrido.',
+        deploymentProductQueued: 'Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentProductRunning: 'Actualizando checkout y tienda - %{elapsed} transcurrido.',
         deploymentArchiveComplete: 'Archivado y no disponible para compradores. El despliegue termino en %{elapsed}.',
         deploymentActiveComplete: 'Estado activo desplegado en %{elapsed}.',
         deploymentDraftComplete: 'Guardado como borrador. El despliegue termino en %{elapsed}.',
@@ -679,7 +696,7 @@
     var keys = {
       scope: { product: 'mediaScopeProduct', add_on: 'mediaScopeAddOn', default: 'mediaScopeDefault' },
       role: { source: 'mediaRoleSource', derived: 'mediaRoleDerived' },
-      status: { ready: 'mediaStatusReady', missing_derivatives: 'mediaStatusMissingDerivatives', not_applicable: 'mediaStatusNotApplicable' },
+      status: { ready: 'mediaStatusReady', missing_derivatives: 'mediaStatusMissingDerivatives', stale_derivatives: 'mediaStatusStaleDerivatives', not_applicable: 'mediaStatusNotApplicable' },
       warning: {
         image_source_oversized: 'mediaWarningImageSourceOversized',
         video_source_oversized: 'mediaWarningVideoSourceOversized',
@@ -1174,6 +1191,8 @@
       requestJson('/admin/logout', { method: 'POST', body: {} }).finally(function() {
         csrfToken = '';
         currentUser = null;
+        uploadedImagePreviews.clear();
+        storeProductsWithPendingMedia.clear();
         showAuth('Signed out.');
       });
     });
@@ -6105,6 +6124,7 @@
     var opts = options || {};
     var root = $('#admin-store-products-results');
     if (!root) return;
+    positionStoreProductStatus();
     clear(root);
     currentStoreProducts = Array.isArray(data.products) ? data.products : [];
     var rows = Array.isArray(data.rows) ? data.rows : [];
@@ -6199,6 +6219,19 @@
     });
     table.appendChild(tbody);
     root.appendChild(table);
+    positionStoreProductStatus($('[data-store-product-editor]', root));
+  }
+
+  function positionStoreProductStatus(form) {
+    var status = $('#admin-store-products-status');
+    if (!status) return;
+    if (!storeProductStatusAnchor) {
+      storeProductStatusAnchor = document.createComment('Product status home');
+      status.parentNode.insertBefore(storeProductStatusAnchor, status);
+    }
+    var host = form && $('[data-store-product-publish-status]', form);
+    if (host) host.appendChild(status);
+    else storeProductStatusAnchor.parentNode.insertBefore(status, storeProductStatusAnchor.nextSibling);
   }
 
   function scrollStoreProductEditorIntoView(productId) {
@@ -6265,8 +6298,13 @@
     var config = storeProductMediaUploadConfig(file);
     if (!config) return Promise.reject(new Error(localizedAdminText('mediaTypeError')));
     if (file.size > config.maxBytes) return Promise.reject(new Error(localizedAdminText(config.sizeErrorKey)));
+    activeStoreMediaUploads += 1;
+    var editor = status && status.closest('[data-store-product-editor]');
+    updateStoreProductEditorDirtyState(editor);
     productUploadStatus(status, localizedAdminText('mediaUploading', { filename: file.name }));
+    var previewContent = '';
     return fileToDataUrl(file).then(function(content) {
+      if (config.type === 'image') previewContent = content;
       return requestJson(config.endpoint, {
         method: 'POST',
         body: {
@@ -6284,9 +6322,14 @@
     }).then(function(data) {
       var nextPath = data.path || data.publicPath || '';
       if (!nextPath) throw new Error(localizedAdminText('mediaUploadMissingPath'));
+      if (previewContent) uploadedImagePreviews.set(new URL(nextPath, window.location.origin).pathname, previewContent);
+      storeProductsWithPendingMedia.add(product.productId || '');
       rememberStoreProductMedia(product, nextPath, file.name || product.name, config.type);
       productUploadStatus(status, localizedAdminText(replacement ? 'mediaReplaced' : 'mediaUploaded'));
       return nextPath;
+    }).finally(function() {
+      activeStoreMediaUploads -= 1;
+      updateStoreProductEditorDirtyState(editor);
     });
   }
 
@@ -8286,7 +8329,7 @@
   }
 
   function storeProductPreviewHtmlWithBase(html) {
-    var markup = sanitizeStoreProductPreviewHtml(html);
+    var markup = stripStoreProductPreviewScripts(String(html || ''));
     if (!markup) return markup;
     var base = storeProductPreviewBaseUrl();
     var previewOrigin = storeProductPreviewOrigin(base);
@@ -8300,12 +8343,12 @@
     });
     var baseTag = '<base href="' + escapeStoreProductEditorAttribute(normalizeBase(base) + '/') + '">';
     if (/<base\b[^>]*>/i.test(markup)) {
-      return markup.replace(/<base\b[^>]*>/i, baseTag);
+      return sanitizeStoreProductPreviewHtml(markup.replace(/<base\b[^>]*>/i, baseTag));
     }
     if (/<head[^>]*>/i.test(markup)) {
-      return markup.replace(/<head([^>]*)>/i, '<head$1>' + baseTag);
+      return sanitizeStoreProductPreviewHtml(markup.replace(/<head([^>]*)>/i, '<head$1>' + baseTag));
     }
-    return baseTag + markup;
+    return sanitizeStoreProductPreviewHtml(baseTag + markup);
   }
 
   function sanitizeStoreProductPreviewHtml(html) {
@@ -8323,6 +8366,16 @@
     if (!doc) return;
     doc.querySelectorAll('script').forEach(function(node) {
       node.remove();
+    });
+    doc.querySelectorAll('img[src], video[poster]').forEach(function(node) {
+      var attribute = node.tagName.toLowerCase() === 'video' ? 'poster' : 'src';
+      var uploaded = uploadedImagePreview(node.getAttribute(attribute));
+      if (!uploaded) return;
+      node.setAttribute(attribute, uploaded);
+      // A published srcset must not override the newly uploaded image.
+      node.removeAttribute('srcset');
+      var picture = node.closest('picture');
+      if (picture) picture.querySelectorAll('source').forEach(function(source) { source.remove(); });
     });
     doc.querySelectorAll('link[href]').forEach(function(node) {
       var href = String(node.getAttribute('href') || '').trim().toLowerCase();
@@ -8409,6 +8462,9 @@
     actions.appendChild(publish);
     actions.appendChild(cancel);
     header.appendChild(actions);
+    var publishStatus = createElement('div', 'admin-store-products__publish-status');
+    publishStatus.dataset.storeProductPublishStatus = 'true';
+    header.appendChild(publishStatus);
     form.appendChild(header);
     var fields = createElement('div', 'admin-store-products__editor-fields');
     var fulfillmentValue = product.fulfillmentType || 'physical';
@@ -9028,6 +9084,7 @@
   function storeProductEditorHasUnsavedChanges(form) {
     if (!form) return false;
     if (storeProductIsCreateForm(form)) return true;
+    if (storeProductsWithPendingMedia.has(form.dataset.storeProductEditor) || form.dataset.storeProductRetryPublish === 'true') return true;
     return storeProductEditorSnapshot(form) !== String(form.dataset.storeProductSavedSnapshot || '');
   }
 
@@ -9035,13 +9092,16 @@
     if (!form) return;
     var publish = $('[data-store-product-publish]', form);
     var dirty = storeProductEditorHasUnsavedChanges(form);
+    var publishing = form.getAttribute('aria-busy') === 'true';
     var label = storeProductPublishActionLabel(form);
     var hint = $('[data-store-product-save-hint]', form);
     form.dataset.storeProductActionLabel = label;
-    setDirtyButtonState(publish, dirty, label, label);
+    setDirtyButtonState(publish, dirty, label, label, {
+      forceDisabled: activeStoreMediaUploads > 0 || publishing
+    });
     if (hint) {
-      hint.textContent = dirty ? storeProductUnsavedHint(form) : '';
-      hint.hidden = !dirty;
+      hint.textContent = dirty && !publishing ? storeProductUnsavedHint(form) : '';
+      hint.hidden = !dirty || publishing;
     }
   }
 
@@ -9115,13 +9175,19 @@
     var fallbackStartedAt = Number(opts.startedAt || Date.now());
     var elapsedMs = Number(deployment && deployment.elapsedMs || 0) || Math.max(0, Date.now() - fallbackStartedAt);
     var elapsed = formatStoreProductDeploymentDuration(elapsedMs);
+    var phases = deployment && deployment.phases;
+    var mediaReady = phases && phases.media && phases.media.status === 'completed' && ['success', 'skipped'].indexOf(phases.media.conclusion) >= 0;
+    var preparingMedia = phases && !mediaReady;
     var message = failed
       ? localizedAdminText(opts.progressUnavailable
         ? 'deploymentProgressUnavailable'
         : storeProductDeploymentOperationKey(operation, 'Failed'))
       : localizedAdminText(storeProductDeploymentMessageKey(deployment, operation), { elapsed: elapsed });
     if (opts.local) message = localizedAdminText(failed ? 'localCatalogFailed' : 'localCatalogUpdating');
+    else if (preparingMedia && !opts.progressUnavailable) message = localizedAdminText(failed ? 'deploymentMediaFailed' : 'deploymentMediaRunning', { elapsed: elapsed });
+    else if (phases && !failed && phases.build && phases.build.status !== 'completed') message = localizedAdminText('deploymentBuildRunning', { elapsed: elapsed });
     var nextState = failed ? 'failed' : String(deployment && (deployment.status || deployment.state) || 'requested');
+    nextState += preparingMedia ? ':media' : phases && phases.build && phases.build.status !== 'completed' ? ':build' : '';
     var stateChanged = status.dataset.storeDeploymentState !== nextState;
 
     clear(status);
@@ -9132,14 +9198,24 @@
     status.dataset.storeDeploymentState = nextState;
 
     var content = createElement('div', 'admin-store-products__deployment admin-dashboard__status-message');
-    content.appendChild(createElement('p', 'admin-store-products__deployment-message', message));
+    var summary = createElement('div', 'admin-store-products__deployment-summary');
+    var messageElement = createElement('p', 'admin-store-products__deployment-message', message);
+    var elapsedStart = !failed && !opts.local ? message.indexOf(elapsed) : -1;
+    if (elapsedStart >= 0) {
+      messageElement.textContent = message.slice(0, elapsedStart);
+      var duration = createElement('time', '', message.slice(elapsedStart));
+      duration.dateTime = 'PT' + Math.floor(elapsedMs / 1000) + 'S';
+      messageElement.appendChild(duration);
+    }
+    summary.appendChild(messageElement);
 
     if (!failed) {
       var progress = createElement('progress', 'admin-store-products__deployment-progress');
       progress.max = 1;
-      progress.setAttribute('aria-label', localizedAdminText(opts.local ? 'localCatalogUpdating' : 'deploymentDeploying'));
-      content.appendChild(progress);
+      progress.setAttribute('aria-label', localizedAdminText(opts.local ? 'localCatalogUpdating' : preparingMedia ? 'deploymentMedia' : 'deploymentDeploying'));
+      summary.appendChild(progress);
     }
+    content.appendChild(summary);
 
     if (opts.local) {
       status.appendChild(content);
@@ -9147,14 +9223,20 @@
     }
 
     var steps = createElement('ol', 'admin-store-products__deployment-steps');
-    [
-      [localizedAdminText('deploymentSaved'), 'complete'],
-      [localizedAdminText('deploymentDeploying'), failed ? 'failed' : 'current'],
+    var phaseSteps = [[localizedAdminText('deploymentSaved'), 'complete']];
+    if (phases) phaseSteps.push([localizedAdminText('deploymentMedia'), mediaReady ? 'complete' : failed ? 'failed' : 'current']);
+    phaseSteps.concat([
+      [localizedAdminText('deploymentDeploying'), preparingMedia ? 'pending' : failed ? 'failed' : 'current'],
       [localizedAdminText('deploymentDeployed'), failed ? 'blocked' : 'pending']
-    ].forEach(function(step) {
+    ]).forEach(function(step) {
       var marker = step[1] === 'complete' ? '✓ ' : step[1] === 'current' ? '● ' : step[1] === 'pending' ? '○ ' : '× ';
-      var item = createElement('li', 'admin-store-products__deployment-step', marker + step[0]);
+      var item = createElement('li', 'admin-store-products__deployment-step');
+      var icon = createElement('span', '', marker);
+      icon.setAttribute('aria-hidden', 'true');
+      item.appendChild(icon);
+      item.appendChild(document.createTextNode(step[0]));
       item.dataset.state = step[1];
+      if (step[1] === 'current') item.setAttribute('aria-current', 'step');
       steps.appendChild(item);
     });
     content.appendChild(steps);
@@ -9209,7 +9291,10 @@
     var cancel = form ? $('[data-store-product-cancel]', form) : null;
     var refresh = $('#admin-store-products-refresh');
 
-    if (form) form.setAttribute('aria-busy', 'true');
+    if (form) {
+      form.setAttribute('aria-busy', 'true');
+      updateStoreProductEditorDirtyState(form);
+    }
     if (cancel) cancel.disabled = true;
     if (refresh) refresh.disabled = true;
 
@@ -9235,6 +9320,10 @@
           startedAt: startedAt
         });
         releaseBusyState();
+        if (form) {
+          form.dataset.storeProductRetryPublish = 'true';
+          updateStoreProductEditorDirtyState(form);
+        }
         reject(error);
       }
 
@@ -9613,7 +9702,9 @@
       var form = event.target.closest('[data-store-product-editor]');
       if (!form) return;
       event.preventDefault();
+      if (activeStoreMediaUploads > 0 || form.getAttribute('aria-busy') === 'true') return;
       var body = readStoreProductEditor(form);
+      if (storeProductsWithPendingMedia.has(body.productId) || form.dataset.storeProductRetryPublish === 'true') body.prepareMedia = true;
       if (!storeProductEditorHasUnsavedChanges(form)) {
         updateStoreProductEditorDirtyState(form);
         setStatus($('#admin-store-products-status'), 'No product changes to publish.');
@@ -9642,6 +9733,7 @@
           operation: deploymentOperation,
           form: form
         }).then(function(deployment) {
+          storeProductsWithPendingMedia.delete(body.productId);
           return refreshStoreProductsAfterDeployment(deployment, {
             closeEditor: true,
             operation: deploymentOperation,
@@ -9649,7 +9741,11 @@
           });
         });
       }).catch(function(error) {
-        if (error && error.deploymentSaved) return;
+        if (error && error.deploymentSaved) {
+          form.dataset.storeProductRetryPublish = 'true';
+          updateStoreProductEditorDirtyState(form);
+          return;
+        }
         updateStoreProductEditorDirtyState(form);
         setStatus($('#admin-store-products-status'), formatError(error), true);
       });
