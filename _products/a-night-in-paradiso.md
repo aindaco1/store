@@ -2,7 +2,7 @@
 identifier: a-night-in-paradiso
 sku: a-night-in-paradiso
 name: "A Night in Paradiso"
-description: "A Night in Paradiso, an October 24, 2026 live benefit at FUSION in Albuquerque supporting the short film Paradiso."
+description: "A Night in Paradiso, an October 24, 2026 live benefit at FUSION in Albuquerque supporting the film Paradiso."
 price: 20
 image: "/assets/images/products/product-a-night-in-paradiso-20260907-020545.png"
 image_alt: "Retro orange, red, and avocado green A Night in Paradiso poster."
