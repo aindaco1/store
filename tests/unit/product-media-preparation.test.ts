@@ -23,7 +23,8 @@ beforeEach(() => {
 const args = process.argv.slice(2);
 if (args.includes('--version') || args.includes('-version') || args.includes('-h')) process.exit(0);
 if (process.argv[1].endsWith('ffprobe')) {
-  console.log(args.includes('csv=s=x:p=0') ? '800x1000' : JSON.stringify({streams:[{codec_type:'video',width:800,height:1000}],format:{duration:1}}));
+  const width = Number(process.env.STORE_TEST_WIDTH || 800);
+  console.log(args.includes('csv=s=x:p=0') ? width+'x1000' : JSON.stringify({streams:[{codec_type:'video',width,height:1000}],format:{duration:1}}));
 } else {
   if (process.env.STORE_TEST_FAIL_ENCODING === '1') process.exit(23);
   const video = process.argv[1].endsWith('ffmpeg');
@@ -66,6 +67,22 @@ describe('product media preparation gate', () => {
     expect(readFileSync(path.join(root, source))).toEqual(Buffer.alloc(1024, 'A'));
     writeFileSync(path.join(root, '_products/poster.md'), 'image: /assets/images/products/missing.png\n');
     expect(() => run(['--write', '--publish'])).toThrow();
+  });
+
+  it('removes obsolete responsive widths when a replacement shrinks, even after a manifest-only refresh', () => {
+    run(['--write', '--publish']);
+    const oldPaths = manifest().assets[0].derivatives.map((item: any) => item.path);
+    writeFileSync(path.join(root, source), Buffer.alloc(1024, 'B'));
+    writeFileSync(path.join(root, '_products/poster.md'), `image: /${source}\n<img src="/${oldPaths[0]}">\n`);
+    const smaller = { STORE_TEST_WIDTH: '200' };
+    run(['--write', '--manifest-only'], smaller);
+    expect(manifest().assets[0].staleDerivatives).toEqual(oldPaths);
+    expect(() => run(['--publish-check'], smaller)).toThrow();
+    run(['--write', '--publish'], smaller);
+    expect(manifest().assets[0].derivatives).toEqual([]);
+    for (const file of oldPaths) expect(() => readFileSync(path.join(root, file))).toThrow();
+    expect(readFileSync(path.join(root, '_products/poster.md'), 'utf8')).not.toContain('.webp');
+    expect(run(['--publish-check'], smaller)).toContain('ready for deployment');
   });
 
   it('prepares video and restores its source reference if a replacement derivative would be larger', () => {
