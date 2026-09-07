@@ -20,8 +20,6 @@ variant_option_name: Sponsorship Tier
 long_content:
   - type: "text"
     body: |
-      ## A Night in Paradiso
-      
       Presented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).
       
       This one-of-a-kind immersive live theatre experience is a **retro-1970s-inspired variety broadcast** featuring local Albuquerque talent, a Bob Barker-inspired host, handmade commercial breaks, and even more spooky surprises to come!
@@ -36,8 +34,6 @@ event_details:
     enabled: true
     enabled_at: "2026-09-03T20:42:19.881Z"
 ---
-## A Night in Paradiso
-
 Presented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).
 
 This one-of-a-kind immersive live theatre experience is a **retro-1970s-inspired variety broadcast** featuring local Albuquerque talent, a Bob Barker-inspired host, handmade commercial breaks, and even more spooky surprises to come!
