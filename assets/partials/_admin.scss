@@ -2554,8 +2554,9 @@ textarea.admin-settings__input--readonly {
   margin-bottom: 4px;
 }
 
-// The results scroller would otherwise trap the editor's sticky action header.
-.admin-store-products__results:has(.admin-store-products__editor) {
+// Both the results scroller and the mobile table can trap the sticky header.
+.admin-store-products__results:has(.admin-store-products__editor),
+.admin-store-products__table:has(.admin-store-products__editor) {
   overflow: visible;
 }
 

@@ -3547,7 +3547,16 @@ test.describe('Admin Dashboard', () => {
       await editor.locator('[data-store-product-field="name"]').evaluate(node => {
         window.scrollBy(0, node.getBoundingClientRect().top + 100);
       });
-      await expect(header).toBeInViewport({ ratio: 1 });
+      const scrollContainers = await header.evaluate(node => {
+        const ancestors = [];
+        for (let current: HTMLElement | null = node as HTMLElement; current; current = current.parentElement) {
+          const style = getComputedStyle(current);
+          ancestors.push({ tag: current.tagName, class: current.className, overflow: style.overflow,
+            display: style.display, position: style.position, top: current.getBoundingClientRect().top });
+        }
+        return ancestors;
+      });
+      await expect(header, JSON.stringify(scrollContainers)).toBeInViewport({ ratio: 1 });
       expect((await header.boundingBox())!.y).toBeLessThanOrEqual(1);
       await page.screenshot({ path: testInfo.outputPath(`media-publishing-${width}.png`) });
       await expectNoAxeViolations(page, '[data-store-product-publish-status]');
