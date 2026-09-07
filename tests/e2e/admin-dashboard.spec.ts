@@ -703,7 +703,8 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
         success: true,
         deployment: {
           ...completedDeployment,
-          conclusion: calls.storeDeploymentConclusion
+          conclusion: calls.storeDeploymentConclusion,
+          ...(calls.storeDeploymentOverride || {})
         }
       });
     }
@@ -3493,6 +3494,96 @@ test.describe('Admin Dashboard', () => {
       await expect.poll(() => calls.storeProducts.length).toBe(2);
       expect(calls.storeProductEvents.slice(-3)).toEqual(['publish', 'deployment', 'products']);
     });
+  });
+
+  for (const width of [1440, 390]) {
+    test(`previews unpublished images and keeps media publishing beside the action at ${width}px`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const calls = await routeAdminWorker(page);
+      calls.storeDeploymentOverride = {
+        status: 'in_progress', conclusion: null,
+        phases: {
+          media: { status: 'in_progress', conclusion: null },
+          build: { status: 'requested', conclusion: null },
+          deploy: { status: 'requested', conclusion: null }
+        }
+      };
+      // This repository path is deliberately unavailable on the public storefront.
+      await page.route('**/assets/images/products/product-fronteras-poster-big-e2e.png', route => route.fulfill({ status: 404, body: '' }));
+      await gotoDomReady(page, '/admin/?admin_login=unpublished-media');
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await selectAdminSection(page, 'Products');
+      await page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' })
+        .getByRole('button', { name: 'Edit', exact: true }).click();
+      const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+      await editor.locator('[data-store-product-image-upload]').setInputFiles({
+        name: 'poster.png', mimeType: 'image/png', buffer: fs.readFileSync('assets/images/fronteras-poster.png')
+      });
+      const imagePath = '/assets/images/products/product-fronteras-poster-big-e2e.png';
+      await expect(editor.locator('[data-store-product-field="image"]')).toHaveValue(imagePath);
+      const fieldImage = editor.locator('.admin-store-products__image-preview img');
+      const previewImage = editor.frameLocator('[data-store-product-preview-frame]').locator('img');
+      for (const image of [fieldImage, previewImage]) {
+        await expect(image).toHaveAttribute('src', /^data:image\/png;base64,/);
+        await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
+      }
+      expect(calls.storeProductPreviews.at(-1).fields.image).toBe(imagePath);
+      const publish = editor.getByRole('button', { name: 'Publish changes', exact: true });
+      await publish.click();
+      await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
+      expect(calls.storeProductPublishes[0]).toMatchObject({ prepareMedia: true, fields: { image: imagePath } });
+      expect(JSON.stringify(calls.storeProductPublishes[0])).not.toContain('data:image');
+      const status = editor.locator('[data-store-product-publish-status] #admin-store-products-status');
+      await expect(status).toContainText('Preparing media');
+      await expect(status.locator('.admin-store-products__deployment-step')).toHaveText([
+        '✓ Saved', '● Media', '○ Deploying', '○ Deployed'
+      ]);
+      await expect(publish).toBeDisabled();
+      expect(calls.storeProducts).toHaveLength(1);
+      await expect(status.getByRole('link', { name: 'Open GitHub run' })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      const header = editor.locator('.admin-store-products__editor-header');
+      expect((await header.boundingBox())!.height).toBeLessThan(width < 500 ? 230 : 150);
+      await editor.locator('[data-store-product-field="name"]').scrollIntoViewIfNeeded();
+      expect((await header.boundingBox())!.y).toBeGreaterThanOrEqual(0);
+      await page.screenshot({ path: testInfo.outputPath(`media-publishing-${width}.png`) });
+      await expectNoAxeViolations(page, '[data-store-product-publish-status]');
+      calls.storeDeploymentOverride.phases.media = { status: 'completed', conclusion: 'success' };
+      calls.storeDeploymentOverride.phases.build = { status: 'in_progress', conclusion: null };
+      await expect(status).toContainText('Building storefront', { timeout: 10000 });
+      expect(calls.storeProducts).toHaveLength(1);
+      calls.storeDeploymentOverride = {};
+      await expect.poll(() => calls.storeProducts.length, { timeout: 10000 }).toBe(2);
+      await expect(editor).toHaveCount(0);
+    });
+  }
+
+  test('allows publishing to retry failed media preparation without reuploading', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    calls.storeDeploymentOverride = {
+      status: 'completed', conclusion: 'failure',
+      phases: {
+        media: { status: 'completed', conclusion: 'failure' },
+        build: { status: 'completed', conclusion: 'skipped' },
+        deploy: { status: 'completed', conclusion: 'skipped' }
+      }
+    };
+    await gotoDomReady(page, '/admin/?admin_login=media-retry');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Products');
+    await page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' })
+      .getByRole('button', { name: 'Edit', exact: true }).click();
+    const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+    await editor.locator('[data-store-product-field="name"]').fill('Updated poster');
+    const publish = editor.getByRole('button', { name: 'Publish changes', exact: true });
+    await publish.click();
+    await expect(editor.locator('#admin-store-products-status')).toContainText('Media preparation failed. The current storefront is unchanged.');
+    await expect(publish).toBeEnabled();
+    expect(calls.storeProducts).toHaveLength(1);
+    calls.storeDeploymentOverride = {};
+    await publish.click();
+    await expect.poll(() => calls.storeProducts.length).toBe(2);
+    expect(calls.storeProductPublishes[1].prepareMedia).toBe(true);
   });
 
   test('waits for the saved local catalog before refreshing and reopening a product', async ({ page }) => {

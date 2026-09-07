@@ -2554,6 +2554,11 @@ textarea.admin-settings__input--readonly {
   margin-bottom: 4px;
 }
 
+// The results scroller would otherwise trap the editor's sticky action header.
+.admin-store-products__results:has(.admin-store-products__editor) {
+  overflow: visible;
+}
+
 .admin-store-products__editor-header {
   align-items: center;
   background: $surface--base;
@@ -2573,6 +2578,65 @@ textarea.admin-settings__input--readonly {
   font-weight: 700;
   line-height: 1.1;
   margin: 0;
+}
+
+.admin-store-products__publish-status {
+  flex: 1 1 100%;
+  min-width: 0;
+
+  &:has(.admin-dashboard__status:empty) { display: none; }
+
+  .admin-dashboard__status,
+  .admin-dashboard__status[data-admin-prominent-status="true"] {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.admin-store-products__deployment {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.admin-store-products__deployment-message {
+  margin: 0;
+}
+
+.admin-store-products__deployment-progress {
+  height: 5px;
+  width: 64px;
+  accent-color: $color--primary;
+}
+
+.admin-store-products__deployment-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-store-products__deployment-step {
+  color: $color--secondary;
+  margin: 0;
+
+  &[data-state="current"] { color: $color--primary; font-weight: 700; }
+}
+
+.admin-store-products__publish-status .admin-dashboard__status-action {
+  font-size: inherit;
+  margin: 0;
+  min-height: 24px;
+  width: auto;
 }
 
 .admin-store-products__preview-title,
@@ -4753,7 +4817,7 @@ textarea.admin-settings__input--readonly {
     border: 1px solid $border--default;
     border-radius: $radius--sm;
     display: block;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .admin-store-products__table tr.admin-store-products__editor-row > td {

@@ -318,3 +318,13 @@ Use the [checkout and fulfillment](MERGE_SMOKE_CHECKLIST.md#checkout-and-fulfill
 ## Production Checklist
 
 Production configuration and deployed behavior checks live in the [merge smoke checklist](MERGE_SMOKE_CHECKLIST.md#production-checklist). Test execution and provider evidence procedures remain above; deployment and rollback steps live in [Workflows](WORKFLOWS.md#deployment-workflow).
+
+### Product media publishing regressions
+
+```bash
+npx vitest run tests/unit/product-media-preparation.test.ts tests/unit/commit-publish-media.test.ts tests/unit/github-retry.test.ts tests/unit/workflow-security.test.ts
+npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium
+node scripts/optimize-media.mjs --publish-check
+```
+
+The preparation fixtures cover source preservation, same-path replacements, stale manifest provenance, failed encoders, broken references, larger-output skips, and concurrent repository edits. Browser fixtures deliberately return 404 for uploaded public URLs and verify both preview surfaces, compact mobile/desktop progress, and retry without reuploading. These checks do not perform a production deployment. Local repository mode continues to report local catalog regeneration separately from GitHub media/deployment jobs.

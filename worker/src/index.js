@@ -326,12 +326,12 @@ async function putAdminRepoBase64File(env, filePath, base64Content, message, sha
   return putGitHubBase64File(env, filePath, base64Content, message, sha);
 }
 
-async function triggerAdminRepoRebuild(env, reason = 'manual') {
+async function triggerAdminRepoRebuild(env, reason = 'manual', commitSha = '') {
   if (isLocalAdminRepoWritesEnabled(env)) {
     const result = await callLocalAdminRepoService(env, '/rebuild');
     return { ...result, triggered: result.ok === true, mode: 'local' };
   }
-  return triggerSiteRebuild(env, reason);
+  return triggerSiteRebuild(env, reason, { commitSha });
 }
 
 async function triggerAdminMediaOptimization(env, options = {}) {
@@ -347,7 +347,7 @@ function adminRepoDeployNotice(env, githubNotice, localNotice) {
 
 function adminRepoDeployment(env, rebuild = {}, commitSha = '') {
   if (isLocalAdminRepoWritesEnabled(env) || rebuild?.triggered !== true) return null;
-  const normalizedCommitSha = String(commitSha || '').trim().toLowerCase();
+  const normalizedCommitSha = String(commitSha || rebuild.commitSha || '').trim().toLowerCase();
   if (!/^[a-f0-9]{40}$/u.test(normalizedCommitSha)) return null;
   return {
     state: 'requested',
@@ -11516,7 +11516,9 @@ async function handleAdminStoreProductPublish(request, env) {
   });
   if (!auth.ok) return auth.response;
 
-  const normalized = normalizeAdminStoreProductPublishBody(parsedBody.body || {}, env);
+  const normalized = normalizeAdminStoreProductPublishBody(parsedBody.body || {}, env, {
+    requireChanges: parsedBody.body?.prepareMedia !== true
+  });
   if (!normalized.ok) {
     return privateJsonResponse({
       success: false,
@@ -11543,7 +11545,8 @@ async function handleAdminStoreProductPublish(request, env) {
     return privateJsonResponse({ error: nextMarkdown.error }, 422, env);
   }
 
-  if (!normalized.createProduct && nextMarkdown.content === existing.content) {
+  const contentChanged = normalized.createProduct || nextMarkdown.content !== existing.content;
+  if (!contentChanged && parsedBody.body?.prepareMedia !== true) {
     return privateJsonResponse({
       success: true,
       published: false,
@@ -11558,9 +11561,9 @@ async function handleAdminStoreProductPublish(request, env) {
 
   const commitMessage = String(parsedBody.body?.message || '').trim()
     || `${normalized.createProduct ? 'Create' : 'Update'} Store product ${normalized.product.id}`;
-  const committed = await putAdminRepoTextFile(env, normalized.sourcePath, nextMarkdown.content, commitMessage, existing?.sha, {
+  const committed = contentChanged ? await putAdminRepoTextFile(env, normalized.sourcePath, nextMarkdown.content, commitMessage, existing?.sha, {
     overwrite: !normalized.createProduct
-  });
+  }) : { ok: true, commitSha: '', commitUrl: '' };
   if (!committed.ok) {
     return privateJsonResponse({
       error: committed.error || 'Unable to publish Store product',
@@ -11568,7 +11571,7 @@ async function handleAdminStoreProductPublish(request, env) {
     }, committed.status || 502, env);
   }
 
-  const rebuild = await triggerAdminRepoRebuild(env, `${normalized.createProduct ? 'admin-store-product-create' : 'admin-store-product-publish'}:${normalized.product.id}`);
+  const rebuild = await triggerAdminRepoRebuild(env, `${normalized.createProduct ? 'admin-store-product-create' : 'admin-store-product-publish'}:${normalized.product.id}`, committed.commitSha);
   const auditKey = await recordAdminAuditEvent(env, {
     action: normalized.createProduct ? 'store_product:create' : 'store_product:publish',
     adminEmail: auth.user.email,
@@ -11704,7 +11707,7 @@ async function handleAdminStoreProductBulkPublish(request, env) {
   }
 
   const rebuild = committedProducts.length > 0
-    ? await triggerAdminRepoRebuild(env, `admin-store-products-bulk-publish:${committedProducts.length}`)
+    ? await triggerAdminRepoRebuild(env, `admin-store-products-bulk-publish:${committedProducts.length}`, committedProducts[0]?.commitSha)
     : { triggered: false, reason: 'No changes' };
   const auditKey = committedProducts.length > 0
     ? await recordAdminAuditEvent(env, {
@@ -11842,7 +11845,7 @@ async function handleAdminStoreProductOrderPublish(request, env) {
   }
 
   const rebuild = committedProducts.length > 0
-    ? await triggerAdminRepoRebuild(env, `admin-store-products-order:${committedProducts.length}`)
+    ? await triggerAdminRepoRebuild(env, `admin-store-products-order:${committedProducts.length}`, committedProducts[0]?.commitSha)
     : { triggered: false, reason: 'No changes' };
   const auditKey = committedProducts.length > 0
     ? await recordAdminAuditEvent(env, {
@@ -18834,7 +18837,9 @@ async function handleAdminMediaUpload(request, env, options = {}) {
     }, uploaded.status || 502, env);
   }
 
-  const mediaOptimization = shouldTriggerAdminMediaOptimization(normalized.filePath, normalized.contentType)
+  const mediaOptimization = uploadScope.scope === 'store'
+    ? { triggered: false, state: 'pending_publish', reason: 'Product publishing prepares media before deployment.' }
+    : shouldTriggerAdminMediaOptimization(normalized.filePath, normalized.contentType)
     ? await triggerAdminMediaOptimization(env, { scope: 'changed' })
     : { triggered: false, reason: 'Media optimization is not configured for this upload type.' };
 

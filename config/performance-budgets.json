@@ -13,7 +13,7 @@
       "shared/dust-wave-platform/packages/site-shell/src/form-control-identity-browser.js": 5000,
       "shared/dust-wave-platform/packages/site-shell/src/shipping-option-utils-browser.js": 6000,
       "assets/main.css": 100000,
-      "assets/admin.css": 115000
+      "assets/admin.css": 117000
     }
   },
   "lighthouse": {

@@ -184,3 +184,5 @@ npm run media:optimize
 ```
 
 Product images should live under `assets/images/products/` when uploaded from admin. Keep source assets in the repo; generated files should be deterministic and smaller than originals.
+
+The September 2026 product publishing controls allocate up to 117,000 bytes for minified `assets/admin.css` (previously 115,000). The measured publishing build is approximately 116 KB. The combined stylesheet budget remains 200,000 bytes; the progress controls introduce no public-page runtime or network dependency.

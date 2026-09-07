@@ -85,14 +85,22 @@ async function triggerGitHubWorkflow(env, {
   };
 }
 
-export async function triggerSiteRebuild(env, reason = 'manual') {
+export async function triggerSiteRebuild(env, reason = 'manual', { commitSha = '' } = {}) {
+  if (reason.startsWith('admin-store-product') && !GITHUB_COMMIT_SHA_PATTERN.test(commitSha)) {
+    const ref = encodeURIComponent(String(env.GITHUB_REF || 'main'));
+    const head = await requestGitHubWorkflowStatus(env, `/git/ref/heads/${ref}`);
+    if (!head.ok || !GITHUB_COMMIT_SHA_PATTERN.test(head.data?.object?.sha || '')) {
+      return { triggered: false, reason: 'Unable to resolve the saved product revision for publishing.' };
+    }
+    commitSha = head.data.object.sha;
+  }
   const result = await triggerGitHubWorkflow(env, {
     workflow: env.GITHUB_WORKFLOW || 'deploy.yml',
-    inputs: { reason },
+    inputs: { reason, ...(GITHUB_COMMIT_SHA_PATTERN.test(commitSha) ? { ref: commitSha } : {}) },
     successMessage: `Site rebuild triggered: ${reason}`
   });
   return result.triggered
-    ? { triggered: true, workflow: result.workflow, requestedAt: result.requestedAt }
+    ? { triggered: true, workflow: result.workflow, requestedAt: result.requestedAt, commitSha }
     : { triggered: false, workflow: result.workflow, requestedAt: result.requestedAt, reason: result.reason };
 }
 
@@ -164,6 +172,29 @@ function withWorkflowRequestTiming(run = {}, requestedAt = '', nowMs = Date.now(
   };
 }
 
+function workflowRunMatchesCommit(run, commitSha, workflow) {
+  if (run.path && run.path !== `.github/workflows/${workflow}`) return false;
+  const title = String(run.display_title || '');
+  // Workflow execution stays on the configured branch. The immutable input is
+  // recorded in the run title, even if that branch advanced before dispatch.
+  if (/^Deploy [a-f0-9]{40}$/.test(title)) return title === `Deploy ${commitSha}`;
+  return String(run.head_sha || '').toLowerCase() === commitSha;
+}
+
+async function withPublishingPhases(env, rawRun, requestedAt) {
+  const run = withWorkflowRequestTiming(normalizedWorkflowRun(rawRun), requestedAt);
+  if (!/^Deploy [a-f0-9]{40}$/.test(String(rawRun.display_title || ''))) return { ok: true, run };
+  const result = await requestGitHubWorkflowStatus(env, `/actions/runs/${run.runId}/jobs?filter=latest&per_page=100`);
+  if (!result.ok) return result;
+  const jobs = Array.isArray(result.data.jobs) ? result.data.jobs : [];
+  const phases = {};
+  for (const [phase, name] of [['media', 'prepare-media'], ['build', 'build'], ['deploy', 'deploy']]) {
+    const job = jobs.find((item) => item.name === name);
+    phases[phase] = { status: normalizedWorkflowStatus(job?.status), conclusion: normalizedWorkflowConclusion(job?.conclusion) };
+  }
+  return { ok: true, run: { ...run, phases } };
+}
+
 async function requestGitHubWorkflowStatus(env, path) {
   if (!env?.GITHUB_TOKEN) return notConfigured(env);
   const owner = String(env.GITHUB_OWNER || 'aindaco1').trim();
@@ -230,26 +261,24 @@ export async function getGitHubWorkflowRun(env, options = {}) {
     return { ok: false, status: 400, code: 'github_invalid_commit', error: 'A full GitHub commit SHA is required.' };
   }
   const runId = Number(options.runId);
+  const workflow = String(options.workflow || env.GITHUB_WORKFLOW || 'deploy.yml').trim();
+  if (!GITHUB_WORKFLOW_FILE_PATTERN.test(workflow)) {
+    return { ok: false, status: 400, code: 'github_invalid_workflow', error: 'GitHub workflow file is invalid.' };
+  }
   let result;
   if (Number.isSafeInteger(runId) && runId > 0) {
     result = await requestGitHubWorkflowStatus(env, `/actions/runs/${runId}`);
     if (!result.ok) return result;
-    if (String(result.data?.head_sha || '').trim().toLowerCase() !== commitSha) {
+    if (!workflowRunMatchesCommit(result.data, commitSha, workflow)) {
       return { ok: false, status: 409, code: 'github_workflow_commit_mismatch', error: 'GitHub workflow run does not match the published commit.' };
     }
-    return { ok: true, run: withWorkflowRequestTiming(normalizedWorkflowRun(result.data), options.requestedAt) };
-  }
-
-  const workflow = String(options.workflow || env.GITHUB_WORKFLOW || 'deploy.yml').trim();
-  if (!GITHUB_WORKFLOW_FILE_PATTERN.test(workflow)) {
-    return { ok: false, status: 400, code: 'github_invalid_workflow', error: 'GitHub workflow file is invalid.' };
+    return withPublishingPhases(env, result.data, options.requestedAt);
   }
 
   const query = new URLSearchParams({
     event: 'workflow_dispatch',
     exclude_pull_requests: 'true',
-    head_sha: commitSha,
-    per_page: '10'
+    per_page: '20'
   });
   result = await requestGitHubWorkflowStatus(
     env,
@@ -262,16 +291,15 @@ export async function getGitHubWorkflowRun(env, options = {}) {
   const earliestCreatedAt = Number.isFinite(requestedAtMs) ? requestedAtMs - 10_000 : 0;
   const runs = Array.isArray(result.data?.workflow_runs) ? result.data.workflow_runs : [];
   const match = runs.find((run) => {
-    if (String(run?.head_sha || '').trim().toLowerCase() !== commitSha) return false;
+    if (!workflowRunMatchesCommit(run, commitSha, workflow)) return false;
     const createdAtMs = Date.parse(String(run?.created_at || ''));
     return !earliestCreatedAt || (Number.isFinite(createdAtMs) && createdAtMs >= earliestCreatedAt);
   });
 
+  if (match) return withPublishingPhases(env, match, requestedAt);
   return {
     ok: true,
-    run: match
-      ? withWorkflowRequestTiming(normalizedWorkflowRun(match), requestedAt)
-      : withWorkflowRequestTiming({
+    run: withWorkflowRequestTiming({
         found: false,
         runId: null,
         status: 'requested',

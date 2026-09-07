@@ -227,14 +227,20 @@ The checkout path consults the reservation-aware coordinator before committing s
 
 4. Worker validates the requested fields, targets, variants, or product order.
 5. Worker patches the matching `_products/*.md` file or files through GitHub.
-6. Worker records an audit event and triggers the normal deploy path. The
-   repository change is committed at this point, but the prior public catalog
-   can remain visible until deployment and cache propagation finish.
+6. Worker records an audit event and dispatches **Deploy Production** with the
+   full saved commit SHA. Its `prepare-media` job uses the existing optimizer to
+   prepare new, changed, missing, or stale media referenced by `_products/`.
+   Uploaded source bytes are preserved. The job commits derivatives, product
+   video-reference updates, and rebuildable manifest metadata automatically,
+   then passes the resulting immutable SHA to both build and deploy jobs.
+   The prior public catalog remains unchanged if media preparation fails.
 7. The dashboard queries the authenticated, private/no-store deployment-status
-   route for the workflow run matching that full commit SHA. One shared
-   operation-aware controller reports requested, queued, running, failed, or
-   completed state with context-specific copy and measures from the dispatch
-   request to the workflow's completion timestamp.
+   route for the run whose `Deploy <commit SHA>` title identifies that saved
+   input, even if the branch advances before dispatch. The shared controller
+   reports **Saved → Media → Deploying → Deployed**, including media/build job
+   state and elapsed time. In an open editor this status sits in the sticky
+   publish header. Failed preparation can be retried through the same publish
+   action, including when product text is unchanged.
 8. Only a successful matching run triggers the product-list refresh. At that
    point Active is public and inventory-aware; Draft and Archived are omitted
    from public listings and unavailable to checkout; and Sold out stays public
@@ -252,8 +258,12 @@ The checkout path consults the reservation-aware coordinator before committing s
    assets/images/products/
    ```
 
-3. Worker dispatches repository media optimization.
-4. Admin publishes the product to persist the selected image path.
+3. The dashboard retains uploaded image bytes in memory for the image field,
+   media browser, and sandboxed product preview. Form data still contains only
+   canonical repository paths; the preview cache ends on reload or sign-out.
+4. Admin publishes the product to persist the selected image path and prepare
+   its media before deployment. Uploads alone do not launch competing optimizer
+   PRs. Replacing media at the same path also enables publishing.
 
 ### Download Library
 
@@ -343,7 +353,11 @@ npm run media:manifest
 npm run media:optimize:check
 ```
 
-Admin uploads dispatch **Optimize dashboard media** with `scope=changed`; a reviewed super-admin repair may use `scope=all`. The workflow operates in Git and produces reviewable media changes. The Worker does not transcode files or maintain a media database.
+Product publication runs `node scripts/optimize-media.mjs --write --publish` before building or deploying. It checks all product references because the deployment publishes the full catalog; unattached uploads are not encoded. Source and derivative hashes detect replacements even at the same path or timestamp. A manifest-only rebuild cannot certify stale derivatives. Intentionally skipped larger output remains valid, and video references fall back to the source when its replacement WebM would be larger.
+
+`scripts/commit-publish-media.mjs` verifies the original checkout and current publishing-branch SHA, allows only product/media/manifest changes, and performs a normal fast-forward push. A concurrent edit or branch policy rejection stops the run; it never forces a push or bypasses branch protection. Refresh and publish again after resolving the conflict. Forks that require PR-only changes must arrange an allowed publishing identity/policy before enabling automatic media incorporation.
+
+Every build, including a manual release, runs the read-only `node scripts/optimize-media.mjs --publish-check` gate. Manual release refs must already contain prepared media. Settings uploads and explicit repair still dispatch **Optimize dashboard media** with `scope=changed`; reviewed super-admin repair may use `scope=all`. That workflow creates a reviewable PR and no longer runs on every asset push. The Worker does not transcode files or maintain a media database.
 
 The repository must enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. Keep the default workflow token permissions read-only; the media workflow already declares its required `contents: write` and `pull-requests: write` permissions. The repository setting permits PR creation; it does not add an approval, merge, or deployment step to this workflow.
 
@@ -361,7 +375,7 @@ With `PAYMENT_RECONCILIATION_ENABLED=true`, scheduled work advances a daily curs
 
 ## Deployment Workflow
 
-All external Actions are pinned to full commit SHAs and updated through reviewed Dependabot pull requests. Every workflow declares explicit token permissions. The build job is read-only; only the deploy job receives Pages write and OIDC access, and only the media optimizer receives repository/pull-request write access for its bot branch and reviewable pull request.
+All external Actions are pinned to full commit SHAs and updated through reviewed Dependabot pull requests. Every workflow declares explicit token permissions. The build job is read-only; only the deploy job receives Pages write and OIDC access, and the product media preparation job receives contents write access for its bounded commit, and the standalone repair workflow receives repository/pull-request write access for its bot branch and reviewable pull request.
 
 Before a release or high-risk data/configuration change, start with metadata-only planning:
 
@@ -378,8 +392,9 @@ Use `npm run backup:snapshot` for an operator-owned snapshot outside the reposit
 2. Run release smoke and backup planning before tagging.
 3. Dispatch the **Deploy Production** workflow from the protected default branch
    with `ref` set to the reviewed immutable release tag or commit. The workflow
-   execution stays authorized by the `github-pages` environment while both
-   checkout jobs deploy only the supplied reviewed ref.
+   execution stays authorized by the `github-pages` environment while build and deploy
+   use only the supplied reviewed ref. Admin product publishes additionally
+   prepare media and use the resulting commit as described above.
 4. The workflow generates the catalog snapshot, builds Jekyll, minifies generated `_site` assets, deploys the Worker to Cloudflare, purges known Workers Cache entries when `WORKERS_CACHE_PURGE_SECRET` is configured, deploys the static site to GitHub Pages, optionally purges the Cloudflare zone cache, and verifies the path-scoped admin `no-transform`/`no-store` response policy without privileged credentials.
 5. The workflow audits deployed `robots.txt`, `sitemap.xml`, `sitemap.txt`, ordinary/Google Inspection responses, and every submitted public URL with bounded propagation retries.
 6. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.

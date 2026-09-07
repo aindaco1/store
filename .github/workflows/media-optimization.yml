@@ -11,19 +11,6 @@ on:
         options:
           - changed
           - all
-  push:
-    branches:
-      - main
-    paths:
-      - 'assets/images/**'
-      - 'assets/videos/**'
-      - 'assets/audio/**'
-      - '_data/media-optimization-manifest.json'
-      - '_products/**'
-      - '_config.yml'
-      - 'scripts/optimize-media.mjs'
-      - 'worker/src/media-catalog.js'
-      - '.github/workflows/media-optimization.yml'
 
 permissions:
   contents: write
