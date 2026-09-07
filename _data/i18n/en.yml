@@ -266,9 +266,9 @@ admin:
   deployment_order_requested: Product order saved. Waiting for the deployment to start - %{elapsed} elapsed.
   deployment_order_queued: Product order saved. Deployment queued - %{elapsed} elapsed.
   deployment_order_running: Product order saved. Updating the storefront - %{elapsed} elapsed.
-  deployment_product_requested: Product saved. Waiting for the deployment to start - %{elapsed} elapsed.
-  deployment_product_queued: Product saved. Deployment queued - %{elapsed} elapsed.
-  deployment_product_running: Product saved. Updating checkout and storefront - %{elapsed} elapsed.
+  deployment_product_requested: Waiting for deployment - %{elapsed} elapsed.
+  deployment_product_queued: Deployment queued - %{elapsed} elapsed.
+  deployment_product_running: Updating checkout and storefront - %{elapsed} elapsed.
   deployment_archive_complete: Archived and unavailable to shoppers. Deployment completed in %{elapsed}.
   deployment_active_complete: Active status deployed in %{elapsed}.
   deployment_draft_complete: Saved as draft. Deployment completed in %{elapsed}.
