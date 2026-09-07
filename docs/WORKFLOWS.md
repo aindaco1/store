@@ -345,6 +345,10 @@ npm run media:optimize:check
 
 Admin uploads dispatch **Optimize dashboard media** with `scope=changed`; a reviewed super-admin repair may use `scope=all`. The workflow operates in Git and produces reviewable media changes. The Worker does not transcode files or maintain a media database.
 
+The repository must enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests**. Keep the default workflow token permissions read-only; the media workflow already declares its required `contents: write` and `pull-requests: write` permissions. The repository setting permits PR creation; it does not add an approval, merge, or deployment step to this workflow.
+
+If **Optimize media** passes but **Open media optimization pull request** fails with `GitHub Actions is not permitted to create or approve pull requests`, check that repository setting. The generated commit may already be on `bot/media-optimization-<run-id>`. Review and recover that output through a PR. After correcting the setting, dispatch a new workflow run: re-running the old run reuses its branch name and can fail on a non-fast-forward push. `scope=changed` only processes media in the latest commit, so a later product-only commit will not regenerate derivatives from an earlier upload; recover those derivatives from the original bot branch or use the reviewed `scope=all` repair.
+
 ### Durable email workflow
 
 See [Email delivery](EMAIL.md#durable-delivery) for the local background-send path, production outbox policy, and dry-run configuration.
