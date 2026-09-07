@@ -6,6 +6,8 @@ This guide covers contributor setup and change preparation. Use the [documentati
 
 Run commands from the repository root. Initialize the recorded shared dependencies before installing or testing; clone with `--recurse-submodules` when possible. CI uses the recorded commits and never follows a moving submodule branch.
 
+The root `esbuild` and `smol-toml` versions must match the dependencies declared by the pinned Platform `build-core` and `release-core` packages. Review those upgrades in Platform first, then update Store's immutable Platform pin, manifests, lockfile, and pin tests together. A consumer-only Dependabot bump that fails this contract should be closed with the upstream prerequisite recorded; do not relax the contract or suppress future security updates. Other Action and dependency updates remain independently reviewable.
+
 Host flow:
 
 ```bash
