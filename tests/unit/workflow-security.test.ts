@@ -71,7 +71,8 @@ describe('workflow security posture', () => {
     expect(deploy).toContain('node ./scripts/optimize-media.mjs --write --publish');
     expect(deploy).toContain('node ./scripts/optimize-media.mjs --publish-check');
     expect(deploy).toContain('npx wrangler deploy -c wrangler.toml --env=""');
-    expect(deploy).toContain('actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5');
+    // The shared action-pin check enforces immutable refs; keep deployment placement here.
+    expect(deployJob).toMatch(/^\s+uses: actions\/deploy-pages@[0-9a-f]{40}(?:\s|$)/m);
     expect(deploy).toContain('group: "production-operations"');
     expect(workflowHeader).toContain('permissions:\n  contents: read');
     expect(workflowHeader).not.toContain('pages: write');
