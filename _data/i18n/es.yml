@@ -266,9 +266,9 @@ admin:
   deployment_order_requested: Orden de productos guardada. Esperando que inicie el despliegue - %{elapsed} transcurrido.
   deployment_order_queued: Orden de productos guardada. Despliegue en cola - %{elapsed} transcurrido.
   deployment_order_running: Orden de productos guardada. Actualizando la tienda - %{elapsed} transcurrido.
-  deployment_product_requested: Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.
-  deployment_product_queued: Producto guardado. Despliegue en cola - %{elapsed} transcurrido.
-  deployment_product_running: Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.
+  deployment_product_requested: Esperando el despliegue - %{elapsed} transcurrido.
+  deployment_product_queued: Despliegue en cola - %{elapsed} transcurrido.
+  deployment_product_running: Actualizando checkout y tienda - %{elapsed} transcurrido.
   deployment_archive_complete: Archivado y no disponible para compradores. El despliegue terminó en %{elapsed}.
   deployment_active_complete: Estado activo desplegado en %{elapsed}.
   deployment_draft_complete: Guardado como borrador. El despliegue terminó en %{elapsed}.

@@ -95,6 +95,8 @@ These cover public layout/accessibility, product-card and product-detail control
 
 Release-focused browser assertions include 200% text-scaling coverage for public checkout/order surfaces and Store admin Products, Orders, Downloads, and Marketing surfaces.
 
+Product publishing is checked at 320, 390, 768, 1024, and 1440 CSS pixels, plus Spanish and 200% text at tablet width. The shared browser fixture verifies matching status type sizes and line heights, single-line action labels at normal text size, 44px phone/tablet publishing controls, contained editor fields, unbroken elapsed durations, visible sticky status, upload previews, and phase transitions. Mobile coverage also exercises bulk publishing outside the editor.
+
 E2E navigation uses the shared `gotoDomReady` helper, then asserts the page-specific application state. Tests do not wait for every late asset before beginning interaction. Layout and text-scaling checks use a bounded font-readiness wait plus animation frames so an invalid or slow font cannot hang the suite; the visible layout/overflow assertions still determine pass or failure.
 
 ## Unit Coverage

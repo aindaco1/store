@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 import { gotoDomReady } from './helpers/navigation';
-import { applyTextScale } from './helpers/rendering';
+import { applyTextScale, waitForStableRendering } from './helpers/rendering';
 
 const WORKER_BASE = process.env.PLAYWRIGHT_WORKER_BASE_URL || 'http://127.0.0.1:8989';
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
@@ -3496,8 +3496,11 @@ test.describe('Admin Dashboard', () => {
     });
   });
 
-  for (const width of [1440, 390]) {
-    test(`previews unpublished images and keeps media publishing beside the action at ${width}px`, async ({ page }, testInfo) => {
+  for (const { width, lang = 'en', textScale = 100 } of [
+    { width: 1440 }, { width: 1024 }, { width: 768 }, { width: 390 }, { width: 320 },
+    { width: 768, lang: 'es' }, { width: 768, textScale: 200 }
+  ]) {
+    test(`previews unpublished images and keeps media publishing beside the action at ${width}px (${lang}, ${textScale}%)`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
       const calls = await routeAdminWorker(page);
       calls.storeDeploymentOverride = {
@@ -3510,9 +3513,10 @@ test.describe('Admin Dashboard', () => {
       };
       // This repository path is deliberately unavailable on the public storefront.
       await page.route('**/assets/images/products/product-fronteras-poster-big-e2e.png', route => route.fulfill({ status: 404, body: '' }));
-      await gotoDomReady(page, '/admin/?admin_login=unpublished-media');
+      await gotoDomReady(page, `${lang === 'es' ? '/es' : ''}/admin/?admin_login=unpublished-media`);
       await expect(page.locator('#admin-app')).toBeVisible();
-      await selectAdminSection(page, 'Products');
+      if (textScale !== 100) await applyTextScale(page, textScale);
+      await selectAdminSection(page, lang === 'es' ? 'Productos' : 'Products');
       await page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' })
         .getByRole('button', { name: 'Edit', exact: true }).click();
       const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
@@ -3534,16 +3538,46 @@ test.describe('Admin Dashboard', () => {
       expect(calls.storeProductPublishes[0]).toMatchObject({ prepareMedia: true, fields: { image: imagePath } });
       expect(JSON.stringify(calls.storeProductPublishes[0])).not.toContain('data:image');
       const status = editor.locator('[data-store-product-publish-status] #admin-store-products-status');
-      await expect(status).toContainText('Preparing media');
-      await expect(status.locator('.admin-store-products__deployment-step')).toHaveText([
+      await expect(status).toContainText(lang === 'es' ? 'Preparando medios' : 'Preparing media');
+      await expect(status.locator('.admin-store-products__deployment-step')).toHaveText(lang === 'es' ? [
+        '✓ Guardado', '● Medios', '○ Desplegando', '○ Desplegado'
+      ] : [
         '✓ Saved', '● Media', '○ Deploying', '○ Deployed'
       ]);
       await expect(publish).toBeDisabled();
       expect(calls.storeProducts).toHaveLength(1);
-      await expect(status.getByRole('link', { name: 'Open GitHub run' })).toBeVisible();
+      await expect(status.getByRole('link', { name: lang === 'es' ? 'Abrir ejecución de GitHub' : 'Open GitHub run' })).toBeVisible();
       await expectNoHorizontalOverflow(page);
       const header = editor.locator('.admin-store-products__editor-header');
-      expect((await header.boundingBox())!.height).toBeLessThan(width < 500 ? 230 : 150);
+      await waitForStableRendering(page);
+      const layout = await header.evaluate(node => {
+        const textMetrics = (element: Element) => {
+          const style = getComputedStyle(element);
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return { fontSize: style.fontSize, lineHeight: style.lineHeight,
+            height: element.getBoundingClientRect().height,
+            textLines: new Set(Array.from(range.getClientRects()).filter(rect => rect.width > 0).map(rect => Math.round(rect.y))).size };
+        };
+        return {
+          statusText: Array.from(node.querySelectorAll('.admin-store-products__deployment-message, .admin-store-products__deployment-step, .admin-dashboard__status-action')).map(textMetrics),
+          buttons: Array.from(node.querySelectorAll('.admin-store-products__editor-actions .btn')).map(textMetrics)
+        };
+      });
+      expect(new Set(layout.statusText.map(text => text.fontSize)).size).toBe(1);
+      expect(new Set(layout.statusText.map(text => text.lineHeight)).size).toBe(1);
+      if (textScale === 100) expect(layout.buttons.map(button => button.textLines)).toEqual([1, 1]);
+      if (width <= 1024) expect(layout.buttons.every(button => button.height >= 44)).toBe(true);
+      const overflowingControls = await editor.evaluate(form => {
+        const bounds = form.getBoundingClientRect();
+        return Array.from(form.querySelectorAll('input, select, textarea, button, iframe')).filter(node => {
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0 && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1);
+        }).map(node => node.getAttribute('name') || node.getAttribute('class'));
+      });
+      expect(overflowingControls).toEqual([]);
+      expect((await header.boundingBox())!.height).toBeLessThan(textScale > 100 ? 300 : width < 500 ? 230 : 150);
+      await editor.screenshot({ path: testInfo.outputPath(`product-editor-${width}.png`) });
       await editor.locator('[data-store-product-field="name"]').evaluate(node => {
         window.scrollBy(0, node.getBoundingClientRect().top + 100);
       });
@@ -3562,8 +3596,19 @@ test.describe('Admin Dashboard', () => {
       await expectNoAxeViolations(page, '[data-store-product-publish-status]');
       calls.storeDeploymentOverride.phases.media = { status: 'completed', conclusion: 'success' };
       calls.storeDeploymentOverride.phases.build = { status: 'in_progress', conclusion: null };
-      await expect(status).toContainText('Building storefront', { timeout: 10000 });
+      await expect(status).toContainText(lang === 'es' ? 'Generando la tienda' : 'Building storefront', { timeout: 10000 });
       expect(calls.storeProducts).toHaveLength(1);
+      calls.storeDeploymentOverride.phases.build = { status: 'completed', conclusion: 'success' };
+      calls.storeDeploymentOverride.phases.deploy = { status: 'in_progress', conclusion: null };
+      await expect(status).toContainText(lang === 'es' ? 'Actualizando checkout y tienda' : 'Updating checkout and storefront', { timeout: 10000 });
+      await expectNoHorizontalOverflow(page);
+      const elapsedLines = await status.locator('time').evaluate(node => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getClientRects().length;
+      });
+      expect(elapsedLines).toBe(1);
+      await header.screenshot({ path: testInfo.outputPath(`publishing-header-${width}.png`) });
       calls.storeDeploymentOverride = {};
       await expect.poll(() => calls.storeProducts.length, { timeout: 10000 }).toBe(2);
       await expect(editor).toHaveCount(0);
@@ -4058,6 +4103,16 @@ test.describe('Admin Dashboard', () => {
       const styles = getComputedStyle(select);
       return styles.appearance === 'none' && styles.backgroundImage !== 'none' && select.getBoundingClientRect().right <= window.innerWidth + 1;
     })).toBe(true);
+    await ticketEditor.getByRole('button', { name: 'Cancel', exact: true }).click();
+    calls.storeDeploymentOverride = { status: 'queued', conclusion: null };
+    await page.locator('[data-store-product-select="fronteras-poster-big"]').check();
+    await page.locator('[data-store-products-bulk-status]').selectOption('draft');
+    await page.locator('[data-store-products-bulk-apply]').click();
+    const bulkStatus = page.locator('#admin-store-products-status');
+    await expect(bulkStatus).toContainText('Deployment queued');
+    await expect(bulkStatus.getByRole('link', { name: 'Open GitHub run' })).toBeVisible();
+    expect(await bulkStatus.evaluate(node => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    await expectNoHorizontalOverflow(page);
   });
 
   test('keeps Store orders admin rows usable on mobile viewports', async ({ page }) => {

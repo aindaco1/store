@@ -578,9 +578,9 @@
         deploymentOrderRequested: 'Product order saved. Waiting for the deployment to start - %{elapsed} elapsed.',
         deploymentOrderQueued: 'Product order saved. Deployment queued - %{elapsed} elapsed.',
         deploymentOrderRunning: 'Product order saved. Updating the storefront - %{elapsed} elapsed.',
-        deploymentProductRequested: 'Product saved. Waiting for the deployment to start - %{elapsed} elapsed.',
-        deploymentProductQueued: 'Product saved. Deployment queued - %{elapsed} elapsed.',
-        deploymentProductRunning: 'Product saved. Updating checkout and storefront - %{elapsed} elapsed.',
+        deploymentProductRequested: 'Waiting for deployment - %{elapsed} elapsed.',
+        deploymentProductQueued: 'Deployment queued - %{elapsed} elapsed.',
+        deploymentProductRunning: 'Updating checkout and storefront - %{elapsed} elapsed.',
         deploymentArchiveComplete: 'Archived and unavailable to shoppers. Deployment completed in %{elapsed}.',
         deploymentActiveComplete: 'Active status deployed in %{elapsed}.',
         deploymentDraftComplete: 'Saved as draft. Deployment completed in %{elapsed}.',
@@ -653,9 +653,9 @@
         deploymentOrderRequested: 'Orden de productos guardada. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
         deploymentOrderQueued: 'Orden de productos guardada. Despliegue en cola - %{elapsed} transcurrido.',
         deploymentOrderRunning: 'Orden de productos guardada. Actualizando la tienda - %{elapsed} transcurrido.',
-        deploymentProductRequested: 'Producto guardado. Esperando que inicie el despliegue - %{elapsed} transcurrido.',
-        deploymentProductQueued: 'Producto guardado. Despliegue en cola - %{elapsed} transcurrido.',
-        deploymentProductRunning: 'Producto guardado. Actualizando checkout y tienda - %{elapsed} transcurrido.',
+        deploymentProductRequested: 'Esperando el despliegue - %{elapsed} transcurrido.',
+        deploymentProductQueued: 'Despliegue en cola - %{elapsed} transcurrido.',
+        deploymentProductRunning: 'Actualizando checkout y tienda - %{elapsed} transcurrido.',
         deploymentArchiveComplete: 'Archivado y no disponible para compradores. El despliegue termino en %{elapsed}.',
         deploymentActiveComplete: 'Estado activo desplegado en %{elapsed}.',
         deploymentDraftComplete: 'Guardado como borrador. El despliegue termino en %{elapsed}.',
@@ -9198,14 +9198,24 @@
     status.dataset.storeDeploymentState = nextState;
 
     var content = createElement('div', 'admin-store-products__deployment admin-dashboard__status-message');
-    content.appendChild(createElement('p', 'admin-store-products__deployment-message', message));
+    var summary = createElement('div', 'admin-store-products__deployment-summary');
+    var messageElement = createElement('p', 'admin-store-products__deployment-message', message);
+    var elapsedStart = !failed && !opts.local ? message.indexOf(elapsed) : -1;
+    if (elapsedStart >= 0) {
+      messageElement.textContent = message.slice(0, elapsedStart);
+      var duration = createElement('time', '', message.slice(elapsedStart));
+      duration.dateTime = 'PT' + Math.floor(elapsedMs / 1000) + 'S';
+      messageElement.appendChild(duration);
+    }
+    summary.appendChild(messageElement);
 
     if (!failed) {
       var progress = createElement('progress', 'admin-store-products__deployment-progress');
       progress.max = 1;
       progress.setAttribute('aria-label', localizedAdminText(opts.local ? 'localCatalogUpdating' : preparingMedia ? 'deploymentMedia' : 'deploymentDeploying'));
-      content.appendChild(progress);
+      summary.appendChild(progress);
     }
+    content.appendChild(summary);
 
     if (opts.local) {
       status.appendChild(content);
@@ -9220,8 +9230,13 @@
       [localizedAdminText('deploymentDeployed'), failed ? 'blocked' : 'pending']
     ]).forEach(function(step) {
       var marker = step[1] === 'complete' ? '✓ ' : step[1] === 'current' ? '● ' : step[1] === 'pending' ? '○ ' : '× ';
-      var item = createElement('li', 'admin-store-products__deployment-step', marker + step[0]);
+      var item = createElement('li', 'admin-store-products__deployment-step');
+      var icon = createElement('span', '', marker);
+      icon.setAttribute('aria-hidden', 'true');
+      item.appendChild(icon);
+      item.appendChild(document.createTextNode(step[0]));
       item.dataset.state = step[1];
+      if (step[1] === 'current') item.setAttribute('aria-current', 'step');
       steps.appendChild(item);
     });
     content.appendChild(steps);
