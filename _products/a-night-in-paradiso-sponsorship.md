@@ -40,26 +40,34 @@ long_content:
       ### SPONSORSHIP TIERS
       
       Sponsorship directly funds production of Paradiso and the live event itself. In exchange, sponsors are recognized across our social channels, printed program, and live broadcast at increasing levels of visibility.
+  - type: "image"
+    align: "center"
+    src: "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-232223.png"
+    alt: "Paradiso Sponsor Packet 4 (1).png"
 variants:
 - id: "special-thanks"
   label: "Special Thanks"
   sku: "a-night-in-paradiso-sponsorship-special-thanks"
   price: 100
+  inventory: 0
   status: "active"
 - id: "shout-out"
   label: "Shout Out"
   sku: "a-night-in-paradiso-sponsorship-shout-out"
   price: 250
+  inventory: 0
   status: "active"
 - id: "on-air"
   label: "On Air"
   sku: "a-night-in-paradiso-sponsorship-on-air"
   price: 500
+  inventory: 0
   status: "active"
 - id: "director-s-chair"
   label: "Director's Chair"
   sku: "a-night-in-paradiso-sponsorship-director-s-chair"
   price: 1000
+  inventory: 0
   status: "active"
 ---
 ## A Talent Showcase, A Variety Broadcast, A Theatre Experience
@@ -85,3 +93,5 @@ From other local filmmakers and artists interested in different services (rangin
 ### SPONSORSHIP TIERS
 
 Sponsorship directly funds production of Paradiso and the live event itself. In exchange, sponsors are recognized across our social channels, printed program, and live broadcast at increasing levels of visibility.
+
+![Paradiso Sponsor Packet 4 (1).png](/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-232223.png)
