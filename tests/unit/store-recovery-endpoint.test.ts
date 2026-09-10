@@ -260,7 +260,7 @@ describe('reviewed Store inventory recovery endpoint', () => {
     });
     expect(Array.from(env.STORE_STATE.store.keys()).some((key: string) => key.startsWith('store-recovery-approval:'))).toBe(false);
     const auditActions = Array.from(env.STORE_STATE.store.entries())
-      .filter(([key]: [string, string]) => key.startsWith('admin-audit:'))
+      .filter(([key]: [string, string]) => key.startsWith('store-admin-audit:'))
       .map(([, value]: [string, string]) => JSON.parse(value).action);
     expect(auditActions).toEqual(expect.arrayContaining([
       'store_recovery_inventory:plan',

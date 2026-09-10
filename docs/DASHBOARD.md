@@ -32,7 +32,17 @@ Admins sign in by email magic link. The browser receives:
 Roles:
 
 - `super_admin`: full dashboard access, including Settings.
-- Store-scoped limited admin with `accessScopes: ["store"]`: Store operational tabs only. Settings is hidden and the session lands on Orders.
+- Store-scoped limited admin with `accessScopes: ["store"]`: products, coupons, downloads, orders, inventory, attendance, analytics, and marketing. Settings and user management are denied by the Worker as well as hidden in the dashboard; the session lands on Orders.
+
+Store users are independent of Pool campaign users. Store saves its list at
+`store-admin-users:v1`; its login nonces, sessions, login history, and audit
+events also use `store-admin-` keys. The Pool's unprefixed keys are never used
+as a fallback, even when both Workers share a KV namespace. A person who
+works in both apps needs a separate assignment in each app.
+
+Save users validates the whole Store list before writing. Each limited admin
+needs Store access. A rejected save displays the specific validation reason
+and leaves the saved list unchanged.
 
 Mutations are protected by admin session, CSRF, and Worker rate limiting.
 

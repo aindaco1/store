@@ -162,7 +162,7 @@ describe('Store checkout email delivery', () => {
     expect(payloads[0].html).toContain('/admin/?admin_login=');
     expect(payloads[0].html).toContain('tab=store-orders');
     expect(payloads[0]).not.toHaveProperty('attachments');
-    const loginKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'));
+    const loginKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('store-admin-login:'));
     expect(loginKeys).toHaveLength(2);
 
     const updated = await storeState.get(`orders:${orderToken}`, { type: 'json' });
@@ -176,7 +176,7 @@ describe('Store checkout email delivery', () => {
       skipped: ['owner@example.com', 'backup@example.com']
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    const idempotentLoginKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'));
+    const idempotentLoginKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('store-admin-login:'));
     expect(idempotentLoginKeys).toHaveLength(2);
     const idempotentUpdate = await storeState.get(`orders:${orderToken}`, { type: 'json' });
     expect(idempotentUpdate.adminNotificationEmailSent).toBe(true);

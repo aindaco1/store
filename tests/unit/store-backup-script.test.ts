@@ -34,10 +34,10 @@ describe('store backup script', () => {
     expect(KV_BACKUP_PREFIXES).toContain('store-order-admin-email-sent:');
     expect(KV_VALUE_BACKUP_PREFIXES).toContain('orders:');
     expect(KV_VALUE_BACKUP_PREFIXES).not.toContain('admin-store-orders:index:v2');
-    expect(KV_QUARANTINE_PREFIXES).toContain('admin-session:');
+    expect(KV_QUARANTINE_PREFIXES).toContain('store-admin-session:');
     expect(KV_QUARANTINE_PREFIXES).toContain('rl:');
     expect(KV_QUARANTINE_PREFIXES).toContain('store-order-lookup:');
-    expect(KV_BACKUP_PREFIXES).not.toContain('admin-session:');
+    expect(KV_BACKUP_PREFIXES).not.toContain('store-admin-session:');
     expect(KV_BACKUP_PREFIXES).not.toContain('rl:');
   });
 
@@ -108,11 +108,11 @@ preview_bucket_name = "store-downloads-preview"
     expect(transformKvBulkGetToPutRecords({
       'orders:one': { value: '{"ok":true}', metadata: { type: 'order' } },
       'store-coupons:v1': { value: '[]' },
-      'admin-users:v1': '{"users":[]}'
+      'store-admin-users:v1': '{"users":[]}'
     })).toEqual([
       { key: 'orders:one', value: '{"ok":true}', metadata: { type: 'order' } },
       { key: 'store-coupons:v1', value: '[]' },
-      { key: 'admin-users:v1', value: '{"users":[]}' }
+      { key: 'store-admin-users:v1', value: '{"users":[]}' }
     ]);
   });
 

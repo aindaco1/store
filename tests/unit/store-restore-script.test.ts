@@ -38,7 +38,7 @@ function fixtureSnapshot() {
     writeJson(path.join(root, 'kv', `${safePrefix}.values.json`), {});
   }
   writeJson(path.join(root, 'kv', 'admin-session.values.json'), {
-    'admin-session:secret': { value: '{}' }
+    'store-admin-session:secret': { value: '{}' }
   });
   writeJson(path.join(root, 'manifest.json'), {
     version: 2,

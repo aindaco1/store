@@ -187,7 +187,7 @@ function cachedOrdersPayload() {
 
 function auditEvents(env: any) {
   return Array.from(env.STORE_STATE.store.entries())
-    .filter(([key]) => String(key).startsWith('admin-audit:'))
+    .filter(([key]) => String(key).startsWith('store-admin-audit:'))
     .map(([, value]) => JSON.parse(String(value)));
 }
 
@@ -924,7 +924,7 @@ describe('Workers Cache admin endpoints', () => {
     }), env, ctx);
     expect(purgeResponse.status).toBe(200);
 
-    const [auditKey] = Array.from(env.STORE_STATE.store.keys()).filter((key) => key.startsWith('admin-audit:'));
+    const [auditKey] = Array.from(env.STORE_STATE.store.keys()).filter((key) => key.startsWith('store-admin-audit:'));
     expect(env.STORE_STATE.metadata.get(auditKey)).toEqual(expect.objectContaining({
       action: 'workers_cache:purge',
       adminEmail: 'admin@example.com'
@@ -945,7 +945,7 @@ describe('Workers Cache admin endpoints', () => {
       page: { valueReads: 0 },
       writeBudget: { kvReadsExpected: 0, kvListExpected: 1 }
     });
-    expect(env.STORE_STATE.get.mock.calls.some(([key]) => String(key).startsWith('admin-audit:'))).toBe(false);
+    expect(env.STORE_STATE.get.mock.calls.some(([key]) => String(key).startsWith('store-admin-audit:'))).toBe(false);
   });
 
   it('allows deploy-secret cache purges without storing the secret in audit data', async () => {

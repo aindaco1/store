@@ -440,7 +440,10 @@
         var data = text ? parseJsonSafely(text) : {};
         if (!response.ok) {
           if (response.status === 401) returnToAdminLoginAfterSessionExpiry();
-          var message = data.error || data.message || 'Request failed.';
+          var validationErrors = Array.isArray(data.errors) ? data.errors.filter(function(value) {
+            return typeof value === 'string' && value.trim();
+          }) : [];
+          var message = data.error || data.message || validationErrors.join(' ') || 'Request failed.';
           throw Object.assign(new Error(message), { status: response.status, data: data });
         }
         return data;
@@ -522,6 +525,8 @@
       : {};
     var messages = {
       en: {
+        adminUserRoleHelp: 'Super admins can manage everything, including Store settings and users. Limited admins can manage all Store operations but cannot change settings or manage users.',
+        adminUserAccessHelp: 'Store access includes products, coupons, downloads, orders, inventory, attendance, analytics, and marketing. Settings and user management require a super admin.',
         about: 'About',
         adminSection: 'Admin section',
         settingsSection: 'Settings section',
@@ -597,6 +602,8 @@
         deploymentOpenRun: 'Open GitHub run'
       },
       es: {
+        adminUserRoleHelp: 'Los superadministradores pueden gestionar todo, incluida la configuración de Store y los usuarios. Los administradores limitados pueden gestionar todas las operaciones de Store, pero no la configuración ni los usuarios.',
+        adminUserAccessHelp: 'El acceso a Store incluye productos, cupones, descargas, pedidos, inventario, asistencia, análisis y marketing. La configuración y la gestión de usuarios requieren un superadministrador.',
         about: 'Acerca de',
         adminSection: 'Seccion de administracion',
         settingsSection: 'Seccion de configuracion',
@@ -2234,8 +2241,8 @@
     var help = {
       name: 'Internal display name for this admin account.',
       email: 'Email address used for admin magic-link sign-in.',
-      role: 'Super admins can manage all dashboard sections. Limited admins can manage only selected access areas.',
-      access: 'Dashboard areas this limited admin can view and manage. Super admins automatically have full access.'
+      role: localizedAdminText('adminUserRoleHelp'),
+      access: localizedAdminText('adminUserAccessHelp')
     };
     return help[key] || '';
   }

@@ -10,13 +10,14 @@ const WORKER_SOURCE_DIR = path.join(ROOT, 'worker', 'src');
 
 const REQUIRED_DYNAMIC_STORAGE_PREFIXES = [
   'orders:',
-  'admin-user:',
-  'admin-login:',
-  'admin-session:',
+  'store-admin-user:',
+  'store-admin-login:',
+  'store-admin-session:',
+  'store-admin-login-history:',
   'rl:',
   'store-order-email-sent:',
   'store-order-admin-email-sent:',
-  'admin-audit:',
+  'store-admin-audit:',
   'observability:',
   'stripe-event:',
   'processor-event:v1:',

@@ -85,10 +85,10 @@ GitHub Actions supply-chain rules:
 | `email-delivery:v1:*` | KV | Minimized provider outcome and content hash | Medium |
 | `email-suppression:v1:*` | KV | Hashed permanent-bounce/complaint suppression | Medium |
 | `resend-webhook:v1:*` | KV | Signed provider event dedupe marker | Low |
-| `admin-login:{hash}` | KV | One-time admin login nonce | Medium |
-| `admin-session:{hash}` | KV | Admin identity, role, scopes, CSRF, expiry | High |
-| `admin-users:v1` | KV | Runtime admin users and scopes | High |
-| `admin-audit:{date}:{action}:{id}` | KV | Recent admin mutation audit metadata | Medium |
+| `store-admin-login:{hash}` | KV | One-time admin login nonce | Medium |
+| `store-admin-session:{hash}` | KV | Admin identity, role, scopes, CSRF, expiry | High |
+| `store-admin-users:v1` | KV | Runtime admin users and scopes | High |
+| `store-admin-audit:{date}:{action}:{id}` | KV | Recent admin mutation audit metadata | Medium |
 | `admin-store-marketing-referrals:v1` | KV | Saved referral/UTM links | Medium |
 | `observability:*` | KV | Bounded webhook/performance telemetry summaries | Low |
 | `workers-cache-purge-failure:recent` | KV | Failure-only cache domains/status/error with seven-day TTL | Low |

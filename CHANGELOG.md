@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Isolate Store users, login links, sessions, login history, and audit events
+  from Pool records when both Workers share a KV namespace. Existing Store
+  sessions require fresh sign-in after the cutover.
+- Reserve settings and user management for super admins while retaining
+  limited admins' Store operations. Explain both roles in English and Spanish.
+- Show user-save validation reasons instead of the generic "Request failed."
+
+
 ## v1.3.7 - 2026-09-03
 
 - Regenerate the canonical Worker catalog at local startup, after dashboard

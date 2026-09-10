@@ -704,7 +704,7 @@ function writeRestorePlan(outputDir, options) {
 3. Restore admin access only when needed, then \`orders:\` KV records.
 4. Rebuild or verify derived indexes/projections before restoring reminders or sent markers.
 5. Restore \`STORE_DOWNLOADS\` objects from \`r2/objects\` or through the admin Downloads tab.
-6. Do not restore \`admin-session:\`, \`admin-login:\`, \`rl:\`, lookup tokens, or cron markers unless this is an isolated incident rehearsal.
+6. Do not restore \`store-admin-session:\`, \`store-admin-login:\`, \`rl:\`, lookup tokens, or cron markers unless this is an isolated incident rehearsal.
 7. Run Jekyll build, content/security/SEO checks, Worker smoke, CSV export previews, R2 download checks, and admin dashboard review before reopening checkout.
 
 KV value files from \`wrangler kv bulk get\` must be transformed with:
