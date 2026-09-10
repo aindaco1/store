@@ -2221,6 +2221,78 @@
       ]
     },
     {
+      "path": "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823.png",
+      "publicPath": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823.png",
+      "name": "product-a-night-in-paradiso-sponsorship-20260910-225823.png",
+      "label": "product a night in paradiso sponsorship 20260910",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1411147,
+      "sha256": "00e5207eadc441510faab6e66736efec9faaf7d401ddc9f5bc2638ecfe37caee",
+      "width": 2550,
+      "height": 3299,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-320.webp",
+        "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-480.webp",
+        "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-640.webp",
+        "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-960.webp",
+        "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-320.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-320.webp",
+          "bytes": 25058,
+          "sha256": "38c23ce1e077a381b541987658b3a17897e5670355bbf4d669e0e94ba10066f7",
+          "sourceSha256": "00e5207eadc441510faab6e66736efec9faaf7d401ddc9f5bc2638ecfe37caee",
+          "width": 320
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-480.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-480.webp",
+          "bytes": 45140,
+          "sha256": "f603fc0641f1ecf523d7c6f5b7d41eaecd957aa9bd33a3cbb270d997c21e505f",
+          "sourceSha256": "00e5207eadc441510faab6e66736efec9faaf7d401ddc9f5bc2638ecfe37caee",
+          "width": 480
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-640.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-640.webp",
+          "bytes": 66466,
+          "sha256": "d6576b13dcb021f1423c4e3b7ff986e5df56df0209e01985bc2e3ead40c67f0a",
+          "sourceSha256": "00e5207eadc441510faab6e66736efec9faaf7d401ddc9f5bc2638ecfe37caee",
+          "width": 640
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-960.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-960.webp",
+          "bytes": 114502,
+          "sha256": "6741b40e2b9a440428b72e90a8ce0e56b2493e00033a0f78d1bc677ba42dbcb7",
+          "sourceSha256": "00e5207eadc441510faab6e66736efec9faaf7d401ddc9f5bc2638ecfe37caee",
+          "width": 960
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-1600.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823-1600.webp",
+          "bytes": 217120,
+          "sha256": "ce6155f96dc7eac53213ad013fd8bfa459fedb4308daf31b1604b962850c593e",
+          "sourceSha256": "00e5207eadc441510faab6e66736efec9faaf7d401ddc9f5bc2638ecfe37caee",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/a-night-in-paradiso-sponsorship.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/products/product-new-product-20260708-075131.png",
       "publicPath": "/assets/images/products/product-new-product-20260708-075131.png",
       "name": "product-new-product-20260708-075131.png",
