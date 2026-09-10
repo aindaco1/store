@@ -105,6 +105,29 @@ Use short, descriptive branches:
 - `docs/shipping`
 - `test/admin-inventory`
 
+## Local Cleanup
+
+After validation, remove only branches whose pull requests are merged and whose
+tips are ancestors of `origin/main`. Check every worktree first and preserve
+branches with unique commits or active work. Delete the corresponding remote
+branch only after confirming its current tip is the reviewed merged commit.
+
+When the local servers and tests have stopped, move obsolete ignored output to
+a dated folder in the system Trash so cleanup remains recoverable:
+
+| Remove when no longer needed | Keep for local development and testing |
+| --- | --- |
+| `_site/`, `.jekyll-cache/`, `.sass-cache/`, `.jekyll-metadata` | Repository source, product media and tracked derivatives, shared submodules |
+| Completed `test-results/`, `playwright-report/`, `coverage/`, disposable logs | Root and Worker `node_modules/`, Ruby gems/Bundler setup, Playwright browsers |
+| `worker/.wrangler/tmp/` from stopped builds | `worker/.wrangler/state/`, local orders, inventory, uploads, and other simulated Worker data |
+| Merged task branches | `_config.local*.yml`, `worker/.dev.vars`, environment files, Podman images and volumes |
+
+The tracked `worker/src/generated/catalog-snapshot.js` remains part of the
+checkout; local regeneration does not make it a cleanup target. Preserve
+diagnostics for unresolved failures and operator backup/recovery evidence.
+Do not use a blanket ignored-file cleanup: ignored files also contain local
+configuration, credentials, dependencies, and test data.
+
 ## Glossary
 
 | Term | Meaning |

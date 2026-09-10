@@ -6,6 +6,11 @@ This runbook covers Store Git/config/build artifacts, Cloudflare KV, private R2 
 
 ## Store admin storage isolation
 
+The Dust Wave production cutover completed on 2026-09-09; see the
+[deployment and verification record](release-evidence/2026-09-09-admin-access-isolation.md).
+The first-release procedure below applies to installations that still use the
+shared layout and to review of older snapshots.
+
 Store auth and audit records use `store-admin-` prefixes. When Store and Pool
 share a KV namespace, unprefixed `admin-users:v1`, `admin-user:`, `admin-login:`,
 `admin-session:`, `admin-login-history:`, and `admin-audit:` records belong to

@@ -45,6 +45,9 @@ The user editor asks for Name, Email, and Role. It automatically includes
 needed. Save users validates the whole Store list before writing. A rejected
 save displays the specific validation reason and leaves the saved list unchanged.
 
+The [2026-09-09 rollout record](release-evidence/2026-09-09-admin-access-isolation.md)
+documents the deployed isolation fix, role boundaries, and simplified user editor.
+
 Mutations are protected by admin session, CSRF, and Worker rate limiting.
 
 When an authenticated dashboard request returns `401`, the browser clears its in-memory admin state and returns to the existing admin sign-in panel with an expired-session message. Initial unsigned visits still open the same sign-in panel without presenting the Worker response text as an error.

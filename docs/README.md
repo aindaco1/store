@@ -51,6 +51,7 @@ Start with the guide for the work you are doing. The [root README](../README.md)
 - [Roadmap](ROADMAP.md): current capability inventory and future work.
 - [Changelog](../CHANGELOG.md): version-by-version changes.
 - [Release evidence](release-evidence/): dated validation, provider, rollout, and rollback records, including historical design QA.
+- [2026-09-09 admin access rollout](release-evidence/2026-09-09-admin-access-isolation.md): Store/Pool identity isolation, role enforcement, and removal of the redundant Store checkbox.
 
 ## Documentation Maintenance
 
