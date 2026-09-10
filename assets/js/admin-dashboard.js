@@ -526,7 +526,6 @@
     var messages = {
       en: {
         adminUserRoleHelp: 'Super admins can manage everything, including Store settings and users. Limited admins can manage all Store operations but cannot change settings or manage users.',
-        adminUserAccessHelp: 'Store access includes products, coupons, downloads, orders, inventory, attendance, analytics, and marketing. Settings and user management require a super admin.',
         about: 'About',
         adminSection: 'Admin section',
         settingsSection: 'Settings section',
@@ -603,7 +602,6 @@
       },
       es: {
         adminUserRoleHelp: 'Los superadministradores pueden gestionar todo, incluida la configuración de Store y los usuarios. Los administradores limitados pueden gestionar todas las operaciones de Store, pero no la configuración ni los usuarios.',
-        adminUserAccessHelp: 'El acceso a Store incluye productos, cupones, descargas, pedidos, inventario, asistencia, análisis y marketing. La configuración y la gestión de usuarios requieren un superadministrador.',
         about: 'Acerca de',
         adminSection: 'Seccion de administracion',
         settingsSection: 'Seccion de configuracion',
@@ -2163,7 +2161,6 @@
 
   function renderAdminUsersEditor(row) {
     var users = Array.isArray(row.rawValue) ? row.rawValue.slice() : [];
-    var accessOptions = Array.isArray(row.accessOptions) ? row.accessOptions : [{ label: 'Store', value: 'store' }];
     var currentEmail = String(row.currentUserEmail || '').toLowerCase();
     var wrapper = createElement('div', 'admin-settings__products-editor admin-settings__users-editor');
     var cards = createElement('div', 'admin-settings__products-list admin-settings__users-list');
@@ -2184,7 +2181,7 @@
     function renderCards() {
       clear(cards);
       users.forEach(function(user, index) {
-        cards.appendChild(renderAdminUserCard(user, index, currentEmail, accessOptions, syncValue));
+        cards.appendChild(renderAdminUserCard(user, index, currentEmail, syncValue));
       });
       syncValue();
     }
@@ -2192,7 +2189,7 @@
     var add = createElement('button', 'btn btn--secondary', 'Add user');
     add.type = 'button';
     add.addEventListener('click', function() {
-      users.unshift({ name: '', email: '', role: 'limited_admin', accessScopes: [] });
+      users.unshift({ name: '', email: '', role: 'limited_admin', accessScopes: ['store'] });
       renderCards();
     });
     var save = createElement('button', 'btn', 'Save users');
@@ -2241,8 +2238,7 @@
     var help = {
       name: 'Internal display name for this admin account.',
       email: 'Email address used for admin magic-link sign-in.',
-      role: localizedAdminText('adminUserRoleHelp'),
-      access: localizedAdminText('adminUserAccessHelp')
+      role: localizedAdminText('adminUserRoleHelp')
     };
     return help[key] || '';
   }
@@ -2288,43 +2284,7 @@
     return wrapper;
   }
 
-  function adminUserAccessList(user, accessOptions) {
-    var field = createElement('div', 'admin-settings__product-field admin-settings__product-field--wide admin-settings__user-access');
-    var labelRow = createElement('span', 'admin-settings__product-label');
-    var labelId = 'admin-user-access-' + String(++adminFieldIdCounter);
-    var selected = new Set((Array.isArray(user.accessScopes) ? user.accessScopes : []).map(String));
-    var list = createElement('div', 'admin-settings__checkbox-list admin-settings__user-access-list');
-    labelRow.id = labelId;
-    labelRow.appendChild(createElement('span', '', 'Access'));
-    labelRow.appendChild(createHelp({ label: 'Access', path: 'admin-user-access-' + String(adminFieldIdCounter), help: adminUserHelp('access') }, null));
-    list.setAttribute('role', 'group');
-    list.setAttribute('aria-labelledby', labelId);
-    accessOptions.forEach(function(option) {
-      var label = createElement('label', 'admin-settings__checkbox-option admin-settings__user-access-option');
-      var checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.value = option.value;
-      checkbox.dataset.adminUserAccessScope = option.value;
-      checkbox.checked = selected.has(String(option.value));
-      label.appendChild(checkbox);
-      label.appendChild(createElement('span', '', option.label || option.value));
-      list.appendChild(label);
-    });
-    if (!accessOptions.length) {
-      list.appendChild(createElement('p', 'admin-settings__empty-note', 'No access scopes are configured.'));
-    }
-    field.appendChild(labelRow);
-    field.appendChild(list);
-    return field;
-  }
-
-  function updateAdminUserCardConditionalFields(card) {
-    var role = $('[data-admin-user-field="role"]', card);
-    var access = $('.admin-settings__user-access', card);
-    if (access) access.hidden = role && role.value === 'super_admin';
-  }
-
-  function renderAdminUserCard(user, index, currentEmail, accessOptions, syncValue) {
+  function renderAdminUserCard(user, index, currentEmail, syncValue) {
     var email = String(user.email || '').toLowerCase();
     var isSelf = email && email === currentEmail;
     var card = createElement('section', 'admin-settings__product-card admin-settings__user-card');
@@ -2341,8 +2301,6 @@
       required: true,
       disabled: isSelf
     }));
-    card.appendChild(adminUserAccessList(user, accessOptions));
-    updateAdminUserCardConditionalFields(card);
     var del = createElement('button', 'btn btn--secondary admin-settings__collection-delete', 'Delete');
     del.type = 'button';
     del.disabled = isSelf;
@@ -2355,20 +2313,13 @@
     });
     card.appendChild(del);
     card.addEventListener('input', syncValue);
-    card.addEventListener('change', function(event) {
-      if (event.target && event.target.dataset && event.target.dataset.adminUserField === 'role') {
-        updateAdminUserCardConditionalFields(card);
-      }
-      syncValue();
-    });
+    card.addEventListener('change', syncValue);
     return card;
   }
 
   function readAdminUserCard(card) {
     var role = ($('[data-admin-user-field="role"]', card) || {}).value || 'limited_admin';
-    var accessScopes = role === 'super_admin' ? [] : $all('[data-admin-user-access-scope]', card)
-      .filter(function(input) { return input.checked; })
-      .map(function(input) { return input.value; });
+    var accessScopes = role === 'super_admin' ? [] : ['store'];
     return {
       name: (($('[data-admin-user-field="name"]', card) || {}).value || '').trim(),
       email: (($('[data-admin-user-field="email"]', card) || {}).value || '').trim().toLowerCase(),

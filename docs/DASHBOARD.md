@@ -40,9 +40,10 @@ events also use `store-admin-` keys. The Pool's unprefixed keys are never used
 as a fallback, even when both Workers share a KV namespace. A person who
 works in both apps needs a separate assignment in each app.
 
-Save users validates the whole Store list before writing. Each limited admin
-needs Store access. A rejected save displays the specific validation reason
-and leaves the saved list unchanged.
+The user editor asks for Name, Email, and Role. It automatically includes
+`accessScopes: ["store"]` for limited admins; no separate Access checkbox is
+needed. Save users validates the whole Store list before writing. A rejected
+save displays the specific validation reason and leaves the saved list unchanged.
 
 Mutations are protected by admin session, CSRF, and Worker rate limiting.
 
