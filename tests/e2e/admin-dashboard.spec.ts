@@ -3933,7 +3933,7 @@ test.describe('Admin Dashboard', () => {
   test('shows the user validation reason and retains edits after a rejected save', async ({ page }) => {
     await routeAdminWorker(page);
     await page.route('**/admin/users', route => route.fulfill({
-      status: 422, contentType: 'application/json',
+      status: 422, headers: JSON_HEADERS,
       body: JSON.stringify({ valid: false, errors: ['Limited admin needs at least one access area.'] })
     }));
     await gotoDomReady(page, '/admin/?admin_login=user-validation-token');
