@@ -1219,15 +1219,6 @@ textarea.admin-settings__input--readonly {
   width: auto;
 }
 
-.admin-settings__user-access-list {
-  background: $surface--base;
-  border: 1px solid $border--default;
-  border-radius: $radius--sm;
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-}
-
 .admin-settings__user-actions {
   align-items: center;
   justify-content: flex-start;

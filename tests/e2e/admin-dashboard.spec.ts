@@ -2543,6 +2543,8 @@ test.describe('Admin Dashboard', () => {
     const adminUsersEditor = page.locator('[data-settings-path="admin.users"]');
     await expect(adminUsersEditor).toBeVisible();
     await expect(adminUsersEditor.locator('[data-admin-user-card]')).toHaveCount(3);
+    await expect(adminUsersEditor.getByRole('checkbox')).toHaveCount(0);
+    await expect(adminUsersEditor.getByRole('button', { name: 'Save users' })).toBeDisabled();
     const selfAdminUser = adminUsersEditor.locator('[data-admin-user-card]').first();
     await expect(selfAdminUser.locator('[data-admin-user-field="email"]')).toHaveValue(SUPER_ADMIN_EMAIL);
     await expect(selfAdminUser.locator('[data-admin-user-field="email"]')).toHaveAttribute('readonly', '');
@@ -2550,13 +2552,12 @@ test.describe('Admin Dashboard', () => {
     await expect(selfAdminUser.getByRole('button', { name: new RegExp(`Delete admin user ${SUPER_ADMIN_EMAIL}`) })).toBeDisabled();
     const otherAdminUser = adminUsersEditor.locator('[data-admin-user-card]').nth(1);
     await otherAdminUser.locator('[data-admin-user-field="role"]').selectOption('limited_admin');
-    await otherAdminUser.locator('[data-admin-user-access-scope="store"]').check();
     await adminUsersEditor.getByRole('button', { name: 'Add user' }).click();
     const newAdminUser = adminUsersEditor.locator('[data-admin-user-card]').first();
     await newAdminUser.locator('[data-admin-user-field="name"]').fill('Store Editor');
     await newAdminUser.locator('[data-admin-user-field="email"]').fill(NEW_ADMIN_EMAIL);
     await newAdminUser.locator('[data-admin-user-field="role"]').selectOption('limited_admin');
-    await newAdminUser.locator('[data-admin-user-access-scope="store"]').check();
+    await expect(newAdminUser.getByRole('checkbox')).toHaveCount(0);
     await adminUsersEditor.getByRole('button', { name: 'Save users' }).click();
     await expect.poll(() => calls.adminUsersSave.length).toBe(1);
     expect(calls.adminUsersSave[0].users[0]).toMatchObject({
@@ -2564,6 +2565,12 @@ test.describe('Admin Dashboard', () => {
       email: NEW_ADMIN_EMAIL,
       role: 'limited_admin',
       accessScopes: ['store']
+    });
+    expect(calls.adminUsersSave[0].users.find((user: any) => user.email === OTHER_ADMIN_EMAIL)).toMatchObject({
+      role: 'limited_admin', accessScopes: ['store']
+    });
+    expect(calls.adminUsersSave[0].users.find((user: any) => user.email === SUPER_ADMIN_EMAIL)).toMatchObject({
+      role: 'super_admin', accessScopes: []
     });
     await expect(adminUsersEditor.locator('[data-admin-users-status]')).toContainText('Users saved');
     await expectNoAxeViolations(page);

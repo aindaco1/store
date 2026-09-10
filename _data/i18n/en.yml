@@ -13,7 +13,6 @@ nav:
   home_aria: "%{title} home"
 admin:
   user_role_help: Super admins can manage everything, including Store settings and users. Limited admins can manage all Store operations but cannot change settings or manage users.
-  user_access_help: Store access includes products, coupons, downloads, orders, inventory, attendance, analytics, and marketing. Settings and user management require a super admin.
   page_title: Admin Dashboard
   login_title: Admin sign-in
   email_label: Admin email

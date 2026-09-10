@@ -8,6 +8,8 @@
 - Reserve settings and user management for super admins while retaining
   limited admins' Store operations. Explain both roles in English and Spanish.
 - Show user-save validation reasons instead of the generic "Request failed."
+- Remove the redundant Store access checkbox from the user editor and assign
+  Store access automatically to limited admins.
 
 
 ## v1.3.7 - 2026-09-03
