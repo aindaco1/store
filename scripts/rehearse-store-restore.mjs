@@ -82,7 +82,7 @@ function representativeKvValues() {
       'store-coupons:v1': { value: JSON.stringify({ version: 1, coupons: [{ code: 'RESTORE10', percentOff: 10 }] }) }
     },
     'admin-users': {
-      'admin-users:v1': { value: JSON.stringify({ users: [{ email: 'recovery-admin@example.invalid', role: 'super_admin', accessScopes: [] }] }) }
+      'store-admin-users:v1': { value: JSON.stringify({ users: [{ email: 'recovery-admin@example.invalid', role: 'super_admin', accessScopes: [] }] }) }
     },
     'marketing-referrals': {
       'admin-store-marketing-referrals:v1': { value: JSON.stringify([{ code: 'restore', name: 'Restore fixture' }]) }
@@ -106,7 +106,7 @@ function representativeKvValues() {
       'store-event-reminder-sent:restore-event:store-order-restore-ticket': { value: '2026-07-09T00:03:00.000Z' }
     },
     'admin-audit': {
-      'admin-audit:restore-fixture': { value: JSON.stringify({ action: 'restore_fixture', createdAt: '2026-07-09T00:04:00.000Z' }) }
+      'store-admin-audit:restore-fixture': { value: JSON.stringify({ action: 'restore_fixture', createdAt: '2026-07-09T00:04:00.000Z' }) }
     }
   };
 }
@@ -117,8 +117,8 @@ export function createSyntheticSnapshot(root) {
     writeJson(path.join(root, 'kv', `${safePrefix(family.prefix)}.values.json`), values[family.id] || {});
   }
 
-  writeJson(path.join(root, 'kv', 'admin-session.values.json'), {
-    'admin-session:must-not-restore': { value: '{"token":"quarantined"}' }
+  writeJson(path.join(root, 'kv', 'store-admin-session.values.json'), {
+    'store-admin-session:must-not-restore': { value: '{"token":"quarantined"}' }
   });
   writeJson(path.join(root, 'kv', 'abandoned-cart.values.json'), {
     'abandoned-cart:must-not-restore': { value: '{"email":"private@example.invalid"}' }
@@ -194,7 +194,7 @@ export async function runSyntheticRestoreRehearsal(options = {}) {
       order.orderDraft?.items || []
     )).map((item) => String(item.fulfillmentType || '')))).filter((type) => REPRESENTATIVE_ORDER_TYPES.includes(type)).sort();
     const quarantineRestored = restoredKeys.some((key) => (
-      key.startsWith('admin-session:') || key.startsWith('abandoned-cart:')
+      key.startsWith('store-admin-session:') || key.startsWith('abandoned-cart:')
     ));
     const derivedRestored = restoredKeys.includes('admin-store-orders:index:v2');
     const sideEffectCommands = commands.filter((parts) => !(
@@ -234,7 +234,7 @@ export async function runSyntheticRestoreRehearsal(options = {}) {
       },
       reminderControlsRestored: restoredKeys.some((key) => key.startsWith('store-event-reminder-sent:')) &&
         restoredKeys.some((key) => key.startsWith('abandoned-cart-suppressed:')),
-      auditEvidenceRestored: restoredKeys.includes('admin-audit:restore-fixture'),
+      auditEvidenceRestored: restoredKeys.includes('store-admin-audit:restore-fixture'),
       inventoryControlsRestored: restoredKeys.includes('store-inventory-overrides:v1') &&
         restoredKeys.includes('add-on-inventory-overrides'),
       restoredR2Objects,

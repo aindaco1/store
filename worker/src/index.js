@@ -13963,10 +13963,10 @@ function normalizeAdminAuditDate(value = '') {
 function adminAuditExportPrefix(request) {
   const url = new URL(request.url);
   const date = normalizeAdminAuditDate(url.searchParams.get('date'));
-  return date ? `admin-audit:${date}:` : 'admin-audit:';
+  return date ? `store-admin-audit:${date}:` : 'store-admin-audit:';
 }
 
-async function listAdminAuditEventKeys(env, prefix = 'admin-audit:') {
+async function listAdminAuditEventKeys(env, prefix = 'store-admin-audit:') {
   if (!env?.STORE_STATE?.list) {
     return { ok: false, status: 503, error: 'Audit storage unavailable' };
   }
@@ -17301,7 +17301,7 @@ async function handleAdminPlanUsage(request, env) {
 }
 
 async function handleAdminSettings(request, env) {
-  const auth = await requireAdminSession(request, env, 'store:read');
+  const auth = await requireAdminSession(request, env, 'settings:read');
   if (!auth.ok) return auth.response;
 
   const sections = [];
@@ -18314,7 +18314,7 @@ function optionalAdminNumber(value, field, { integer = false } = {}) {
 }
 
 async function validateAdminSettingsChanges(request, env, body = {}, options = {}) {
-  const auth = await requireAdminSession(request, env, 'store:read', options);
+  const auth = await requireAdminSession(request, env, 'settings:read', options);
   if (!auth.ok) return { ok: false, response: auth.response };
 
   const changes = Array.isArray(body?.changes) ? body.changes : [];
@@ -18456,6 +18456,7 @@ async function handleAdminUsersSave(request, env, body = {}) {
   if (!normalized.ok) {
     return privateJsonResponse({
       valid: false,
+      error: normalized.error,
       errors: [normalized.error],
       writeBudget: adminReadBudget()
     }, 422, env);
@@ -19145,7 +19146,7 @@ function getAdminAuditEventKey(action, now = new Date()) {
   const id = typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
-  return `admin-audit:${dateKey}:${safeAction}:${id}`;
+  return `store-admin-audit:${dateKey}:${safeAction}:${id}`;
 }
 
 async function recordAdminAuditEvent(env, event = {}) {

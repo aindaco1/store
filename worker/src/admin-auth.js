@@ -19,7 +19,8 @@ import {
 } from '../../shared/dust-wave-platform/packages/worker-core/src/session-security.js';
 
 export const ADMIN_SESSION_COOKIE = 'store_admin_session';
-export const ADMIN_USERS_KV_KEY = 'admin-users:v1';
+// Store and Pool may share a KV namespace. Never read the unscoped Pool auth keys.
+export const ADMIN_USERS_KV_KEY = 'store-admin-users:v1';
 const ADMIN_CORS_ALLOWED_HEADERS = 'Content-Type, Authorization, x-admin-key, x-store-admin-csrf';
 
 const ADMIN_LOGIN_TTL_SECONDS = 15 * 60;
@@ -73,8 +74,10 @@ function normalizeConfiguredAdminUser(user, source = 'config') {
   if (!user || typeof user !== 'object' || Array.isArray(user)) return null;
   const email = normalizeEmail(user.email);
   if (!isValidEmail(email)) return null;
-  const role = String(user.role || '').trim() === 'super_admin' ? 'super_admin' : 'limited_admin';
+  const role = String(user.role || '').trim();
+  if (role !== 'super_admin' && role !== 'limited_admin') return null;
   const scopeSource = user.accessScopes ?? user.access_scopes ?? [];
+  if (role === 'limited_admin' && !normalizeAdminAccessScopes(scopeSource).includes('store')) return null;
   return {
     name: String(user.name || '').trim(),
     email,
@@ -297,7 +300,7 @@ async function recordAdminLoginHistory(request, env, sessionKey, session = {}) {
     client: summarizeAdminUserAgent(request.headers.get('User-Agent') || ''),
     networkId: await adminNetworkFingerprint(request, env)
   };
-  await env.STORE_STATE.put(`admin-login-history:${dateKey}:${eventId}`, JSON.stringify(historyRecord), {
+  await env.STORE_STATE.put(`store-admin-login-history:${dateKey}:${eventId}`, JSON.stringify(historyRecord), {
     expirationTtl: ADMIN_LOGIN_HISTORY_TTL_SECONDS,
     metadata: historyRecord
   });
@@ -395,7 +398,7 @@ export async function createAdminLoginUrl(env, {
   const normalizedSource = normalizeLoginSource(source);
   const loginTtlSeconds = getAdminLoginTtlSeconds(normalizedSource);
   const token = await signLoginToken(env, nonce, normalizedEmail, loginTtlSeconds);
-  await env.STORE_STATE.put(`admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
+  await env.STORE_STATE.put(`store-admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
     email: normalizedEmail,
     role: user.role,
     accessScopes: user.accessScopes || [],
@@ -424,7 +427,7 @@ function clearSessionCookie(request) {
 
 async function getStoredAdminUser(env, email) {
   if (!env?.STORE_STATE) return null;
-  const key = `admin-user:${await sha256Hex(email)}`;
+  const key = `store-admin-user:${await sha256Hex(email)}`;
   return env.STORE_STATE.get(key, { type: 'json' });
 }
 
@@ -464,12 +467,7 @@ async function resolveAdminUser(env, email) {
 
   const storedUser = await getStoredAdminUser(env, normalizedEmail);
   if (storedUser?.email) {
-    return {
-      email: normalizeEmail(storedUser.email),
-      role: storedUser.role === 'super_admin' ? 'super_admin' : 'limited_admin',
-      accessScopes: Array.isArray(storedUser.accessScopes) ? storedUser.accessScopes.map(String) : [],
-      source: 'kv'
-    };
+    return normalizeConfiguredAdminUser(storedUser, 'kv');
   }
 
   if (getAdminBootstrapEmails(env).includes(normalizedEmail)) {
@@ -512,7 +510,7 @@ export async function handleAdminAuthStart(request, env, body = {}) {
   const nonce = randomToken(24);
   const token = await signLoginToken(env, nonce, email);
   const loginUrl = buildAdminUrl(env, token, preferredLang);
-  await env.STORE_STATE.put(`admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
+  await env.STORE_STATE.put(`store-admin-login:${await sha256Hex(nonce)}`, JSON.stringify({
     email,
     role: user.role,
     accessScopes: user.accessScopes || [],
@@ -538,7 +536,7 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
     return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
   }
 
-  const nonceKey = `admin-login:${await sha256Hex(payload.nonce)}`;
+  const nonceKey = `store-admin-login:${await sha256Hex(payload.nonce)}`;
   const loginRecord = await env.STORE_STATE.get(nonceKey, { type: 'json' });
   if (!loginRecord || normalizeEmail(loginRecord.email) !== normalizeEmail(payload.email)) {
     return privateAdminJsonResponse({ error: 'Invalid or expired token' }, 401, env);
@@ -554,7 +552,7 @@ export async function handleAdminAuthExchange(request, env, body = {}) {
   const csrfToken = randomToken(24);
   const sessionTtlSeconds = getAdminSessionTtlSeconds(loginRecord);
   const expiresAt = new Date(Date.now() + sessionTtlSeconds * 1000).toISOString();
-  const sessionKey = `admin-session:${await sha256Hex(sessionToken)}`;
+  const sessionKey = `store-admin-session:${await sha256Hex(sessionToken)}`;
   const sessionRecord = {
     email: user.email,
     role: user.role,
@@ -586,18 +584,18 @@ async function listAdminKeys(env, prefix, limit = ADMIN_SESSION_LIST_LIMIT) {
 
 export async function listAdminSessionReview(env) {
   const [sessionKeys, historyKeys] = await Promise.all([
-    listAdminKeys(env, 'admin-session:'),
-    listAdminKeys(env, 'admin-login-history:', 1000)
+    listAdminKeys(env, 'store-admin-session:'),
+    listAdminKeys(env, 'store-admin-login-history:', 1000)
   ]);
   const now = Date.now();
   const active = [];
   for (const key of sessionKeys) {
     const keyName = String(key?.name || '');
-    if (!/^admin-session:[a-f0-9]{64}$/.test(keyName)) continue;
+    if (!/^store-admin-session:[a-f0-9]{64}$/.test(keyName)) continue;
     const session = await env.STORE_STATE.get(keyName, { type: 'json' });
     if (!session?.email || new Date(session.expiresAt || 0).getTime() <= now) continue;
     active.push({
-      id: keyName.slice('admin-session:'.length),
+      id: keyName.slice('store-admin-session:'.length),
       email: normalizeEmail(session.email),
       role: session.role === 'super_admin' ? 'super_admin' : 'limited_admin',
       source: normalizeLoginSource(session.source),
@@ -610,12 +608,12 @@ export async function listAdminSessionReview(env) {
   const recent = [];
   for (const key of historyKeys) {
     const keyName = String(key?.name || '');
-    if (!keyName.startsWith('admin-login-history:')) continue;
+    if (!keyName.startsWith('store-admin-login-history:')) continue;
     const record = key?.metadata && typeof key.metadata === 'object'
       ? key.metadata
       : await env.STORE_STATE.get(keyName, { type: 'json' });
     if (!record?.email || !record?.createdAt) continue;
-    const sessionId = String(record.sessionKey || '').replace(/^admin-session:/, '');
+    const sessionId = String(record.sessionKey || '').replace(/^store-admin-session:/, '');
     if (/^[a-f0-9]{64}$/.test(sessionId)) historyBySessionId.set(sessionId, record);
     recent.push({
       email: normalizeEmail(record.email),
@@ -647,7 +645,7 @@ export async function revokeAdminSessionById(env, id = '') {
   if (!/^[a-f0-9]{64}$/.test(normalized)) {
     return { ok: false, status: 400, error: 'Invalid admin session ID' };
   }
-  const key = `admin-session:${normalized}`;
+  const key = `store-admin-session:${normalized}`;
   const session = await env?.STORE_STATE?.get(key, { type: 'json' });
   if (!session?.email) return { ok: false, status: 404, error: 'Admin session not found' };
   await env.STORE_STATE.delete(key);
@@ -670,7 +668,7 @@ export async function requireAdminSession(request, env, permission = 'store:read
   }
 
   const sessionId = await sha256Hex(sessionToken);
-  const session = await env.STORE_STATE.get(`admin-session:${sessionId}`, { type: 'json' });
+  const session = await env.STORE_STATE.get(`store-admin-session:${sessionId}`, { type: 'json' });
   if (!session?.email || !session?.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
     return { ok: false, response: privateAdminJsonResponse({ error: 'Unauthorized' }, 401, env) };
   }
@@ -693,7 +691,8 @@ export async function requireAdminSession(request, env, permission = 'store:read
   const allowedScope = user.role === 'super_admin' || !accessScope || user.accessScopes.includes(accessScope);
   const allowed = user.role === 'super_admin' || (
     allowedScope &&
-    ['store:read', 'settings:publish', 'fulfillment:manage'].includes(permission)
+    (['store:read', 'fulfillment:manage'].includes(permission) ||
+      (permission === 'settings:publish' && accessScope === 'store'))
   );
 
   if (!allowed) {
@@ -729,7 +728,7 @@ export async function handleAdminLogout(request, env) {
   }
 
   if (sessionToken && env?.STORE_STATE) {
-    const sessionKey = `admin-session:${await sha256Hex(sessionToken)}`;
+    const sessionKey = `store-admin-session:${await sha256Hex(sessionToken)}`;
     const session = await env.STORE_STATE.get(sessionKey, { type: 'json' });
     if (session?.csrfToken && !isTrustedAdminOriginRequest(request, env)) {
       return privateAdminJsonResponse({ error: 'Origin not allowed' }, 403, env);

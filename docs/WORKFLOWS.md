@@ -305,14 +305,14 @@ New-admin access emails also use this exchange and open `tab=store-orders` direc
 | `observability:*` | Bounded webhook/performance summaries and recent events |
 | Store SKU Durable Object | Reservation-aware SKU inventory coordination |
 | `STORE_DOWNLOADS` | Digital download R2 objects |
-| `admin-users:v1` | Runtime admin users |
+| `store-admin-users:v1` | Runtime admin users |
 | `admin-store-marketing-referrals:v1` | Saved referral/UTM links |
 | `store_admin_session` | Admin session cookie |
 | GitHub contents API | `_products`, `_config.yml`, and product media publishing |
 
 Store KV state should stay inside the documented order, inventory, coupon, admin, audit, lookup, reminder, marketing, observability, rate-limit, and email keys.
 
-Super admins can export recent admin mutation audit events from **Settings -> Store readiness**. The CSV is backed by bounded `admin-audit:` KV listing and is intended for production operational review, not permanent retention.
+Super admins can export recent admin mutation audit events from **Settings -> Store readiness**. The CSV is backed by bounded `store-admin-audit:` KV listing and is intended for production operational review, not permanent retention.
 
 Store admins can export an order reconciliation CSV from **Settings -> Store readiness**. It is one row per order and flags amount, currency, and payment/order status mismatches for production review.
 

@@ -422,14 +422,14 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
           'content-type': 'text/csv',
           'content-disposition': 'attachment; filename="admin-audit-2026-06-11.csv"'
         },
-        body: `key,created_at,action,admin_email\nadmin-audit:2026-06-11:store_order:check_in:test,2026-06-11T12:00:00.000Z,store_order:check_in,${SUPER_ADMIN_EMAIL}\n`
+        body: `key,created_at,action,admin_email\nstore-admin-audit:2026-06-11:store_order:check_in:test,2026-06-11T12:00:00.000Z,store_order:check_in,${SUPER_ADMIN_EMAIL}\n`
       });
     }
     if (url.pathname === '/admin/audit' && method === 'GET') {
       calls.auditSearch.push(Object.fromEntries(url.searchParams.entries()));
       return fulfillJson({
         rows: [{
-          key: 'admin-audit:2026-06-11:store_order:check_in:test',
+          key: 'store-admin-audit:2026-06-11:store_order:check_in:test',
           createdAt: '2026-06-11T12:00:00.000Z',
           action: 'store_order:check_in',
           adminEmail: SUPER_ADMIN_EMAIL,
@@ -3928,6 +3928,27 @@ test.describe('Admin Dashboard', () => {
         ]
       }
     ]);
+  });
+
+  test('shows the user validation reason and retains edits after a rejected save', async ({ page }) => {
+    await routeAdminWorker(page);
+    await page.route('**/admin/users', route => route.fulfill({
+      status: 422, contentType: 'application/json',
+      body: JSON.stringify({ valid: false, errors: ['Limited admin needs at least one access area.'] })
+    }));
+    await gotoDomReady(page, '/admin/?admin_login=user-validation-token');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Settings');
+    await selectSettingsSection(page, 'Users');
+    const editor = page.locator('[data-settings-path="admin.users"]');
+    await editor.getByRole('button', { name: 'Add user' }).click();
+    const user = editor.locator('[data-admin-user-card]').first();
+    await user.locator('[data-admin-user-field="name"]').fill('New operator');
+    await user.locator('[data-admin-user-field="email"]').fill(NEW_ADMIN_EMAIL);
+    await editor.getByRole('button', { name: 'Save users' }).click();
+    await expect(editor.locator('[data-admin-users-status]')).toHaveText('Limited admin needs at least one access area.');
+    await expect(user.locator('[data-admin-user-field="email"]')).toHaveValue(NEW_ADMIN_EMAIL);
+    await expect(editor.getByRole('button', { name: 'Save users' })).toBeEnabled();
   });
 
   test('loads the Spanish admin route and keeps limited admins in Store-only areas', async ({ page }) => {

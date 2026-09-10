@@ -4,6 +4,32 @@ The Store owner/operator approved the documented RPO/RTO, four-hour active-sales
 
 This runbook covers Store Git/config/build artifacts, Cloudflare KV, private R2 downloads, provider evidence, and guarded recovery. Do not commit snapshots, exports, decrypted archives, or customer data.
 
+## Store admin storage isolation
+
+Store auth and audit records use `store-admin-` prefixes. When Store and Pool
+share a KV namespace, unprefixed `admin-users:v1`, `admin-user:`, `admin-login:`,
+`admin-session:`, `admin-login-history:`, and `admin-audit:` records belong to
+the old shared layout and may contain Pool data. Never automatically copy,
+restore, or delete them as Store records.
+
+Before the first isolated release, prepare an explicitly reviewed Store user
+list under `store-admin-users:v1`, preserving the Store owner as super admin
+and assigning `limited_admin` / `accessScopes: ["store"]` only to approved
+Store operators. Preserve Pool campaign assignments in its existing list.
+An existing isolated Store list must be reviewed before replacement; a missing
+list falls back only to Store's own configured or bootstrap users.
+
+The cutover requires fresh Store sign-in: old shared sessions and invitation
+nonces are deliberately not migrated. Pool sign-in continues using its own
+records. Store backup and restore cover the isolated user list and audit
+events; sessions, nonces, and 30-day minimized login history remain excluded
+from restored authentication state. Older snapshots require explicit key and
+membership review before any admin-user restore.
+
+Rollback to a release using the shared keys reintroduces the collision. Prefer
+a forward fix; do not roll back auth isolation while either app is being used
+to manage users.
+
 ## Recovery Objectives
 
 The machine-readable source of truth is [`config/store-data-inventory.json`](../config/store-data-inventory.json). `npm run backup:inventory:audit` compares known Worker storage families with that inventory.

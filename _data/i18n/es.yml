@@ -12,6 +12,8 @@ nav:
   close_menu: Cerrar menú
   home_aria: Inicio de %{title}
 admin:
+  user_role_help: Los superadministradores pueden gestionar todo, incluida la configuración de Store y los usuarios. Los administradores limitados pueden gestionar todas las operaciones de Store, pero no la configuración ni los usuarios.
+  user_access_help: El acceso a Store incluye productos, cupones, descargas, pedidos, inventario, asistencia, análisis y marketing. La configuración y la gestión de usuarios requieren un superadministrador.
   page_title: Panel de administración
   login_title: Iniciar sesión de administración
   email_label: Correo de administración

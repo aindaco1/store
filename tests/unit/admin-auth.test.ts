@@ -86,7 +86,7 @@ describe('admin auth links', () => {
     expect(parsed.searchParams.get('tab')).toBe('store-orders');
     expect(storeState.put).toHaveBeenCalledOnce();
     const [key, value, options] = storeState.put.mock.calls[0];
-    expect(key).toMatch(/^admin-login:/);
+    expect(key).toMatch(/^store-admin-login:/);
     expect(JSON.parse(String(value))).toMatchObject({
       email: 'admin@example.com',
       role: 'super_admin',
@@ -98,7 +98,7 @@ describe('admin auth links', () => {
   it('builds one-time admin invitation links with the standard login lifetime', async () => {
     const storeState = {
       get: vi.fn(async (key: string, options?: { type?: string }) => {
-        if (key !== 'admin-users:v1') return null;
+        if (key !== 'store-admin-users:v1') return null;
         const value = JSON.stringify({
           users: [{
             email: 'new-admin@example.com',
@@ -126,7 +126,7 @@ describe('admin auth links', () => {
     expect(parsed.pathname).toBe('/admin/');
     expect(parsed.searchParams.get('admin_login')).toBeTruthy();
     expect(parsed.searchParams.get('tab')).toBe('store-orders');
-    const loginPut = storeState.put.mock.calls.find(([key]) => String(key).startsWith('admin-login:'));
+    const loginPut = storeState.put.mock.calls.find(([key]) => String(key).startsWith('store-admin-login:'));
     expect(loginPut?.[2]).toMatchObject({ expirationTtl: 900 });
     expect(JSON.parse(String(loginPut?.[1] || '{}'))).toMatchObject({
       email: 'new-admin@example.com',
@@ -138,7 +138,7 @@ describe('admin auth links', () => {
 
   it('rejects an unredeemed invitation after the invited user is removed', async () => {
     const storeState = new MockKVNamespace();
-    await storeState.put('admin-users:v1', JSON.stringify({
+    await storeState.put('store-admin-users:v1', JSON.stringify({
       users: [{
         email: 'new-admin@example.com',
         role: 'limited_admin',
@@ -155,7 +155,7 @@ describe('admin auth links', () => {
       source: 'admin_user_invitation'
     });
     const token = new URL(loginUrl).searchParams.get('admin_login') || '';
-    await storeState.put('admin-users:v1', JSON.stringify({
+    await storeState.put('store-admin-users:v1', JSON.stringify({
       users: [{ email: 'owner@example.com', role: 'super_admin', accessScopes: [] }]
     }));
 
@@ -167,7 +167,7 @@ describe('admin auth links', () => {
 
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject({ error: 'Unauthorized' });
-    expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-session:'))).toHaveLength(0);
+    expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('store-admin-session:'))).toHaveLength(0);
   });
 
   it('consumes authenticated order notification links once and creates a shorter admin session', async () => {
@@ -208,15 +208,15 @@ describe('admin auth links', () => {
     expect(sessionCookie).toContain('SameSite=Lax');
     expect(sessionCookie).toContain('Max-Age=1800');
     expect(sessionCookie).toContain('Secure');
-    expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-login:'))).toHaveLength(0);
-    const sessionKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('admin-session:'));
+    expect(Array.from(storeState.store.keys()).filter((key) => key.startsWith('store-admin-login:'))).toHaveLength(0);
+    const sessionKeys = Array.from(storeState.store.keys()).filter((key) => key.startsWith('store-admin-session:'));
     expect(sessionKeys).toHaveLength(1);
     expect(JSON.parse(storeState.store.get(sessionKeys[0]) || '{}')).toMatchObject({
       email: 'admin@example.com',
       role: 'super_admin',
       source: 'store_order_admin_notification'
     });
-    const sessionPut = storeState.put.mock.calls.find(([key]) => String(key).startsWith('admin-session:'));
+    const sessionPut = storeState.put.mock.calls.find(([key]) => String(key).startsWith('store-admin-session:'));
     expect(sessionPut?.[2]).toMatchObject({ expirationTtl: 1800 });
 
     const secondResponse = await handleAdminAuthExchange(
