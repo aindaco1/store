@@ -44,7 +44,7 @@ This file is a current capability inventory and forward plan, not release histor
 ### Admin, publishing, and operations
 
 - [x] **Protected administration** — English and Spanish admin routes use magic links, signed sessions, CSRF and origin checks, role and scope enforcement, optional Turnstile, rate limits, and private/no-store responses.
-- [x] **Independent Store users** — Store user, login, session, history, and audit keys are isolated from Pool. The user editor asks for Name, Email, and Role and automatically assigns Store access to limited admins; settings and user management require a super admin. See the [rollout evidence](release-evidence/2026-09-09-admin-access-isolation.md).
+- [x] **Independent Store users** — Store user, login, session, history, and audit keys are isolated from Pool. The user editor asks for Name, Email, and Role and automatically assigns Store access to limited admins; settings and user management require a super admin. See the [release history index](README.md#capabilities-and-release-history) for rollout evidence.
 - [x] **Store operations dashboard** — Settings, Products, Orders, Downloads, Coupons, Analytics, Marketing, Inventory, users, readiness, plan usage, runtime diagnostics, and observability are available through one responsive dashboard.
 - [x] **Repository-backed publishing** — Production product, configuration, and media changes use guarded GitHub writes; local development uses the test-only repository sidecar.
 - [x] **Order and fulfillment operations** — Admin can review orders, update item fulfillment, manage download access, check in attendees, inspect imported order context, and export operational data.

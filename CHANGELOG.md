@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore the product option dropdown caret using the configured Store text color on catalog and product pages.
+
 - Isolate Store users, login links, sessions, login history, and audit events
   from Pool records when both Workers share a KV namespace. Existing Store
   sessions require fresh sign-in after the cutover.

@@ -59,7 +59,7 @@ Supported statuses:
 - `draft`
 - `archived`
 
-Variants live on the product:
+Variants live on the product. Catalog and product-page option dropdowns use a visible theme-colored caret, including during keyboard focus:
 
 ```yaml
 variant_option_name: Size

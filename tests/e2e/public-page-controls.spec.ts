@@ -202,6 +202,9 @@ test.describe('Store Public Page Controls', () => {
     await expect(card.locator('[data-store-price]')).toHaveText('$30');
     await expect(card.locator('[data-store-variant-select]')).toBeVisible();
     await expect(card.locator('[data-store-variant-select]')).toHaveValue('s');
+    await expect(card.locator('[data-store-variant-select]')).toHaveCSS('background-image', /linear-gradient/);
+    await card.locator('[data-store-variant-select]').focus();
+    await expect(card.locator('[data-store-variant-select]')).toHaveCSS('background-image', /linear-gradient/);
     await expect(card.locator('[data-store-availability]')).toHaveText('Only 1 left');
     await expect(card.locator('[data-store-availability]')).toHaveAttribute('data-store-inventory-state', 'low');
     await expect(card.locator('[data-store-quantity]')).toHaveValue('1');
@@ -213,8 +216,28 @@ test.describe('Store Public Page Controls', () => {
     await expect(page.locator(CART_ROOT)).toHaveCount(1);
     await expect(page.locator(LEGACY_CART_SELECTORS)).toHaveCount(0);
     await expect(await firstProductCard(page)).toBeVisible();
+    await expect((await firstProductCard(page)).locator('[data-store-variant-select]')).toHaveCSS('background-image', /linear-gradient/);
     await expectNoHorizontalOverflow(page);
   });
+
+  for (const localePrefix of ['', '/es']) {
+    test(`product detail option caret stays visible during focus and selection (${localePrefix || 'en'})`, async ({ page }) => {
+      await gotoDomReady(page, `${localePrefix}/products/a-night-in-paradiso-sponsorship/`);
+      const select = page.locator('[data-store-variant-select]');
+      for (const width of [1280, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(select).toBeVisible();
+        await expect(select).toHaveCSS('background-image', /linear-gradient/);
+        await select.focus();
+        await expect(select).toHaveCSS('background-image', /linear-gradient/);
+        await select.selectOption('shout-out');
+        await select.press('Tab');
+        await expect(select).toHaveValue('shout-out');
+        await expect(page.locator('button.store-add-item')).toContainText('$250');
+        await expectNoHorizontalOverflow(page);
+      }
+    });
+  }
 
   test('archived Film Fatale stays out of the catalog and cannot be added from its direct page', async ({ page }) => {
     await gotoDomReady(page, '/');
