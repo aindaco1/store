@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sha256File } from './lib/file-integrity.mjs';
+import { planSnapshotRetention } from '../shared/dust-wave-platform/packages/release-core/src/backup-planning.js';
+import { readRetentionReceipt } from '../shared/dust-wave-platform/packages/release-core/src/backup-receipts.js';
 import { loadStoreDataInventory } from './lib/store-data-inventory.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,64 +36,6 @@ function resolveRetentionRoot(value) {
   return fs.realpathSync(root);
 }
 
-function utcDay(date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function utcMonth(date) {
-  return date.toISOString().slice(0, 7);
-}
-
-function utcIsoWeek(date) {
-  const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = value.getUTCDay() || 7;
-  value.setUTCDate(value.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((value.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${value.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
-}
-
-function readReceipt(directory) {
-  const manifestPath = path.join(directory, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) return { ok: false, reason: 'missing_manifest' };
-  if (fs.lstatSync(manifestPath).isSymbolicLink()) return { ok: false, reason: 'symbolic_link_manifest' };
-  let receipt;
-  try {
-    receipt = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  } catch {
-    return { ok: false, reason: 'invalid_manifest' };
-  }
-  if (receipt.encrypted !== true || !String(receipt.archive || '').trim()) {
-    return { ok: false, reason: 'not_encrypted_receipt' };
-  }
-  const createdAt = new Date(String(receipt.completedAt || receipt.createdAt || ''));
-  if (!Number.isFinite(createdAt.getTime())) return { ok: false, reason: 'invalid_created_at' };
-  const archiveName = String(receipt.archive).trim();
-  if (path.basename(archiveName) !== archiveName) return { ok: false, reason: 'unsafe_archive_name' };
-  const archivePath = path.join(directory, archiveName);
-  if (!fs.existsSync(archivePath)) return { ok: false, reason: 'missing_archive' };
-  const archiveStat = fs.lstatSync(archivePath);
-  if (archiveStat.isSymbolicLink()) return { ok: false, reason: 'symbolic_link_archive' };
-  if (!archiveStat.isFile()) return { ok: false, reason: 'missing_archive' };
-  const expectedSha256 = String(receipt.archiveSha256 || '').trim().toLowerCase();
-  if (!/^[a-f0-9]{64}$/.test(expectedSha256) || sha256File(archivePath) !== expectedSha256) {
-    return { ok: false, reason: 'archive_checksum_mismatch' };
-  }
-  return { ok: true, receipt, createdAt };
-}
-
-function retainBuckets(snapshots, count, keyFor, reason, retained) {
-  if (count <= 0) return;
-  const buckets = new Set();
-  for (const snapshot of snapshots) {
-    const key = keyFor(snapshot.createdAt);
-    if (buckets.has(key)) continue;
-    buckets.add(key);
-    retained.get(snapshot.name).add(reason);
-    if (buckets.size >= count) break;
-  }
-}
-
 export function planBackupRetention(options = {}) {
   if (!String(options.root || '').trim()) throw new Error('Backup retention root is required.');
   const root = resolveRetentionRoot(options.root);
@@ -105,7 +48,7 @@ export function planBackupRetention(options = {}) {
       continue;
     }
     const directory = path.join(root, entry.name);
-    const read = readReceipt(directory);
+    const read = readRetentionReceipt(directory);
     if (!read.ok) {
       untouched.push({ name: entry.name, reason: read.reason });
       continue;
@@ -118,46 +61,7 @@ export function planBackupRetention(options = {}) {
       archiveBytes: Number(read.receipt.archiveBytes || fs.statSync(path.join(directory, read.receipt.archive)).size)
     });
   }
-  snapshots.sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
-  const retained = new Map(snapshots.map((snapshot) => [snapshot.name, new Set()]));
-  if (snapshots.length) retained.get(snapshots[0].name).add('newest');
-  retainBuckets(snapshots, Number(configured.daily || 0), utcDay, 'daily', retained);
-  retainBuckets(snapshots, Number(configured.weekly || 0), utcIsoWeek, 'weekly', retained);
-  retainBuckets(snapshots, Number(configured.monthly || 0), utcMonth, 'monthly', retained);
-  if (configured.releaseSnapshots !== false) {
-    for (const snapshot of snapshots.filter((entry) => entry.releaseSnapshot)) {
-      retained.get(snapshot.name).add('release');
-    }
-  }
-
-  const keep = snapshots.filter((snapshot) => retained.get(snapshot.name).size > 0).map((snapshot) => ({
-    name: snapshot.name,
-    createdAt: snapshot.createdAt.toISOString(),
-    archiveBytes: snapshot.archiveBytes,
-    reasons: Array.from(retained.get(snapshot.name)).sort()
-  }));
-  const prune = snapshots.filter((snapshot) => retained.get(snapshot.name).size === 0).map((snapshot) => ({
-    name: snapshot.name,
-    createdAt: snapshot.createdAt.toISOString(),
-    archiveBytes: snapshot.archiveBytes
-  }));
-  return {
-    schemaVersion: 1,
-    plannedAt: new Date().toISOString(),
-    rootName: path.basename(root),
-    retention: {
-      daily: Number(configured.daily || 0),
-      weekly: Number(configured.weekly || 0),
-      monthly: Number(configured.monthly || 0),
-      releaseSnapshots: configured.releaseSnapshots !== false
-    },
-    keep,
-    prune,
-    untouched: untouched.sort((left, right) => left.name.localeCompare(right.name)),
-    bytesEligibleForPrune: prune.reduce((sum, snapshot) => sum + snapshot.archiveBytes, 0),
-    containsCustomerData: false,
-    executeByDefault: false
-  };
+  return planSnapshotRetention({ snapshots, retention: configured, untouched, rootName: path.basename(root) });
 }
 
 export function executeBackupRetention(plan, options = {}) {
@@ -178,7 +82,7 @@ export function executeBackupRetention(plan, options = {}) {
     if (!pathIsWithin(root, directory)) throw new Error('Backup prune target escapes the retention root.');
     const stat = fs.lstatSync(directory);
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error(`Backup prune target is unsafe: ${snapshot.name}.`);
-    const receipt = readReceipt(directory);
+    const receipt = readRetentionReceipt(directory);
     if (!receipt.ok) throw new Error(`Backup prune target failed revalidation: ${snapshot.name}:${receipt.reason}.`);
     fs.rmSync(directory, { recursive: true, force: false });
     deleted.push(snapshot.name);

@@ -320,7 +320,7 @@
     data-debug-console-logging-enabled="{{ site.debug.console_logging_enabled | default: true }}"
     data-debug-verbose-console-logging="{{ site.debug.verbose_console_logging | default: true }}"></script>
   <script data-cfasync="false" src="/assets/js/logger.js?v={{ asset_version }}" defer data-store-logger-script="true"></script>
-  <script data-cfasync="false" src="/assets/js/video-first-frame-poster.js?v={{ asset_version }}" defer></script>
+  <script data-dustwave-video-posters="true" data-poster-global="StoreVideoPosters" data-poster-cache-key="store_first_frame_poster" data-poster-url-base="page" data-cfasync="false" src="/shared/dust-wave-platform/packages/site-shell/src/video-first-frame-poster-browser.js?v={{ asset_version }}" defer></script>
   {% include form-control-identity-script.html asset_version=asset_version %}
   <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}" defer></script>
   <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js?v={{ asset_version }}" defer></script>

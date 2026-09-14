@@ -60,3 +60,5 @@ Keep procedures in the guide that owns the topic and link to them from other gui
 Keep README, LICENSE, AGENTS, and CHANGELOG at the repository root. Root `admin.md`, `orders.md`, `order-success.md`, and `terms.md` are Jekyll page sources. Worker and test READMEs stay beside their code, and shared submodules retain their own documentation.
 
 When moving a guide, update incoming links and check relative paths and section anchors from its new location. Keep this index current as guides are added or consolidated.
+
+- [Platform reuse batch 2](platform-reuse-batch2-2026-09-14.md): shared primitives, characterization and independent rollback.

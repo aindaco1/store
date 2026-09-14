@@ -4,22 +4,22 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = 'ae380c43a16af352ae946f47dd1b7aa4e5b093f0';
+const expectedCommit = '8609b10348da42f20e51b5a9048e074a3a3ae5e2';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.34.1',
-  '@dustwave/admin-shell': '0.10.2',
+  '@dustwave/platform-workspace': '0.38.0',
+  '@dustwave/admin-shell': '0.11.0',
   '@dustwave/build-core': '0.2.0',
   '@dustwave/design-core': '0.2.0',
   '@dustwave/inventory-core': '0.1.0',
   '@dustwave/media-core': '0.4.0',
   '@dustwave/product-video-core': '0.1.0',
-  '@dustwave/release-core': '0.2.0',
+  '@dustwave/release-core': '0.4.0',
   '@dustwave/shipping-core': '0.2.0',
-  '@dustwave/site-shell': '0.2.0',
+  '@dustwave/site-shell': '0.3.0',
   '@dustwave/tax-core': '0.3.0',
-  '@dustwave/test-core': '0.1.0',
-  '@dustwave/timed-text': '0.10.0',
-  '@dustwave/worker-core': '0.12.1'
+  '@dustwave/test-core': '0.2.0',
+  '@dustwave/timed-text': '0.11.1',
+  '@dustwave/worker-core': '0.15.0'
 };
 
 function readJson(relativePath: string) {
@@ -82,6 +82,7 @@ describe('shared platform pin', () => {
       'packages/inventory-core/src/index.js',
       'packages/media-core/src/site-catalog.js',
       'packages/site-shell/src/a11y-live-browser.js',
+      'packages/site-shell/src/video-first-frame-poster-browser.js',
       'packages/site-shell/src/cart-icon-browser.js',
       'packages/site-shell/src/deferred-stylesheets-browser.js',
       'packages/site-shell/src/form-control-identity-browser.js',
@@ -105,6 +106,8 @@ describe('shared platform pin', () => {
       'packages/release-core/src/cache-policy.js',
       'packages/release-core/src/cloudflare-admin-response-rule.js',
       'packages/release-core/src/file-integrity.js',
+      'packages/release-core/src/backup-planning.js',
+      'packages/release-core/src/backup-receipts.js',
       'packages/release-core/src/kv-backup-records.js',
       'packages/release-core/src/provider-evidence.js',
       'packages/release-core/src/screen-reader-evidence.js',
