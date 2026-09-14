@@ -195,6 +195,10 @@ minify_site_assets() {
 }
 
 verify_build_artifacts() {
+  if [[ -e _site/shared/dust-wave-platform/examples ]]; then
+    echo "Platform starter recipes leaked into the generated site"
+    return 1
+  fi
   if [[ -e _site/shared/dust-wave-jekyll-template ]]; then
     echo "The source-upgrade Jekyll template leaked into the generated site"
     return 1

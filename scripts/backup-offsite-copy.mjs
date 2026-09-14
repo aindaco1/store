@@ -5,7 +5,8 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
-import { sha256File } from './lib/file-integrity.mjs';
+import { inspectEncryptedSnapshot, requireBackupDirectory } from '../shared/dust-wave-platform/packages/release-core/src/backup-receipts.js';
+export { inspectEncryptedSnapshot };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ACKNOWLEDGEMENT = 'STORE_BACKUP_OFF_DEVICE_COPY';
@@ -23,59 +24,9 @@ function pathIsWithin(parent, candidate) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function requireRealDirectory(value, label) {
-  const resolved = path.resolve(String(value || ''));
-  if (!value || !fs.existsSync(resolved)) throw new Error(`${label} must be an existing directory.`);
-  const stat = fs.lstatSync(resolved);
-  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`${label} must be a real, non-symlinked directory.`);
-  return fs.realpathSync(resolved);
-}
-
-function safeSnapshotName(value) {
-  const name = String(value || '').trim();
-  if (!name || name !== path.basename(name) || !/^[A-Za-z0-9._-]+$/.test(name)) {
-    throw new Error('Encrypted receipt outputName is not a safe directory name.');
-  }
-  return name;
-}
-
-export function inspectEncryptedSnapshot(snapshot) {
-  const source = requireRealDirectory(snapshot, 'Snapshot');
-  const manifestPath = path.join(source, 'manifest.json');
-  if (!fs.existsSync(manifestPath) || !fs.lstatSync(manifestPath).isFile()) {
-    throw new Error('Snapshot manifest.json is missing.');
-  }
-  const receipt = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  if (receipt.encrypted !== true || !String(receipt.archive || '').trim()) {
-    throw new Error('Snapshot is not an encrypted backup receipt.');
-  }
-  const archiveName = path.basename(String(receipt.archive));
-  if (archiveName !== receipt.archive || !/\.tar\.gz\.(?:age|gpg)$/.test(archiveName)) {
-    throw new Error('Encrypted receipt archive path is invalid.');
-  }
-  const archivePath = path.join(source, archiveName);
-  if (!fs.existsSync(archivePath) || !fs.lstatSync(archivePath).isFile()) {
-    throw new Error('Encrypted archive is missing.');
-  }
-  const archiveSha256 = sha256File(archivePath);
-  if (archiveSha256 !== String(receipt.archiveSha256 || '').trim().toLowerCase()) {
-    throw new Error('Encrypted archive checksum does not match its receipt.');
-  }
-  return {
-    source,
-    receipt,
-    manifestPath,
-    archivePath,
-    archiveName,
-    archiveSha256,
-    archiveBytes: fs.statSync(archivePath).size,
-    outputName: safeSnapshotName(receipt.outputName)
-  };
-}
-
 export function planOffsiteCopy(options = {}) {
   const snapshot = inspectEncryptedSnapshot(options.snapshot);
-  const destinationRoot = requireRealDirectory(options.destination, 'Destination');
+  const destinationRoot = requireBackupDirectory(options.destination, 'Destination');
   if (pathIsWithin(ROOT, destinationRoot)) throw new Error('Off-device destination cannot be inside the repository.');
   if (pathIsWithin(snapshot.source, destinationRoot) || pathIsWithin(destinationRoot, snapshot.source)) {
     throw new Error('Off-device destination and source snapshot cannot contain one another.');

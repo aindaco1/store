@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { evidenceAgeCheck } from '../shared/dust-wave-platform/packages/release-core/src/backup-planning.js';
 import { auditStoreDataInventory } from './audit-store-data-inventory.mjs';
 import { commandAvailable } from './lib/command-runner.mjs';
 import { buildSecretInventory, createBackupSnapshot } from './store-backup.mjs';
@@ -31,42 +32,6 @@ function readJsonIfPresent(filePath) {
   const resolved = path.resolve(filePath);
   if (!fs.existsSync(resolved)) return null;
   return JSON.parse(fs.readFileSync(resolved, 'utf8'));
-}
-
-function ageHours(timestamp, now = new Date()) {
-  const parsed = Date.parse(String(timestamp || ''));
-  if (!Number.isFinite(parsed)) return null;
-  return Math.max(0, (now.getTime() - parsed) / (60 * 60 * 1000));
-}
-
-function evidenceAgeCheck({ id, label, evidence, timestampFields, maxAgeHours, required }) {
-  if (!evidence) {
-    return {
-      id,
-      status: required ? 'FAIL' : 'WARN',
-      detail: `${label} evidence is unavailable`,
-      ageHours: null,
-      maxAgeHours
-    };
-  }
-  const timestamp = timestampFields.map((field) => evidence[field]).find(Boolean);
-  const age = ageHours(timestamp);
-  if (age === null) {
-    return {
-      id,
-      status: 'FAIL',
-      detail: `${label} evidence has no valid timestamp`,
-      ageHours: null,
-      maxAgeHours
-    };
-  }
-  return {
-    id,
-    status: age <= maxAgeHours ? 'PASS' : (required ? 'FAIL' : 'WARN'),
-    detail: `${label} evidence age is ${age.toFixed(2)} hours`,
-    ageHours: Number(age.toFixed(2)),
-    maxAgeHours
-  };
 }
 
 export async function collectBackupReadiness(options = {}) {

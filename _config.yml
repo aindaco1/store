@@ -37,6 +37,7 @@ exclude:
   - Containerfile.dev
   - Containerfile.playwright.dev
   - shared/dust-wave-jekyll-template
+  - shared/dust-wave-platform/examples
 platform:
   name: Shop
   version: 1.3.7

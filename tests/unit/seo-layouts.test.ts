@@ -205,7 +205,7 @@ describe('Store SEO templates', () => {
       ['shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'a11y-live-browser.js'],
       ['assets', 'js', 'store-config.js'],
       ['assets', 'js', 'logger.js'],
-      ['assets', 'js', 'video-first-frame-poster.js'],
+      ['shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'video-first-frame-poster-browser.js'],
       ['shared', 'dust-wave-platform', 'packages', 'site-shell', 'src', 'form-control-identity-browser.js'],
       [
         'shared',
