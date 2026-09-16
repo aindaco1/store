@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Preserve the selected shared Podman engine and CLI. Project startup no longer
+  restarts VMs or kills unrelated listeners when a local port is occupied.
+
 - Restore the product option dropdown caret using the configured Store text color on catalog and product pages.
 - Pin the Worker development toolchain's Sharp dependency to 0.35.4 to resolve GHSA-rgj7-g3m4-5g8c without changing production dependencies.
 

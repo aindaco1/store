@@ -8,11 +8,12 @@ SITE_IMAGE="localhost/store-dev-site:latest"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [ -x "$candidate/podman" ]; then

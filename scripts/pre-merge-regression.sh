@@ -19,11 +19,12 @@ HOST_JEKYLL_FAILURE_REASON=""
 HOST_JEKYLL_LOG=""
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [[ -x "$candidate/podman" ]]; then
@@ -51,21 +52,9 @@ prefer_current_node_path() {
 }
 
 stabilize_podman_connection() {
-  local socket_path=""
-
   prefer_podman_path || return 0
   command -v podman >/dev/null 2>&1 || return 0
   store_select_podman_connection
-
-  if [[ -n "${CONTAINER_CONNECTION:-}" ]]; then
-    unset CONTAINER_HOST
-    return 0
-  fi
-
-  socket_path="$(podman machine inspect --format '{{.ConnectionInfo.PodmanSocket.Path}}' podman-machine-default 2>/dev/null || true)"
-  if [[ -n "${socket_path}" && -S "${socket_path}" ]]; then
-    export CONTAINER_HOST="unix://${socket_path}"
-  fi
 }
 
 check_host_jekyll_status() {
@@ -533,21 +522,10 @@ fi
 
 run_phase "7b. Podman release resource check" env PODMAN_REQUIRE_RELEASE_RESOURCES=true npm run podman:doctor
 
-if command -v lsof >/dev/null 2>&1; then
-  EXISTING_WORKER_PIDS="$(lsof -ti tcp:8989 || true)"
-  if [[ -n "${EXISTING_WORKER_PIDS}" ]]; then
-    echo "Stopping existing process(es) on port 8989"
-    while IFS= read -r pid; do
-      [[ -z "${pid}" ]] && continue
-      process_name="$(ps -p "${pid}" -o comm= 2>/dev/null | tr -d '[:space:]' || true)"
-      if [[ "${process_name}" = "gvproxy" ]]; then
-        echo "Skipping gvproxy on port 8989; Podman ports are cleaned up via pod removal."
-        continue
-      fi
-      kill "${pid}" 2>/dev/null || true
-    done <<< "${EXISTING_WORKER_PIDS}"
-    sleep 1
-  fi
+if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:8989 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port 8989 is occupied. Stop its owning project explicitly before running this isolated gate." >&2
+  lsof -nP -iTCP:8989 -sTCP:LISTEN >&2 || true
+  exit 1
 fi
 
 if [[ -f worker/.dev.vars ]]; then
