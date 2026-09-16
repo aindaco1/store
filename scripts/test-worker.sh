@@ -42,11 +42,12 @@ fail() { echo -e "${RED}✗${NC} $1"; exit 1; }
 warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [ -x "$candidate/podman" ]; then

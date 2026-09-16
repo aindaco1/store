@@ -2,7 +2,7 @@
 
 # Keep Store on the user's selected engine without managing another VM's lifecycle.
 store_select_podman_connection() {
-  [ -z "${CONTAINER_CONNECTION:-}" ] || return 0
+  [ -z "${CONTAINER_HOST:-}" ] && [ -z "${CONTAINER_CONNECTION:-}" ] || return 0
   case "$(uname -s)" in
     Darwin|MINGW*|MSYS*|CYGWIN*) ;;
     *) return 0 ;;
@@ -13,7 +13,7 @@ store_select_podman_connection() {
   selected_connection="$(podman system connection list \
     --format '{{if .Default}}{{.Name}}{{end}}' 2>/dev/null | awk 'NF {print; exit}' || true)"
   case "$selected_connection" in
-    ''|podman-machine-default) return 0 ;;
+    '') return 0 ;;
   esac
   export CONTAINER_CONNECTION="$selected_connection"
 }

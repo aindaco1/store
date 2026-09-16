@@ -33,6 +33,7 @@ prefer_current_node_path() {
 prefer_current_node_path || true
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
     local candidate=""
     for candidate in \
         "/opt/podman/bin" \

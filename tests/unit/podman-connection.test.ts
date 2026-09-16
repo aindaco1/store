@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const helper = resolve('scripts/podman-connection.sh');
 
-function selectConnection(os: string, selected: string, explicit = '', status = 0) {
+function selectConnection(os: string, selected: string, explicit = '', status = 0, host = '') {
   const result = spawnSync('bash', ['-c', `
     set -euo pipefail
     uname() { printf '%s\\n' "$STORE_TEST_OS"; }
@@ -24,6 +25,7 @@ function selectConnection(os: string, selected: string, explicit = '', status = 
     env: {
       ...process.env,
       CONTAINER_CONNECTION: explicit,
+      CONTAINER_HOST: host,
       STORE_TEST_OS: os,
       STORE_TEST_SELECTED: selected,
       STORE_TEST_STATUS: String(status)
@@ -45,8 +47,12 @@ describe('Store Podman connection selection', () => {
     expect(selectConnection('Darwin', 'shared-engine', 'explicit-engine')).toBe('explicit-engine');
   });
 
-  it('retains default-machine lifecycle management for the standard connection', () => {
-    expect(selectConnection('Darwin', 'podman-machine-default')).toBe('');
+  it('pins the standard default without managing its lifecycle', () => {
+    expect(selectConnection('Darwin', 'podman-machine-default')).toBe('podman-machine-default');
+  });
+
+  it('preserves an explicit URL without selecting a conflicting connection', () => {
+    expect(selectConnection('Darwin', 'shared-engine', '', 0, 'unix:///tmp/explicit.sock')).toBe('');
   });
 
   it('leaves native Linux engine selection unchanged', () => {
@@ -56,5 +62,20 @@ describe('Store Podman connection selection', () => {
   it('retains the existing fallback when no connection is available', () => {
     expect(selectConnection('Darwin', '')).toBe('');
     expect(selectConnection('Darwin', '', '', 125)).toBe('');
+  });
+  it('reports a busy host port without signalling its owner', () => {
+    const source = readFileSync(resolve('scripts/dev-podman.sh'), 'utf8');
+    const fn = source.slice(source.indexOf('wait_for_port_release() {'), source.indexOf('ensure_podman_ready() {'));
+    const result = spawnSync('bash', ['-c', `
+      set -euo pipefail
+      lsof() { echo 'unrelated project listener'; }
+      sleep() { :; }
+      kill() { echo 'UNSAFE SIGNAL' >&2; return 99; }
+      ${fn}
+      wait_for_port_release 4000 Jekyll
+    `], { encoding: 'utf8' });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('Port 4000 is still in use');
+    expect(result.stderr).not.toContain('UNSAFE SIGNAL');
   });
 });

@@ -47,37 +47,19 @@ Not included:
 - [Podman](https://podman.io/docs/installation)
 - optional [Stripe CLI](https://stripe.com/docs/stripe-cli) for local webhook forwarding
 
-On macOS and Windows, Store honors an explicit `CONTAINER_CONNECTION` first,
-then a non-default-machine connection selected with `podman system connection default`.
-The doctor, dev stack, and pre-merge gate share this selection helper and reuse
-that engine without starting or restarting its VM. When the selected connection
-is `podman-machine-default` (or none is configured), Store retains its existing
-default-machine startup behavior. On Linux, it talks directly to the local
-rootless Podman engine.
-
-When another task already owns the active macOS/Windows VM slot, select its
-registered connection as Podman's default or use an explicit per-command override:
-
-```bash
-CONTAINER_CONNECTION=<connection-name> npm run podman:doctor
-CONTAINER_CONNECTION=<connection-name> npm run test:premerge
-```
-
-If startup reports that another VM is already running, this is VM contention,
-not evidence of a crash. Check `podman system connection list` and run the doctor
-against the existing engine. Machine listings are provider-specific: use
-`CONTAINERS_MACHINE_PROVIDER=applehv podman machine inspect <name>` for an Apple
-virtualization VM when the configured provider is libkrun. Resize a shared VM
-only after its workloads have stopped; keep its images and volumes intact.
-
-An explicit `CONTAINER_CONNECTION` is authoritative across the doctor, dev stack, and pre-merge wrapper. Store checks that engine but does not manage the selected VM's lifecycle. The strict release check still verifies the 6 GiB configured-memory baseline, allowing for the guest operating system's reserved memory when only engine-reported capacity is available.
+On macOS and Windows, Store preserves explicit `CONTAINER_HOST` and
+`CONTAINER_CONNECTION` endpoints, otherwise it pins Podman's selected default
+connection. Project tools never initialize, start, stop, or restart VMs. Start
+and select a shared machine at the host level before launching projects. Native
+Linux uses its rootless engine. All launchers retain the Podman executable on
+PATH, avoiding mixed package-installer/Homebrew clients.
 
 Release and pre-merge suites require at least 6 GiB of Podman machine memory on macOS and Windows. Browser traces, Jekyll, Wrangler/Miniflare, and the production-like Worker can exhaust a 4 GiB VM during repeated full-suite runs even when individual focused tests pass. Configure the machine while it is stopped:
 
 ```bash
-podman machine stop podman-machine-default
-podman machine set --memory 6144 podman-machine-default
-podman machine start podman-machine-default
+podman machine stop <selected-machine>
+podman machine set --memory 6144 <selected-machine>
+podman machine start <selected-machine>
 ```
 
 `npm run podman:doctor` reports the configured memory. Ordinary development gets a warning below 6 GiB; `npm run test:premerge` and `npm run release:smoke` fail before starting long Podman phases. After resizing, run the doctor because the selected VM backend must remain reachable with the configured value.
@@ -263,8 +245,9 @@ Container names use the `store-dev-*` prefix across the local Podman helpers.
 If startup stalls, check the Podman machine:
 
 ```bash
-podman machine inspect
-podman machine start
+podman system connection list
+podman machine list
+podman info
 ```
 
 Then retry:
@@ -291,3 +274,45 @@ npm run test:e2e:headless:podman
 ```
 
 If the doctor passes and the headless Podman suite is green, the local Store environment is ready for normal work.
+
+## Concurrent projects
+
+Use one shared rootless engine on macOS. Pool publishes ports 4000/8787 with
+`pool-dev-*` resources; Store publishes 4002/8989 with `store-dev-*` resources.
+Each launcher removes only its own project's containers/pod. An occupied host
+port causes startup to fail with a diagnostic; it never signals an unknown
+listener. One development stack per project is supported; concurrent checkouts
+of the same project must not share these fixed resource names and local state.
+
+Set `CONTAINER_CONNECTION=<name>` or `CONTAINER_HOST=<url>` per command to use a
+specific engine. Set the normal host default with
+`podman system connection default <name>`; project launchers do not change it.
+Use a host login service to start the selected VM once, rather than putting
+machine recovery in each project's supervisor. Restarting project containers
+is safe; restarting the engine interrupts every project.
+
+The 6 GiB release minimum covers a single project's gate, not all concurrent
+workloads. Budget RAM for the combined builds, browser suites, and services;
+inspect `podman stats` and `podman system df`. Resize only during an idle
+maintenance window. No project launcher prunes shared storage.
+
+## Updating the machine
+
+Check `podman version` after updating the host CLI. Keep the VM engine on the
+same supported major/minor line. In an idle maintenance window, pause any login
+watchdog, confirm `podman ps` has no running workloads, and use Podman's in-place
+OS update, for example:
+
+```bash
+podman machine os apply quay.io/podman/machine-os:6.1 <selected-machine>
+podman machine stop <selected-machine>
+podman machine set --memory 16384 <selected-machine>
+podman machine start <selected-machine>
+podman version
+npm run podman:doctor
+```
+
+Choose the image version and RAM for the installed CLI and host capacity; these
+example values are not automatic updates. Preserve existing images/volumes and
+compare inventories before/after. Restore the login watchdog after verification.
+Official reference: [machine OS apply](https://docs.podman.io/en/latest/markdown/podman-machine-os-apply.1.html).

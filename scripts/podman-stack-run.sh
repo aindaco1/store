@@ -11,11 +11,12 @@ DEV_PID=""
 STOP_FILE=""
 
 prefer_podman_path() {
+  command -v podman >/dev/null 2>&1 && return 0
   local candidate=""
   for candidate in \
+    "/opt/homebrew/bin" \
     "/opt/podman/bin" \
     "/usr/local/podman/bin" \
-    "/opt/homebrew/bin" \
     "/usr/local/bin"
   do
     if [ -x "$candidate/podman" ]; then
