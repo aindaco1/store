@@ -24,8 +24,33 @@ and Design Core 0.3.0 exports; Store does not opt into the new editor styles.
 
 The regression fails against the old pin and passes with the new pin. Focused
 tax and Platform-pin suites pass all 18 tests. The fixture uses a synthetic
-street address; no customer details are recorded here. Full release checks and
-production acceptance are appended after completion.
+street address; no customer details are recorded here.
+
+- Full local pre-merge checks passed: 569 unit, 22 security, and 57 browser tests,
+  together with builds, content, localization, templates, secret checks, and
+  Worker smoke checks.
+- Root and Worker production and full dependency audits all reported zero
+  vulnerabilities.
+- Backup inventory validation passed for 48 storage families; backup planning
+  passed in dry-run mode. A synthetic restore rehearsal passed for 17 records,
+  including five orders, with 26 verified artifacts and 50 planned actions.
+  This used no production records or provider writes. The separate backup
+  readiness report still warns that current production backup/rehearsal evidence
+  is missing; remote provider inventory was not requested. Synthetic rehearsal
+  success does not establish production backup readiness.
+- [PR 85](https://github.com/aindaco1/store/pull/85) passed the
+  [hosted Merge Smoke gate](https://github.com/aindaco1/store/actions/runs/35152124621)
+  and merged at `ecdae3dd09433be0e428e4c1290bf9952bd0772e`.
+- [Production deployment](https://github.com/aindaco1/store/actions/runs/35152898153)
+  used that exact reviewed ref and succeeded for Worker and Pages, including
+  cache purges, admin response security policy, and the 52-URL public crawl audit.
+  Worker version: `83cb5478-2405-4276-a6ce-b993c307e3ca`.
+- Read-only production quotes for the authorized verification address returned
+  $11.90 at 7.625% from `nm_grt_fallback_flat` before deployment, then $11.80 at
+  7.5625% from `nm_grt_api_intuit`, location `29-504`, after deployment. The input
+  subtotal was $156.00 with $5.17 shipping. The response was HTTP 200 with
+  `Cache-Control: private, no-store, max-age=0`. Only redacted amounts and provider
+  metadata were retained. No order, payment, or customer record was changed.
 
 ## Ethical review and rollback
 
