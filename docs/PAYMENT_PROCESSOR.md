@@ -35,6 +35,13 @@ Rules for new payment code:
 - Round only at controlled boundaries, then store the rounded cent value.
 - Use the stored order totals for emails, analytics, exports, fulfillment, and reconciliation. Do not recalculate settled orders from today's catalog or tax settings.
 
+Tax provider transport comes from the pinned Tax Core package. Cloudflare
+requests use manual redirect handling; every 3xx provider response is rejected
+before reading its body or forwarding credentials. Store retains its existing
+fallback policy when the address provider fails. The tax regression suite
+emulates Cloudflare's accepted redirect modes and verifies the provider source
+as well as the amount, so a silent flat-rate fallback cannot pass as a live quote.
+
 ### No Lost State
 
 The Worker must be able to explain what happened to an order even when Stripe webhooks are delayed, duplicated, or retried.

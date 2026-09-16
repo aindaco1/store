@@ -272,6 +272,25 @@ describe('tax engine scaffold', () => {
     });
   });
 
+  it('uses the address provider in a Worker-compatible runtime instead of the flat fallback', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_input, init) => {
+      if (!['follow', 'manual'].includes(init?.redirect)) {
+        throw new TypeError('Cloudflare fetch only supports follow or manual redirects');
+      }
+      return new Response(JSON.stringify({ results: [{
+        success: true, tax_rate: '7.5625', location_code: '29-504', source: 'Intuit'
+      }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }) as typeof fetch);
+
+    const quote = await quoteTax({ TAX_PROVIDER: 'nm_grt', SALES_TAX_RATE: '0.07625' }, {
+      subtotalCents: 15600,
+      shippingCents: 517,
+      destination: { country: 'US', state: 'NM', city: 'Corrales', postalCode: '87048', line1: '123 Main St' }
+    });
+    expect(quote).toMatchObject({ source: 'nm_grt_api_intuit', taxCents: 1180,
+      effectiveRate: 0.075625, locationCode: '29-504' });
+  });
+
   it('normalizes the minimal billing destination shape', () => {
     expect(normalizeTaxDestination({
       country: 'us',
