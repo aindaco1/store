@@ -316,3 +316,10 @@ Choose the image version and RAM for the installed CLI and host capacity; these
 example values are not automatic updates. Preserve existing images/volumes and
 compare inventories before/after. Restore the login watchdog after verification.
 Official reference: [machine OS apply](https://docs.podman.io/en/latest/markdown/podman-machine-os-apply.1.html).
+
+## Jekyll cache isolation
+
+Container Jekyll commands disable the on-disk cache. The mounted repository can
+contain a host Ruby cache or an incomplete iCloud-synced cache entry; neither
+can prevent container startup. In-memory caching and the persistent Bundler
+dependency volume remain available.
