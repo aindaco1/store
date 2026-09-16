@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Restore address-based New Mexico GRT and ZIP.TAX requests in Cloudflare Workers
+  with shared Tax Core 0.3.1. Reject provider redirects explicitly and retain
+  existing fallback policy and accepted order totals.
+
 - Preserve the selected shared Podman engine and CLI. Project startup no longer
   restarts VMs or kills unrelated listeners when a local port is occupied.
 
