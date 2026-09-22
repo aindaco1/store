@@ -79,17 +79,17 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "sku": "a-night-in-paradiso",
       "name": "A Night in Paradiso",
       "description": "A Night in Paradiso, an October 24, 2026 live benefit at FUSION in Albuquerque supporting the short film Paradiso.",
-      "body_description": "## A Night in Paradiso\n\nPresented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only live benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).\n\n*Paradiso* follows a lonely young woman whose obsession with a doomed film antihero - and the niche actor behind him - becomes a waking nightmare as the boundary between the movie she loves and the life she is living dissolves.\n\nThe live event is a **retro-1970s-inspired variety broadcast and immersive theatre experience** with Albuquerque talent, a Bob Barker-inspired host, scripted horror interruptions, handmade commercial breaks, and more surprises!",
+      "body_description": "Presented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).\n\nThis one-of-a-kind immersive live theatre experience is a **retro-1970s-inspired variety broadcast** featuring local Albuquerque talent, a Bob Barker-inspired host, handmade commercial breaks, and even more spooky surprises to come!",
       "long_content": [
         {
           "type": "text",
-          "body": "## A Night in Paradiso\n\nPresented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only live benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).\n\n*Paradiso* follows a lonely young woman whose obsession with a doomed film antihero - and the niche actor behind him - becomes a waking nightmare as the boundary between the movie she loves and the life she is living dissolves.\n\nThe live event is a **retro-1970s-inspired variety broadcast and immersive theatre experience** with Albuquerque talent, a Bob Barker-inspired host, scripted horror interruptions, handmade commercial breaks, and more surprises!\n"
+          "body": "Presented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).\n\nThis one-of-a-kind immersive live theatre experience is a **retro-1970s-inspired variety broadcast** featuring local Albuquerque talent, a Bob Barker-inspired host, handmade commercial breaks, and even more spooky surprises to come!\n"
         }
       ],
       "price": 20.0,
       "price_cents": 2000,
       "currency": "USD",
-      "image": "/assets/images/products/product-a-night-in-paradiso-20260903-204215.png",
+      "image": "/assets/images/products/product-a-night-in-paradiso-20260907-020545.png",
       "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso/",
       "type": "ticket",
       "fulfillment_type": "ticket",
@@ -2941,9 +2941,156 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
         }
       },
       "turnstile_required": true
+    },
+    {
+      "id": "a-night-in-paradiso-sponsorship",
+      "slug": "a-night-in-paradiso-sponsorship",
+      "sku": "a-night-in-paradiso-sponsorship",
+      "name": "A Night in Paradiso Sponsorship",
+      "description": "A Night in Paradiso, is a one-of-a-kind immersive live theatre experience meant to set the stage and raise funds for R. Barela's next short film, Paradiso, bringing the audience to a nostalgic retro-70s inspired variety talent show haunted by a mysterious figure lurking in the darkness.",
+      "body_description": "## A Talent Showcase, A Variety Broadcast, A Theatre Experience\n\n**A Night in Paradiso**, is a one-of-a-kind immersive live theatre experience meant to set the stage and raise funds for [R. Barela’](https://www.instagram.com/r._barela/)s next short film, *Paradiso*, bringing the audience to a nostalgic retro-70s inspired variety talent show haunted by a mysterious figure lurking in the darkness.\n\nWe'll have a Bob Barker inspired host; introducing our unique handpicked local talent acts, making zany quips, and calling out incoming donations.\n\nIn a series of scripted and pre-planned occurrences enacted by plant-actors in the audience or crew members, a mysterious Phantom figure “played” in-universe by infamous cult actor, Finley Zopilote, will be revealed as the “cause” of several technical diﬃculties and unexplainable eerie mishaps. Through various blink-of-an-eye appearances throughout the show, his presence will bring a sense of horror, unease, and campiness that lets the audience in on what they’re getting with our finished film.\n\nIn between our talent, we will have brief intermissions where we show handmade scripted “commercial break” intermissions, including sponsor spots crafted specifically for the broadcast.\n\nThe event is able to be experienced in-person, or watched via a livestream broadcast on several different platforms. Guests both virtually and in-person are able to submit donations live and will be displayed via a nostalgic donation meter.\n\n### THE OPPORTUNITY\n\nAcross platforms, **your company name and support for us will be shared with over 10,000 social media followers (and counting!)** The livestream itself will be broadcast on several mediums and will reach even further.\n\nWith heavy promotion across town, our reach will span across a wide range of audiences.\n\nFrom other local filmmakers and artists interested in different services (ranging from renting out your location to film in to catering), or exposing the average person to a new business they hadn’t heard of before, this is a unique once-in-a-lifetime opportunity to connect to reach new customers and clients within the community!\n\n### SPONSORSHIP TIERS\n\nSponsorship directly funds production of Paradiso and the live event itself. In exchange, sponsors are recognized across our social channels, printed program, and live broadcast at increasing levels of visibility.\n\n![Paradiso Sponsor Packet 4 (1).png](/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-232223.png)",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "## A Talent Showcase, A Variety Broadcast, A Theatre Experience\n\n**A Night in Paradiso**, is a one-of-a-kind immersive live theatre experience meant to set the stage and raise funds for [R. Barela’](https://www.instagram.com/r._barela/)s next short film, *Paradiso*, bringing the audience to a nostalgic retro-70s inspired variety talent show haunted by a mysterious figure lurking in the darkness.\n\nWe'll have a Bob Barker inspired host; introducing our unique handpicked local talent acts, making zany quips, and calling out incoming donations.\n\nIn a series of scripted and pre-planned occurrences enacted by plant-actors in the audience or crew members, a mysterious Phantom figure “played” in-universe by infamous cult actor, Finley Zopilote, will be revealed as the “cause” of several technical diﬃculties and unexplainable eerie mishaps. Through various blink-of-an-eye appearances throughout the show, his presence will bring a sense of horror, unease, and campiness that lets the audience in on what they’re getting with our finished film.\n\nIn between our talent, we will have brief intermissions where we show handmade scripted “commercial break” intermissions, including sponsor spots crafted specifically for the broadcast.\n\nThe event is able to be experienced in-person, or watched via a livestream broadcast on several different platforms. Guests both virtually and in-person are able to submit donations live and will be displayed via a nostalgic donation meter.\n\n### THE OPPORTUNITY\n\nAcross platforms, **your company name and support for us will be shared with over 10,000 social media followers (and counting!)** The livestream itself will be broadcast on several mediums and will reach even further.\n\nWith heavy promotion across town, our reach will span across a wide range of audiences.\n\nFrom other local filmmakers and artists interested in different services (ranging from renting out your location to film in to catering), or exposing the average person to a new business they hadn’t heard of before, this is a unique once-in-a-lifetime opportunity to connect to reach new customers and clients within the community!\n\n### SPONSORSHIP TIERS\n\nSponsorship directly funds production of Paradiso and the live event itself. In exchange, sponsors are recognized across our social channels, printed program, and live broadcast at increasing levels of visibility.\n"
+        },
+        {
+          "type": "image",
+          "align": "center",
+          "src": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-232223.png",
+          "alt": "Paradiso Sponsor Packet 4 (1).png"
+        }
+      ],
+      "price": 0.0,
+      "price_cents": 0,
+      "currency": "USD",
+      "image": "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823.png",
+      "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso-sponsorship/",
+      "type": "service",
+      "fulfillment_type": "service",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 1000.0,
+      "collection": "dustwave",
+      "category": "objects",
+      "localized_paths": {
+        "en": "/products/a-night-in-paradiso-sponsorship/",
+        "es": "/es/products/a-night-in-paradiso-sponsorship/"
+      },
+      "variants": [
+        {
+          "id": "special-thanks",
+          "label": "Special Thanks",
+          "sku": "a-night-in-paradiso-sponsorship-special-thanks",
+          "price": 100.0,
+          "price_cents": 10000,
+          "price_override": true,
+          "inventory": 0,
+          "status": "active"
+        },
+        {
+          "id": "shout-out",
+          "label": "Shout Out",
+          "sku": "a-night-in-paradiso-sponsorship-shout-out",
+          "price": 250.0,
+          "price_cents": 25000,
+          "price_override": true,
+          "inventory": 0,
+          "status": "active"
+        },
+        {
+          "id": "on-air",
+          "label": "On Air",
+          "sku": "a-night-in-paradiso-sponsorship-on-air",
+          "price": 500.0,
+          "price_cents": 50000,
+          "price_override": true,
+          "inventory": 0,
+          "status": "active"
+        },
+        {
+          "id": "director-s-chair",
+          "label": "Director's Chair",
+          "sku": "a-night-in-paradiso-sponsorship-director-s-chair",
+          "price": 1000.0,
+          "price_cents": 100000,
+          "price_override": true,
+          "inventory": 0,
+          "status": "active"
+        }
+      ],
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "standard",
+      "turnstile_required": false
+    },
+    {
+      "id": "monster-bash",
+      "slug": "monster-bash",
+      "sku": "monster-bash",
+      "name": "Monster Bash",
+      "description": "Monster Bash at Juno Brewery on October 22, 2026, 7–10 p.m. DJ Neuromancer, dancing, and a costume contest with prizes. Tickets: $15 online, $20 at the door.",
+      "body_description": "Dust Wave invites you to **Monster Bash!** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Dust Wave invites you to **Monster Bash!** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**\n"
+        }
+      ],
+      "price": 15.0,
+      "price_cents": 1500,
+      "currency": "USD",
+      "image": "/assets/images/products/product-monster-bash-20260922-170930.png",
+      "url": "https://shop.dustwave.xyz/products/monster-bash/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 1000.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/monster-bash/",
+        "es": "/es/products/monster-bash/"
+      },
+      "inventory_tracking": true,
+      "inventory": 100,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-10-22T19:00:00-06:00",
+        "ends_at": "2026-10-22T22:00:00-06:00",
+        "venue": "Juno Brewery",
+        "address": "1501 1st St NW\nAlbuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true,
+        "followup": {
+          "enabled": false
+        }
+      },
+      "turnstile_required": false
     }
   ],
-  "source_hash": "a2643cd207844f3633af0665530b4cd441c12a963d849fdc42468b2e3823e645"
+  "source_hash": "1b61cb3a53cf2dc99fb9f918dd481edd5d5fa76684e5e2f787e5da754dbc15a2"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
