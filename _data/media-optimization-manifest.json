@@ -2365,6 +2365,69 @@
       ]
     },
     {
+      "path": "assets/images/products/product-monster-bash-20260922-170930.png",
+      "publicPath": "/assets/images/products/product-monster-bash-20260922-170930.png",
+      "name": "product-monster-bash-20260922-170930.png",
+      "label": "product monster bash 20260922",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 511672,
+      "sha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
+      "width": 1080,
+      "height": 1350,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/products/product-monster-bash-20260922-170930-320.webp",
+        "assets/images/products/product-monster-bash-20260922-170930-480.webp",
+        "assets/images/products/product-monster-bash-20260922-170930-640.webp",
+        "assets/images/products/product-monster-bash-20260922-170930-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/products/product-monster-bash-20260922-170930-320.webp",
+          "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-320.webp",
+          "bytes": 50414,
+          "sha256": "42a68babe367bcf7cca400ae630184873c882c644da7a14c2bb853b125ac2a95",
+          "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
+          "width": 320
+        },
+        {
+          "path": "assets/images/products/product-monster-bash-20260922-170930-480.webp",
+          "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-480.webp",
+          "bytes": 95294,
+          "sha256": "684432ff7b9301f19a4095e9b672ae3902f87d7d5ca4c901b9f3632fdc1351b7",
+          "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
+          "width": 480
+        },
+        {
+          "path": "assets/images/products/product-monster-bash-20260922-170930-640.webp",
+          "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-640.webp",
+          "bytes": 143444,
+          "sha256": "d75e8f681c47136776848520d2dc851286724888915857d5a0b168119d45b063",
+          "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
+          "width": 640
+        },
+        {
+          "path": "assets/images/products/product-monster-bash-20260922-170930-960.webp",
+          "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-960.webp",
+          "bytes": 245844,
+          "sha256": "e8b0d4153f0c63e096ba25c75dcb3150a05cb8f42973eff731ed790766134863",
+          "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/monster-bash.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/products/product-new-product-20260708-075131.png",
       "publicPath": "/assets/images/products/product-new-product-20260708-075131.png",
       "name": "product-new-product-20260708-075131.png",
