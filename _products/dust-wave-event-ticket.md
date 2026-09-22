@@ -11,7 +11,7 @@ status: active
 public: false
 launch_test: true
 category: dustwave
-order: 490
+order: 510
 shipping_preset: ticket
 tax_category: admission
 inventory_tracking: true

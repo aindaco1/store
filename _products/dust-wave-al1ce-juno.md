@@ -12,7 +12,7 @@ public: false
 sitemap: false
 indexable: false
 category: dustwave
-order: 280
+order: 300
 shipping_preset: ticket
 tax_category: admission
 inventory_tracking: false

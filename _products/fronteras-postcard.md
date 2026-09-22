@@ -9,7 +9,7 @@ type: postcard
 fulfillment_type: physical
 status: active
 category: fronteras
-order: 470
+order: 490
 shipping_preset: sticker
 tax_category: standard
 inventory_tracking: false

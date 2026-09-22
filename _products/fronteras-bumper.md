@@ -9,7 +9,7 @@ type: sticker
 fulfillment_type: physical
 status: active
 category: fronteras
-order: 420
+order: 440
 shipping_preset: sticker
 tax_category: standard
 inventory_tracking: false

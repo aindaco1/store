@@ -9,7 +9,7 @@ type: shirt
 fulfillment_type: physical
 status: active
 category: dustwave
-order: 110
+order: 130
 shipping_preset: tshirt
 tax_category: standard
 inventory_tracking: false

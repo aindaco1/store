@@ -9,7 +9,7 @@ type: shirt
 fulfillment_type: physical
 status: active
 category: fronteras
-order: 390
+order: 410
 shipping_preset: tshirt
 tax_category: standard
 inventory_tracking: true

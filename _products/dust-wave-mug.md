@@ -9,7 +9,7 @@ type: physical
 fulfillment_type: physical
 status: active
 category: dustwave
-order: 30
+order: 50
 shipping_preset: mug
 tax_category: standard
 inventory_tracking: true

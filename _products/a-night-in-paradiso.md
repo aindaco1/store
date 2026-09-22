@@ -11,7 +11,7 @@ fulfillment_type: "ticket"
 status: "active"
 category: dustwave
 storefront_category: support
-order: 9
+order: 10
 shipping_preset: ""
 tax_category: "admission"
 inventory_tracking: true

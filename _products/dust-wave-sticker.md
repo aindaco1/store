@@ -9,7 +9,7 @@ type: sticker
 fulfillment_type: physical
 status: active
 category: dustwave
-order: 20
+order: 40
 shipping_preset: sticker
 tax_category: standard
 inventory_tracking: true

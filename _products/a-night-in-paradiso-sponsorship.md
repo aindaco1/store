@@ -9,7 +9,7 @@ type: "service"
 fulfillment_type: "service"
 status: "active"
 category: "dustwave"
-order: 1000
+order: 530
 shipping_preset: ""
 tax_category: "standard"
 inventory_tracking: false

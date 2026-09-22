@@ -9,7 +9,7 @@ type: shirt
 fulfillment_type: physical
 status: archived
 category: dustwave
-order: 150
+order: 170
 shipping_preset: tshirt
 tax_category: standard
 inventory_tracking: true

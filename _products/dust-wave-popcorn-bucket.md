@@ -9,7 +9,7 @@ type: bucket
 fulfillment_type: physical
 status: active
 category: dustwave
-order: 80
+order: 100
 shipping_preset: parcel
 tax_category: standard
 inventory_tracking: true

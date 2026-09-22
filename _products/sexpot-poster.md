@@ -9,7 +9,7 @@ type: physical
 fulfillment_type: physical
 status: active
 category: dustwave
-order: 100
+order: 120
 shipping_preset: poster
 tax_category: standard
 inventory_tracking: false

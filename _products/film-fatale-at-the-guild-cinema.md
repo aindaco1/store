@@ -9,7 +9,7 @@ type: "ticket"
 fulfillment_type: "ticket"
 status: "archived"
 category: "dustwave"
-order: 50
+order: 70
 shipping_preset: ""
 tax_category: "admission"
 inventory_tracking: true

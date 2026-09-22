@@ -9,7 +9,7 @@ type: physical
 fulfillment_type: physical
 status: active
 category: dustwave
-order: 70
+order: 90
 shipping_preset: parcel
 tax_category: standard
 inventory_tracking: false

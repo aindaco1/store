@@ -10,7 +10,7 @@ type: "ticket"
 fulfillment_type: "ticket"
 status: "active"
 category: "dustwave"
-order: 1000
+order: 20
 shipping_preset: ""
 tax_category: "admission"
 inventory_tracking: true
