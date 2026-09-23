@@ -83,6 +83,72 @@ Lighthouse runs through `podman-stack-run.sh` by default. Production posture acc
 
 Use [contributor setup](CONTRIBUTING.md#local-setup) for service URLs and [configuration synchronization](CONTRIBUTING.md#configuration-and-product-changes) for local catalog recovery. The `local-catalog-sync` and `local-admin-publish` unit suites cover real temporary repository writes, regeneration, and Worker readiness without touching the shop's product files or external providers.
 
+## Opt-in Jev Message Pilot
+
+`npm run test:jev` runs a local, advisory semantic review of built-in synthetic
+customer messages in English and Spanish. It is separate from `npm test`, CI,
+pre-merge, and release gates. It follows CutNotes' scoped-question and review
+pattern; CutNotes' calibrated threshold is not evidence of accuracy for Store.
+
+```bash
+npm run test:jev -- --dry-run
+npm run test:jev
+# Prefer the existing Wrangler login over an environment token when necessary:
+npm run test:jev -- --wrangler-auth
+```
+
+The preview requires Node, Ruby and installed repository dependencies, but no
+credentials or network. Live runs use `CLOUDFLARE_ACCOUNT_ID` (falling back to
+Store's existing Wrangler account configuration) and `CLOUDFLARE_API_TOKEN`, or
+the installed Worker's existing Wrangler login. Missing authentication fails;
+the command never logs in, installs dependencies, reads `.dev.vars`, or deploys.
+
+Store owns `tests/fixtures/jev-messages.json` and `scripts/jev-messages.mjs`.
+The pinned Platform `test-core/jev` entry owns request construction, bounded
+Cloudflare transport, response validation, review decisions and batch execution.
+Store owns fixture selection, credential discovery, limits and interpretation.
+The pilot uses the existing translator and `STORE_EMAIL_CAPTURE_PAYLOAD` mode:
+no copied email templates, actual recipients, live orders, RSVP answers or
+provider sends. Only selected repository UI copy, rendered synthetic email
+subjects/plain text, and requirements are submitted. There is no arbitrary
+input-file option. The plain-text review does not prove HTML layout, browser
+state transitions, accessibility, payment correctness or email delivery.
+
+The initial corpus covers conditional order lookup, pending payments, one-email
+reminder consent, expiring one-time lookup links, reminder opt-out, and free RSVP
+confirmations. Spanish candidates receive the same requirements plus an
+English/Spanish meaning comparison. Eighteen labeled controls include faithful
+and deliberately flawed messages in both languages, an instruction-injection
+example, and a translation pair. These are engineering labels, not independent
+human translation approval or a held-out benchmark.
+
+Each run validates locale completeness and unresolved interpolation before
+authentication. The batch has hard client limits of 40 requests, 80 questions,
+and 16,000 UTF-8 bytes per request, with a 45-second request timeout and no
+automatic retries, fallback, purchases or top-ups. These limits bound work,
+not provider billing; current pricing is shown in the Cloudflare dashboard.
+Requests use [Cloudflare's Jev endpoint](https://developers.cloudflare.com/ai/models/typesafe/jev/)
+with cache and gateway logging disabled through request headers.
+
+New evidence goes under ignored `jev-results/jev-<timestamp>/`, or a new
+`--output-dir` directory. Existing evidence is never overwritten. The default
+directory is separate from Playwright output, which browser tests clear.
+`requests.json` shows what is sent; `report.json` retains source hashes, questions, model,
+probabilities, usage and durations; `review.md` pairs each requirement with the
+actual candidate. Retain useful diagnostic runs locally and remove disposable
+runs from `jev-results` when no longer needed; this introduces no production
+storage or backup family.
+
+The provisional probability margin is 0.10 with `jev-1.13.0` as the expected
+model. Near ties, uncertain answers and other model versions need review.
+Known-answer control errors prevent an overall pass. No threshold is fitted or
+changed during a run. Exit 0 means
+an explicit preview or a completed pilot with no flags; exit 1 means review;
+exit 2 means incomplete/error. A preview is always marked incomplete, and every
+report says `releaseAccepted: false`. A passing pilot never overrides exact
+tests or human review. Review the pilot's false passes, false failures and
+language-specific findings before proposing any default or CI gate.
+
 ## Browser Coverage
 
 Default Playwright specs:

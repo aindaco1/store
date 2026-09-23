@@ -15,6 +15,7 @@ vendor/
 # Node/Playwright
 node_modules/
 test-results/
+jev-results/
 playwright-report/
 playwright/.cache/
 coverage/

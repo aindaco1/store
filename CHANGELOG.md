@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add an explicit local Jev pilot for synthetic customer messages and
+  English/Spanish meaning, using Platform Test Core 0.3.0. Keep its reports
+  advisory and separate from CI, release gates, and Playwright output.
+
 - Restore address-based New Mexico GRT and ZIP.TAX requests in Cloudflare Workers
   with shared Tax Core 0.3.1. Reject provider redirects explicitly and retain
   existing fallback policy and accepted order totals.

@@ -20,8 +20,8 @@ Current release: `v1.3.7`. See the [changelog](../CHANGELOG.md) for release chan
 
 ## Shared Foundations and Ownership
 
-Store pins Dust Wave Platform `0.39.1` (Tax Core `0.3.1`) at exact commit
-`51f552d02fe0f888ffdefcc556a4059067f0f3d4` and Dust Wave Jekyll Template
+Store pins Dust Wave Platform `0.40.0` (Test Core `0.3.0`, Tax Core `0.3.1`) at exact commit
+`60d439b887f1244f82ff232c849d74152b28c776` and Dust Wave Jekyll Template
 `v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
 Platform supplies characterized Worker, admin, browser, design, build, release,
 shipping, tax, inventory, media, and test primitives. The Jekyll Template owns
