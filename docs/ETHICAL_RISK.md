@@ -124,3 +124,15 @@ Pause and get explicit owner review before merging when a change:
 - **Publication truth and automation:** An uploaded source could become public before its display assets are ready, or an optimizer could overwrite concurrent work. Media preparation now precedes both storefront and Worker deployment, preserves uploaded source bytes, verifies source/derivative hashes, and stops on broken references or encoding failure. Automatic incorporation is confined to product/media/manifest changes with a normal fast-forward push; repository protection is not bypassed. Existing public content stays live when preparation fails.
 - **Privacy and access:** Temporary preview bytes remain in browser memory and are cleared on reload/sign-out. Canonical form payloads retain repository paths, and the opaque preview iframe keeps its existing script/attribute sanitization. There is no new media database, customer-data collection, or provider mutation. Existing admin scope, CSRF, and current-file-SHA upload checks remain authoritative.
 - **Status and accessibility:** The existing publishing controller exposes media/build progress in a compact sticky action area with localized English/Spanish copy and failure retry. Progress is indeterminate until jobs provide evidence; successful local tests do not imply a successful hosted production run. Content rights and authored alt text remain the operator’s responsibility.
+
+## Jev Message Evaluation Review — 2026-09-22
+
+The opt-in [Jev message pilot](TESTING.md#opt-in-jev-message-pilot) sends only
+selected repository copy and synthetic rendered messages to Cloudflare/TypeSafe.
+It uses existing email capture and a blocked network during rendering, accepts
+no arbitrary input files, and introduces no runtime AI or customer-data storage.
+Fixed request limits, no automatic retries, and explicit incomplete/review states
+bound provider use and prevent a failed evaluator from implying approval.
+Its English/Spanish controls are engineering judgments: operator review remains
+necessary before adopting a gate or changing customer copy. No payment, email
+send, deployment, or translation approval follows automatically from a score.

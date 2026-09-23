@@ -22,6 +22,7 @@
     "test:cache-policy": "node ./scripts/audit-cache-policy.mjs",
     "test:secrets": "node ./scripts/audit-secrets.mjs",
     "test:i18n": "ruby ./scripts/check-i18n-completeness.rb",
+    "test:jev": "node ./scripts/jev-messages.mjs",
     "localization:review": "node ./scripts/localization-review.mjs",
     "production:posture": "node ./scripts/audit-production-posture.mjs",
     "launch:readiness": "ruby ./scripts/check-launch-readiness.rb",

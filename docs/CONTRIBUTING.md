@@ -119,6 +119,7 @@ a dated folder in the system Trash so cleanup remains recoverable:
 | --- | --- |
 | `_site/`, `.jekyll-cache/`, `.sass-cache/`, `.jekyll-metadata` | Repository source, product media and tracked derivatives, shared submodules |
 | Completed `test-results/`, `playwright-report/`, `coverage/`, disposable logs | Root and Worker `node_modules/`, Ruby gems/Bundler setup, Playwright browsers |
+| Disposable `jev-results/` previews and superseded runs | Retained Jev baselines and reports with unresolved review findings |
 | `worker/.wrangler/tmp/` from stopped builds | `worker/.wrangler/state/`, local orders, inventory, uploads, and other simulated Worker data |
 | Merged task branches | `_config.local*.yml`, `worker/.dev.vars`, environment files, Podman images and volumes |
 

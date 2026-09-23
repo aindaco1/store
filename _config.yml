@@ -23,6 +23,7 @@ exclude:
   - scripts
   - tests
   - test-results
+  - jev-results
   - playwright-report
   - package.json
   - package-lock.json

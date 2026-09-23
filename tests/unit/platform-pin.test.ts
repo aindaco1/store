@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '51f552d02fe0f888ffdefcc556a4059067f0f3d4';
+const expectedCommit = '60d439b887f1244f82ff232c849d74152b28c776';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.39.1',
+  '@dustwave/platform-workspace': '0.40.0',
   '@dustwave/admin-shell': '0.12.0',
   '@dustwave/build-core': '0.2.0',
   '@dustwave/design-core': '0.3.0',
@@ -17,7 +17,7 @@ const expectedVersions = {
   '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.3.0',
   '@dustwave/tax-core': '0.3.1',
-  '@dustwave/test-core': '0.2.0',
+  '@dustwave/test-core': '0.3.0',
   '@dustwave/timed-text': '0.11.1',
   '@dustwave/worker-core': '0.15.0'
 };
@@ -92,6 +92,7 @@ describe('shared platform pin', () => {
       'packages/tax-core/src/nm-grt-starter.js',
       'packages/tax-core/src/provider.js',
       'packages/test-core/src/index.js',
+      'packages/test-core/src/jev.js',
       'packages/worker-core/src/date-time.js',
       'packages/worker-core/src/http.js',
       'packages/worker-core/src/github.js',
