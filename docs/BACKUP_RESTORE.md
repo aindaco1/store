@@ -317,3 +317,8 @@ npm run test:e2e:headless
 ```
 
 Also verify Settings -> Store readiness, orders/audit/reconciliation exports, a non-destructive order lookup, R2 download delivery, inventory totals, Stripe idempotency markers, cron state after a fresh scheduler run, and a Workers Cache purge followed by a fresh Orders read. Resume Stripe webhooks before checkout traffic and monitor duplicate/missing side effects.
+
+
+## Checkout coordinator recovery
+
+The checkout candidate stores payment recovery checkpoints alongside inventory in the existing DO (`checkout:` and `checkout-due:`). These cannot be reconstructed from claimed-stock projections alone. Preserve the live coordinator; never import or revive ephemeral holds from backups. Stop sales and resolve processor/order discrepancies before the existing maker/checker inventory rebuild. Replacement now rejects active checkout reservations, including pinned uncertain payments. Terminal records expire after 30 days; unresolved money evidence is retained for reconciliation. See [checkout holds](CHECKOUT_HOLDS.md).

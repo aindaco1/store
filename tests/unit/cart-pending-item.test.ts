@@ -129,6 +129,17 @@ describe('first-party pending cart handoff', () => {
     expect(persisted.tipTouched).toBe(true);
   });
 
+  it('preserves postal-code edits and clearing across tax-quote and form aliases', async () => {
+    await import('../../assets/js/cart-provider.js');
+    const provider = (window as any).StoreCartProvider;
+    const readyApi = await provider.whenReady();
+    await readyApi.api.cart.update({ billingAddress: { country: 'US', postalCode: '87102' } });
+    await readyApi.api.cart.update({ billingAddress: { postal_code: '10001' } });
+    expect(provider.store.getState().cart.billingAddress).toMatchObject({ postalCode: '10001', postal_code: '10001' });
+    await readyApi.api.cart.update({ billingAddress: { postal_code: '' } });
+    expect(provider.store.getState().cart.billingAddress).toMatchObject({ country: 'US', postalCode: '', postal_code: '' });
+  });
+
   it('preserves physical-item metadata when cart.js handles redirect add buttons', async () => {
     document.body.innerHTML = `
       <div data-store-cart-root="true"></div>
@@ -656,6 +667,7 @@ describe('first-party pending cart handoff', () => {
           }
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
+      if (url.endsWith('/api/checkout/hold')) return Response.json({ success: true, phase: 'held', heldQuantity: 0, serverTime: new Date().toISOString(), expiresAt: new Date(Date.now() + 86400000).toISOString() });
       if (url.endsWith('/api/checkout/intent')) {
         checkoutBody = JSON.parse(String(init?.body || '{}'));
         return new Response(JSON.stringify({

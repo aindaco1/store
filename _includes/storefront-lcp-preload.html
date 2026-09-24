@@ -8,7 +8,7 @@
   {%- endif -%}
 {%- endfor -%}
 {%- if lcp_product and lcp_product.image -%}
-  {%- assign lcp_sizes = "(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" -%}
+  {%- capture lcp_sizes -%}{% include product-card-image-sizes.html src=lcp_product.image %}{%- endcapture -%}
   {%- assign lcp_srcset = lcp_product.image | local_responsive_image_srcset: "320,480,640,960,1600" -%}
   {%- if lcp_srcset != "" -%}
     {%- assign lcp_fallback_entry = lcp_srcset | split: ", " | last -%}

@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-24T20:02:54.545Z",
+  "baseOrigin": "http://127.0.0.1:4002",
+  "ok": true,
+  "routes": [
+    {
+      "path": "/",
+      "ok": true,
+      "checks": [
+        {
+          "id": "category:performance",
+          "actual": 0.89,
+          "minimum": 0.8,
+          "ok": true
+        },
+        {
+          "id": "category:accessibility",
+          "actual": 0.96,
+          "minimum": 0.95,
+          "ok": true
+        },
+        {
+          "id": "category:best-practices",
+          "actual": 0.96,
+          "minimum": 0.9,
+          "ok": true
+        },
+        {
+          "id": "category:seo",
+          "actual": 1,
+          "minimum": 0.95,
+          "ok": true
+        },
+        {
+          "id": "audit:largest-contentful-paint",
+          "actual": 3460.5586000000003,
+          "maximum": 4000,
+          "ok": true
+        },
+        {
+          "id": "audit:cumulative-layout-shift",
+          "actual": 0.0001032037792879963,
+          "maximum": 0.1,
+          "ok": true
+        },
+        {
+          "id": "audit:total-blocking-time",
+          "actual": 0,
+          "maximum": 300,
+          "ok": true
+        },
+        {
+          "id": "resource:total",
+          "actual": 767534,
+          "maximum": 1000000,
+          "ok": true
+        },
+        {
+          "id": "resource:image",
+          "actual": 293613,
+          "maximum": 300000,
+          "ok": true
+        },
+        {
+          "id": "resource:stylesheet",
+          "actual": 78461,
+          "maximum": 100000,
+          "ok": true
+        },
+        {
+          "id": "resource:third-party",
+          "actual": 46179,
+          "maximum": 75000,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "path": "/products/fronteras-poster-big/",
+      "ok": true,
+      "checks": [
+        {
+          "id": "category:performance",
+          "actual": 0.93,
+          "minimum": 0.8,
+          "ok": true
+        },
+        {
+          "id": "category:accessibility",
+          "actual": 0.96,
+          "minimum": 0.95,
+          "ok": true
+        },
+        {
+          "id": "category:best-practices",
+          "actual": 1,
+          "minimum": 0.9,
+          "ok": true
+        },
+        {
+          "id": "category:seo",
+          "actual": 1,
+          "minimum": 0.95,
+          "ok": true
+        },
+        {
+          "id": "audit:largest-contentful-paint",
+          "actual": 3164.1146,
+          "maximum": 4000,
+          "ok": true
+        },
+        {
+          "id": "audit:cumulative-layout-shift",
+          "actual": 0.002770477235202861,
+          "maximum": 0.1,
+          "ok": true
+        },
+        {
+          "id": "audit:total-blocking-time",
+          "actual": 0,
+          "maximum": 300,
+          "ok": true
+        },
+        {
+          "id": "resource:total",
+          "actual": 524274,
+          "maximum": 1000000,
+          "ok": true
+        },
+        {
+          "id": "resource:image",
+          "actual": 185688,
+          "maximum": 300000,
+          "ok": true
+        },
+        {
+          "id": "resource:stylesheet",
+          "actual": 78461,
+          "maximum": 100000,
+          "ok": true
+        },
+        {
+          "id": "resource:third-party",
+          "actual": 46180,
+          "maximum": 75000,
+          "ok": true
+        }
+      ]
+    },
+    {
+      "path": "/terms/",
+      "ok": true,
+      "checks": [
+        {
+          "id": "category:performance",
+          "actual": 0.91,
+          "minimum": 0.8,
+          "ok": true
+        },
+        {
+          "id": "category:accessibility",
+          "actual": 0.96,
+          "minimum": 0.95,
+          "ok": true
+        },
+        {
+          "id": "category:best-practices",
+          "actual": 1,
+          "minimum": 0.9,
+          "ok": true
+        },
+        {
+          "id": "category:seo",
+          "actual": 1,
+          "minimum": 0.95,
+          "ok": true
+        },
+        {
+          "id": "audit:largest-contentful-paint",
+          "actual": 2750.28835,
+          "maximum": 4000,
+          "ok": true
+        },
+        {
+          "id": "audit:cumulative-layout-shift",
+          "actual": 0.01169578329568569,
+          "maximum": 0.1,
+          "ok": true
+        },
+        {
+          "id": "audit:total-blocking-time",
+          "actual": 0,
+          "maximum": 300,
+          "ok": true
+        },
+        {
+          "id": "resource:total",
+          "actual": 346559,
+          "maximum": 1000000,
+          "ok": true
+        },
+        {
+          "id": "resource:image",
+          "actual": 12869,
+          "maximum": 300000,
+          "ok": true
+        },
+        {
+          "id": "resource:stylesheet",
+          "actual": 78461,
+          "maximum": 100000,
+          "ok": true
+        },
+        {
+          "id": "resource:third-party",
+          "actual": 46180,
+          "maximum": 75000,
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "containsCredentials": false,
+  "containsCustomerData": false
+}

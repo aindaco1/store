@@ -96,7 +96,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 9.0,
+      "order": 10.0,
       "collection": "dustwave",
       "category": "support",
       "localized_paths": {
@@ -131,6 +131,62 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     },
     {
+      "id": "monster-bash",
+      "slug": "monster-bash",
+      "sku": "monster-bash",
+      "name": "Monster Bash",
+      "description": "Monster Bash at Juno Brewery on October 22, 2026, 7–10 p.m. DJ Neuromancer, dancing, and a costume contest with prizes. Tickets: $15 online, $20 at the door.",
+      "body_description": "Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**\n"
+        }
+      ],
+      "price": 15.0,
+      "price_cents": 1500,
+      "currency": "USD",
+      "image": "/assets/images/products/product-monster-bash-20260922-170930.png",
+      "url": "https://shop.dustwave.xyz/products/monster-bash/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 20.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/monster-bash/",
+        "es": "/es/products/monster-bash/"
+      },
+      "inventory_tracking": true,
+      "inventory": 100,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-10-22T19:00:00-06:00",
+        "ends_at": "2026-10-22T22:00:00-06:00",
+        "venue": "Juno Brewery",
+        "address": "1501 1st St NW\nAlbuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true,
+        "followup": {
+          "enabled": true,
+          "enabled_at": "2026-09-22T17:53:32.989Z"
+        }
+      },
+      "turnstile_required": false
+    },
+    {
       "id": "t-shirt-1",
       "slug": "dust-wave-t-shirt",
       "sku": "t-shirt-1",
@@ -147,7 +203,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 10.0,
+      "order": 30.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -258,7 +314,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 20.0,
+      "order": 40.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -305,7 +361,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 30.0,
+      "order": 50.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -343,7 +399,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 40.0,
+      "order": 60.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -460,7 +516,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 50.0,
+      "order": 70.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -509,7 +565,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 60.0,
+      "order": 80.0,
       "collection": "dustwave",
       "category": "prints",
       "localized_paths": {
@@ -547,7 +603,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 70.0,
+      "order": 90.0,
       "collection": "dustwave",
       "category": "media",
       "localized_paths": {
@@ -585,7 +641,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 80.0,
+      "order": 100.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -623,7 +679,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 90.0,
+      "order": 110.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -661,7 +717,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 100.0,
+      "order": 120.0,
       "collection": "dustwave",
       "category": "prints",
       "localized_paths": {
@@ -699,7 +755,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 110.0,
+      "order": 130.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -810,7 +866,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 120.0,
+      "order": 140.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -848,7 +904,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 130.0,
+      "order": 150.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -959,7 +1015,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 140.0,
+      "order": 160.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -1006,7 +1062,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 150.0,
+      "order": 170.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -1117,7 +1173,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 160.0,
+      "order": 180.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -1170,7 +1226,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 170.0,
+      "order": 190.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1221,7 +1277,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 180.0,
+      "order": 200.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1272,7 +1328,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 190.0,
+      "order": 210.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1323,7 +1379,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 200.0,
+      "order": 220.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1374,7 +1430,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 210.0,
+      "order": 230.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1425,7 +1481,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 220.0,
+      "order": 240.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1476,7 +1532,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 230.0,
+      "order": 250.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1527,7 +1583,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 240.0,
+      "order": 260.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1578,7 +1634,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 250.0,
+      "order": 270.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1629,7 +1685,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 260.0,
+      "order": 280.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1680,7 +1736,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 270.0,
+      "order": 290.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1731,7 +1787,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 280.0,
+      "order": 300.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1782,7 +1838,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 290.0,
+      "order": 310.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1856,7 +1912,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 300.0,
+      "order": 320.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1930,7 +1986,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 310.0,
+      "order": 330.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1981,7 +2037,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 320.0,
+      "order": 340.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2032,7 +2088,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 330.0,
+      "order": 350.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2083,7 +2139,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 340.0,
+      "order": 360.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2134,7 +2190,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 350.0,
+      "order": 370.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2185,7 +2241,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 360.0,
+      "order": 380.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2237,7 +2293,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 370.0,
+      "order": 390.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2288,7 +2344,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 380.0,
+      "order": 400.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -2326,7 +2382,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 390.0,
+      "order": 410.0,
       "collection": "fronteras",
       "category": "apparel",
       "localized_paths": {
@@ -2437,7 +2493,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 400.0,
+      "order": 420.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2475,7 +2531,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 410.0,
+      "order": 430.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2513,7 +2569,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 420.0,
+      "order": 440.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2560,7 +2616,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 430.0,
+      "order": 450.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2607,7 +2663,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 440.0,
+      "order": 460.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2645,7 +2701,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 450.0,
+      "order": 470.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2683,7 +2739,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 460.0,
+      "order": 480.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2721,7 +2777,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 470.0,
+      "order": 490.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2768,7 +2824,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 480.0,
+      "order": 500.0,
       "collection": "dustwave",
       "category": "downloads",
       "localized_paths": {
@@ -2811,7 +2867,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 490.0,
+      "order": 510.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2880,7 +2936,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 500.0,
+      "order": 520.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2971,7 +3027,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 1000.0,
+      "order": 530.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -3033,64 +3089,9 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       },
       "tax_category": "standard",
       "turnstile_required": false
-    },
-    {
-      "id": "monster-bash",
-      "slug": "monster-bash",
-      "sku": "monster-bash",
-      "name": "Monster Bash",
-      "description": "Monster Bash at Juno Brewery on October 22, 2026, 7–10 p.m. DJ Neuromancer, dancing, and a costume contest with prizes. Tickets: $15 online, $20 at the door.",
-      "body_description": "Dust Wave invites you to **Monster Bash!** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**",
-      "long_content": [
-        {
-          "type": "text",
-          "body": "Dust Wave invites you to **Monster Bash!** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**\n"
-        }
-      ],
-      "price": 15.0,
-      "price_cents": 1500,
-      "currency": "USD",
-      "image": "/assets/images/products/product-monster-bash-20260922-170930.png",
-      "url": "https://shop.dustwave.xyz/products/monster-bash/",
-      "type": "ticket",
-      "fulfillment_type": "ticket",
-      "status": "active",
-      "public": true,
-      "launch_test": false,
-      "order": 1000.0,
-      "collection": "dustwave",
-      "category": "event-access",
-      "localized_paths": {
-        "en": "/products/monster-bash/",
-        "es": "/es/products/monster-bash/"
-      },
-      "inventory_tracking": true,
-      "inventory": 100,
-      "shipping_preset": "parcel",
-      "shipping": {
-        "weight_oz": 12,
-        "packaging_weight_oz": 4,
-        "length_in": 12,
-        "width_in": 9,
-        "height_in": 4,
-        "stack_height_in": 1
-      },
-      "tax_category": "admission",
-      "event_details": {
-        "starts_at": "2026-10-22T19:00:00-06:00",
-        "ends_at": "2026-10-22T22:00:00-06:00",
-        "venue": "Juno Brewery",
-        "address": "1501 1st St NW\nAlbuquerque, NM 87102",
-        "ticket_delivery": "qr",
-        "ics": true,
-        "followup": {
-          "enabled": false
-        }
-      },
-      "turnstile_required": false
     }
   ],
-  "source_hash": "1b61cb3a53cf2dc99fb9f918dd481edd5d5fa76684e5e2f787e5da754dbc15a2"
+  "source_hash": "e6f7002d8f6275efc510779e0a77f1b54ad63b5a92faaa5a8edec7e39abdf256"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

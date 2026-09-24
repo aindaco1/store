@@ -179,3 +179,8 @@ Digital products should define a stable `download.file_key`. Upload or replace t
 The Downloads tab is now a reusable file library. Create library files there, then attach the selected file key to a digital product or digital variant from the product editor.
 
 Confirmed digital entitlements stay available from the token-scoped order page unless an admin revokes access from Orders. Individual signed download URLs remain short-lived and can be refreshed while entitlement is active.
+
+
+## Checkout hold policy
+
+`checkout.hold_seconds` defaults to 600 (bounded to 600–1800), mirrored to `CHECKOUT_HOLD_SECONDS`. Ten explicit extensions are available near expiry. This is independent of order retention. `pricing.default_tip_percent` stays at 5; compact rendering does not change the price policy. See [checkout holds](CHECKOUT_HOLDS.md).

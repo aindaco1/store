@@ -204,7 +204,11 @@
   data-store-category="{{ product_category | escape }}"
   data-store-category-label="{{ product_category_label | escape }}">
   <a class="store-product-card__media" href="{{ product.url }}">
-    {% include responsive-image.html src=product.image alt=product_display_name class="store-product-card__image" loading=product_image_loading decoding=include.image_decoding fetchpriority=product_image_fetchpriority sizes="(min-width: 900px) 28vw, (min-width: 640px) 42vw, 100vw" %}
+    {%- capture product_image_sizes -%}{% include product-card-image-sizes.html src=product.image %}{%- endcapture -%}
+    {%- if page.layout == 'product-preview' -%}
+      {%- assign product_image_sizes = '(min-width: 761px) 420px, calc(100vw - 32px)' -%}
+    {%- endif -%}
+    {% include responsive-image.html src=product.image alt=product_display_name class="store-product-card__image" loading=product_image_loading decoding=include.image_decoding fetchpriority=product_image_fetchpriority sizes=product_image_sizes %}
   </a>
   <div class="store-product-card__body">
     {%- if show_product_eyebrow or show_product_title -%}

@@ -9,7 +9,7 @@ import {
   providerEvidenceShouldFail
 } from '../shared/dust-wave-platform/packages/release-core/src/provider-evidence.js';
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
-import { resolveProviderTargets } from './lib/provider-targets.mjs';
+import { findRequiredStripeWebhook, resolveProviderTargets } from './lib/provider-targets.mjs';
 import { stripeCliAuthState } from './lib/stripe-cli-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -237,24 +237,6 @@ function stripeKeyForReadiness() {
 
 function stripeAuthHeader(key) {
   return `Basic ${Buffer.from(`${key}:`).toString('base64')}`;
-}
-
-function hasRequiredStripeWebhook(endpoint, workerBase) {
-  const requiredEvents = new Set(['payment_intent.succeeded', 'payment_intent.payment_failed']);
-  const url = String(endpoint?.url || '').replace(/\/+$/, '');
-  const expectedUrl = `${workerBase.replace(/\/+$/, '')}/webhooks/stripe`;
-  if (url !== expectedUrl) return false;
-  if (endpoint.status && endpoint.status !== 'enabled') return false;
-  const enabledEvents = new Set(endpoint.enabled_events || []);
-  if (enabledEvents.has('*')) return true;
-  return Array.from(requiredEvents).every((event) => enabledEvents.has(event));
-}
-
-function findRequiredStripeWebhook(endpoints, workerBase, { livemode = null } = {}) {
-  return (endpoints || []).find((entry) => {
-    if (livemode !== null && entry?.livemode !== livemode) return false;
-    return hasRequiredStripeWebhook(entry, workerBase);
-  });
 }
 
 async function listStripeWebhooksWithApi(key) {

@@ -332,14 +332,14 @@ runtime:
     postal_code: Código postal
     country: País
     tax_location: Ubicación fiscal
-    tax_location_note: Añade tu país y código postal de facturación para que podamos finalizar el impuesto antes de guardar tu método de pago.
-    tax_location_note_nm: Añade tu dirección de facturación de Nuevo México, ciudad, estado y código postal para que podamos finalizar el impuesto antes de guardar tu método de pago.
+    tax_location_note: Usamos tu país y código postal de facturación para calcular el impuesto.
+    tax_location_note_nm: También necesitamos tu dirección, ciudad y estado para calcular el impuesto de Nuevo México.
     tax_location_required: Introduce tu país y código postal de facturación para finalizar el impuesto antes de continuar.
     tax_location_required_nm: Introduce tu dirección de facturación, ciudad, estado y código postal para finalizar el impuesto de Nuevo México antes de continuar.
     payment_method: Método de pago
     payment_consent: Tu pago se procesa de forma segura con Stripe.
     checkout_reminder_consent: Envíame un recordatorio si no termino la compra.
-    tip_label: Propina para %{platform} para el mantenimiento de la plataforma.
+    tip_label: Propina opcional para %{platform}
     tip_copy: "Las propinas opcionales ayudan a que %{platform} siga haciendo lo suyo."
     tip_with_percent: Propina para %{platform} (%{percent}%)
     estimated_total: Total estimado
@@ -390,13 +390,39 @@ runtime:
     complete_order: Finalizar pedido
     processing_payment: Procesando pago...
     finishing_order: Finalizando pedido...
+    quantity_input: "Cantidad de %{item}"
+    pay_amount: "Pagar %{amount}"
+    event_local_time: "Hora local del lugar"
+    checkout_policy: "Todas las ventas son finales, sujetas a nuestra política de entrega y a tus derechos legales."
+    checkout_policy_link: "Ver política"
+    ticket_delivery: "Tus entradas estarán disponibles en la página de tu pedido. Te enviaremos el enlace por correo."
+    delivery_email: "Enviaremos el enlace del pedido a %{email}."
+    hold_before_start: "Las entradas limitadas se reservan al iniciar la compra. Puedes solicitar más tiempo."
+    tickets_held: "Entradas reservadas para ti"
+    details_title: "Tus datos"
+    retry_payment: "Reintentar cargar el pago"
+    payment_title: "Pago"
+    ticket_reservation: "Reserva de entradas"
+    ticket_reserved: "1 entrada reservada mientras completas tu compra."
+    tickets_reserved: "%{count} entradas reservadas mientras completas tu compra."
+    hold_time_remaining: "Tiempo restante"
+    hold_warning: "Tu reserva de entradas termina en menos de 2 minutos. ¿Necesitas más tiempo?"
+    hold_more_time: "Más tiempo"
+    hold_expired: "Tu reserva ha terminado. Comprueba la disponibilidad para continuar."
+    hold_check_again: "Comprobar disponibilidad"
+    hold_check_payment: "Comprobar estado del pago"
+    payment_resolving: "Estamos comprobando tu pago. No vuelvas a pagar."
+    checkout_locked: "El pago ya se ha iniciado. Vuelve al carrito antes de cambiar este pedido."
+    hold_unavailable: "La compra no está disponible. Inténtalo de nuevo."
+    hold_sold_out: "La cantidad solicitada ya no está disponible."
+    temporarily_held: "Algunos artículos están reservados en otra compra. Inténtalo de nuevo en breve o cambia la cantidad."
     pay_now: Pagar ahora
     loading_secure_payment: Cargando pago seguro...
     payment_processing_still: El pago sigue procesándose. Quédate en esta página un momento e inténtalo de nuevo.
     save_payment_error: Hubo un error al guardar tu método de pago.
     payment_confirm_error: Hubo un error al confirmar tu pago.
     secure_checkout_not_ready: El pago seguro todavía no está listo.
-    secure_checkout_mount_error: No se pudo montar el pago seguro.
+    secure_checkout_mount_error: No se pudo cargar el pago seguro.
     first_party_disabled: El pago de primera parte no está habilitado para esta compilación.
     start_order_error: Hubo un error al iniciar tu pedido.
     email_required: Introduce una dirección de correo para continuar.

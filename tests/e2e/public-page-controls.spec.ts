@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 import { gotoDomReady } from './helpers/navigation';
+import { routeCheckoutHold } from './helpers/checkout';
 import { waitForStableRendering } from './helpers/rendering';
 
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
@@ -121,6 +122,21 @@ test.describe('Store Public Page Controls', () => {
     expect(metrics.titleBlockHeights).toHaveLength(1);
     expect(metrics.descriptionFontSize).toBeLessThan(13);
     await expectNoHorizontalOverflow(page);
+  });
+
+  test('mobile portrait cards preload the same appropriately sized artwork they display', async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.75 });
+    try {
+      const page = await context.newPage();
+      await gotoDomReady(page, '/');
+      const picture = page.locator(`${PRODUCT_CARD} picture`).first();
+      const sizes = await picture.locator('source').getAttribute('sizes');
+      expect(sizes).toBeTruthy();
+      await expect(page.locator('link[rel="preload"][as="image"]')).toHaveAttribute('imagesizes', sizes!);
+      await expect.poll(() => picture.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.currentSrc)).toMatch(/-(?:320|480|640)\.webp$/);
+    } finally {
+      await context.close();
+    }
   });
 
   test('product card images survive product navigation and browser back', async ({ page }) => {
@@ -385,6 +401,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('collects direct-link RSVP attendee details without persisting responses in browser storage', async ({ page }) => {
+    await routeCheckoutHold(page);
     let checkoutBody: Record<string, any> | null = null;
     await page.route('**/api/store/inventory**', async (route) => {
       await route.fulfill({
@@ -445,6 +462,9 @@ test.describe('Store Public Page Controls', () => {
     await cart.getByLabel('Attendee name').nth(1).fill('Sam Guest');
     await cart.getByLabel('Age group').nth(0).selectOption('18_plus');
     await cart.getByLabel('Age group').nth(1).selectOption('under_18');
+    await expect(cart.getByRole('button', { name: 'Complete order' })).toBeEnabled();
+    await page.waitForTimeout(500); // Longer than paid checkout's automatic preparation debounce.
+    expect(checkoutBody).toBeNull();
     await cart.getByRole('button', { name: 'Complete order' }).click();
 
     await expect.poll(() => checkoutBody).not.toBeNull();

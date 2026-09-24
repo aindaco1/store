@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 import { gotoDomReady } from './helpers/navigation';
+import { routeCheckoutHold } from './helpers/checkout';
 import { applyTextScale } from './helpers/rendering';
 
 const axePath = path.resolve(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js');
@@ -146,6 +147,7 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('cart and checkout panel have no obvious axe violations', async ({ page }) => {
+    await routeCheckoutHold(page);
     await gotoDomReady(page, '/');
     const productCard = page.locator('.store-product-card').filter({ hasText: 'Fronteras T-Shirt' });
     await expect(productCard).toHaveCount(1);
@@ -158,11 +160,12 @@ test.describe('Public Page Accessibility', () => {
 
     await cart.getByRole('button', { name: 'Checkout' }).click();
     await expect(cart.getByLabel('Email address')).toBeVisible();
-    await expect(cart.getByText('Payment method', { exact: true })).toBeVisible();
-    await expect(cart.getByRole('button', { name: 'Continue to payment' })).toBeVisible();
+    await expect(cart.getByText('Payment method', { exact: true })).toBeHidden();
+    await expect(cart.locator('#store-first-party-cart-title')).toHaveText('Your details');
+    await expect(cart.getByRole('button', { name: 'Payment', exact: true })).toBeDisabled();
     await expect(cart).toContainText('Order summary');
-    await expect(cart).toContainText('All sales are final after payment.');
-    await expect(cart.getByRole('link', { name: 'Read the return and fulfillment policy.' })).toHaveAttribute('href', '/terms/#returns-refunds');
+    await expect(cart).toContainText('All sales are final, subject to our fulfillment policy and your statutory rights.');
+    await expect(cart.getByRole('link', { name: 'View policy' })).toHaveAttribute('href', '/terms/#returns-refunds');
     await expectNoAxeViolations(page);
   });
 
@@ -247,6 +250,7 @@ test.describe('Public Page Accessibility', () => {
   });
 
   test('release checkout and order surfaces tolerate 200% text scaling', async ({ page }) => {
+    await routeCheckoutHold(page);
     await page.setViewportSize({ width: 640, height: 900 });
     await gotoDomReady(page, '/');
     await applyTextScale(page);

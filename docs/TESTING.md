@@ -331,9 +331,16 @@ Release provider and payment probes read `worker/.dev.vars` by default, with she
 
 ```bash
 PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook
+# Also exercise the new held checkout and same-intent replay:
+PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook --checkout-holds
 ```
 
-That path creates Stripe test-mode PaymentIntents for paid digital, paid physical, paid ticket, and failed-payment paths, confirms successful intents with the Stripe test card, signs local `payment_intent.succeeded` or `payment_intent.payment_failed` webhooks with the configured test webhook secret, posts them to the non-production Worker, and polls Store orders until they settle. It also runs a free RSVP checkout without Stripe. Run the Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`; the smoke checks order `emailDelivery` markers to prove customer/admin order emails rendered without calling Resend. It never targets `checkout.dustwave.xyz`.
+That path creates Stripe test-mode PaymentIntents for paid digital, paid physical, paid ticket, and failed-payment paths, confirms successful intents with the Stripe test card, signs local `payment_intent.succeeded` or `payment_intent.payment_failed` webhooks with the configured test webhook secret, posts them to the non-production Worker, and polls Store orders until they settle. It also runs a free RSVP checkout without Stripe. Run the Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`; the smoke checks order `emailDelivery` markers to prove customer/admin order emails rendered without calling Resend. It never targets `checkout.dustwave.xyz`. The held variant also checks retryable
+card declines, confirmed cancellation, and a real Stripe `requires_action` test
+intent followed by safe abandonment. These API checks do not claim a completed
+wallet or interactive 3DS challenge. The synthetic ticket/RSVP catalog must have
+fixture stock in isolated local state; never change production stock to run them.
+RSVP smoke submits the configured attendee name and required answer.
 
 For optional interactive checkout rehearsal outside the release gate, run:
 
@@ -396,3 +403,10 @@ node scripts/optimize-media.mjs --publish-check
 ```
 
 The preparation fixtures cover source preservation, same-path replacements, stale manifest provenance, failed encoders, broken references, larger-output skips, and concurrent repository edits. Browser fixtures deliberately return 404 for uploaded public URLs and verify both preview surfaces, compact mobile/desktop progress, and retry without reuploading. These checks do not perform a production deployment. Local repository mode continues to report local catalog regeneration separately from GitHub media/deployment jobs.
+
+
+## Checkout holds
+
+Run `npx vitest run tests/unit/checkout-holds.test.ts tests/unit/cart-pending-item.test.ts` and `npx playwright test tests/e2e/checkout-holds.spec.ts --project=chromium`. The coordinator suite uses serialized, rollback-capable storage and mocked Stripe; the browser suite covers English/Spanish mobile fields, extensions, expiry/reacquisition and the retained 5% tip. The public gateway test checks origin/capability, canonical metadata and same-intent reuse. These are separate from real-provider 3DS/processing/cancellation and deployed webhook acceptance. `APP_MODE=test` exercises new attempt reservations; only the legacy no-attempt helper skips them. Run the complete pre-merge gate with the preview stack stopped so its isolated Worker can own port 8989.
+
+Podman's Jekyll preview serves generated files from `/tmp/store-jekyll-site` inside the container. `_site` remains excluded explicitly, so older host build output is neither watched nor published when using this alternate destination. This prevents cloud-synced `_site` renames/removals from breaking the live preview. Production/static build destinations are unchanged.

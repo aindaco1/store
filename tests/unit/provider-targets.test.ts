@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { resolveProviderTargets } from '../../scripts/lib/provider-targets.mjs';
+import { findRequiredStripeWebhook, resolveProviderTargets } from '../../scripts/lib/provider-targets.mjs';
 
 describe('release provider targets', () => {
   it('lets explicit release targets override checked-in local Wrangler values', () => {
@@ -55,5 +55,35 @@ describe('release provider targets', () => {
     const workflow = readFileSync('.github/workflows/release-provider-evidence.yml', 'utf8');
     expect(workflow).toContain('SITE_BASE: https://shop.dustwave.xyz');
     expect(workflow).toContain('WORKER_BASE: https://checkout.dustwave.xyz');
+  });
+});
+
+
+describe('Stripe webhook release readiness', () => {
+  const workerBase = 'https://checkout.example.com';
+  const endpoint = {
+    url: `${workerBase}/webhooks/stripe`,
+    status: 'enabled',
+    livemode: true,
+    enabled_events: ['payment_intent.succeeded', 'payment_intent.payment_failed', 'payment_intent.canceled']
+  };
+
+  it('requires cancellation delivery as well as payment success and failure', () => {
+    expect(findRequiredStripeWebhook([endpoint], `${workerBase}/`, { livemode: true })).toBe(endpoint);
+    for (const missing of endpoint.enabled_events) {
+      expect(findRequiredStripeWebhook([{ ...endpoint, enabled_events: endpoint.enabled_events.filter(event => event !== missing) }], workerBase)).toBeUndefined();
+    }
+  });
+
+  it('accepts an all-events subscription', () => {
+    const wildcard = { ...endpoint, enabled_events: ['*'] };
+    expect(findRequiredStripeWebhook([wildcard], workerBase)).toBe(wildcard);
+  });
+
+  it('rejects disabled, wrong-origin and wrong-mode endpoints', () => {
+    expect(findRequiredStripeWebhook([{ ...endpoint, status: 'disabled' }], workerBase)).toBeUndefined();
+    expect(findRequiredStripeWebhook([endpoint], 'https://another.example.com')).toBeUndefined();
+    expect(findRequiredStripeWebhook([endpoint], workerBase, { livemode: false })).toBeUndefined();
+    expect(findRequiredStripeWebhook([], workerBase)).toBeUndefined();
   });
 });

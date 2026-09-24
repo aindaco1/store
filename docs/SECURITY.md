@@ -275,3 +275,8 @@ For production smoke, also complete a real Stripe test checkout for each fulfill
 - Stripe webhook endpoint and signing secret must be configured for the production Worker domain.
 - USPS and NM GRT credentials/settings must be verified against the production origin address.
 - Admin bootstrap users and limited scopes must be reviewed before deployment.
+
+
+## Anonymous checkout attempts
+
+The local checkout candidate adds trusted-origin, rate-limited, private/no-store POST hold/status/extend/release routes with 256-bit opaque capabilities. Canonical counts, catalog prices, expiry, and payment parameters are server-owned. Treat capabilities and frozen checkout records as restricted data; no raw form/payment logging. Existing site/XSS boundaries apply to browser capability storage. Uncertain money keeps inventory reserved until processor truth is established. See [lifecycle and retention](CHECKOUT_HOLDS.md).

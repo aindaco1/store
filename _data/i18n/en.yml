@@ -332,14 +332,14 @@ runtime:
     postal_code: Postal code
     country: Country
     tax_location: Tax location
-    tax_location_note: Add your billing country and postal code so we can finalize tax before you save your payment method.
-    tax_location_note_nm: Add your New Mexico billing street address, city, state, and postal code so we can finalize tax before you save your payment method.
+    tax_location_note: We use your billing country and postal code to calculate tax.
+    tax_location_note_nm: We also need your street address, city, and state to calculate New Mexico tax.
     tax_location_required: Enter your billing country and postal code to finalize tax before continuing.
     tax_location_required_nm: Enter your billing street address, city, state, and postal code to finalize New Mexico tax before continuing.
     payment_method: Payment method
     payment_consent: Your payment is processed securely by Stripe.
     checkout_reminder_consent: Email me one reminder if I leave checkout.
-    tip_label: Tip %{platform} for platform maintenance.
+    tip_label: Optional tip for %{platform}
     tip_copy: "Optional tips help keep %{platform} doing its thing."
     tip_with_percent: "%{platform} tip (%{percent}%)"
     estimated_total: Estimated total
@@ -390,13 +390,39 @@ runtime:
     complete_order: Complete order
     processing_payment: Processing payment...
     finishing_order: Finishing order...
+    quantity_input: "Quantity for %{item}"
+    pay_amount: "Pay %{amount}"
+    event_local_time: "Venue local time"
+    checkout_policy: "All sales are final, subject to our fulfillment policy and your statutory rights."
+    checkout_policy_link: "View policy"
+    ticket_delivery: "Your tickets will be available on your order page. We will email you the link."
+    delivery_email: "Order link will be sent to %{email}."
+    hold_before_start: "Limited tickets are held when checkout starts. You can request more time."
+    tickets_held: "Tickets held for you"
+    details_title: "Your details"
+    retry_payment: "Retry loading payment"
+    payment_title: "Payment"
+    ticket_reservation: "Ticket reservation"
+    ticket_reserved: "1 ticket reserved while you check out."
+    tickets_reserved: "%{count} tickets reserved while you check out."
+    hold_time_remaining: "Time remaining"
+    hold_warning: "Your ticket hold ends in under 2 minutes. Need more time?"
+    hold_more_time: "More time"
+    hold_expired: "Your hold ended. Check availability to continue."
+    hold_check_again: "Check availability"
+    hold_check_payment: "Check payment status"
+    payment_resolving: "We are checking your payment. Do not pay again."
+    checkout_locked: "Payment has already started. Return to your cart before changing this order."
+    hold_unavailable: "Checkout is unavailable. Please try again."
+    hold_sold_out: "The requested quantity is no longer available."
+    temporarily_held: "Some items are held by another checkout. Try again shortly or change the quantity."
     pay_now: Pay now
     loading_secure_payment: Loading secure payment...
     payment_processing_still: Payment is still processing. Please stay on this page a moment and try again.
     save_payment_error: There was an error saving your payment method.
     payment_confirm_error: There was an error confirming your payment.
     secure_checkout_not_ready: Secure checkout is not ready yet.
-    secure_checkout_mount_error: Secure checkout could not be mounted.
+    secure_checkout_mount_error: Secure payment could not load.
     first_party_disabled: First-party checkout is not enabled for this build.
     start_order_error: There was an error starting your order.
     email_required: Enter an email address to continue.

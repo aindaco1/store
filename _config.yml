@@ -17,6 +17,7 @@ debug:
   console_logging_enabled: true
   verbose_console_logging: false
 exclude:
+  - _site
   - README.md
   - LICENSE
   - worker
@@ -41,8 +42,8 @@ exclude:
   - shared/dust-wave-platform/examples
 platform:
   name: Shop
-  version: 1.3.7
-  release_label: v1.3.7
+  version: 1.3.8
+  release_label: v1.3.8
   company_name: Dust Wave
   support_email: info@dustwave.xyz
   orders_email_from: Dust Wave Shop <orders@shop.dustwave.xyz>
@@ -159,6 +160,7 @@ shipping:
       height_in: 0
       stack_height_in: 0
 checkout:
+  hold_seconds: 600
   stripe_publishable_key: pk_live_51N48NKK9nUOzi4tvVuw9UdqVYGLyre50ex4s4giogLQDgUfejp0lfSxV6ZXRdiqN8RY7t0IDIRjiWQ192hcXWVSl00Htn02Ci3
 analytics:
   provider: none
