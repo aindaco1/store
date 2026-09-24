@@ -1,6 +1,6 @@
 # Checkout holds
 
-Local release candidate: `release/checkout-ux-ticket-holds`. This guide describes the candidate implementation, not a production rollout. The design review is [checkout-ux-review-2026-09-24.md](checkout-ux-review-2026-09-24.md).
+Implementation contract for Store v1.3.8. Deployment and acceptance are recorded in [release evidence](release-evidence/v1.3.8-checkout-holds.md). The design review is [checkout-ux-review-2026-09-24.md](checkout-ux-review-2026-09-24.md).
 
 ## Buyer experience
 
