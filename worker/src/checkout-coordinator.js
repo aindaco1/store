@@ -111,9 +111,23 @@ export function checkoutCoordinator(owner, mechanics) {
     const record = await createPayment(prepared.record);
     if (record.phase === 'confirmed') return { ...view(record), requiresPayment: false, nextAction: 'order_confirmed' };
     if (record.phase !== 'payment' || record.cancelRequested || record.expiresAt <= Date.now()) return error('payment_resolving', 'We are checking this payment. Do not pay again.', 409);
+    const unavailable = await paymentUnavailable(record, prepared.record.phase === 'creating');
+    if (unavailable) return unavailable.success ? error('hold_expired', 'Your hold ended. Check availability again.') : unavailable;
     return { ...view(record), checkoutUiMode: 'payment_intent', nextAction: 'confirm_payment', requiresPayment: true,
       orderToken: orderToken(record.id), paymentIntentId: record.paymentIntentId, clientSecret: record.clientSecret,
       publishableKey: record.publishableKey, totals: record.order.orderDraft.totals, orderDraft: record.order.orderDraft };
+  }
+
+  async function paymentUnavailable(record, freshlyCreated = false) {
+    try {
+      const stripe = createStoreStripeClient(env, checkoutStripeKey(env), { operation: 'checkout_payment_status', orderToken: orderToken(record.id), intent: 'read' });
+      const status = freshlyCreated ? record.order.payment.status : (await stripe.paymentIntents.retrieve(record.paymentIntentId)).status;
+      // Cancellation must use the existing checkpoint/release path. A paid or
+      // processing intent keeps its stock until the signed webhook settles it.
+      if (status === 'canceled') return release(record.id);
+      if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(status)) return null;
+    } catch (_error) {}
+    return error('payment_resolving', 'We are checking this payment. Do not pay again.');
   }
 
   async function createPayment(record) {
@@ -290,7 +304,11 @@ export function checkoutCoordinator(owner, mechanics) {
       let record = await ctx.storage.get(key(body.attemptId));
       if (!record) return error('hold_missing', 'Checkout was not found.', 404);
       if (record.phase === 'creating') record = await createPayment(record);
-      if (!terminal(record) && record.expiresAt <= Date.now()) return release(record.id);
+      if (!terminal(record) && (record.cancelRequested || record.expiresAt <= Date.now())) return release(record.id);
+      if (record.phase === 'payment') {
+        const unavailable = await paymentUnavailable(record);
+        if (unavailable) return unavailable;
+      }
       return view(record);
     },
     async alarm() {

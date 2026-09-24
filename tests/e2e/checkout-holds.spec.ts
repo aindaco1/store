@@ -48,17 +48,14 @@ for (const lang of ['en', 'es']) {
     await expect(cart.locator('[data-cart-hold]')).toHaveAttribute('data-state', 'warning');
     await cart.locator('[data-cart-hold-extend]').click();
     await expect(cart.locator('[data-cart-hold-extend]')).toBeHidden();
-    await cart.locator('[data-cart-custom-checkout-email]').fill('checkout-test@example.com');
-    await cart.locator('[data-cart-custom-checkout-email]').blur();
-    await cart.locator('[data-cart-tax-destination-field="postal_code"]').fill('10001');
-    await expect(cart.locator('[data-cart-start-checkout]')).toBeEnabled();
-    await expect(cart.locator('[data-cart-checkout-next]')).toHaveAttribute('data-ready', 'true');
     await cart.locator('[data-cart-custom-checkout-email]').fill('not-an-email');
+    await cart.locator('[data-cart-tax-destination-field="postal_code"]').fill('10001');
     await expect(cart.locator('[data-cart-start-checkout]')).toBeDisabled();
-    await expect(cart.locator('[data-cart-checkout-next]')).toHaveAttribute('data-ready', 'false');
+    await expect(cart.locator('.store-first-party-cart__readiness')).toHaveCount(0);
+    await cart.locator('[data-cart-tax-destination-field="postal_code"]').fill('');
     await cart.locator('[data-cart-custom-checkout-email]').fill('checkout-test@example.com');
     await cart.locator('[data-cart-custom-checkout-email]').blur();
-    await expect(cart.locator('[data-cart-start-checkout]')).toBeEnabled();
+    await expect(cart.locator('[data-cart-start-checkout]')).toBeDisabled();
     await cart.locator('[data-cart-hold]').scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath('details-ready-mobile.png'), animations: 'disabled' });
     await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
@@ -80,18 +77,28 @@ for (const lang of ['en', 'es']) {
   });
 }
 
-for (const physical of [false, true]) {
-test(`${physical ? 'Physical' : 'Ticket'}: Pay uses saved details and a card error keeps the same checkout attempt`, async ({ page }, testInfo) => {
+for (const { physical, failFirstMount } of [{ physical: false, failFirstMount: false }, { physical: true, failFirstMount: false }, { physical: false, failFirstMount: true }]) {
+test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal mount recovery' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
   let creations = 0; let confirms = 0;
+  let releasedAttempt = ''; const mounts: string[] = []; const canceledSecrets = new Set<string>();
   let lastConfirm: any;
   if (physical) await page.setViewportSize({ width: 390, height: 844 });
   await page.exposeFunction('recordFixtureConfirm', (params: any) => { confirms++; lastConfirm = params; });
+  await page.exposeFunction('recordFixtureMount', (secret: string) => {
+    mounts.push(secret);
+    return canceledSecrets.has(secret) || (failFirstMount && secret === 'pi_browser_fixture_1_secret');
+  });
   await page.addInitScript(() => {
     (window as any).Stripe = () => ({
-      elements: () => ({ create: () => {
+      elements: ({ clientSecret }: any) => ({ create: () => {
         const handlers: Record<string, Function> = {};
         return { on: (event: string, callback: Function) => { handlers[event] = callback; },
-          mount: (node: HTMLElement) => { node.textContent = 'Fixture payment element'; setTimeout(() => handlers.change?.({ complete: true }), 10); }, unmount: () => {} };
+          mount: (node: HTMLElement) => {
+            node.innerHTML = '<div>Fixture payment element</div>';
+            (window as any).recordFixtureMount(clientSecret).then((terminal: boolean) => terminal
+              ? handlers.loaderror?.({ error: { message: 'This PaymentIntent is in a terminal state' } })
+              : (handlers.ready?.(), handlers.change?.({ complete: true })));
+          }, unmount: () => {} };
       } }),
       confirmPayment: async (params: any) => { await (window as any).recordFixtureConfirm(params); return { error: { message: 'Fixture card declined' } }; }
     });
@@ -100,11 +107,13 @@ test(`${physical ? 'Physical' : 'Ticket'}: Pay uses saved details and a card err
   await page.route('**/shipping/quote', (route) => route.fulfill({ json: { shippingCents: 300, source: 'manual' } }));
   await page.route('**/api/checkout/*', async (route) => {
     const action = new URL(route.request().url()).pathname.split('/').pop();
-    const base = { success: true, phase: action === 'hold' ? 'held' : 'payment', heldQuantity: physical ? 0 : 1, extensionsRemaining: 10,
+    const attempt = route.request().postDataJSON().attemptId;
+    if (action === 'release') { releasedAttempt = attempt; canceledSecrets.add(`pi_browser_fixture_${creations}_secret`); }
+    const base = { success: true, phase: attempt === releasedAttempt ? 'released' : action === 'hold' ? 'held' : 'payment', heldQuantity: physical ? 0 : 1, extensionsRemaining: 10,
       serverTime: new Date().toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString() };
     if (action === 'intent') creations++;
     await route.fulfill({ json: action === 'intent' ? { ...base, checkoutUiMode: 'payment_intent', requiresPayment: true,
-      paymentIntentId: 'pi_browser_fixture', clientSecret: 'pi_browser_fixture_secret', publishableKey: 'pk_test_fixture', orderToken: 'store-order-browser-fixture', totals: { totalCents: physical ? 3603 : 2253 } } : base });
+      paymentIntentId: `pi_browser_fixture_${creations}`, clientSecret: `pi_browser_fixture_${creations}_secret`, publishableKey: 'pk_test_fixture', orderToken: 'store-order-browser-fixture', totals: { totalCents: physical ? 3603 : 2253 } } : base });
   });
   await gotoDomReady(page, physical ? '/products/fronteras-t-shirt/' : '/products/a-night-in-paradiso/');
   await page.locator('.store-add-item').first().click();
@@ -120,7 +129,14 @@ test(`${physical ? 'Physical' : 'Ticket'}: Pay uses saved details and a card err
     await cart.locator('[data-cart-tax-destination-field="postal_code"]').fill('10001');
     await cart.locator('[data-cart-tax-destination-field="postal_code"]').blur();
   }
-  await cart.locator('[data-cart-start-checkout]').click();
+  // No intermediate Continue action: the final field automatically loads payment.
+  if (failFirstMount) {
+    await expect(cart.locator('[data-cart-hold-retry]')).toBeVisible();
+    await expect(cart.locator('[data-cart-checkout-error]')).toHaveText('Secure payment could not load. Your hold ended. Check availability to continue.');
+    await expect(cart.locator('[data-cart-custom-checkout-region="payment"]')).toHaveCount(0);
+    expect(creations).toBe(1);
+    await cart.locator('[data-cart-hold-retry]').click();
+  }
   await expect(cart.locator('#store-first-party-cart-title')).toHaveText('Payment');
   await expect(cart.locator('[data-cart-custom-checkout-email]')).toHaveCount(0);
   await expect(cart.locator('[data-cart-delivery-email]')).toHaveText('Order link will be sent to checkout-test@example.com.');
@@ -129,6 +145,8 @@ test(`${physical ? 'Physical' : 'Ticket'}: Pay uses saved details and a card err
   await expect(pay).toHaveText(physical ? 'Pay $36.03' : 'Pay $22.53');
   await expect(cart.locator('[data-cart-checkout-summary-total]')).toHaveText(physical ? '$36.03' : '$22.53');
   await expect(pay).toBeEnabled();
+  expect(creations).toBe(failFirstMount ? 2 : 1);
+  expect(confirms).toBe(0);
   if (physical) {
     await expect(cart.locator('[data-cart-delivery-address]')).toContainText('123 Test Street');
     await expect(cart.locator('[data-cart-custom-shipping-field]')).toHaveCount(0);
@@ -140,8 +158,18 @@ test(`${physical ? 'Physical' : 'Ticket'}: Pay uses saved details and a card err
   await expect(pay).toBeEnabled();
   await pay.click();
   await expect.poll(() => confirms).toBe(2);
-  expect(creations).toBe(1);
+  expect(creations).toBe(failFirstMount ? 2 : 1);
   expect(lastConfirm.confirmParams.payment_method_data.billing_details.email).toBe('checkout-test@example.com');
   if (physical) expect(lastConfirm.confirmParams.payment_method_data.billing_details.address.line1).toBe('123 Test Street');
+  const mountedBeforeBack = mounts.length;
+  await cart.locator('[data-cart-back]').click();
+  await expect(cart.locator('[data-cart-continue]')).toBeVisible();
+  expect(mounts).toHaveLength(mountedBeforeBack);
+  await cart.locator('[data-cart-continue]').click();
+  await expect(pay).toBeEnabled();
+  expect(creations).toBe(failFirstMount ? 3 : 2);
+  expect(mounts.length).toBeGreaterThan(mountedBeforeBack);
+  expect(mounts.slice(mountedBeforeBack).every((secret) => secret === `pi_browser_fixture_${creations}_secret`)).toBe(true);
+  expect(canceledSecrets.has(mounts.at(-1)!)).toBe(false);
 });
 }

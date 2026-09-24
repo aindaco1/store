@@ -3634,6 +3634,9 @@
     let checkoutHoldTimer = 0;
     let checkoutHoldRequest = false;
     let checkoutHoldDeadline = 0;
+    let automaticCheckoutTimer = 0;
+    let checkoutStartInFlight = false;
+    let automaticCheckoutFailed = false;
     const checkoutAttemptKey = 'store_checkout_attempt_v1';
     let checkoutUiState = {
       status: 'idle',
@@ -4177,7 +4180,7 @@
           <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
             <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}</p>
             <div class="store-first-party-cart__stripe-shell">
-              <div class="store-first-party-cart__stripe-region store-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment"></div>
+              <div class="store-first-party-cart__stripe-region store-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment" tabindex="-1" role="group" aria-label="${escapeAttribute(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}"></div>
             </div>
             <p class="store-first-party-cart__note store-first-party-cart__note--payment-consent">${escapeHtml(getRuntimeMessage('cart.storePaymentConsent', 'Your payment is processed securely by Stripe.'))}</p>
           </div>
@@ -4341,7 +4344,7 @@
         ${checkoutErrorMarkup}
       `;
       const footerActions = isCheckoutPreview ? `
-          ${wantsCustomCheckout && !hasCustomCheckoutSession ? `<p class="store-first-party-cart__readiness" data-cart-checkout-next role="status" aria-live="polite"></p>` : ''}
+          ${wantsCustomCheckout && !hasCustomCheckoutSession ? `<p class="store-first-party-cart__note" data-cart-checkout-next role="status" aria-live="polite"></p>` : ''}
           ${finalSaleNoticeMarkup}
           <div class="store-first-party-cart__actions">
             <button type="button" class="store-first-party-cart__action store-first-party-cart__action--secondary" data-cart-back>${escapeHtml(getRuntimeMessage('cart.backToCart', 'Back to cart'))}</button>
@@ -4418,7 +4421,8 @@
       root.setAttribute('aria-hidden', 'false');
       activateCartDialog(root);
       emitCartSummaryUpdated();
-      syncCheckoutStartButton();
+      if (checkoutHold) syncCheckoutHoldUI();
+      else syncCheckoutStartButton();
       if (isCustomCheckout && customCheckout?.scriptStatus === 'ready') {
         mountCustomCheckoutIntoDrawer(root);
         ensureCustomCheckoutMounted(root);
@@ -4691,6 +4695,7 @@
 
     function closeFirstPartyCart() {
       if (!isCartOpen) return;
+      clearAutomaticCheckoutTimer();
       clearCustomCheckoutTaxDraftSyncTimer();
       isCartOpen = false;
       renderFirstPartyCart();
@@ -4851,6 +4856,8 @@
           clearStoreCartAfterOrder(); redirectWindow(buildStoreOrderSuccessPath(data.orderToken)); return;
         }
         if (renew) {
+          automaticCheckoutFailed = false;
+          checkoutUiState.error = '';
           teardownActiveCustomCheckoutMount();
           checkoutUiState.customCheckout = { ...checkoutUiState.customCheckout, clientSecret: '', paymentIntentId: '', orderId: '' };
         }
@@ -4871,6 +4878,9 @@
     }
 
     async function abandonActiveCustomCheckoutIntent() {
+      clearAutomaticCheckoutTimer();
+      invalidateCustomCheckoutFlow();
+      teardownActiveCustomCheckoutMount();
       if (checkoutAttemptId) {
         const result = await checkoutHoldAction('release');
         if (result.phase === 'confirmed') {
@@ -4884,6 +4894,12 @@
       clearFirstPartyCheckoutSnapshot();
       clearPendingOrderFlag();
       clearInterval(checkoutHoldTimer);
+      // Keep contact drafts, but never mount a canceled payment's secret again.
+      checkoutUiState.customCheckout = {
+        emailDraft: getPersistedCustomCheckoutEmailDraft(),
+        shippingDraft: getPersistedCustomCheckoutShippingDraft(),
+        abandonedCartConsent: readAbandonedCheckoutConsentDraft()
+      };
     }
 
     function clearStoreCartAfterOrder() {
@@ -5011,6 +5027,18 @@
       return registration.valid ? '' : registration.message;
     }
 
+    function clearAutomaticCheckoutTimer() {
+      window.clearTimeout(automaticCheckoutTimer);
+      automaticCheckoutTimer = 0;
+    }
+
+    function canStartAutomaticCheckout() {
+      return isCartOpen && currentRoute === CHECKOUT_VIEW_ROUTE && getCheckoutUiMode() === 'custom' &&
+        !checkoutStartInFlight && !automaticCheckoutFailed && !checkoutUiState.error &&
+        !checkoutUiState.customCheckout?.clientSecret && !checkoutUiState.customCheckout?.sessionId &&
+        checkoutHoldIsReady() && doesCurrentCheckoutRequirePayment() && !getCheckoutDetailsMessage();
+    }
+
     function syncCheckoutStartButton() {
       const root = getCartRoot();
       const button = root?.querySelector('[data-cart-start-checkout]');
@@ -5023,23 +5051,29 @@
       const ready = !detailsMessage && !holdBlocked;
       const hint = root.querySelector('[data-cart-checkout-next]');
       if (hint) {
-        const message = detailsMessage || (holdBlocked
-          ? getRuntimeMessage('cart.holdReview', 'Check your ticket reservation to continue.')
-          : checkoutRequiresPayment
-            ? getRuntimeMessage('cart.detailsReady', 'Details complete. Ready for secure payment.')
-            : getRuntimeMessage('cart.detailsReadyFree', 'Details complete. Ready to place your order.'));
-        hint.dataset.ready = String(ready);
+        const message = detailsMessage || '';
+        hint.hidden = !message;
         if (hint.textContent !== message) hint.textContent = message;
       }
-      button.disabled = !ready || checkoutUiState.status === 'submitting' ||
+      const automaticPayment = checkoutRequiresPayment && getCheckoutUiMode() === 'custom';
+      button.disabled = !ready || checkoutStartInFlight || (automaticPayment && !automaticCheckoutFailed) || checkoutUiState.status === 'submitting' ||
         getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER;
-      button.textContent = checkoutUiState.status === 'submitting'
+      button.textContent = checkoutUiState.status === 'submitting' || (automaticPayment && ready && !automaticCheckoutFailed)
         ? (checkoutRequiresPayment
           ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
           : getRuntimeMessage('cart.finishingOrder', 'Finishing order...'))
         : (checkoutRequiresPayment
-          ? getRuntimeMessage('cart.continueToPayment', 'Continue to payment')
+          ? (automaticCheckoutFailed ? getRuntimeMessage('cart.retryPayment', 'Retry loading payment') : getRuntimeMessage('cart.paymentTitle', 'Payment'))
           : getRuntimeMessage('cart.completeOrder', 'Complete order'));
+      button.setAttribute('aria-busy', String(checkoutStartInFlight));
+      if (!canStartAutomaticCheckout()) clearAutomaticCheckoutTimer();
+      else if (!automaticCheckoutTimer) {
+        // Let typing/autofill settle; availability and final Pay remain separate.
+        automaticCheckoutTimer = window.setTimeout(() => {
+          automaticCheckoutTimer = 0;
+          if (canStartAutomaticCheckout()) void startFirstPartyCheckout();
+        }, 350);
+      }
     }
 
     function requestCloseFirstPartyCart() {
@@ -5949,6 +5983,7 @@
     async function mountCustomCheckoutIntoDrawer(root) {
       if (!root || currentRoute !== CHECKOUT_VIEW_ROUTE || checkoutUiState.mode !== 'custom') return;
       if (!checkoutUiState.customCheckout || checkoutUiState.customCheckout.scriptStatus !== 'ready') return;
+      if (!checkoutUiState.customCheckout.clientSecret || !checkoutHoldIsReady()) return;
       const paymentContainer = root.querySelector('[data-cart-custom-checkout-region="payment"]');
       const shippingContainer = root.querySelector('[data-cart-custom-checkout-region="address"]');
       const mountStatus = checkoutUiState.customCheckout.mountStatus || 'idle';
@@ -5991,6 +6026,11 @@
           useShippingAddressElement: Boolean(shippingContainer),
           allowedCountries: SHIPPING_COUNTRY_OPTIONS.map((option) => option.value),
           defaultCountry: DEFAULT_SHIPPING_COUNTRY,
+          onReady: function() {
+            if (isActiveCustomCheckoutFlow(flowToken) && !root.contains(document.activeElement)) {
+              paymentContainer.focus({ preventScroll: true });
+            }
+          },
           onChange: function(event) {
             if (!isActiveCustomCheckoutFlow(flowToken)) return;
             checkoutUiState.customCheckout = {
@@ -6001,19 +6041,7 @@
             };
             syncCustomCheckoutConfirmButton();
           },
-          onLoadError: function(message) {
-            if (!isActiveCustomCheckoutFlow(flowToken)) return;
-            activeCustomCheckoutMount = null;
-            void abandonActiveCustomCheckoutIntent(getActiveCustomCheckoutOrderId()).catch((error) => setCheckoutUiError(error.message));
-            checkoutUiState.status = 'idle';
-            checkoutUiState.customCheckout = {
-              ...(checkoutUiState.customCheckout || {}),
-              mountStatus: 'error',
-              canConfirm: false
-            };
-            setCheckoutUiError(message || getRuntimeMessage('cart.secureCheckoutMountError', 'Secure checkout could not be mounted.'));
-            syncCustomCheckoutConfirmButton();
-          }
+          onLoadError: (message) => { void handleCustomCheckoutLoadFailure(flowToken, message); }
         });
 
         if (!isActiveCustomCheckoutFlow(flowToken)) {
@@ -6034,20 +6062,27 @@
         }
         syncCustomCheckoutConfirmButton();
       } catch (error) {
-        if (!isActiveCustomCheckoutFlow(flowToken)) return;
-        activeCustomCheckoutMount = null;
-        await abandonActiveCustomCheckoutIntent(getActiveCustomCheckoutOrderId());
-        setCheckoutUiState({
-          status: 'idle',
-          mode: 'custom',
-          error: error?.message || 'Secure checkout could not be mounted.',
-          customCheckout: {
-            ...(checkoutUiState.customCheckout || {}),
-            mountStatus: 'error',
-            canConfirm: false
-          }
-        });
+        await handleCustomCheckoutLoadFailure(flowToken, error?.message);
       }
+    }
+
+    async function handleCustomCheckoutLoadFailure(flowToken, message) {
+      if (!isActiveCustomCheckoutFlow(flowToken)) return;
+      automaticCheckoutFailed = true;
+      try {
+        await abandonActiveCustomCheckoutIntent();
+        if (['released', 'expired'].includes(checkoutHold?.phase)) {
+          message = `${getRuntimeMessage('cart.secureCheckoutMountError', 'Secure payment could not load.')} ${holdMessage('holdExpired', 'Your hold ended. Check availability to continue.')}`;
+        }
+      } catch (error) {
+        // An uncertain cancellation must stay attached to this payment.
+        message = error.message;
+      }
+      setCheckoutUiState({
+        status: 'idle',
+        error: message || getRuntimeMessage('cart.secureCheckoutMountError', 'Secure payment could not load.'),
+        customCheckout: { ...(checkoutUiState.customCheckout || {}), scriptStatus: 'error', mountStatus: 'error', canConfirm: false }
+      });
     }
 
     async function confirmCustomCheckout() {
@@ -6232,24 +6267,7 @@
           }
         });
       } catch (error) {
-        if (!isActiveCustomCheckoutFlow(flowToken)) return;
-        await abandonActiveCustomCheckoutIntent(nextCustomCheckout.orderId);
-        const refreshedCustomCheckout = checkoutUiState.customCheckout || nextCustomCheckout;
-        setCheckoutUiState({
-          status: 'idle',
-          mode: 'custom',
-          error: error?.message || getRuntimeMessage('cart.secureCheckoutMountError', 'Secure checkout could not be mounted.'),
-          customCheckout: {
-            ...refreshedCustomCheckout,
-            sessionId: nextCustomCheckout.sessionId,
-            clientSecret: nextCustomCheckout.clientSecret,
-            publishableKey: nextCustomCheckout.publishableKey,
-            orderId: nextCustomCheckout.orderId,
-            checkoutUiMode: nextCustomCheckout.checkoutUiMode,
-            scriptStatus: 'error',
-            mountStatus: 'error'
-          }
-        });
+        await handleCustomCheckoutLoadFailure(flowToken, error?.message);
       }
     }
 
@@ -6303,31 +6321,30 @@
           }
         });
       } catch (error) {
-        if (!isActiveCustomCheckoutFlow(flowToken)) return;
-        await abandonActiveCustomCheckoutIntent(nextCustomCheckout.orderId);
-        const refreshedCustomCheckout = checkoutUiState.customCheckout || nextCustomCheckout;
-        setCheckoutUiState({
-          status: 'idle',
-          mode: 'custom',
-          error: error?.message || getRuntimeMessage('cart.secureCheckoutMountError', 'Secure checkout could not be mounted.'),
-          customCheckout: {
-            ...refreshedCustomCheckout,
-            checkoutUiMode: nextCustomCheckout.checkoutUiMode,
-            sessionId: '',
-            paymentIntentId: nextCustomCheckout.paymentIntentId,
-            clientSecret: nextCustomCheckout.clientSecret,
-            publishableKey: nextCustomCheckout.publishableKey,
-            orderId: nextCustomCheckout.orderId,
-            scriptStatus: 'error',
-            mountStatus: 'error'
-          }
-        });
+        await handleCustomCheckoutLoadFailure(flowToken, error?.message);
       }
     }
 
     async function startFirstPartyCheckout() {
-      if (checkoutUiState.status === 'submitting') return;
+      if (checkoutStartInFlight || isCustomCheckoutBusy() || checkoutUiState.customCheckout?.clientSecret) return;
+      clearAutomaticCheckoutTimer();
+      checkoutStartInFlight = true;
+      automaticCheckoutFailed = false;
+      checkoutUiState.status = 'submitting';
+      try {
+        await performFirstPartyCheckout();
+        if (checkoutUiState.error || (doesCurrentCheckoutRequirePayment() && !checkoutUiState.customCheckout?.clientSecret)) automaticCheckoutFailed = true;
+      } catch (error) {
+        automaticCheckoutFailed = true;
+        setCheckoutUiState({ status: 'idle', error: error?.message || getRuntimeMessage('cart.startOrderError', 'There was an error starting your order.') });
+      } finally {
+        checkoutStartInFlight = false;
+        if (checkoutUiState.status === 'submitting') checkoutUiState.status = 'idle';
+        syncCheckoutStartButton();
+      }
+    }
 
+    async function performFirstPartyCheckout() {
       if (getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER) {
         setCheckoutUiState({
           status: 'idle',
@@ -6345,11 +6362,6 @@
       });
       const shippingDraft = shouldDeferCustomCheckout ? readCustomCheckoutShippingDraft() : null;
       const requiresTaxLocation = cartRequiresCustomCheckoutTaxLocation(state);
-
-      if (requiresTaxLocation) {
-        clearCustomCheckoutTaxDraftSyncTimer();
-        await syncCustomCheckoutTaxDraft({ refreshEstimate: false });
-      }
 
       const billingDestination = readReadyTaxDestination(store.getState());
       const emailField = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
@@ -6409,12 +6421,19 @@
       }
       showEventRegistrationValidationError({ valid: true });
 
+      persistCustomCheckoutDraftState(emailValue, shippingDraft || undefined);
+      if (requiresTaxLocation) {
+        clearCustomCheckoutTaxDraftSyncTimer();
+        await syncCustomCheckoutTaxDraft({ refreshEstimate: false });
+      }
+
       setCheckoutUiState({
         status: 'submitting',
         error: ''
       });
 
-      if ((requiresTaxLocation && billingDestination) || startsStoreCheckout) {
+      // Store submissions already request a fresh tax quote below.
+      if (!startsStoreCheckout && requiresTaxLocation && billingDestination) {
         await refreshCustomCheckoutTaxEstimate({
           shippingDraft
         });
@@ -6502,6 +6521,7 @@
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
+          if (data.code === 'hold_expired' || data.code === 'payment_resolving') await refreshCheckoutHold();
           const validationMessage = Array.isArray(data?.errors)
             ? String(data.errors.find((entry) => String(entry?.message || '').trim())?.message || '').trim()
             : '';
@@ -6821,6 +6841,7 @@
       }
 
       document._storeFirstPartyCartInputHandler = function handleFirstPartyCartInput(event) {
+        if (event.target?.closest?.('[data-store-cart-root]')) clearAutomaticCheckoutTimer();
         if (event.target?.closest?.('[data-cart-custom-checkout-email], [data-cart-custom-checkout-name]')) {
           setCustomCheckoutEmailError('');
           syncCheckoutStartButton();
@@ -6917,6 +6938,7 @@
       };
 
       document._storeFirstPartyCartChangeHandler = function handleFirstPartyCartChange(event) {
+        if (event.target?.closest?.('[data-store-cart-root]')) clearAutomaticCheckoutTimer();
         const registrationField = event.target?.closest?.('[data-rsvp-registration-answer], [data-rsvp-attendee-name]');
         if (registrationField && updateEventRegistrationDraftFromField(registrationField)) {
           setCheckoutUiError('');
@@ -7334,6 +7356,7 @@
             },
             navigate: function(route) {
               const previousRoute = currentRoute;
+              clearAutomaticCheckoutTimer();
               clearCustomCheckoutTaxDraftSyncTimer();
               if (currentRoute === CHECKOUT_VIEW_ROUTE && checkoutUiState.mode === 'custom') {
                 persistCustomCheckoutDraftState(
@@ -7346,6 +7369,7 @@
                 cartShouldFocusAfterRender = true;
               }
               if (currentRoute !== CHECKOUT_VIEW_ROUTE) {
+                automaticCheckoutFailed = false;
                 lastCustomCheckoutShippingSignature = '';
                 invalidateCustomCheckoutFlow();
                 teardownActiveCustomCheckoutMount();

@@ -58,6 +58,33 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('checkout inventory lifecycle', () => {
+  it('does not return a canceled intent on replay and releases it through the existing checkpoint', async () => {
+    await hold(); await pay(); status = 'canceled';
+    expect(await pay()).toMatchObject({ code: 'hold_expired' });
+    expect(await call('checkout-status')).toMatchObject({ phase: 'released' });
+    expect(createCount).toBe(1);
+    expect(await hold(second)).toMatchObject({ success: true });
+  });
+  it.each(['succeeded', 'processing', 'requires_capture'])('blocks remounting a %s intent without creating another charge', async (paymentStatus) => {
+    await hold(); await pay(); status = paymentStatus;
+    expect(await pay()).toMatchObject({ code: 'payment_resolving' });
+    expect(await call('checkout-status')).toMatchObject({ code: 'payment_resolving' });
+    expect(await hold(second)).toMatchObject({ code: 'temporarily_held' });
+    expect(createCount).toBe(1);
+  });
+  it('rejects a terminal intent returned by a replayed Stripe create', async () => {
+    await hold(); status = 'canceled';
+    expect(await pay()).toMatchObject({ code: 'hold_expired' });
+    expect(await call('checkout-status')).toMatchObject({ phase: 'released' });
+  });
+  it('finishes an uncertain cancellation on status check before offering another payment', async () => {
+    await hold(); await pay(); cancelFails = true;
+    expect(await call('checkout-release')).toMatchObject({ code: 'payment_resolving' });
+    expect(await call('checkout-status')).toMatchObject({ code: 'payment_resolving' });
+    cancelFails = false;
+    expect(await call('checkout-status')).toMatchObject({ phase: 'released' });
+    expect(createCount).toBe(1);
+  });
   it('serializes simultaneous buyers and reuses the winning attempt without resetting time', async () => {
     const results = await Promise.all([hold(), hold(second)]);
     expect(results.filter((r) => r.success)).toHaveLength(1);

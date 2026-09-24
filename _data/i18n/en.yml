@@ -400,14 +400,12 @@ runtime:
     hold_before_start: "Limited tickets are held when checkout starts. You can request more time."
     tickets_held: "Tickets held for you"
     details_title: "Your details"
+    retry_payment: "Retry loading payment"
     payment_title: "Payment"
-    details_ready: "Details complete. Ready for secure payment."
-    details_ready_free: "Details complete. Ready to place your order."
     ticket_reservation: "Ticket reservation"
     ticket_reserved: "1 ticket reserved while you check out."
     tickets_reserved: "%{count} tickets reserved while you check out."
     hold_time_remaining: "Time remaining"
-    hold_review: "Check your ticket reservation to continue."
     hold_warning: "Your ticket hold ends in under 2 minutes. Need more time?"
     hold_more_time: "More time"
     hold_expired: "Your hold ended. Check availability to continue."
@@ -424,7 +422,7 @@ runtime:
     save_payment_error: There was an error saving your payment method.
     payment_confirm_error: There was an error confirming your payment.
     secure_checkout_not_ready: Secure checkout is not ready yet.
-    secure_checkout_mount_error: Secure checkout could not be mounted.
+    secure_checkout_mount_error: Secure payment could not load.
     first_party_disabled: First-party checkout is not enabled for this build.
     start_order_error: There was an error starting your order.
     email_required: Enter an email address to continue.

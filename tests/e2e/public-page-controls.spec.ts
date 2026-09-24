@@ -447,6 +447,9 @@ test.describe('Store Public Page Controls', () => {
     await cart.getByLabel('Attendee name').nth(1).fill('Sam Guest');
     await cart.getByLabel('Age group').nth(0).selectOption('18_plus');
     await cart.getByLabel('Age group').nth(1).selectOption('under_18');
+    await expect(cart.getByRole('button', { name: 'Complete order' })).toBeEnabled();
+    await page.waitForTimeout(500); // Longer than paid checkout's automatic preparation debounce.
+    expect(checkoutBody).toBeNull();
     await cart.getByRole('button', { name: 'Complete order' }).click();
 
     await expect.poll(() => checkoutBody).not.toBeNull();

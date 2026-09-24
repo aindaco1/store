@@ -1033,24 +1033,6 @@ body.store-cart-open {
   color: $color--secondary;
 }
 
-.store-first-party-cart__readiness {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border-inline-start: 3px solid $border--strong;
-  background: $surface--subtle;
-  color: $color--secondary;
-  font-size: 0.875rem;
-  line-height: 1.5;
-
-  &[data-ready='true'] {
-    border-inline-start-color: $color--success-dark;
-    background: $color--success-notice-bg;
-    color: $color--success-dark;
-    font-weight: 600;
-  }
-}
-
 .store-first-party-cart__delivery {
   margin: 0;
   color: $color--secondary;
