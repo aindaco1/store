@@ -49,6 +49,8 @@ Start with the guide for the work you are doing. The [root README](../README.md)
 ## Capabilities And Release History
 
 - [Roadmap](ROADMAP.md): current capability inventory and future work.
+- [Checkout hold implementation](CHECKOUT_HOLDS.md) — local candidate policy, payment boundaries, and recovery.
+- [Checkout UX review, September 2026](checkout-ux-review-2026-09-24.md): HoldMyTicket comparison, Store pre-payment observations, and proposed checkout/hold improvements; planning evidence, not shipped behavior.
 - [Changelog](../CHANGELOG.md): version-by-version changes.
 - [Release evidence](release-evidence/): dated validation, provider, rollout, and rollback records, including historical design QA.
 - [2026-09-09 admin access rollout](release-evidence/2026-09-09-admin-access-isolation.md): Store/Pool identity isolation, role enforcement, and removal of the redundant Store checkbox.

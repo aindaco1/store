@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 import { gotoDomReady } from './helpers/navigation';
+import { routeCheckoutHold } from './helpers/checkout';
 import { waitForStableRendering } from './helpers/rendering';
 
 const SITE_BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:4002';
@@ -385,6 +386,7 @@ test.describe('Store Public Page Controls', () => {
   });
 
   test('collects direct-link RSVP attendee details without persisting responses in browser storage', async ({ page }) => {
+    await routeCheckoutHold(page);
     let checkoutBody: Record<string, any> | null = null;
     await page.route('**/api/store/inventory**', async (route) => {
       await route.fulfill({

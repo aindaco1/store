@@ -68,6 +68,7 @@
 
 import { buildStoreEventFollowupEmailMessage, sendAdminUserCreatedEmail, sendStoreAbandonedCartEmail, sendStoreEventFollowupEmail, sendStoreEventReminderEmail, sendStoreOrderAdminNotificationEmail, sendStoreOrderEmail, sendStoreOrderLookupEmail } from './email.js';
 import { emailOutboxEnabled, enqueueEmailOutbox, isEmailOutboxRecipientSuppressed, processEmailOutbox, processResendWebhook, suppressPromotionalEmail, verifyResendWebhook } from './email-outbox.js';
+import { CHECKOUT_ATTEMPT_PATTERN } from './checkout-policy.js';
 import { verifyStripeSignature, DEFAULT_STRIPE_API_VERSION } from './stripe.js';
 import { createStoreStripeClient, recordStripeProcessorEvent, storeReconciliationBreak } from './payment-integrity.js';
 import { reconcileIndexedStorePayments, STORE_PAYMENT_RECONCILIATION_STATE_KEY } from './store-payment-reconciliation.js';
@@ -3431,6 +3432,10 @@ export default {
 
       if (path === '/api/store/inventory' && method === 'GET') {
         return handleGetPublicStoreInventory(request, env, ctx);
+      }
+
+      if (/^\/api\/checkout\/(hold|status|extend|release)$/.test(path) && method === 'POST') {
+        return handleStoreCheckoutHold(request, env, path.split('/').pop());
       }
 
       if ((path === '/api/checkout/intent' || path === '/checkout/intent') && method === 'POST') {
@@ -12310,7 +12315,8 @@ async function handleAdminStoreInventoryRecoveryReconciliation(request, env, bod
       return privateJsonResponse({ error: 'Recovery reconciliation execution blocked', missing: missingAcknowledgements }, 409, env);
     }
 
-    await callStoreInventoryCoordinator(env, '/replace', { inventory: plan.expectedInventory });
+    const replacement = await callStoreInventoryCoordinator(env, '/replace', { inventory: plan.expectedInventory });
+    if (!replacement.success) return privateJsonResponse({ error: replacement.error || 'Inventory replacement blocked' }, 409, env);
     await env.STORE_STATE.delete(key);
     invalidateStoreReadCachesForMutation(env, ctx, 'inventory_override');
     const auditKey = await recordAdminAuditEvent(env, {
@@ -14680,6 +14686,63 @@ async function handleStoreCartValidate(request, env) {
   }, status, env);
 }
 
+function buildStorePaymentIntentParams(orderDraft, orderToken, orderHash) {
+  return {
+    amount: orderDraft.totals.totalCents,
+    currency: orderDraft.currency.toLowerCase(),
+    automatic_payment_methods: {
+      enabled: true
+    },
+    metadata: {
+      orderToken,
+      orderHash,
+      checkoutProvider: 'first_party',
+      storeOrderVersion: String(STORE_ORDER_DRAFT_VERSION),
+      email: orderDraft.customer.email || '',
+      itemCount: String(orderDraft.totals.itemCount),
+      couponCode: String(orderDraft.totals.couponCode || ''),
+      discountCents: String(orderDraft.totals.discountCents || 0),
+      tipPercent: String(orderDraft.totals.tipPercent || 0),
+      tipAmountCents: String(orderDraft.totals.tipAmountCents || 0),
+      requiresShipping: orderDraft.totals.requiresShipping ? 'true' : 'false',
+      requiresTurnstile: orderDraft.totals.requiresTurnstile ? 'true' : 'false'
+    }
+  };
+}
+
+async function storeCheckoutSelection(items) {
+  const selection = items.map((item) => [item.productId, item.sku, item.variantId || '', item.quantity, item.unitPriceCents])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(selection)));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function handleStoreCheckoutHold(request, env, action) {
+  if (getCheckoutProvider(env) !== 'first_party') return privateJsonResponse({ error: 'Not found' }, 404, env);
+  const origin = requireTrustedSiteOrigin(request, env);
+  if (!origin.ok) return origin.response;
+  const rate = await checkRateLimit(request, env, { ...(action === 'hold' ? RATE_LIMITS.start : RATE_LIMITS.cartValidate), privateResponse: true });
+  if (!rate.allowed) return rate.response;
+  const parsed = await parseJsonRequestBody(request, env, { maxBytes: MAX_STANDARD_JSON_BODY_BYTES, privateResponse: true, emptyValue: {} });
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.body || {};
+  if (!CHECKOUT_ATTEMPT_PATTERN.test(body.attemptId || '')) return privateJsonResponse({ error: 'Invalid checkout attempt.' }, 400, env);
+  if (!hasStoreInventoryCoordinator(env)) return privateJsonResponse({ error: 'Checkout inventory is unavailable.' }, 503, env);
+  const payload = { attemptId: body.attemptId };
+  if (action === 'hold') {
+    const snapshot = await getEffectiveStoreCatalogSnapshot(env);
+    const validation = validateStoreOrderDraft(body, { env, snapshot, enforceSubmittedPrices: true, enforceInventory: true, enforceEventRegistration: false });
+    if (!validation.valid) return privateJsonResponse({ error: 'Your cart needs attention.', ...validation }, 422, env);
+    // Only finite tickets are held while the buyer fills out contact/tax details.
+    payload.counts = getStoreSkuReservationCounts(validation.items.filter((item) => item.fulfillmentType === 'ticket'));
+    payload.selection = await storeCheckoutSelection(validation.items);
+    payload.inventory = await buildStoreCatalogInventorySnapshot(env);
+    payload.items = validation.items.map(({ productId, eventDetails }) => ({ productId, eventDetails }));
+  }
+  const result = await callStoreInventoryCoordinator(env, `/checkout-${action}`, payload);
+  return privateJsonResponse({ ...result, ...(result.success && payload.items ? { items: payload.items } : {}) }, result.success ? 200 : result.status || 409, env);
+}
+
 async function handleStoreCheckoutIntent(request, env, ctx = null) {
   if (getCheckoutProvider(env) !== 'first_party') {
     return jsonResponse({ error: 'Not found' }, 404);
@@ -14732,13 +14795,16 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     return privateJsonResponse({ error: 'Order storage unavailable' }, 503, env);
   }
 
-  const orderToken = `store-order-${createCheckoutNonce()}`;
+  const attemptId = String(body.attemptId || '');
+  if (attemptId && !CHECKOUT_ATTEMPT_PATTERN.test(attemptId)) return privateJsonResponse({ error: 'Invalid checkout attempt.' }, 400, env);
+  if (attemptId && !hasStoreInventoryCoordinator(env)) return privateJsonResponse({ error: 'Checkout inventory is unavailable.' }, 503, env);
+  const orderToken = `store-order-${attemptId || createCheckoutNonce()}`;
   const storeCatalogSnapshot = await getEffectiveStoreCatalogSnapshot(env);
   let validation = validateStoreOrderDraft(body, {
     env,
     snapshot: storeCatalogSnapshot,
     enforceSubmittedPrices: true,
-    enforceInventory: false,
+    enforceInventory: Boolean(attemptId),
     enforceEventRegistration: true
   });
   const couponCode = String(body.couponCode || body.coupon_code || '').trim();
@@ -14829,6 +14895,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       orderToken,
       orderHash,
       checkoutProvider: 'first_party',
+      ...(attemptId ? { checkoutAttemptId: attemptId } : {}),
       createdAt: orderDraft.createdAt,
       expiresAt: orderDraft.expiresAt,
       validationWarnings: draftResult.validation.warnings || []
@@ -14846,8 +14913,29 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     itemCount: orderDraft.totals.itemCount
   } : null;
 
+  if (attemptId && orderDraft.totals.requiresPayment) {
+    const publishableKey = getStripePublishableKey(env);
+    const config = validateStripeCheckoutKeyPair(env, getStripeKey(env), publishableKey);
+    if (!config.ok) return privateJsonResponse({ error: config.error }, config.status || 503, env);
+    const counts = getStoreSkuReservationCounts(draftResult.validation.items);
+    const order = { ...buildStoredOrderBase(), status: STORE_ORDER_STATUS_DRAFT, orderDraft,
+      inventoryReservation: buildStoreInventoryReservation(orderToken, counts),
+      ...(abandonedCartReminder ? { abandonedCart: abandonedCartReminder } : {}),
+      payment: { required: true, provider: 'stripe', status: 'not_created', amountCents: orderDraft.totals.totalCents, currency: orderDraft.currency } };
+    const result = await callStoreInventoryCoordinator(env, '/checkout-pay', {
+      attemptId, order, counts, inventory: await buildStoreCatalogInventorySnapshot(env),
+      selection: await storeCheckoutSelection(draftResult.validation.items), publishableKey,
+      params: buildStorePaymentIntentParams(orderDraft, orderToken, orderHash)
+    });
+    if (result.success && abandonedCartReminder) queueAbandonedCheckoutFollowupQuietly(ctx, env, { ...order, status: STORE_ORDER_STATUS_PAYMENT_PENDING });
+    invalidateAdminStoreOrderScanCache(env, ctx);
+    return privateJsonResponse({ ok: result.success, checkoutProvider: 'first_party', ...result }, result.success ? 200 : result.status || 409, env);
+  }
+
   if (!orderDraft.totals.requiresPayment) {
-    const inventoryReservationResult = await saveStoreInventoryReservation(env, orderToken, draftResult.validation.items);
+    const inventoryReservationResult = attemptId
+      ? { success: true, reservation: buildStoreInventoryReservation(orderToken, getStoreSkuReservationCounts(draftResult.validation.items)) }
+      : await saveStoreInventoryReservation(env, orderToken, draftResult.validation.items);
     if (!inventoryReservationResult?.success) {
       return privateJsonResponse({
         error: inventoryReservationResult?.error || 'Store inventory reservation failed',
@@ -14856,7 +14944,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     }
 
     const confirmedAt = new Date().toISOString();
-    const inventoryCommit = await confirmOrClaimStoreInventoryReservation(
+    const inventoryCommit = attemptId ? { success: true } : await confirmOrClaimStoreInventoryReservation(
       env,
       orderToken,
       inventoryReservationResult.reservation
@@ -14883,7 +14971,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       status: STORE_ORDER_STATUS_CONFIRMED,
       confirmedAt
     };
-    const storedOrder = {
+    let storedOrder = {
       ...storedOrderBase,
       status: STORE_ORDER_STATUS_CONFIRMED,
       confirmedAt,
@@ -14897,6 +14985,16 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
         bookedAt: confirmedAt
       }
     };
+
+    if (attemptId) {
+      storedOrder.inventoryReservation = buildStoreInventoryReservation(orderToken, getStoreSkuReservationCounts(draftResult.validation.items), 'confirmed', confirmedAt);
+      const result = await callStoreInventoryCoordinator(env, '/checkout-free', {
+        attemptId, order: storedOrder, counts: getStoreSkuReservationCounts(draftResult.validation.items),
+        inventory: await buildStoreCatalogInventorySnapshot(env), selection: await storeCheckoutSelection(draftResult.validation.items)
+      });
+      if (!result.success) return privateJsonResponse(result, result.status || 409, env);
+      storedOrder = result.order;
+    }
 
     await env.STORE_STATE.put(
       storeOrderStorageKey,
@@ -14976,27 +15074,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     intent: 'create',
     valueTime: pendingOrderDraft.valueTime || pendingOrderDraft.createdAt
   });
-  const paymentIntentParams = {
-    amount: pendingOrderDraft.totals.totalCents,
-    currency: pendingOrderDraft.currency.toLowerCase(),
-    automatic_payment_methods: {
-      enabled: true
-    },
-    metadata: {
-      orderToken,
-      orderHash,
-      checkoutProvider: 'first_party',
-      storeOrderVersion: String(STORE_ORDER_DRAFT_VERSION),
-      email: pendingOrderDraft.customer.email || '',
-      itemCount: String(pendingOrderDraft.totals.itemCount),
-      couponCode: String(pendingOrderDraft.totals.couponCode || ''),
-      discountCents: String(pendingOrderDraft.totals.discountCents || 0),
-      tipPercent: String(pendingOrderDraft.totals.tipPercent || 0),
-      tipAmountCents: String(pendingOrderDraft.totals.tipAmountCents || 0),
-      requiresShipping: pendingOrderDraft.totals.requiresShipping ? 'true' : 'false',
-      requiresTurnstile: pendingOrderDraft.totals.requiresTurnstile ? 'true' : 'false'
-    }
-  };
+  const paymentIntentParams = buildStorePaymentIntentParams(orderDraft, orderToken, orderHash);
   let paymentIntent;
   try {
     paymentIntent = await stripe.paymentIntents.create(paymentIntentParams, {
@@ -15268,7 +15346,9 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   const confirmedAt = loaded.storedOrder.confirmedAt || new Date().toISOString();
   const inventoryCommit = alreadyConfirmed
     ? { success: true, reservation: loaded.storedOrder.inventoryReservation || null }
-    : await confirmOrClaimStoreInventoryReservation(
+    : loaded.storedOrder.checkoutAttemptId
+      ? await callStoreInventoryCoordinator(env, '/checkout-confirm', { attemptId: loaded.storedOrder.checkoutAttemptId })
+      : await confirmOrClaimStoreInventoryReservation(
         env,
         metadata.orderToken,
         loaded.storedOrder.inventoryReservation
@@ -15302,6 +15382,9 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
   if (snapshot.financials?.chargeId) updatedOrder.stripeChargeId = snapshot.financials.chargeId;
   if (snapshot.financials?.balanceTransactionId) updatedOrder.stripeBalanceTransactionId = snapshot.financials.balanceTransactionId;
   if (inventoryCommit.reservation) updatedOrder.inventoryReservation = inventoryCommit.reservation;
+  else if (loaded.storedOrder.checkoutAttemptId && loaded.storedOrder.inventoryReservation) {
+    updatedOrder.inventoryReservation = buildStoreInventoryReservation(metadata.orderToken, loaded.storedOrder.inventoryReservation.counts, 'confirmed', confirmedAt);
+  }
   delete updatedOrder.failedAt;
   delete updatedOrder.orderDraft.failedAt;
 
@@ -15344,6 +15427,18 @@ async function failStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
         storeOrder: 'confirmed'
       }
     };
+  }
+
+  if (loaded.storedOrder.checkoutAttemptId) {
+    if (paymentIntent.status !== 'canceled') {
+      // A declined PaymentIntent remains payable. Keep its capacity and let the
+      // buyer retry the existing Element until expiry/cancellation.
+      return { ok: true, status: 200, outcome: 'store_order_payment_retryable', orderToken: metadata.orderToken, response: { received: true } };
+    }
+    const result = await callStoreInventoryCoordinator(env, '/checkout-release', { attemptId: loaded.storedOrder.checkoutAttemptId });
+    if (!result.success) return storeOrderSettlementError(result.error, 409, 'store_order_pending_resolution', metadata.orderToken);
+    await deleteAbandonedCheckoutFollowup(env, metadata.orderToken, { reason: 'canceled' });
+    return { ok: true, status: 200, outcome: 'store_order_payment_canceled', orderToken: metadata.orderToken, response: { received: true } };
   }
 
   const failedAt = new Date().toISOString();
@@ -15701,7 +15796,7 @@ async function handleStripeWebhook(request, env, ctx) {
     }), { expirationTtl: STRIPE_EVENT_MARKER_TTL_SECONDS });
   }
 
-  if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
+  if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
     const paymentIntent = event.data.object;
     if (isStorePaymentIntent(paymentIntent)) {
       const metadata = getStorePaymentIntentMetadata(paymentIntent);

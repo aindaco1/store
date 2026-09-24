@@ -738,7 +738,7 @@ body.store-cart-open {
 
 .store-first-party-cart__tip-box {
   margin-top: 16px;
-  @include surface-card(14px 16px);
+  @include surface-card(8px 12px);
 }
 
 .store-first-party-cart__tip-header {
@@ -978,8 +978,12 @@ body.store-cart-open {
   }
 
   .store-first-party-cart__item {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
   }
+
+  .store-first-party-cart__item-main { grid-column: 2; }
 
   .store-first-party-cart__item-media {
     width: 100%;
@@ -988,7 +992,13 @@ body.store-cart-open {
   }
 
   .store-first-party-cart__item-actions {
-    align-items: flex-start;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
 
   .store-first-party-cart__quantity {
@@ -1012,22 +1022,21 @@ body.store-cart-open {
   }
 
   .store-first-party-cart__actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .store-first-party-cart__action {
     white-space: normal;
   }
 
-  .store-first-party-cart__line-item,
-  .store-first-party-cart__tip-header {
-    flex-direction: column;
+  .store-first-party-cart__line-item {
+    flex-direction: row;
     align-items: flex-start;
     gap: 6px;
   }
 
   .store-first-party-cart__tip-controls {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto;
     gap: 8px;
   }
 
@@ -1036,7 +1045,7 @@ body.store-cart-open {
   }
 
   .store-first-party-cart__coupon-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .store-first-party-cart__coupon-remove {
@@ -1067,9 +1076,9 @@ body.store-cart-open {
 
   .store-first-party-cart__summary-row > strong,
   .store-first-party-cart__summary-value {
-    margin-left: 0;
-    width: 100%;
-    justify-content: flex-start;
+    margin-left: auto;
+    width: auto;
+    justify-content: flex-end;
   }
 
   .store-first-party-cart__summary-value--shipping-option {
@@ -1093,3 +1102,12 @@ body.store-cart-open {
     padding-top: 14px;
   }
 }
+
+.store-first-party-cart__hold {
+  @include surface-card(10px 12px);
+  margin-bottom: 12px;
+  p { margin: 0 0 8px; }
+  [data-cart-hold-timer] { font-variant-numeric: tabular-nums; white-space: nowrap; }
+}
+.store-first-party-cart [hidden] { display: none !important; }
+.store-first-party-cart__line-item-name ~ span { display: block; }

@@ -4,6 +4,8 @@ Store uses Stripe as its payment processor, with the Cloudflare Worker as the ca
 
 This document describes the current Store implementation from setup through operations. It folds payment-engineering operating guidance into Store's order-based commerce model.
 
+For the local checkout release candidate, [CHECKOUT_HOLDS.md](CHECKOUT_HOLDS.md) defines the new stable-attempt path, short ticket deadline, cancellation, and recovery contract. Older no-attempt clients retain the legacy intent path described below.
+
 ## Current Model
 
 Store is not a wallet, deferred payment system, marketplace ledger, or bank-like balance system. It is an immediate commerce checkout for physical products, digital downloads, tickets, and free RSVPs:
@@ -14,7 +16,7 @@ Store is not a wallet, deferred payment system, marketplace ledger, or bank-like
 - Paid orders create a Stripe PaymentIntent and mount Stripe's Payment Element through the Store checkout sidecar.
 - Stripe owns card data and PCI-sensitive payment fields.
 - Paid Store orders become confirmed only after a signed `payment_intent.succeeded` webhook validates against the stored order draft.
-- Failed/canceled paid orders release inventory reservations and remain private/no-store.
+- New checkout attempts retain inventory after a declined card; only confirmed cancellation releases a payable intent. All order/payment responses remain private/no-store. See [checkout holds](CHECKOUT_HOLDS.md).
 - Store owns order records, order emails, admin notifications, fulfillment actions, inventory state, reconciliation exports, and operational diagnostics.
 
 Stripe receipt emails are intentionally suppressed for Store PaymentIntents. Store sends customer order confirmations and super-admin order notifications through the Resend email path so totals, localization, and fulfillment links stay in one controlled system.
@@ -323,7 +325,7 @@ For `payment_intent.succeeded`, the Worker:
 11. Queues customer order email, super-admin order notifications, lookup indexing, and event reminders.
 12. Marks the Stripe event processed only after settlement succeeds.
 
-For `payment_intent.payment_failed`, the Worker:
+For a new attempt, `payment_intent.payment_failed` acknowledges a retryable card failure and keeps capacity; `payment_intent.canceled` resolves the attempt through the coordinator. For a legacy order without an attempt, `payment_intent.payment_failed` follows the older behavior:
 
 1. Runs the same signature, idempotency, Store-order, and amount/currency validation.
 2. Releases the inventory reservation unless the order was already confirmed.
@@ -505,11 +507,11 @@ After checkout, fulfillment, or payment changes:
 - Confirm Stripe publishable/secret keys match the selected app mode.
 - Confirm the Stripe webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` in production.
 - Confirm the test-mode Stripe webhook endpoint targets `https://store-worker-staging.jogo.workers.dev/webhooks/stripe` and the staging Worker only.
-- Confirm the webhook subscribes to `payment_intent.succeeded` and `payment_intent.payment_failed`.
+- Confirm the webhook subscribes to `payment_intent.succeeded`, `payment_intent.payment_failed`, and `payment_intent.canceled`.
 - Review webhook observability.
 - Export Store reconciliation CSV from **Settings -> Store readiness**.
 - Compare Stripe payments against Store confirmed orders, total amounts, currencies, charge IDs, balance transaction IDs, and card verification outcomes.
-- Confirm failed/canceled payments release reservations.
+- Confirm declined cards retain the existing intent/stock and confirmed cancellation releases reservations.
 - Confirm Store order emails, admin notifications, lookup links, downloads, check-in actions, and CSV exports match the settled order state.
 
 ### Processor journal and bounded reconciliation

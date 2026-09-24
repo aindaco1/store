@@ -873,13 +873,13 @@
     if (taxDestinationNeedsDetailedStreetAddress(normalized)) {
       return getRuntimeMessage(
         'cart.taxLocationNoteNm',
-        'Add your New Mexico billing street address, city, state, and postal code so we can finalize tax before you save your payment method.'
+        'Add your New Mexico billing street address, city, state, and postal code to calculate tax.'
       );
     }
 
     return getRuntimeMessage(
       'cart.taxLocationNote',
-      'Add your billing country and postal code so we can finalize tax before you save your payment method.'
+      'Add your billing country and postal code to calculate tax.'
     );
   }
 
@@ -2560,11 +2560,26 @@
     return !Boolean(options?.hasCustomCheckoutSession);
   }
 
-  function buildCheckoutLineItems(items) {
+  function getCheckoutEventLines(details) {
+    if (!details) return [];
+    const lines = [];
+    const starts = String(details.starts_at || details.startsAt || '');
+    const wallTime = starts.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+    if (wallTime) {
+      const date = new Date(`${wallTime[1]}T${wallTime[2]}:00Z`);
+      if (Number.isFinite(date.getTime())) lines.push(new Intl.DateTimeFormat(getCurrentLang(), { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(date) + ' · ' + getRuntimeMessage('cart.eventLocalTime', 'Venue local time'));
+    }
+    if (details.venue) lines.push(String(details.venue));
+    if (details.address) lines.push(String(details.address));
+    return lines;
+  }
+
+  function buildCheckoutLineItems(items, canonicalItems = []) {
     return (items || []).map((item) => ({
       name: getCartItemFieldValue(item, '_variant_label')
         ? `${item?.name || item?.id || 'Untitled item'} (${getCartItemFieldValue(item, '_variant_label')})`
         : (item?.name || item?.id || 'Untitled item'),
+      meta: getCheckoutEventLines(canonicalItems.find((entry) => entry.productId === getStoreCartItemProductId(item))?.eventDetails),
       quantity: Math.max(1, Number(item?.quantity || 1)),
       showQuantity: item?.stackable === true || Math.max(1, Number(item?.quantity || 1)) > 1,
       amountCents: Math.round((Number(item?.price) || 0) * Math.max(1, Number(item?.quantity || 1)) * 100)
@@ -2750,7 +2765,7 @@
                     step="1"
                     inputmode="numeric"
                     pattern="[0-9]*"
-                    aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}"
+                    aria-label="${escapeAttribute(getRuntimeMessage('cart.quantityInput', 'Quantity for %{item}').replace('%{item}', product.name || product.productId))}"
                     value="${escapeAttribute(String(Math.min(maxQuantity, Math.max(1, Number(draft.quantity || 1)))))}"
                     data-cart-addon-product-quantity
                     data-addon-product-id="${escapeAttribute(product.productId)}"
@@ -3614,6 +3629,12 @@
     let cartBackgroundUnlock = null;
     let cartReturnFocusTarget = null;
     let cartShouldFocusAfterRender = false;
+    let checkoutHold = null;
+    let checkoutAttemptId = '';
+    let checkoutHoldTimer = 0;
+    let checkoutHoldRequest = false;
+    let checkoutHoldDeadline = 0;
+    const checkoutAttemptKey = 'store_checkout_attempt_v1';
     let checkoutUiState = {
       status: 'idle',
       error: '',
@@ -3942,7 +3963,7 @@
       const pricing = getCurrentDisplayedFirstPartyPricing(state);
       const checkoutRequiresPayment = doesCurrentCheckoutRequirePayment(pricing);
       const hasPhysicalItems = cartHasPhysicalItems(items);
-      const checkoutLineItems = buildCheckoutLineItems(items);
+      const checkoutLineItems = buildCheckoutLineItems(items, checkoutHold?.items || []);
       const wantsCustomCheckout = isCheckoutPreview &&
         isFirstPartyCheckoutEnabled &&
         getCheckoutUiMode() === 'custom';
@@ -3985,13 +4006,14 @@
         : '/terms/#returns-refunds';
       const finalSaleNoticeMarkup = `
         <p class="store-first-party-cart__policy-notice">
-          ${escapeHtml(getRuntimeMessage('cart.finalSaleNotice', 'All sales are final after payment. No returns or exchanges; fulfillment problems and non-waivable rights remain covered.'))}
-          <a href="${escapeAttribute(returnPolicyUrl)}">${escapeHtml(getRuntimeMessage('cart.returnPolicy', 'Read the return and fulfillment policy.'))}</a>
+          ${escapeHtml(getRuntimeMessage('cart.checkoutPolicy', 'All sales are final, subject to our fulfillment policy and your statutory rights.'))}
+          <a href="${escapeAttribute(returnPolicyUrl)}">${escapeHtml(getRuntimeMessage('cart.checkoutPolicyLink', 'View policy'))}</a>
         </p>
       `;
       const checkoutErrorMarkup = `
         <p class="store-first-party-cart__error" data-cart-checkout-error role="alert" ${checkoutUiState.error ? '' : 'hidden'}>${escapeHtml(checkoutUiState.error || '')}</p>
       `;
+      const ticketDeliveryMarkup = items.some((item) => getCartItemFieldValue(item, '_product_type') === 'ticket') ? `<p class="store-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.ticketDelivery', 'Your tickets will be available on your order page. We will email you the link.'))}</p>` : '';
       const abandonedReminderMarkup = `
         <label class="store-first-party-cart__checkbox store-first-party-cart__reminder">
           <input type="checkbox" ${readAbandonedCheckoutConsentDraft() ? 'checked' : ''} data-cart-abandoned-consent>
@@ -4024,6 +4046,7 @@
                     data-cart-custom-checkout-email
                   >
                   <p id="store-custom-checkout-email-error" class="store-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
+                  ${ticketDeliveryMarkup}
                   ${abandonedReminderMarkup}
                 </div>
                 <div class="store-first-party-cart__field store-first-party-cart__field--full">
@@ -4092,7 +4115,8 @@
                     data-cart-custom-checkout-email
                   >
                 <p id="store-custom-checkout-email-error" class="store-first-party-cart__field-error" data-cart-custom-checkout-email-error ${customCheckout?.emailError ? '' : 'hidden'}>${escapeHtml(customCheckout?.emailError || '')}</p>
-                ${abandonedReminderMarkup}
+                ${ticketDeliveryMarkup}
+                  ${abandonedReminderMarkup}
               </div>
             </div>
           </div>
@@ -4103,14 +4127,6 @@
               <div class="store-first-party-cart__stripe-shell">
                 <p class="store-first-party-cart__note" data-cart-tax-location-note>${escapeHtml(getTaxLocationNote(taxLocationDraft))}</p>
                 <div class="store-first-party-cart__shipping-grid">
-                  <div class="store-first-party-cart__field store-first-party-cart__field--full">
-                    <label class="store-first-party-cart__field-label" for="store-custom-tax-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))}${requiresDetailedTaxLocation ? ' <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span>' : ''}</label>
-                    <input id="store-custom-tax-line1" name="billing-address-line1" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-line1" autocapitalize="words" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.line1 || '')}" data-cart-tax-destination-field="line1">
-                  </div>
-                  <div class="store-first-party-cart__field store-first-party-cart__field--full">
-                    <label class="store-first-party-cart__field-label" for="store-custom-tax-line2">${escapeHtml(getRuntimeMessage('cart.addressLine2', 'Address line 2'))}</label>
-                    <input id="store-custom-tax-line2" name="billing-address-line2" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-line2" autocapitalize="words" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.line2 || '')}" data-cart-tax-destination-field="line2">
-                  </div>
                   <div class="store-first-party-cart__field">
                     <label class="store-first-party-cart__field-label" for="store-custom-tax-country">${escapeHtml(getRuntimeMessage('cart.country', 'Country'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                     <select id="store-custom-tax-country" name="billing-country" class="store-first-party-cart__input store-first-party-cart__input--select" autocomplete="section-store-checkout billing country" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" data-cart-tax-destination-field="country">
@@ -4118,14 +4134,22 @@
                     </select>
                   </div>
                   <div class="store-first-party-cart__field">
-                    <label class="store-first-party-cart__field-label" for="store-custom-tax-city">${escapeHtml(getRuntimeMessage('cart.city', 'City'))}${requiresDetailedTaxLocation ? ' <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span>' : ''}</label>
-                    <input id="store-custom-tax-city" name="billing-address-level2" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-level2" autocapitalize="words" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.city || '')}" data-cart-tax-destination-field="city">
-                  </div>
-                  <div class="store-first-party-cart__field">
                     <label class="store-first-party-cart__field-label" for="store-custom-tax-postal">${escapeHtml(getRuntimeMessage('cart.postalCode', 'Postal code'))} <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span></label>
                     <input id="store-custom-tax-postal" name="billing-postal-code" class="store-first-party-cart__input" type="text" inputmode="text" autocomplete="section-store-checkout billing postal-code" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.postal_code || getStoredBillingAddress(state)?.postalCode || '')}" data-cart-tax-destination-field="postal_code">
                   </div>
-                  <div class="store-first-party-cart__field">
+                  <div class="store-first-party-cart__field store-first-party-cart__field--full" data-cart-tax-details ${requiresDetailedTaxLocation ? '' : 'hidden'}>
+                    <label class="store-first-party-cart__field-label" for="store-custom-tax-line1">${escapeHtml(getRuntimeMessage('cart.addressLine1', 'Address line 1'))}${requiresDetailedTaxLocation ? ' <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span>' : ''}</label>
+                    <input id="store-custom-tax-line1" name="billing-address-line1" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-line1" autocapitalize="words" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.line1 || '')}" data-cart-tax-destination-field="line1">
+                  </div>
+                  <div class="store-first-party-cart__field store-first-party-cart__field--full" data-cart-tax-details ${requiresDetailedTaxLocation ? '' : 'hidden'}>
+                    <label class="store-first-party-cart__field-label" for="store-custom-tax-line2">${escapeHtml(getRuntimeMessage('cart.addressLine2', 'Address line 2'))}</label>
+                    <input id="store-custom-tax-line2" name="billing-address-line2" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-line2" autocapitalize="words" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.line2 || '')}" data-cart-tax-destination-field="line2">
+                  </div>
+                  <div class="store-first-party-cart__field" data-cart-tax-details ${requiresDetailedTaxLocation ? '' : 'hidden'}>
+                    <label class="store-first-party-cart__field-label" for="store-custom-tax-city">${escapeHtml(getRuntimeMessage('cart.city', 'City'))}${requiresDetailedTaxLocation ? ' <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span>' : ''}</label>
+                    <input id="store-custom-tax-city" name="billing-address-level2" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-level2" autocapitalize="words" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.city || '')}" data-cart-tax-destination-field="city">
+                  </div>
+                  <div class="store-first-party-cart__field" data-cart-tax-details ${requiresDetailedTaxLocation ? '' : 'hidden'}>
                     <label class="store-first-party-cart__field-label" for="store-custom-tax-state">${escapeHtml(requiresDetailedTaxLocation ? getRuntimeMessage('cart.stateProvince', 'State / Province') : getRuntimeMessage('cart.stateProvinceOptional', 'State / Province (optional)'))}${requiresDetailedTaxLocation ? ' <span class="store-first-party-cart__required-mark" aria-hidden="true">*</span>' : ''}</label>
                     <input id="store-custom-tax-state" name="billing-address-level1" class="store-first-party-cart__input" type="text" autocomplete="section-store-checkout billing address-level1" autocapitalize="characters" aria-describedby="store-custom-tax-error" aria-invalid="${customCheckout?.taxError ? 'true' : 'false'}" value="${escapeHtml(getStoredBillingAddress(state)?.state || '')}" data-cart-tax-destination-field="state">
                   </div>
@@ -4169,9 +4193,9 @@
           </div>
           <div class="store-first-party-cart__item-actions">
             <span class="store-first-party-cart__item-price">${formatCurrency((item.price || 0) * itemQuantity)}</span>
-            <div class="store-first-party-cart__quantity" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}">
+            <div class="store-first-party-cart__quantity" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantityInput', 'Quantity for %{item}').replace('%{item}', item.name || item.id))}">
               <button type="button" class="store-first-party-cart__quantity-button" data-cart-item-quantity-step="-1" data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.decreaseQuantity', 'Decrease quantity'))}"${itemQuantity <= 1 ? ' disabled' : ''}>-</button>
-              <input class="store-first-party-cart__quantity-input" type="number" inputmode="numeric" min="1"${hasFiniteMaxQuantity ? ` max="${escapeAttribute(String(itemMaxQuantity))}"` : ''} value="${escapeAttribute(String(itemQuantity))}" data-cart-item-quantity data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantity', 'Quantity'))}">
+              <input class="store-first-party-cart__quantity-input" type="number" inputmode="numeric" min="1"${hasFiniteMaxQuantity ? ` max="${escapeAttribute(String(itemMaxQuantity))}"` : ''} value="${escapeAttribute(String(itemQuantity))}" data-cart-item-quantity data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantityInput', 'Quantity for %{item}').replace('%{item}', item.name || item.id))}">
               <button type="button" class="store-first-party-cart__quantity-button" data-cart-item-quantity-step="1" data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.increaseQuantity', 'Increase quantity'))}"${hasFiniteMaxQuantity && itemQuantity >= itemMaxQuantity ? ' disabled' : ''}>+</button>
             </div>
             <button type="button" class="store-first-party-cart__remove" data-remove-item="${item.uniqueId}">${escapeHtml(getRuntimeMessage('cart.remove', 'Remove'))}</button>
@@ -4187,7 +4211,7 @@
             <label id="store-cart-tip-label" class="store-first-party-cart__tip-label" for="store-cart-tip-input">${escapeHtml(getRuntimeMessage('cart.tipLabel', `Tip ${getPlatformCompanyName()} for platform maintenance.`))}</label>
             <span id="store-cart-tip-amount" data-cart-tip-amount>${formatCents(pricing.tipAmountCents)}</span>
           </div>
-          <p class="store-first-party-cart__tip-copy" id="store-cart-tip-copy">${escapeHtml(getRuntimeMessage('cart.tipCopy', `Optional tips help keep ${getPlatformCompanyName()} doing its thing.`))}</p>
+          <p class="store-first-party-cart__tip-copy sr-only" id="store-cart-tip-copy">${escapeHtml(getRuntimeMessage('cart.tipCopy', `Optional tips help keep ${getPlatformCompanyName()} doing its thing.`))}</p>
           <div class="store-first-party-cart__tip-controls">
             <input
               id="store-cart-tip-input"
@@ -4238,6 +4262,12 @@
       const cartAddOnMarkup = renderCartAddOnSection(items);
       const bodyMarkup = isCheckoutPreview ? `
         <section class="store-first-party-cart__checkout-preview">
+          <div class="store-first-party-cart__hold" data-cart-hold hidden>
+            <p><span data-cart-hold-status role="status" aria-live="polite"></span> <span data-cart-hold-timer role="timer" aria-live="off"></span></p>
+            <button type="button" class="store-first-party-cart__action store-first-party-cart__action--secondary" data-cart-hold-extend hidden>${escapeHtml(holdMessage('holdMoreTime', 'More time'))}</button>
+            <button type="button" class="store-first-party-cart__action" data-cart-hold-retry hidden>${escapeHtml(holdMessage('holdCheckAgain', 'Check availability'))}</button>
+            <button type="button" class="store-first-party-cart__action" data-cart-hold-status-retry hidden>${escapeHtml(holdMessage('holdCheckPayment', 'Check payment status'))}</button>
+          </div>
           <div class="store-first-party-cart__summary-block">
             <div class="store-first-party-cart__line-items">
               <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.orderSummary', 'Order summary'))}</p>
@@ -4246,6 +4276,7 @@
                   <li class="store-first-party-cart__line-item">
                     <div>
                       <strong class="store-first-party-cart__line-item-name">${escapeHtml(item.name)}</strong>
+                      ${item.meta.map((line) => `<span>${escapeHtml(line)}</span>`).join('')}
                       ${item.showQuantity ? `<span>${escapeHtml(getRuntimeMessage('cart.quantity', 'Qty %{count}').replace('%{count}', String(item.quantity)))}</span>` : ''}
                     </div>
                     <strong class="store-first-party-cart__line-item-amount">${formatCents(item.amountCents)}</strong>
@@ -4285,8 +4316,12 @@
         <ul class="store-first-party-cart__items">${itemMarkup}</ul>
         ${cartAddOnMarkup}
         ${cartEstimateMarkup}
+        <p class="store-first-party-cart__note">${escapeHtml(holdMessage('holdBeforeStart', 'Limited tickets are held when checkout starts. You can request more time.'))}</p>
+        ${checkoutErrorMarkup}
       `;
       const footerActions = isCheckoutPreview ? `
+          <p class="store-first-party-cart__note" data-cart-checkout-next>${escapeHtml(!hasCustomCheckoutSession && requiresTaxLocation && !hasReadyTaxLocation ? getTaxLocationRequiredMessage(taxLocationDraft) : '')}</p>
+          ${hasCustomCheckoutSession ? `<p class="store-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.deliveryEmail', 'Order link will be sent to %{email}.').replace('%{email}', getPersistedCustomCheckoutEmailDraft()))}</p>` : ''}
           ${finalSaleNoticeMarkup}
           <div class="store-first-party-cart__actions">
             <button type="button" class="store-first-party-cart__action store-first-party-cart__action--secondary" data-cart-back>${escapeHtml(getRuntimeMessage('cart.backToCart', 'Back to cart'))}</button>
@@ -4679,21 +4714,160 @@
         Boolean(checkoutUiState.customCheckout);
     }
 
+    function holdMessage(key, fallback) { return getRuntimeMessage(`cart.${key}`, fallback); }
+
+    async function checkoutCapability(renew = false) {
+      const readOrCreate = () => {
+        let stored = '';
+        try { stored = localStorage.getItem(checkoutAttemptKey) || ''; } catch {}
+        if (renew && stored && stored !== checkoutAttemptId) { checkoutAttemptId = stored; return stored; }
+        checkoutAttemptId = checkoutAttemptId || stored;
+        if (renew || !/^[a-f0-9]{64}$/.test(checkoutAttemptId)) {
+          checkoutAttemptId = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('');
+          try { localStorage.setItem(checkoutAttemptKey, checkoutAttemptId); } catch {}
+        }
+        return checkoutAttemptId;
+      };
+      // The same anonymous browser uses one attempt across tabs and reloads.
+      return navigator.locks?.request ? navigator.locks.request(checkoutAttemptKey, readOrCreate) : readOrCreate();
+    }
+
+    function applyCheckoutHold(data) {
+      checkoutHold = { ...checkoutHold, ...data };
+      if (data.expiresAt && data.serverTime) {
+        checkoutHoldDeadline = performance.now() + Math.max(0, Date.parse(data.expiresAt) - Date.parse(data.serverTime));
+      }
+      clearInterval(checkoutHoldTimer);
+      if (Number(checkoutHold.heldQuantity) > 0) checkoutHoldTimer = window.setInterval(syncCheckoutHoldUI, 1000);
+      syncCheckoutHoldUI();
+    }
+
+    async function checkoutHoldAction(action, extra = {}) {
+      const attemptId = checkoutAttemptId || await checkoutCapability();
+      const response = await fetch(`${getWorkerBase()}/api/checkout/${action}`, {
+        method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attemptId, ...extra })
+      });
+      const data = await response.json();
+      if (!response.ok || data.success !== true) {
+        const messages = {
+          temporarily_held: holdMessage('temporarilyHeld', 'Some items are held by another checkout. Try again shortly or change the quantity.'),
+          sold_out: holdMessage('holdSoldOut', 'The requested quantity is no longer available.'),
+          hold_expired: holdMessage('holdExpired', 'Your hold ended. Check availability to continue.'),
+          checkout_locked: holdMessage('checkoutLocked', 'Payment has already started. Return to your cart before changing this order.'),
+          payment_resolving: holdMessage('paymentResolving', 'We are checking your payment. Do not pay again.')
+        };
+        if (data.code === 'payment_resolving') applyCheckoutHold({ phase: 'resolving' });
+        throw Object.assign(new Error(messages[data.code] || data.error || holdMessage('holdUnavailable', 'Checkout is unavailable. Please try again.')), { code: data.code });
+      }
+      applyCheckoutHold(data);
+      return data;
+    }
+
+    async function refreshCheckoutHold() {
+      if (checkoutHoldRequest || !checkoutAttemptId) return;
+      checkoutHoldRequest = true;
+      try {
+        const data = await checkoutHoldAction('status');
+        if (data.phase === 'confirmed' && data.orderToken) {
+          checkoutRedirectCommitted = true;
+          clearStoreCartAfterOrder();
+          redirectWindow(buildStoreOrderSuccessPath(data.orderToken));
+        }
+      } catch (error) { applyCheckoutHold({ phase: 'resolving' }); setCheckoutUiError(error.message); }
+      finally { checkoutHoldRequest = false; }
+    }
+
+    function checkoutHoldIsReady() {
+      return checkoutHold && ['held', 'payment'].includes(checkoutHold.phase) && checkoutHoldDeadline > performance.now();
+    }
+
+    function syncCheckoutHoldUI() {
+      const root = getCartRoot();
+      if (!root || currentRoute !== CHECKOUT_VIEW_ROUTE) return;
+      const region = root.querySelector('[data-cart-hold]');
+      if (!region) return;
+      const seconds = Math.max(0, Math.ceil((checkoutHoldDeadline - performance.now()) / 1000));
+      const active = checkoutHold && ['held', 'payment'].includes(checkoutHold.phase);
+      const expired = checkoutHold && ['expired', 'released'].includes(checkoutHold.phase);
+      const visible = Number(checkoutHold?.heldQuantity) > 0 || expired || ['resolving', 'creating', 'unresolved'].includes(checkoutHold?.phase);
+      region.hidden = !visible;
+      const timer = region.querySelector('[data-cart-hold-timer]');
+      timer.textContent = active && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : '';
+      const status = region.querySelector('[data-cart-hold-status]');
+      const text = expired ? holdMessage('holdExpired', 'Your hold ended. Check availability to continue.')
+        : !active || seconds === 0 ? holdMessage('paymentResolving', 'We are checking your payment. Do not pay again.')
+        : seconds <= 120 ? holdMessage('holdWarning', 'Your ticket hold ends in under 2 minutes. Need more time?')
+        : holdMessage('ticketsHeld', 'Tickets held for you: %{count}.').replace('%{count}', String(checkoutHold.heldQuantity));
+      if (status.textContent !== text) status.textContent = text;
+      region.querySelector('[data-cart-hold-extend]').hidden = !(active && seconds > 0 && seconds <= 120 && checkoutHold.extensionsRemaining > 0);
+      region.querySelector('[data-cart-hold-retry]').hidden = !expired;
+      region.querySelector('[data-cart-hold-status-retry]').hidden = !['resolving', 'creating', 'unresolved'].includes(checkoutHold?.phase);
+      if (active && !seconds && !checkoutHoldRequest && !isCustomCheckoutBusy()) void refreshCheckoutHold();
+      if (checkoutHoldIsReady()) { syncCheckoutStartButton(); syncCustomCheckoutConfirmButton(); }
+      else {
+        root.querySelectorAll('[data-cart-start-checkout], [data-cart-confirm-custom-checkout]').forEach((button) => { button.disabled = true; });
+      }
+    }
+
+    async function enterCheckout(renew = false) {
+      if (checkoutHoldRequest) return;
+      checkoutHoldRequest = true;
+      const button = getCartRoot()?.querySelector('[data-cart-continue], [data-cart-hold-retry]');
+      if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+      try {
+        await checkoutCapability(renew);
+        const payload = buildFirstPartyCheckoutPayload(store.getState());
+        if (!payload.valid) throw new Error(payload.error);
+        const data = await checkoutHoldAction('hold', { items: payload.payload.items.map(({ id, productId, sku, variantId, price, quantity }) => ({ id, productId, sku, variantId, price, quantity })) });
+        if (['released', 'expired'].includes(data.phase)) {
+          await checkoutCapability(true);
+          await checkoutHoldAction('hold', { items: payload.payload.items.map(({ id, productId, sku, variantId, price, quantity }) => ({ id, productId, sku, variantId, price, quantity })) });
+        } else if (data.phase === 'confirmed') {
+          clearStoreCartAfterOrder(); redirectWindow(buildStoreOrderSuccessPath(data.orderToken)); return;
+        }
+        if (renew) {
+          teardownActiveCustomCheckoutMount();
+          checkoutUiState.customCheckout = { ...checkoutUiState.customCheckout, clientSecret: '', paymentIntentId: '', orderId: '' };
+        }
+        if (doesCurrentCheckoutRequirePayment()) void prewarmStripeJs()?.catch(() => {});
+        cartShouldFocusAfterRender = true;
+        apiRoot.api.theme.cart.navigate(CHECKOUT_VIEW_ROUTE);
+        syncCheckoutHoldUI();
+      } catch (error) { setCheckoutUiError(error.message); }
+      finally { checkoutHoldRequest = false; if (button) { button.disabled = false; button.removeAttribute('aria-busy'); } }
+    }
+
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && currentRoute === CHECKOUT_VIEW_ROUTE) void refreshCheckoutHold(); });
+    window.addEventListener('online', () => { if (currentRoute === CHECKOUT_VIEW_ROUTE) void refreshCheckoutHold(); });
+    window.addEventListener('storage', (event) => { if (event.key === checkoutAttemptKey && currentRoute === CHECKOUT_VIEW_ROUTE) void refreshCheckoutHold(); });
+
     function getActiveCustomCheckoutOrderId() {
       return String(checkoutUiState?.customCheckout?.orderId || readActiveCustomCheckoutOrderId() || '').trim();
     }
 
-    async function abandonActiveCustomCheckoutIntent(orderId = getActiveCustomCheckoutOrderId()) {
-      const nextOrderId = String(orderId || '').trim();
-      if (!nextOrderId) return;
-
+    async function abandonActiveCustomCheckoutIntent() {
+      if (checkoutAttemptId) {
+        const result = await checkoutHoldAction('release');
+        if (result.phase === 'confirmed') {
+          checkoutRedirectCommitted = true;
+          clearStoreCartAfterOrder();
+          redirectWindow(buildStoreOrderSuccessPath(result.orderToken));
+          return;
+        }
+      }
       writeActiveCustomCheckoutOrderId('');
       clearFirstPartyCheckoutSnapshot();
       clearPendingOrderFlag();
+      clearInterval(checkoutHoldTimer);
     }
 
     function clearStoreCartAfterOrder() {
       persistedAbandonedCheckoutConsentDraft = false;
+      checkoutHold = null;
+      checkoutAttemptId = '';
+      clearInterval(checkoutHoldTimer);
+      try { localStorage.removeItem(checkoutAttemptKey); } catch {}
       eventRegistrationDrafts.clear();
       updateCartState((state) => {
         const totals = calculateCartTotals([], 0, '');
@@ -4748,7 +4922,7 @@
     }
 
     function isCustomCheckoutConfirmable(customCheckout = checkoutUiState.customCheckout) {
-      if (!customCheckout || customCheckout.mountStatus !== 'mounted') return false;
+      if (!checkoutHoldIsReady() || !customCheckout || customCheckout.mountStatus !== 'mounted') return false;
       if (isStorePaymentIntentCheckout(customCheckout)) {
         return customCheckout.canConfirm === true;
       }
@@ -4770,7 +4944,9 @@
         if (normalizedStatus === 'submitting') {
           return getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...');
         }
-        return getRuntimeMessage('cart.payNow', 'Pay now');
+        return Number.isFinite(customCheckout?.totalCents)
+          ? getRuntimeMessage('cart.payAmount', 'Pay %{amount}').replace('%{amount}', formatCents(customCheckout.totalCents))
+          : getRuntimeMessage('cart.payNow', 'Pay now');
       }
 
       return getRuntimeMessage('cart.payNow', 'Pay now');
@@ -4811,7 +4987,7 @@
       const requiresTaxLocation = cartRequiresCustomCheckoutTaxLocation(store.getState());
       const hasReadyTaxLocation = Boolean(readReadyTaxDestination(store.getState()));
 
-      button.disabled = checkoutUiState.status === 'submitting' ||
+      button.disabled = (checkoutHold && !checkoutHoldIsReady()) || checkoutUiState.status === 'submitting' ||
         getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER ||
         (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) ||
         (requiresTaxLocation && !hasReadyTaxLocation);
@@ -4827,10 +5003,10 @@
     function requestCloseFirstPartyCart() {
       if (isCustomCheckoutBusy()) return;
       const activeOrderId = getActiveCustomCheckoutOrderId();
-      if (currentRoute === CHECKOUT_VIEW_ROUTE && activeOrderId) {
-        void abandonActiveCustomCheckoutIntent(activeOrderId).finally(() => {
+      if (currentRoute === CHECKOUT_VIEW_ROUTE && (activeOrderId || checkoutAttemptId)) {
+        void abandonActiveCustomCheckoutIntent(activeOrderId).then(() => {
           closeFirstPartyCart();
-        });
+        }).catch((error) => setCheckoutUiError(error.message));
         return;
       }
       closeFirstPartyCart();
@@ -4848,8 +5024,8 @@
       };
 
       const activeOrderId = getActiveCustomCheckoutOrderId();
-      if (activeOrderId) {
-        void abandonActiveCustomCheckoutIntent(activeOrderId).finally(goBackToCart);
+      if (activeOrderId || checkoutAttemptId) {
+        void abandonActiveCustomCheckoutIntent(activeOrderId).then(goBackToCart).catch((error) => setCheckoutUiError(error.message));
         return;
       }
 
@@ -5048,7 +5224,11 @@
       const root = getCartRoot();
       const note = root?.querySelector('[data-cart-tax-location-note]');
       if (!(note instanceof HTMLElement)) return;
-      note.textContent = getTaxLocationNote(destination || readCustomCheckoutTaxDraft());
+      const draft = destination || readCustomCheckoutTaxDraft();
+      note.textContent = getTaxLocationNote(draft);
+      root.querySelectorAll('[data-cart-tax-details]').forEach((field) => { field.hidden = !taxDestinationNeedsDetailedStreetAddress(draft); });
+      const hint = root.querySelector('[data-cart-checkout-next]');
+      if (hint) hint.textContent = isTaxDestinationReady(draft) ? '' : getTaxLocationRequiredMessage(draft);
     }
 
     function setCheckoutUiError(message) {
@@ -5259,6 +5439,7 @@
       return apiRoot.api.cart.update({
         billingAddress: nextBillingAddress
       }).then(() => {
+        syncCustomCheckoutTaxLocationNote(nextBillingAddress);
         if (settings.refreshEstimate === false) {
           syncCheckoutStartButton();
           return null;
@@ -5266,7 +5447,6 @@
 
         return refreshCustomCheckoutTaxEstimate().finally(() => {
           syncCheckoutStartButton();
-          ensureCustomCheckoutBootstrapped();
         });
       });
     }
@@ -5447,7 +5627,6 @@
 
       syncFirstPartyCartTipUI();
       syncCheckoutPreviewSummaryUI();
-      ensureCustomCheckoutBootstrapped();
     }
 
     async function refreshCustomCheckoutTaxEstimate(options) {
@@ -5776,7 +5955,7 @@
           onLoadError: function(message) {
             if (!isActiveCustomCheckoutFlow(flowToken)) return;
             activeCustomCheckoutMount = null;
-            void abandonActiveCustomCheckoutIntent(getActiveCustomCheckoutOrderId());
+            void abandonActiveCustomCheckoutIntent(getActiveCustomCheckoutOrderId()).catch((error) => setCheckoutUiError(error.message));
             checkoutUiState.status = 'idle';
             checkoutUiState.customCheckout = {
               ...(checkoutUiState.customCheckout || {}),
@@ -5886,6 +6065,10 @@
           }
         }
 
+        if (checkoutAttemptId) {
+          await checkoutHoldAction('status');
+          if (!checkoutHoldIsReady()) throw new Error(holdMessage('holdExpired', 'Your hold ended. Check availability to continue.'));
+        }
         const result = await mount.confirm(confirmingStorePaymentIntent
           ? buildStorePaymentIntentConfirmOptions(emailValue)
           : undefined);
@@ -6028,6 +6211,7 @@
         ...existingCustomCheckout,
         checkoutUiMode: 'payment_intent',
         sessionId: '',
+        totalCents: Number(data?.totals?.totalCents),
         paymentIntentId: String(data?.paymentIntentId || ''),
         clientSecret: String(data?.clientSecret || ''),
         publishableKey: String(data?.publishableKey || ''),
@@ -6248,10 +6432,9 @@
         const stripeReadyPromise = canUseCustomCheckoutUi() && doesCurrentCheckoutRequirePayment()
           ? prewarmStripeJs()
           : null;
-        const existingOrderId = getActiveCustomCheckoutOrderId();
-        if (existingOrderId) {
-          await abandonActiveCustomCheckoutIntent(existingOrderId);
-        }
+        if (!checkoutHold) { await enterCheckout(); }
+        if (!checkoutHoldIsReady()) throw new Error(holdMessage('holdExpired', 'Your hold ended. Check availability to continue.'));
+        payloadResult.payload.attemptId = checkoutAttemptId;
 
         const response = await fetch(`${getWorkerBase()}${payloadResult.endpoint || STORE_CHECKOUT_INTENT_ENDPOINT}`, {
           method: 'POST',
@@ -6280,6 +6463,7 @@
         }
 
         if (data?.checkoutUiMode === 'payment_intent') {
+          applyCheckoutHold(data);
           if (!data?.clientSecret || !data?.publishableKey || !data?.paymentIntentId || !data?.orderToken) {
             throw new Error('Store payment bootstrap was incomplete.');
           }
@@ -6301,24 +6485,6 @@
         });
         setCheckoutUiError(errorMessage);
       }
-    }
-
-    function shouldBootstrapCustomCheckoutSession() {
-      const state = store.getState();
-      return (
-        currentRoute === CHECKOUT_VIEW_ROUTE &&
-        getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER &&
-        getCheckoutUiMode() === 'custom' &&
-        checkoutUiState.status === 'idle' &&
-        (!cartRequiresCustomCheckoutTaxLocation(state) || Boolean(readReadyTaxDestination(state))) &&
-        !checkoutUiState.customCheckout?.sessionId &&
-        !checkoutUiState.customCheckout?.clientSecret
-      );
-    }
-
-    function ensureCustomCheckoutBootstrapped() {
-      if (!shouldBootstrapCustomCheckoutSession()) return;
-      void startFirstPartyCheckout();
     }
 
     function ensureCustomCheckoutMounted(root) {
@@ -6466,18 +6632,23 @@
           return;
         }
 
+        const holdAction = event.target?.closest?.('[data-cart-hold-extend], [data-cart-hold-retry], [data-cart-hold-status-retry]');
+        if (holdAction) {
+          event.preventDefault();
+          if (holdAction.hasAttribute('data-cart-hold-retry')) void enterCheckout(true);
+          else if (holdAction.hasAttribute('data-cart-hold-status-retry')) void refreshCheckoutHold();
+          else {
+            holdAction.disabled = true;
+            void checkoutHoldAction('extend').catch((error) => setCheckoutUiError(error.message)).finally(() => { holdAction.disabled = false; });
+          }
+          return;
+        }
+
         const continueTrigger = event.target?.closest?.('[data-cart-continue]');
         if (continueTrigger) {
           event.preventDefault();
           eventBus.emit('summary.checkout_clicked');
-          if (doesCurrentCheckoutRequirePayment()) {
-            const prewarm = prewarmStripeJs();
-            if (prewarm && typeof prewarm.catch === 'function') {
-              void prewarm.catch(() => {});
-            }
-          }
-          cartShouldFocusAfterRender = true;
-          apiRoot.api.theme.cart.navigate(CHECKOUT_VIEW_ROUTE);
+          void enterCheckout();
           return;
         }
 
@@ -6755,8 +6926,7 @@
         if (shippingField) {
           syncCheckoutStartButton();
           void refreshCustomCheckoutEstimates().finally(() => {
-            ensureCustomCheckoutBootstrapped();
-          });
+            });
           syncCustomCheckoutShippingToStripe().catch((error) => {
             checkoutUiState.status = 'idle';
             setCheckoutUiError(error?.message || 'Shipping validation failed.');
@@ -6894,6 +7064,11 @@
               nextItems,
               nextTipPercent
             );
+            const billingAddress = { ...(currentState.cart?.billingAddress || {}), ...(payload?.billingAddress || {}) };
+            // Browser forms use postal_code; tax quotes use postalCode. Preserve
+            // explicit edits (including clearing) instead of reviving an alias.
+            const postalKey = ['postal_code', 'postalCode'].find((key) => Object.prototype.hasOwnProperty.call(payload?.billingAddress || {}, key));
+            if (postalKey) billingAddress.postalCode = billingAddress.postal_code = String(payload.billingAddress[postalKey] ?? '');
 
             updateCartState((state) => ({
               ...state,
@@ -6908,10 +7083,7 @@
                 email: nextEmail,
                 tipPercent: nextTipPercent,
                 tipTouched: nextTipTouched,
-                billingAddress: {
-                  ...(state.cart?.billingAddress || {}),
-                  ...(payload?.billingAddress || {})
-                }
+                billingAddress
               }
             }));
             return Promise.resolve(store.getState().cart);
@@ -7128,8 +7300,7 @@
               };
               renderFirstPartyCart();
               eventBus.emit('theme.routechanged', payload);
-              ensureCustomCheckoutBootstrapped();
-              if (currentRoute === CHECKOUT_VIEW_ROUTE) {
+                  if (currentRoute === CHECKOUT_VIEW_ROUTE) {
                 refreshCustomCheckoutEstimates();
               }
               if (currentRoute === CART_VIEW_ROUTE) {

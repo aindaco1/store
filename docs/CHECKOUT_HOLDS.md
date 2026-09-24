@@ -1,0 +1,44 @@
+# Checkout holds
+
+Local release candidate: `release/checkout-ux-ticket-holds`. This guide describes the candidate implementation, not a production rollout. The design review is [checkout-ux-review-2026-09-24.md](checkout-ux-review-2026-09-24.md).
+
+## Buyer experience
+
+Explicit **Checkout** validates current catalog prices and atomically reserves finite ticket quantities before contact/tax entry. Adding to a cart does not reserve stock. A mixed cart shares one checkout: finite tickets are held early; other finite stock is reserved when payment or a free order begins. Untracked products and free RSVP forms have no artificial ticket countdown.
+
+The initial ticket window is ten minutes. `checkout.hold_seconds` in `_config.yml` is mirrored to `CHECKOUT_HOLD_SECONDS` (600–1800 seconds). The extension allowance is ten; **More time** appears with two minutes left and adds one full window. Duplicate extensions made outside that warning window do not consume another extension. Refreshing or opening another tab reuses the browser's attempt and deadline. This is a reservation, not a waiting room or a guarantee of one person per device.
+
+The timer uses server time and a monotonic browser clock. It does not poll each second. Status is rechecked on foreground/online, expiry, and immediately before payment confirmation. Time changes are not live-announced every second; warnings and recovery states are. Expiry preserves safe cart/contact/address drafts and offers an explicit availability check. RSVP answers remain memory-only. Back/Close releases an unstarted hold; once a payment exists it must first be safely canceled. An uncertain payment stays attached to its attempt, with a status check instead of a second charge.
+
+Event date/time (labeled venue-local time), venue/address, quantities and ticket delivery instructions use canonical event metadata. Country/postal code precedes conditional New Mexico street/city/state fields. Guest checkout, Stripe's Payment Element, tax authority, and the **5% default optional tip** remain. Final Pay displays the canonical amount; creating an order/payment now requires an explicit Continue action.
+
+## Authority and payment boundaries
+
+`worker/src/checkout-coordinator.js` runs inside the existing `StoreInventoryCoordinator`. Existing inventory primitives remain authoritative; no new database or Durable Object binding is added. Direct claims also subtract outstanding reservations. A checkout's inventory transitions and attempt checkpoint commit in one storage transaction. Stripe/KV I/O occurs outside that transaction.
+
+The browser generates a 256-bit opaque capability and stores only that capability in `store_checkout_attempt_v1`. Web Locks serialize creation/renewal across supporting tabs. Public POST routes `/api/checkout/hold`, `/status`, `/extend`, and `/release` require the trusted origin, bounded JSON, rate limits, and the capability. They are private/no-store. The capability is not a general order lookup or admin credential. No client supplies trusted prices, counts, expiry, or Stripe parameters.
+
+The stable attempt becomes `store-order-<capability>`. The coordinator freezes the validated draft and Stripe request before creating an intent with `store-order:<orderToken>` as its idempotency key. Request retries reuse that checkpoint and intent. Changes after payment begins require safe abandonment followed by a new availability check. Final validation still rejects stale prices/coupons, empty stock, invalid registrations and changed selections.
+
+| State | Stock and recovery |
+| --- | --- |
+| `held` | Short reservation; expiry can release without contacting Stripe. |
+| `creating` | Pinned reservation and frozen create request. A 30-second durable lease and coalesced in-flight work prevent concurrent checkpoint writers. An alarm retries the same request/key after an ambiguous result. |
+| `payment` | Pinned reservation; displayed deadline still applies, but stock is not released by lazy inventory cleanup. A declined card remains retryable against this same intent. |
+| Expired/abandoned payment | Retrieve Stripe status; cancel only a cancellable intent with a deterministic cancellation key. Checkpoint confirmed `canceled` in order storage before releasing capacity; a failed write keeps the reservation for recovery. |
+| Processing/succeeded/unknown at cancellation | Keep stock and record a reconciliation break. Verified signed success commits inventory exactly once; no automatic second charge or refund. |
+| `confirmed` / `released` / `expired` | Terminal attempt checkpoint; replay cannot consume stock again. |
+
+Free orders atomically commit inventory with a frozen confirmed-order checkpoint, then persist the order. A retry or alarm can recover its order write without a second stock claim. Paid confirmation remains signed-webhook-only. Subscribe to `payment_intent.succeeded`, `payment_intent.payment_failed`, and `payment_intent.canceled`. A failed card event does **not** release capacity for a still-payable intent.
+
+A bounded due-key index drives the existing DO alarm, including closed tabs. It processes up to 25 records at a time and schedules further work even after provider failures. Creation retries stop before Stripe's minimum 24-hour idempotency retention (at 23 hours). Such an unresolved creation remains reserved and raises an operator reconciliation break; recovery must establish processor truth before capacity can be released. A time limit alone is not proof that a payment cannot succeed.
+
+## Retention, recovery, and limitations
+
+DO `checkout:` records include an anonymous capability, selected counts/deadline, and, during creation/payment, the frozen order (including contact/RSVP data) and necessary Stripe identifiers/secret. `checkout-due:` is the bounded scheduling index. Terminal checkpoints last 30 days; payment payload/client secret are removed from terminal paid records. Confirmed free checkpoints retain the order for write recovery for that period. Unresolved money evidence is retained until resolved rather than silently expiring it with inventory. `orders:` remains canonical historical order storage; canceled new-attempt drafts expire after 30 days.
+
+These live checkpoints are **not rebuildable from claimed inventory alone**. Do not restore transient holds from a backup, roll back an active coordinator, or replace its inventory while checkout reservations exist. Inventory replacement is blocked while these reservations exist. During disaster recovery, stop sales, preserve the live coordinator, compare Stripe and canonical orders, resolve outstanding attempts, then use the existing maker/checker recovery workflow. See [backup/restore](BACKUP_RESTORE.md) and the [data inventory](../config/store-data-inventory.json).
+
+Legacy clients without `attemptId` retain the older intent path during transition; they do not gain early holds. New attempts protect capacity from legacy direct claims. Anonymous devices can still create separate attempts within existing rate limits; this release is not anti-scalping identity enforcement. The public stock projection remains advisory and excludes temporary holds. Existing reconciliation diagnostics are reused rather than logging capabilities, form answers, or raw payment payloads.
+
+Real-provider 3DS/async payment, mobile keyboard/assistive-technology, wallet/domain eligibility, and the actual statement descriptor remain separate pre-deployment acceptance checks. No new wallet component or invented descriptor is introduced. Local test evidence is recorded in [release evidence](release-evidence/2026-09-24-checkout-ux-local.md).

@@ -17,6 +17,7 @@ debug:
   console_logging_enabled: true
   verbose_console_logging: false
 exclude:
+  - _site
   - README.md
   - LICENSE
   - worker
@@ -159,6 +160,7 @@ shipping:
       height_in: 0
       stack_height_in: 0
 checkout:
+  hold_seconds: 600
   stripe_publishable_key: pk_live_51N48NKK9nUOzi4tvVuw9UdqVYGLyre50ex4s4giogLQDgUfejp0lfSxV6ZXRdiqN8RY7t0IDIRjiWQ192hcXWVSl00Htn02Ci3
 analytics:
   provider: none

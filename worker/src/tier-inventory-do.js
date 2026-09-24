@@ -1,3 +1,4 @@
+import { checkoutCoordinator } from './checkout-coordinator.js';
 import {
   cloneInventory,
   cloneReservations,
@@ -53,6 +54,10 @@ class InventoryCoordinator {
       body = await request.json();
     } catch (_err) {
       return jsonResponse({ error: 'Invalid JSON body' }, 400);
+    }
+
+    if (this.checkout && ['/checkout-hold', '/checkout-extend', '/checkout-pay', '/checkout-free', '/checkout-status', '/checkout-release', '/checkout-confirm'].includes(url.pathname)) {
+      return jsonResponse(await this.checkout.handle(url.pathname, body));
     }
 
     const payload = validatePayload(body, this.getPayloadOptions());
@@ -112,7 +117,7 @@ class InventoryCoordinator {
         return { success: true, state };
       }
 
-      const remaining = Number(item.limit || 0) - Number(item.claimed || 0);
+      const remaining = Number(item.limit || 0) - Number(item.claimed || 0) - Number(getReservedCounts(state.reservations)[payload.itemId] || 0);
       if (payload.qty > remaining) {
         return {
           success: false,
@@ -180,7 +185,7 @@ class InventoryCoordinator {
         const item = inventory[itemId];
         if (!item) continue;
 
-        const remaining = Number(item.limit || 0) - Number(item.claimed || 0);
+        const remaining = Number(item.limit || 0) - Number(item.claimed || 0) - Number(getReservedCounts(state.reservations)[itemId] || 0);
         if (delta > remaining) {
           return {
             success: false,
@@ -216,12 +221,16 @@ class InventoryCoordinator {
   async handleReplace(payload) {
     const state = await this.ctx.storage.transaction(async (storage) => {
       const currentState = await getWorkingState(storage, payload.inventory);
+      if (Object.keys(currentState.reservations).some((id) => /^store-order-[a-f0-9]{64}$/.test(id))) {
+        return { blocked: true };
+      }
       currentState.inventory = cloneInventory(payload.inventory || {});
       currentState.reservations = {};
       currentState.updatedAt = new Date().toISOString();
       await putWorkingState(storage, currentState);
       return currentState;
     });
+    if (state.blocked) return jsonResponse({ success: false, error: 'Resolve active checkouts before rebuilding inventory.' });
     await syncInventoryToKv(this.env, payload.scope, state.inventory, this.kvKeyPrefix);
     return jsonResponse({ success: true, inventory: state.inventory, state });
   }
@@ -230,32 +239,9 @@ class InventoryCoordinator {
     const result = await this.ctx.storage.transaction(async (storage) => {
       const state = await getWorkingState(storage, payload.inventory);
       const reservationId = payload.reservationId;
-      const previousReservation = getReservationCounts(state.reservations[reservationId]);
-      const nextReservation = normalizeCountMap(payload.nextCounts || {});
-      const reservedCounts = getReservedCounts(state.reservations, reservationId);
-      const itemIds = new Set([...Object.keys(previousReservation), ...Object.keys(nextReservation)]);
-
-      for (const itemId of itemIds) {
-        const item = state.inventory[itemId];
-        if (!item) continue;
-
-        const nextQty = Number(nextReservation[itemId] || 0);
-        const reservedByOthers = Number(reservedCounts[itemId] || 0);
-        const available = Number(item.limit || 0) - Number(item.claimed || 0) - reservedByOthers;
-        if (nextQty > available) {
-          return {
-            success: false,
-            error: `Only ${Math.max(0, available)} remaining for this ${this.availabilityLabel}`,
-            remaining: Math.max(0, available)
-          };
-        }
-      }
-
-      if (Object.keys(nextReservation).length > 0) {
-        state.reservations[reservationId] = buildReservationEntry(nextReservation, Date.now(), payload.ttlSeconds);
-      } else {
-        delete state.reservations[reservationId];
-      }
+      const entry = buildReservationEntry(normalizeCountMap(payload.nextCounts || {}), Date.now(), payload.ttlSeconds);
+      const reserved = reserveCounts(state, reservationId, entry.counts, entry.expiresAt);
+      if (!reserved.success) return reserved;
       state.updatedAt = new Date().toISOString();
       await putWorkingState(storage, state);
       return {
@@ -338,7 +324,10 @@ class InventoryCoordinator {
 export class StoreInventoryCoordinator extends InventoryCoordinator {
   constructor(ctx, env) {
     super(ctx, env);
+    this.checkout = checkoutCoordinator(this, { getWorkingState, putWorkingState, reserveCounts, syncInventoryToKv });
   }
+
+  async alarm() { await this.checkout.alarm(); }
 }
 
 function validatePayload(body, options = {}) {
@@ -430,4 +419,20 @@ function jsonResponse(data, status = 200) {
       'Content-Type': 'application/json'
     }
   });
+}
+
+// Shared by ordinary reservations and the checkout lifecycle. No partial holds.
+function reserveCounts(state, reservationId, counts, expiresAt) {
+  const next = normalizeCountMap(counts || {});
+  const others = getReservedCounts(state.reservations, reservationId);
+  for (const [sku, count] of Object.entries(next)) {
+    const item = state.inventory[sku];
+    if (!item) return { success: false, code: 'inventory_missing', status: 409, error: 'Inventory is unavailable. Refresh your cart.' };
+    const available = Math.max(0, Number(item.limit || 0) - Number(item.claimed || 0) - Number(others[sku] || 0));
+    if (count > available) return { success: false, code: Number(others[sku]) > 0 ? 'temporarily_held' : 'sold_out', status: 409,
+      error: Number(others[sku]) > 0 ? 'Some tickets or items are held by another checkout. Try again shortly or change the quantity.' : 'The requested quantity is no longer available.', remaining: available };
+  }
+  if (Object.keys(next).length) state.reservations[reservationId] = { counts: next, expiresAt };
+  else delete state.reservations[reservationId];
+  return { success: true };
 }

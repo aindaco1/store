@@ -1,0 +1,42 @@
+# Checkout UX and ticket holds: local candidate
+
+Date: September 24, 2026. Branch: `release/checkout-ux-ticket-holds`, based on `7a5c2fb` (v1.3.7). Local implementation only; no version bump, push, provider configuration change, purchase, email send, or deployment was performed.
+
+## Scope
+
+The owner authorized the [checkout review](../checkout-ux-review-2026-09-24.md) recommendations locally and explicitly retained the **5% default optional tip**. The tip control, mobile cart and summary/actions are more compact. Checkout adds canonical event details, ticket/email guidance, corrected quantity labels, country/postal-first conditional tax fields, explicit progression and the canonical total on Pay.
+
+Finite tickets are held at explicit Checkout for ten minutes by default. The existing inventory Durable Object owns stable attempts, ten explicit time extensions, expiry, same-intent retry, payment-aware cancellation and recovery. No new binding/database/payment component was added. See [implementation and recovery](../CHECKOUT_HOLDS.md).
+
+Config synchronization regenerated the Worker catalog from the existing 53 canonical product files, including the previously absent Monster Bash projection and current display order. No product source, price or inventory count was edited.
+
+## Automated evidence
+
+| Check | Result |
+| --- | --- |
+| Complete final `npm run test:premerge` | Passed all phases after all runtime and preview changes: secret/content/template/i18n/syntax, focused regressions, full unit suite, generated-site/build audits, Podman resources, security, Worker smoke and E2E. Logs: `/tmp/store-premerge-logs.YUbiGd/`. |
+| Full unit suite in that gate | **117 files, 597 tests passed**. |
+| Final `npm run test:unit` after cancellation checkpoint ordering and postal-alias clearing | **117 files, 597 tests passed**. Log: `/tmp/store-checkout-unit-final.log`. |
+| Checkout lifecycle suite | **20 tests passed**: last-unit contention, multi-SKU atomicity, direct-claim protection, fixed deadline/reuse, ten extensions, closed-tab expiry, creation retry/lease overlap, cancel races, unresolved/processing stock protection, free-order replay, checkpoint failure, signed decline/success/replay, origin/capability/cache boundaries. Stripe is mocked. |
+| Security suite | 4 files, 22 tests passed. |
+| Complete browser suite | **60 tests passed** in Chromium. Includes public/admin accessibility and responsive regression coverage. |
+| Focused checkout/public browser run | 28 tests passed: English/Spanish mobile hold/extension/expiry/reacquisition, retained contact draft and 5% tip, conditional address, canonical Pay amount, one intent across a card-error retry, physical cart, RSVP and 200% text. Provider responses are fixtures. |
+| Podman Worker smoke | Healthy Worker; valid carts accepted, tampered carts rejected, malformed checkout fails closed. |
+| Data inventory audit | 48 storage families covered; live DO recovery checkpoints classified explicitly. |
+| Syntax and whitespace | Changed runtime files parse; `git diff --check` passed. |
+
+The initial broad browser attempt exposed an add-on quantity-label variable error and old policy-copy assertions. Both were corrected. Frontend fixtures now explicitly provide the new hold response; actual reservation transitions are exercised in the coordinator/public-gateway tests. That interrupted attempt is not counted as acceptance. The final gate above passed.
+
+The final cancellation change checkpoints canceled provider state before returning capacity. Its new test injects failure specifically into the order write, confirms stock stays pinned, and confirms a retry safely releases it. Postal-code edits now keep form and tax-quote aliases aligned, including an explicitly cleared value. The complete unit suite and three dedicated checkout browser tests passed after these follow-ups.
+
+The final preview also exposed renamed/missing generated files under the cloud-synced `_site` folder. Podman now serves from an internal temporary directory and explicitly excludes old `_site` output. This affects local preview isolation, not production build destinations.
+
+## Local preview and remaining acceptance
+
+Preview command: `SKIP_STRIPE=true ./scripts/dev.sh --podman --detach`. Site: `http://127.0.0.1:4002`; local Worker: `http://127.0.0.1:8989`. Stripe webhook forwarding stays inactive. Browser/local fixtures do not establish provider-originated payment acceptance.
+
+Manual local browser review at 390px verified the compact 5% tip, real ten-minute hold, event recap, conditional tax fields, empty-postal recovery, natural hold expiry and explicit reacquisition. Back to cart released the review hold. No payment was submitted. Screenshots: [cart](../images/checkout-ux-2026-09-24/05-local-cart-mobile.png), [checkout](../images/checkout-ux-2026-09-24/06-local-checkout-mobile.png), [tax fields](../images/checkout-ux-2026-09-24/07-local-checkout-mobile-fields.png), [expired hold](../images/checkout-ux-2026-09-24/08-local-checkout-expired.png).
+
+Before deployment, complete real Stripe test-mode 3DS/async payments, cancellation races and actual webhook delivery; confirm wallet/domain eligibility and the real statement descriptor; review mobile keyboards and assistive technology on representative devices. Preserve active coordinator checkpoints during rollback/recovery. Legacy clients without an attempt retain the old payment path until rollout completes.
+
+The original HoldMyTicket files remain reference material, not instructions. Personal values from those captures were not copied into code, documentation or fixtures.
