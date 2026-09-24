@@ -160,7 +160,8 @@ test.describe('Public Page Accessibility', () => {
 
     await cart.getByRole('button', { name: 'Checkout' }).click();
     await expect(cart.getByLabel('Email address')).toBeVisible();
-    await expect(cart.getByText('Payment method', { exact: true })).toBeVisible();
+    await expect(cart.getByText('Payment method', { exact: true })).toBeHidden();
+    await expect(cart.locator('#store-first-party-cart-title')).toHaveText('Your details');
     await expect(cart.getByRole('button', { name: 'Continue to payment' })).toBeVisible();
     await expect(cart).toContainText('Order summary');
     await expect(cart).toContainText('All sales are final, subject to our fulfillment policy and your statutory rights.');

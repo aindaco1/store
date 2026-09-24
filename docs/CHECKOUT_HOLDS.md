@@ -12,6 +12,8 @@ The timer uses server time and a monotonic browser clock. It does not poll each 
 
 Event date/time (labeled venue-local time), venue/address, quantities and ticket delivery instructions use canonical event metadata. Country/postal code precedes conditional New Mexico street/city/state fields. Guest checkout, Stripe's Payment Element, tax authority, and the **5% default optional tip** remain. Final Pay displays the canonical amount; creating an order/payment now requires an explicit Continue action.
 
+The drawer labels the stages **Your details** and **Payment**. Email is collected once with the required contact, tax/shipping and RSVP details. The completion status beside **Continue to payment** uses the same checks as the button; incomplete details explain what is missing, and an expired reservation blocks continuation. Payment displays a read-only delivery email and, for physical goods, the shipping address. The payment-method card appears only after payment starts. **Back to cart** retains the existing safe cancellation and editing flow. The reservation card separates its title, ticket count and labeled timer; expiry replaces the active-reservation claim and hides the clock.
+
 ## Authority and payment boundaries
 
 `worker/src/checkout-coordinator.js` runs inside the existing `StoreInventoryCoordinator`. Existing inventory primitives remain authoritative; no new database or Durable Object binding is added. Direct claims also subtract outstanding reservations. A checkout's inventory transitions and attempt checkpoint commit in one storage transaction. Stripe/KV I/O occurs outside that transaction.

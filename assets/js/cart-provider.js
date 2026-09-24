@@ -3670,6 +3670,7 @@
       return getDisplayedFirstPartyPricing(state, {
         currentRoute,
         checkoutMode: checkoutUiState.mode,
+        shippingDraft: checkoutUiState.customCheckout?.clientSecret ? getPersistedCustomCheckoutShippingDraft() : undefined,
         shippingQuote: checkoutUiState.customCheckout?.shippingQuote,
         taxQuote: checkoutUiState.customCheckout?.taxQuote
       });
@@ -3969,6 +3970,7 @@
         getCheckoutUiMode() === 'custom';
       const isCustomCheckout = wantsCustomCheckout && checkoutUiState.mode === 'custom';
       const customCheckout = checkoutUiState.customCheckout || {};
+      const checkoutShippingDraft = customCheckout.shippingDraft || getPersistedCustomCheckoutShippingDraft();
       const hasCustomCheckoutSession = Boolean(customCheckout?.sessionId || customCheckout?.clientSecret);
       const requiresRegistrationContactName = items.some((item) => getEventRegistrationConfig(item)?.requireContactName);
       const eventRegistrationMarkup = isCheckoutPreview
@@ -3997,7 +3999,6 @@
         hasCustomCheckoutSession: Boolean(checkoutUiState.customCheckout?.sessionId || checkoutUiState.customCheckout?.clientSecret)
       });
       const requiresTaxLocation = cartRequiresCustomCheckoutTaxLocation(state);
-      const hasReadyTaxLocation = Boolean(readReadyTaxDestination(state));
       const showCustomCheckoutConfirmButton = wantsCustomCheckout &&
         !isDeferredCustomCheckoutStart &&
         hasCustomCheckoutSession;
@@ -4021,7 +4022,20 @@
         </label>
       `;
       const customCheckoutMarkup = wantsCustomCheckout ? `
-        ${hasPhysicalItems ? `
+        ${hasCustomCheckoutSession ? `
+          <p class="store-first-party-cart__delivery" data-cart-delivery-email>${escapeHtml(getRuntimeMessage('cart.deliveryEmail', 'Order link will be sent to %{email}.').replace('%{email}', getPersistedCustomCheckoutEmailDraft()))}</p>
+          ${hasPhysicalItems ? `<div class="store-first-party-cart__callout" data-cart-delivery-address>
+            <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.shippingAddress', 'Contact & Shipping address'))}</p>
+            <p class="store-first-party-cart__delivery">${[
+              checkoutShippingDraft?.name,
+              checkoutShippingDraft?.address?.line1,
+              checkoutShippingDraft?.address?.line2,
+              [checkoutShippingDraft?.address?.city, checkoutShippingDraft?.address?.state, checkoutShippingDraft?.address?.postal_code].filter(Boolean).join(' '),
+              checkoutShippingDraft?.address?.country
+            ].filter(Boolean).map(escapeHtml).join('<br>')}</p>
+          </div>` : ''}
+          ${eventRegistrationMarkup}
+        ` : hasPhysicalItems ? `
           <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
             <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.shippingAddress', 'Contact & Shipping address'))}</p>
             <div class="store-first-party-cart__shipping-fallback store-first-party-cart__shipping-fallback--plain" data-cart-custom-shipping-fallback>
@@ -4159,7 +4173,7 @@
             </div>
           ` : ''}
         `}
-        ${checkoutRequiresPayment ? `
+        ${checkoutRequiresPayment && hasCustomCheckoutSession ? `
           <div class="store-first-party-cart__callout store-first-party-cart__callout--stripe">
             <p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}</p>
             <div class="store-first-party-cart__stripe-shell">
@@ -4263,7 +4277,14 @@
       const bodyMarkup = isCheckoutPreview ? `
         <section class="store-first-party-cart__checkout-preview">
           <div class="store-first-party-cart__hold" data-cart-hold hidden>
-            <p><span data-cart-hold-status role="status" aria-live="polite"></span> <span data-cart-hold-timer role="timer" aria-live="off"></span></p>
+            <div class="store-first-party-cart__hold-copy">
+              <strong data-cart-hold-title>${escapeHtml(holdMessage('ticketsHeld', 'Tickets held for you'))}</strong>
+              <p data-cart-hold-status role="status" aria-live="polite"></p>
+            </div>
+            <div class="store-first-party-cart__hold-clock" data-cart-hold-clock>
+              <span class="store-first-party-cart__hold-clock-label">${escapeHtml(holdMessage('holdTimeRemaining', 'Time remaining'))}</span>
+              <strong data-cart-hold-timer role="timer" aria-live="off" aria-label="${escapeAttribute(holdMessage('holdTimeRemaining', 'Time remaining'))}"></strong>
+            </div>
             <button type="button" class="store-first-party-cart__action store-first-party-cart__action--secondary" data-cart-hold-extend hidden>${escapeHtml(holdMessage('holdMoreTime', 'More time'))}</button>
             <button type="button" class="store-first-party-cart__action" data-cart-hold-retry hidden>${escapeHtml(holdMessage('holdCheckAgain', 'Check availability'))}</button>
             <button type="button" class="store-first-party-cart__action" data-cart-hold-status-retry hidden>${escapeHtml(holdMessage('holdCheckPayment', 'Check payment status'))}</button>
@@ -4320,8 +4341,7 @@
         ${checkoutErrorMarkup}
       `;
       const footerActions = isCheckoutPreview ? `
-          <p class="store-first-party-cart__note" data-cart-checkout-next>${escapeHtml(!hasCustomCheckoutSession && requiresTaxLocation && !hasReadyTaxLocation ? getTaxLocationRequiredMessage(taxLocationDraft) : '')}</p>
-          ${hasCustomCheckoutSession ? `<p class="store-first-party-cart__note">${escapeHtml(getRuntimeMessage('cart.deliveryEmail', 'Order link will be sent to %{email}.').replace('%{email}', getPersistedCustomCheckoutEmailDraft()))}</p>` : ''}
+          ${wantsCustomCheckout && !hasCustomCheckoutSession ? `<p class="store-first-party-cart__readiness" data-cart-checkout-next role="status" aria-live="polite"></p>` : ''}
           ${finalSaleNoticeMarkup}
           <div class="store-first-party-cart__actions">
             <button type="button" class="store-first-party-cart__action store-first-party-cart__action--secondary" data-cart-back>${escapeHtml(getRuntimeMessage('cart.backToCart', 'Back to cart'))}</button>
@@ -4341,7 +4361,7 @@
                 type="button"
                 class="store-first-party-cart__action"
                 data-cart-start-checkout
-                ${!isFirstPartyCheckoutEnabled || checkoutUiState.status === 'submitting' || (isDeferredCustomCheckoutStart && !isCustomCheckoutShippingDraftComplete(customCheckout?.shippingDraft)) || (requiresTaxLocation && !hasReadyTaxLocation) ? 'disabled' : ''}
+                disabled
               >${checkoutUiState.status === 'submitting'
                 ? escapeHtml(checkoutRequiresPayment
                   ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
@@ -4382,7 +4402,7 @@
           <header class="store-first-party-cart__header">
             <div>
               ${isCheckoutPreview
-                ? `<p id="store-first-party-cart-title" class="store-first-party-cart__section-label store-first-party-cart__section-label--header">${escapeHtml(getRuntimeMessage('cart.checkoutTitle', 'Checkout'))}</p>`
+                ? `<p id="store-first-party-cart-title" class="store-first-party-cart__section-label store-first-party-cart__section-label--header">${escapeHtml(wantsCustomCheckout ? (hasCustomCheckoutSession ? getRuntimeMessage('cart.paymentTitle', 'Payment') : getRuntimeMessage('cart.detailsTitle', 'Your details')) : getRuntimeMessage('cart.checkoutTitle', 'Checkout'))}</p>`
                 : `<p id="store-first-party-cart-title" class="store-first-party-cart__section-label store-first-party-cart__section-label--header">${escapeHtml(getRuntimeMessage('cart.yourCart', 'Your cart'))}</p>`}
             </div>
             <button type="button" class="store-first-party-cart__close" data-cart-close aria-label="${escapeAttribute(getRuntimeMessage('cart.closeCart', 'Close cart'))}" data-cart-dialog-initial-focus>X</button>
@@ -4398,6 +4418,7 @@
       root.setAttribute('aria-hidden', 'false');
       activateCartDialog(root);
       emitCartSummaryUpdated();
+      syncCheckoutStartButton();
       if (isCustomCheckout && customCheckout?.scriptStatus === 'ready') {
         mountCustomCheckoutIntoDrawer(root);
         ensureCustomCheckoutMounted(root);
@@ -4543,12 +4564,7 @@
       if (!root || !isCartOpen || currentRoute !== CHECKOUT_VIEW_ROUTE) return;
 
       const state = store.getState();
-      const pricing = getDisplayedFirstPartyPricing(store.getState(), {
-        currentRoute,
-        checkoutMode: checkoutUiState.mode,
-        shippingQuote: checkoutUiState.customCheckout?.shippingQuote,
-        taxQuote: checkoutUiState.customCheckout?.taxQuote
-      });
+      const pricing = getCurrentDisplayedFirstPartyPricing(state);
       const subtotal = root.querySelector('[data-cart-checkout-summary-subtotal]');
       const tipRow = root.querySelector('[data-cart-checkout-summary-tip-row]');
       const tipLabel = root.querySelector('[data-cart-checkout-summary-tip-label]');
@@ -4794,17 +4810,25 @@
       region.hidden = !visible;
       const timer = region.querySelector('[data-cart-hold-timer]');
       timer.textContent = active && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` : '';
+      region.querySelector('[data-cart-hold-clock]').hidden = !active || seconds === 0;
+      region.dataset.state = expired ? 'expired' : !active || seconds === 0 ? 'resolving' : seconds <= 120 ? 'warning' : 'active';
+      region.querySelector('[data-cart-hold-title]').textContent = active && seconds > 0
+        ? holdMessage('ticketsHeld', 'Tickets held for you')
+        : holdMessage('ticketReservation', 'Ticket reservation');
       const status = region.querySelector('[data-cart-hold-status]');
       const text = expired ? holdMessage('holdExpired', 'Your hold ended. Check availability to continue.')
         : !active || seconds === 0 ? holdMessage('paymentResolving', 'We are checking your payment. Do not pay again.')
         : seconds <= 120 ? holdMessage('holdWarning', 'Your ticket hold ends in under 2 minutes. Need more time?')
-        : holdMessage('ticketsHeld', 'Tickets held for you: %{count}.').replace('%{count}', String(checkoutHold.heldQuantity));
+        : (Number(checkoutHold.heldQuantity) === 1
+          ? holdMessage('ticketReserved', '1 ticket reserved while you check out.')
+          : holdMessage('ticketsReserved', '%{count} tickets reserved while you check out.').replace('%{count}', String(checkoutHold.heldQuantity)));
       if (status.textContent !== text) status.textContent = text;
       region.querySelector('[data-cart-hold-extend]').hidden = !(active && seconds > 0 && seconds <= 120 && checkoutHold.extensionsRemaining > 0);
       region.querySelector('[data-cart-hold-retry]').hidden = !expired;
       region.querySelector('[data-cart-hold-status-retry]').hidden = !['resolving', 'creating', 'unresolved'].includes(checkoutHold?.phase);
       if (active && !seconds && !checkoutHoldRequest && !isCustomCheckoutBusy()) void refreshCheckoutHold();
-      if (checkoutHoldIsReady()) { syncCheckoutStartButton(); syncCustomCheckoutConfirmButton(); }
+      syncCheckoutStartButton();
+      if (checkoutHoldIsReady()) { syncCustomCheckoutConfirmButton(); }
       else {
         root.querySelectorAll('[data-cart-start-checkout], [data-cart-confirm-custom-checkout]').forEach((button) => { button.disabled = true; });
       }
@@ -4969,6 +4993,24 @@
       );
     }
 
+    function getCheckoutDetailsMessage() {
+      if (getCheckoutUiMode() !== 'custom') return '';
+      const emailMessage = getCheckoutEmailValidationMessage(readCustomCheckoutEmailDraft());
+      if (emailMessage) return emailMessage;
+      const state = store.getState();
+      const shippingDraft = cartHasPhysicalItems(state.cart.items.items) ? readCustomCheckoutShippingDraft() : null;
+      if (shippingDraft && !isCustomCheckoutShippingDraftComplete(shippingDraft)) {
+        return getRuntimeMessage('cart.shippingAddressRequired', 'Enter a complete shipping address to continue.');
+      }
+      if (cartRequiresCustomCheckoutTaxLocation(state) && !readReadyTaxDestination(state)) {
+        return getTaxLocationRequiredMessage(getCurrentBillingAddress(state));
+      }
+      const nameField = getCartRoot()?.querySelector('[data-cart-custom-checkout-name]');
+      const name = shippingDraft?.name || (nameField instanceof HTMLInputElement ? nameField.value : state.customer?.name);
+      const registration = validateEventRegistrationDrafts(state.cart.items.items, name, readCustomCheckoutEmailDraft());
+      return registration.valid ? '' : registration.message;
+    }
+
     function syncCheckoutStartButton() {
       const root = getCartRoot();
       const button = root?.querySelector('[data-cart-start-checkout]');
@@ -4976,21 +5018,21 @@
 
       const checkoutRequiresPayment = doesCurrentCheckoutRequirePayment();
 
-      const shouldDeferCustomCheckout = shouldDeferPhysicalCustomCheckoutStart(store.getState(), {
-        currentRoute,
-        checkoutMode: checkoutUiState.mode,
-        hasCustomCheckoutSession: Boolean(checkoutUiState.customCheckout?.sessionId || checkoutUiState.customCheckout?.clientSecret)
-      });
-      const shippingDraft = shouldDeferCustomCheckout
-        ? readCustomCheckoutShippingDraft()
-        : checkoutUiState.customCheckout?.shippingDraft || null;
-      const requiresTaxLocation = cartRequiresCustomCheckoutTaxLocation(store.getState());
-      const hasReadyTaxLocation = Boolean(readReadyTaxDestination(store.getState()));
-
-      button.disabled = (checkoutHold && !checkoutHoldIsReady()) || checkoutUiState.status === 'submitting' ||
-        getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER ||
-        (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) ||
-        (requiresTaxLocation && !hasReadyTaxLocation);
+      const detailsMessage = getCheckoutDetailsMessage();
+      const holdBlocked = checkoutHold && !checkoutHoldIsReady();
+      const ready = !detailsMessage && !holdBlocked;
+      const hint = root.querySelector('[data-cart-checkout-next]');
+      if (hint) {
+        const message = detailsMessage || (holdBlocked
+          ? getRuntimeMessage('cart.holdReview', 'Check your ticket reservation to continue.')
+          : checkoutRequiresPayment
+            ? getRuntimeMessage('cart.detailsReady', 'Details complete. Ready for secure payment.')
+            : getRuntimeMessage('cart.detailsReadyFree', 'Details complete. Ready to place your order.'));
+        hint.dataset.ready = String(ready);
+        if (hint.textContent !== message) hint.textContent = message;
+      }
+      button.disabled = !ready || checkoutUiState.status === 'submitting' ||
+        getRequestedCheckoutProvider() !== FIRST_PARTY_CHECKOUT_PROVIDER;
       button.textContent = checkoutUiState.status === 'submitting'
         ? (checkoutRequiresPayment
           ? getRuntimeMessage('cart.loadingSecurePayment', 'Loading secure payment...')
@@ -5175,6 +5217,14 @@
       }
     }
 
+    function getCheckoutEmailValidationMessage(email) {
+      if (!String(email || '').trim()) return getRuntimeMessage('cart.emailRequired', 'Enter an email address to continue.');
+      const input = document.createElement('input');
+      input.type = 'email';
+      input.value = email;
+      return input.validity.valid ? '' : getRuntimeMessage('cart.emailInvalid', 'Enter a valid email address to continue.');
+    }
+
     function getCustomCheckoutEmailFieldMessage(errorLike) {
       const rawMessage = String(errorLike?.error?.message || errorLike?.message || '').trim();
       const message = rawMessage.toLowerCase();
@@ -5227,8 +5277,6 @@
       const draft = destination || readCustomCheckoutTaxDraft();
       note.textContent = getTaxLocationNote(draft);
       root.querySelectorAll('[data-cart-tax-details]').forEach((field) => { field.hidden = !taxDestinationNeedsDetailedStreetAddress(draft); });
-      const hint = root.querySelector('[data-cart-checkout-next]');
-      if (hint) hint.textContent = isTaxDestinationReady(draft) ? '' : getTaxLocationRequiredMessage(draft);
     }
 
     function setCheckoutUiError(message) {
@@ -5283,6 +5331,7 @@
     function readCustomCheckoutShippingDraft() {
       const root = getCartRoot();
       const fields = root ? Array.from(root.querySelectorAll('[data-cart-custom-shipping-field]')) : [];
+      if (!fields.length && getPersistedCustomCheckoutShippingDraft()) return getPersistedCustomCheckoutShippingDraft();
       const read = function(name) {
         const field = fields.find((node) => node.getAttribute('data-cart-custom-shipping-field') === name);
         if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
@@ -5867,8 +5916,8 @@
         emailError: ''
       };
 
-      if (!trimmedEmail) {
-        const message = getRuntimeMessage('cart.emailRequired', 'Enter an email address to continue.');
+      const message = getCheckoutEmailValidationMessage(trimmedEmail);
+      if (message) {
         checkoutUiState.customCheckout.emailError = message;
         setCustomCheckoutEmailError(message);
         return {
@@ -5883,17 +5932,17 @@
       }
 
       const result = await activeCustomCheckoutMount.updateEmail(trimmedEmail);
-      const message = result?.error?.message || '';
-      checkoutUiState.customCheckout.emailError = message;
-      setCustomCheckoutEmailError(message);
+      const providerMessage = result?.error?.message || '';
+      checkoutUiState.customCheckout.emailError = providerMessage;
+      setCustomCheckoutEmailError(providerMessage);
 
-      if (message && options?.raise) {
-        throw new Error(message);
+      if (providerMessage && options?.raise) {
+        throw new Error(providerMessage);
       }
 
       return {
-        ok: !message,
-        message
+        ok: !providerMessage,
+        message: providerMessage
       };
     }
 
@@ -6015,7 +6064,7 @@
       const root = getCartRoot();
       const emailInput = root?.querySelector('[data-cart-custom-checkout-email]');
       const emailFallbackVisible = Boolean(root?.querySelector('[data-cart-custom-checkout-email-fallback]:not([hidden])'));
-      const emailValue = emailInput instanceof HTMLInputElement ? emailInput.value : '';
+      const emailValue = readCustomCheckoutEmailDraft();
       const mount = activeCustomCheckoutMount;
       const flowToken = customCheckoutFlowToken;
       const orderId = String(checkoutUiState.customCheckout?.orderId || '');
@@ -6081,7 +6130,7 @@
               emailError: emailFieldMessage
             };
             setCustomCheckoutEmailError(emailFieldMessage);
-            setCheckoutUiError('');
+            setCheckoutUiError(emailInput ? '' : emailFieldMessage);
             focusCustomCheckoutEmailField();
             syncCustomCheckoutConfirmButton();
             return;
@@ -6125,7 +6174,7 @@
             emailError: emailFieldMessage
           };
           setCustomCheckoutEmailError(emailFieldMessage);
-          setCheckoutUiError('');
+          setCheckoutUiError(emailInput ? '' : emailFieldMessage);
           focusCustomCheckoutEmailField();
           syncCustomCheckoutConfirmButton();
           return;
@@ -6304,13 +6353,12 @@
 
       const billingDestination = readReadyTaxDestination(store.getState());
       const emailField = getCartRoot()?.querySelector('[data-cart-custom-checkout-email]');
-      const emailValue = String(
-        (emailField instanceof HTMLInputElement ? emailField.value : '') ||
+      const emailValue = String(emailField instanceof HTMLInputElement ? emailField.value : (
         readCustomCheckoutEmailDraft() ||
         state?.customer?.email ||
         state?.cart?.email ||
         ''
-      ).trim();
+      )).trim();
       const contactNameField = getCartRoot()?.querySelector('[data-cart-custom-checkout-name]');
       const contactNameValue = String(
         shippingDraft?.name ||
@@ -6318,6 +6366,13 @@
         state?.customer?.name ||
         ''
       ).trim();
+
+      const emailMessage = getCheckoutUiMode() === 'custom' ? getCheckoutEmailValidationMessage(emailValue) : '';
+      if (emailMessage) {
+        setCustomCheckoutEmailError(emailMessage);
+        emailField?.focus();
+        return;
+      }
 
       if (shouldDeferCustomCheckout && !isCustomCheckoutShippingDraftComplete(shippingDraft)) {
         const message = getRuntimeMessage('cart.shippingAddressRequired', 'Enter a complete shipping address to continue.');
@@ -6766,9 +6821,15 @@
       }
 
       document._storeFirstPartyCartInputHandler = function handleFirstPartyCartInput(event) {
+        if (event.target?.closest?.('[data-cart-custom-checkout-email], [data-cart-custom-checkout-name]')) {
+          setCustomCheckoutEmailError('');
+          syncCheckoutStartButton();
+          return;
+        }
         const registrationField = event.target?.closest?.('[data-rsvp-registration-answer], [data-rsvp-attendee-name]');
         if (registrationField && updateEventRegistrationDraftFromField(registrationField)) {
           setCheckoutUiError('');
+          syncCheckoutStartButton();
           return;
         }
 
@@ -6859,6 +6920,7 @@
         const registrationField = event.target?.closest?.('[data-rsvp-registration-answer], [data-rsvp-attendee-name]');
         if (registrationField && updateEventRegistrationDraftFromField(registrationField)) {
           setCheckoutUiError('');
+          syncCheckoutStartButton();
           return;
         }
 

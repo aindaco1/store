@@ -14,12 +14,12 @@ Config synchronization regenerated the Worker catalog from the existing 53 canon
 
 | Check | Result |
 | --- | --- |
-| Complete final `npm run test:premerge` | Passed all phases after all runtime and preview changes: secret/content/template/i18n/syntax, focused regressions, full unit suite, generated-site/build audits, Podman resources, security, Worker smoke and E2E. Logs: `/tmp/store-premerge-logs.YUbiGd/`. |
+| Complete final `npm run test:premerge` | Passed all phases after all runtime and preview changes: secret/content/template/i18n/syntax, focused regressions, full unit suite, generated-site/build audits, Podman resources, security, Worker smoke and E2E. Logs: `/tmp/store-premerge-logs.rzyh7N/`. |
 | Full unit suite in that gate | **117 files, 597 tests passed**. |
 | Final `npm run test:unit` after cancellation checkpoint ordering and postal-alias clearing | **117 files, 597 tests passed**. Log: `/tmp/store-checkout-unit-final.log`. |
 | Checkout lifecycle suite | **20 tests passed**: last-unit contention, multi-SKU atomicity, direct-claim protection, fixed deadline/reuse, ten extensions, closed-tab expiry, creation retry/lease overlap, cancel races, unresolved/processing stock protection, free-order replay, checkpoint failure, signed decline/success/replay, origin/capability/cache boundaries. Stripe is mocked. |
 | Security suite | 4 files, 22 tests passed. |
-| Complete browser suite | **60 tests passed** in Chromium. Includes public/admin accessibility and responsive regression coverage. |
+| Complete browser suite | **61 tests passed** in Chromium. Includes public/admin accessibility and responsive regression coverage. |
 | Focused checkout/public browser run | 28 tests passed: English/Spanish mobile hold/extension/expiry/reacquisition, retained contact draft and 5% tip, conditional address, canonical Pay amount, one intent across a card-error retry, physical cart, RSVP and 200% text. Provider responses are fixtures. |
 | Podman Worker smoke | Healthy Worker; valid carts accepted, tampered carts rejected, malformed checkout fails closed. |
 | Data inventory audit | 48 storage families covered; live DO recovery checkpoints classified explicitly. |
@@ -30,6 +30,14 @@ The initial broad browser attempt exposed an add-on quantity-label variable erro
 The final cancellation change checkpoints canceled provider state before returning capacity. Its new test injects failure specifically into the order write, confirms stock stays pinned, and confirms a retry safely releases it. Postal-code edits now keep form and tax-quote aliases aligned, including an explicitly cleared value. The complete unit suite and three dedicated checkout browser tests passed after these follow-ups.
 
 The final preview also exposed renamed/missing generated files under the cloud-synced `_site` folder. Podman now serves from an internal temporary directory and explicitly excludes old `_site` output. This affects local preview isolation, not production build destinations.
+
+## Details-to-payment follow-up
+
+The owner requested one email entry, clearer readiness before payment, removal of the empty payment-method card, and a better ticket-hold presentation. **Your details** now collects the email and required tax/shipping/RSVP information once. One completion check controls both the next-action status and button; **Payment** shows the delivery email and shipping address as a summary. Saved shipping data continues to drive estimates and payment confirmation after the form disappears. The hold separates its title, reservation count and labeled timer, with explicit warning and expiry states. The optional tip remains 5% by default.
+
+Four focused checkout browser tests passed after the follow-up: English/Spanish mobile details, invalid-email and missing-address gating, expiry/reacquisition, 200% text without horizontal overflow, ticket/physical payment progression, matching order-summary and Pay amounts, preserved confirmation email/address, and same-intent decline retry. Screenshots use only fixture data: [English details](../images/checkout-ux-2026-09-24/09-details-ready-mobile.png), [Spanish details](../images/checkout-ux-2026-09-24/10-details-ready-mobile-es.png), and [physical payment summary](../images/checkout-ux-2026-09-24/11-payment-delivery-summary.png). The payment element in these tests is a fixture, not provider acceptance.
+
+An initial follow-up gate caught the CSS total budget overrun. Removing unused legacy cart/add-on styles kept the existing thresholds intact: final generated CSS totals 198,780 bytes against 200,000. The full final gate recorded above passed after the saved-address and style fixes. The first physical-payment fixture used an inconsistent shipping amount; it now follows the product's $3 shipping and asserts the summary matches Pay.
 
 ## Local preview and remaining acceptance
 
