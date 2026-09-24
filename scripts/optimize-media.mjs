@@ -23,7 +23,7 @@ const IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png', '.webp']);
 const RESPONSIVE_IMAGE_EXTENSIONS = new Set(['.gif', '.jpg', '.jpeg', '.png']);
 const VIDEO_EXTENSIONS = new Set(['.mov', '.mp4', '.m4v']);
 const RESPONSIVE_WEBP_WIDTHS = MEDIA_RESPONSIVE_WIDTHS;
-const RESPONSIVE_WEBP_QUALITY = '86';
+const RESPONSIVE_WEBP_QUALITY = '80';
 const MEDIA_ROOTS = ['assets/images', 'assets/videos', 'assets/audio'];
 const REFERENCE_ROOTS = ['_products', '_data', '_includes', '_layouts'];
 const REFERENCE_FILES = ['_config.yml'];
@@ -92,6 +92,7 @@ function parseArgs(argv = []) {
   };
   for (const arg of argv) {
     if (arg === '--write') args.write = true;
+    else if (arg === '--force') args.force = true;
     else if (arg === '--check') args.check = true;
     else if (arg === '--changed') args.changed = true;
     else if (arg === '--manifest-only') args.manifestOnly = true;

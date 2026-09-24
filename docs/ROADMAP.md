@@ -99,12 +99,13 @@ Keep these scoped to Store's goals and data model. Share implementation patterns
 
 ### Checkout clarity and ticket holds
 
-The [September checkout review](checkout-ux-review-2026-09-24.md) led to the local candidate on `release/checkout-ux-ticket-holds`. The owner authorized implementation, with the optional tip kept at **5% by default**. The objective is preventing competition for scarce tickets. [Implementation and recovery contract](CHECKOUT_HOLDS.md).
+The [September checkout review](checkout-ux-review-2026-09-24.md) led to the v1.3.8 release on `release/checkout-ux-ticket-holds`. The owner authorized implementation, with the optional tip kept at **5% by default**. The objective is preventing competition for scarce tickets. [Implementation and recovery contract](CHECKOUT_HOLDS.md).
 
 - [x] Implement a stable checkout attempt and payment-aware inventory lifecycle locally: serialized early ticket reservations, same-intent retries, safe cancellation, alarms, retained recovery checkpoints, idempotent stock confirmation, and stock-aware direct claims.
 - [x] Implement visible finite-ticket holds locally: explicit Checkout trigger, ten-minute default, ten explicit extensions, status on resume, expiry/reacquisition, and English/Spanish recovery states. Mixed carts share the same checkout; ordinary RSVP forms have no ticket countdown.
 - [x] Implement checkout clarity locally: canonical event recap and delivery guidance, compact tip/cart/mobile summary/actions, a dedicated quantity accessible name, country/postal-first conditional tax fields, distinct Your details/Payment stages, one email entry, automatic payment loading after required details are complete, existing inline guidance, a labeled reservation timer, and canonical total on Pay. Preserve the 5% tip default.
-- [ ] Complete provider/device acceptance and release review before deployment: real Stripe test-mode 3DS/processing/cancel races and webhook delivery, wallets/domain eligibility, actual statement descriptor, mobile keyboard and assistive-technology checks. Track local gates separately in [release evidence](release-evidence/2026-09-24-checkout-ux-local.md).
+- [x] Complete automated release review: real Stripe test-mode payment matrices, 3DS-required/cancellation state, retry and processing recovery, mobile/zoom/keyboard checks, security and performance. See [v1.3.8 evidence and acceptance limits](release-evidence/v1.3.8-checkout-holds.md).
+- [ ] Extend device acceptance with physical-device wallets and VoiceOver speech; no new wallet component is included in v1.3.8.
 
 ### RSVP and event operations
 

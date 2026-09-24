@@ -124,6 +124,21 @@ test.describe('Store Public Page Controls', () => {
     await expectNoHorizontalOverflow(page);
   });
 
+  test('mobile portrait cards preload the same appropriately sized artwork they display', async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.75 });
+    try {
+      const page = await context.newPage();
+      await gotoDomReady(page, '/');
+      const picture = page.locator(`${PRODUCT_CARD} picture`).first();
+      const sizes = await picture.locator('source').getAttribute('sizes');
+      expect(sizes).toBeTruthy();
+      await expect(page.locator('link[rel="preload"][as="image"]')).toHaveAttribute('imagesizes', sizes!);
+      await expect.poll(() => picture.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.currentSrc)).toMatch(/-(?:320|480|640)\.webp$/);
+    } finally {
+      await context.close();
+    }
+  });
+
   test('product card images survive product navigation and browser back', async ({ page }) => {
     await gotoDomReady(page, '/');
     await expect.poll(async () => {

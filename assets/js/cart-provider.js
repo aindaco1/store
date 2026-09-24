@@ -4954,7 +4954,7 @@
     }
 
     function isCustomCheckoutBusy() {
-      return checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting';
+      return checkoutStartInFlight || checkoutUiState.status === 'submitting' || checkoutUiState.status === 'confirming' || checkoutUiState.status === 'redirecting';
     }
 
     function isStorePaymentIntentCheckout(customCheckout = checkoutUiState.customCheckout) {
@@ -5043,6 +5043,12 @@
       const root = getCartRoot();
       const button = root?.querySelector('[data-cart-start-checkout]');
       if (!button) return;
+
+      // Freeze the details being submitted until preparation finishes. This
+      // also prevents Back/Close from abandoning an intent still being created.
+      root.querySelectorAll('input, select, textarea, [data-cart-back], button[data-cart-close]').forEach((field) => {
+        field.disabled = checkoutStartInFlight;
+      });
 
       const checkoutRequiresPayment = doesCurrentCheckoutRequirePayment();
 
@@ -6331,6 +6337,7 @@
       checkoutStartInFlight = true;
       automaticCheckoutFailed = false;
       checkoutUiState.status = 'submitting';
+      syncCheckoutStartButton();
       try {
         await performFirstPartyCheckout();
         if (checkoutUiState.error || (doesCurrentCheckoutRequirePayment() && !checkoutUiState.customCheckout?.clientSecret)) automaticCheckoutFailed = true;

@@ -2,6 +2,8 @@
 
 Date: September 24, 2026. Branch: `release/checkout-ux-ticket-holds`, based on `7a5c2fb` (v1.3.7). Local implementation only; no version bump, push, provider configuration change, purchase, email send, or deployment was performed.
 
+This is historical local evidence. See [v1.3.8 release verification](v1.3.8-checkout-holds.md) for the later authorized release and provider checks.
+
 ## Scope
 
 The owner authorized the [checkout review](../checkout-ux-review-2026-09-24.md) recommendations locally and explicitly retained the **5% default optional tip**. The tip control, mobile cart and summary/actions are more compact. Checkout adds canonical event details, ticket/email guidance, corrected quantity labels, country/postal-first conditional tax fields, automatic payment preparation with explicit final confirmation and the canonical total on Pay.

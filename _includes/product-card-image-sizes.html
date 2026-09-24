@@ -1,0 +1,7 @@
+{%- comment -%}Portrait artwork is contained inside square catalog cards. Keep preload and image selection identical.{%- endcomment -%}
+{%- assign card_dimensions = include.src | local_image_dimensions -%}
+{%- assign card_ratio = 1.0 -%}
+{%- if card_dimensions.width > 0 and card_dimensions.height > card_dimensions.width -%}
+  {%- assign card_ratio = card_dimensions.width | times: 1.0 | divided_by: card_dimensions.height -%}
+{%- endif -%}
+(min-width: 901px) {{ card_ratio | times: 28 | round: 2 }}vw, (min-width: 641px) {{ card_ratio | times: 42 | round: 2 }}vw, calc({{ card_ratio | times: 100 | round: 2 }}vw - {{ card_ratio | times: 32 | round: 2 }}px)

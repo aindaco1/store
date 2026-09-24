@@ -6,7 +6,7 @@ import { expectNoHorizontalOverflow } from './helpers/mobile';
 // and Stripe failure boundaries are exercised by checkout-holds.test.ts.
 for (const lang of ['en', 'es']) {
   test(`${lang}: mobile hold, extension, expiry recovery and checkout clarity`, async ({ page }, testInfo) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: lang === 'en' ? 320 : 390, height: 844 });
     let attempts: string[] = []; let phase = 'held'; let nearExpiry = false;
     await page.route('**/api/checkout/*', async (route) => {
       const body = route.request().postDataJSON();
@@ -77,13 +77,26 @@ for (const lang of ['en', 'es']) {
   });
 }
 
-for (const { physical, failFirstMount } of [{ physical: false, failFirstMount: false }, { physical: true, failFirstMount: false }, { physical: false, failFirstMount: true }]) {
-test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal mount recovery' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
+for (const { physical, failFirstMount, failPreparation, width } of [
+  { physical: false, failFirstMount: false, width: 320 },
+  { physical: true, failFirstMount: false, width: 390 },
+  { physical: false, failFirstMount: false, width: 768 },
+  { physical: false, failFirstMount: true, width: 1280 },
+  { physical: false, failFirstMount: false, failPreparation: true, width: 390 }
+]) {
+test(`${physical ? 'Physical' : 'Ticket'} ${width}px${failFirstMount ? ' with terminal mount recovery' : failPreparation ? ' with network recovery' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
   let creations = 0; let confirms = 0;
+  let succeed = false;
+  let finishPreparation!: () => void;
+  const preparation = new Promise<void>((resolve) => { finishPreparation = resolve; });
   let releasedAttempt = ''; const mounts: string[] = []; const canceledSecrets = new Set<string>();
   let lastConfirm: any;
-  if (physical) await page.setViewportSize({ width: 390, height: 844 });
-  await page.exposeFunction('recordFixtureConfirm', (params: any) => { confirms++; lastConfirm = params; });
+  let submittedDetails: any;
+  await page.setViewportSize({ width, height: 844 });
+  await page.exposeFunction('recordFixtureConfirm', (params: any) => {
+    confirms++; lastConfirm = params;
+    return succeed ? { paymentIntent: { status: 'succeeded' } } : { error: { message: 'Fixture card declined' } };
+  });
   await page.exposeFunction('recordFixtureMount', (secret: string) => {
     mounts.push(secret);
     return canceledSecrets.has(secret) || (failFirstMount && secret === 'pi_browser_fixture_1_secret');
@@ -100,7 +113,7 @@ test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal moun
               : (handlers.ready?.(), handlers.change?.({ complete: true })));
           }, unmount: () => {} };
       } }),
-      confirmPayment: async (params: any) => { await (window as any).recordFixtureConfirm(params); return { error: { message: 'Fixture card declined' } }; }
+      confirmPayment: (params: any) => (window as any).recordFixtureConfirm(params)
     });
   });
   await page.route('**/tax/quote', (route) => route.fulfill({ json: { taxCents: 153, taxDetails: { effectiveRate: 0.0765, destination: { country: 'US', postalCode: '10001' } } } }));
@@ -111,7 +124,15 @@ test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal moun
     if (action === 'release') { releasedAttempt = attempt; canceledSecrets.add(`pi_browser_fixture_${creations}_secret`); }
     const base = { success: true, phase: attempt === releasedAttempt ? 'released' : action === 'hold' ? 'held' : 'payment', heldQuantity: physical ? 0 : 1, extensionsRemaining: 10,
       serverTime: new Date().toISOString(), expiresAt: new Date(Date.now() + 600000).toISOString() };
-    if (action === 'intent') creations++;
+    if (action === 'intent') {
+      creations++;
+      submittedDetails = route.request().postDataJSON();
+      if (creations === 1) await preparation;
+      if (failPreparation && creations === 1) {
+        await route.fulfill({ status: 503, json: { error: 'Payment service unavailable. Please retry.' } });
+        return;
+      }
+    }
     await route.fulfill({ json: action === 'intent' ? { ...base, checkoutUiMode: 'payment_intent', requiresPayment: true,
       paymentIntentId: `pi_browser_fixture_${creations}`, clientSecret: `pi_browser_fixture_${creations}_secret`, publishableKey: 'pk_test_fixture', orderToken: 'store-order-browser-fixture', totals: { totalCents: physical ? 3603 : 2253 } } : base });
   });
@@ -130,6 +151,24 @@ test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal moun
     await cart.locator('[data-cart-tax-destination-field="postal_code"]').blur();
   }
   // No intermediate Continue action: the final field automatically loads payment.
+  await expect.poll(() => creations).toBe(1);
+  await expect(cart.locator('[data-cart-custom-checkout-email]')).toBeDisabled();
+  await expect(cart.locator('[data-cart-back]')).toBeDisabled();
+  await expect(cart.locator('button[data-cart-close]')).toBeDisabled();
+  await expect(cart.locator('[data-cart-start-checkout]')).toHaveText('Loading secure payment...');
+  await page.keyboard.press('Escape');
+  await expect(cart).toBeVisible();
+  expect(releasedAttempt).toBe('');
+  expect(submittedDetails.customer.email).toBe('checkout-test@example.com');
+  finishPreparation();
+  if (failPreparation) {
+    await expect(cart.locator('[data-cart-checkout-error]')).toHaveText('Payment service unavailable. Please retry.');
+    await expect(cart.locator('[data-cart-custom-checkout-email]')).toBeEnabled();
+    await expect(cart.locator('[data-cart-back]')).toBeEnabled();
+    await page.waitForTimeout(500); // A failed automatic attempt must not loop.
+    expect(creations).toBe(1);
+    await cart.getByRole('button', { name: 'Retry loading payment' }).click();
+  }
   if (failFirstMount) {
     await expect(cart.locator('[data-cart-hold-retry]')).toBeVisible();
     await expect(cart.locator('[data-cart-checkout-error]')).toHaveText('Secure payment could not load. Your hold ended. Check availability to continue.');
@@ -145,20 +184,23 @@ test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal moun
   await expect(pay).toHaveText(physical ? 'Pay $36.03' : 'Pay $22.53');
   await expect(cart.locator('[data-cart-checkout-summary-total]')).toHaveText(physical ? '$36.03' : '$22.53');
   await expect(pay).toBeEnabled();
-  expect(creations).toBe(failFirstMount ? 2 : 1);
+  expect(creations).toBe(failFirstMount || failPreparation ? 2 : 1);
   expect(confirms).toBe(0);
   if (physical) {
     await expect(cart.locator('[data-cart-delivery-address]')).toContainText('123 Test Street');
     await expect(cart.locator('[data-cart-custom-shipping-field]')).toHaveCount(0);
   }
   await expectNoHorizontalOverflow(page);
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
+  await expectNoHorizontalOverflow(page);
+  await page.addStyleTag({ content: 'html { font-size: 100% !important; }' });
   await page.screenshot({ path: testInfo.outputPath('payment.png'), animations: 'disabled' });
   await pay.click();
   await expect(cart.locator('[data-cart-checkout-error]')).toHaveText('Fixture card declined');
   await expect(pay).toBeEnabled();
   await pay.click();
   await expect.poll(() => confirms).toBe(2);
-  expect(creations).toBe(failFirstMount ? 2 : 1);
+  expect(creations).toBe(failFirstMount || failPreparation ? 2 : 1);
   expect(lastConfirm.confirmParams.payment_method_data.billing_details.email).toBe('checkout-test@example.com');
   if (physical) expect(lastConfirm.confirmParams.payment_method_data.billing_details.address.line1).toBe('123 Test Street');
   const mountedBeforeBack = mounts.length;
@@ -167,9 +209,17 @@ test(`${physical ? 'Physical' : 'Ticket'}${failFirstMount ? ' with terminal moun
   expect(mounts).toHaveLength(mountedBeforeBack);
   await cart.locator('[data-cart-continue]').click();
   await expect(pay).toBeEnabled();
-  expect(creations).toBe(failFirstMount ? 3 : 2);
+  expect(creations).toBe(failFirstMount || failPreparation ? 3 : 2);
   expect(mounts.length).toBeGreaterThan(mountedBeforeBack);
   expect(mounts.slice(mountedBeforeBack).every((secret) => secret === `pi_browser_fixture_${creations}_secret`)).toBe(true);
   expect(canceledSecrets.has(mounts.at(-1)!)).toBe(false);
+  // Successful confirmation redirects once and clears the basket. The real
+  // signed-webhook settlement is covered by the Worker/provider smoke matrix.
+  await page.route('**/order-success/?orderToken=*', (route) => route.fulfill({ contentType: 'text/html', body: '<h1>Order received</h1>' }));
+  succeed = true;
+  await pay.click();
+  await expect(page).toHaveURL(/\/order-success\/\?orderToken=store-order-browser-fixture/);
+  expect(confirms).toBe(3);
+  expect(await page.evaluate(() => localStorage.getItem('store_checkout_attempt_v1'))).toBeNull();
 });
 }

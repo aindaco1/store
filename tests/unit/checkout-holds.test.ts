@@ -85,6 +85,14 @@ describe('checkout inventory lifecycle', () => {
     expect(await call('checkout-status')).toMatchObject({ phase: 'released' });
     expect(createCount).toBe(1);
   });
+  it('keeps the same payment and stock when Stripe status cannot be read', async () => {
+    await hold(); await pay();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')));
+    expect(await pay()).toMatchObject({ code: 'payment_resolving' });
+    expect(await call('checkout-status')).toMatchObject({ code: 'payment_resolving' });
+    expect(await hold(second)).toMatchObject({ code: 'temporarily_held' });
+    expect(createCount).toBe(1);
+  });
   it('serializes simultaneous buyers and reuses the winning attempt without resetting time', async () => {
     const results = await Promise.all([hold(), hold(second)]);
     expect(results.filter((r) => r.success)).toHaveLength(1);
@@ -264,8 +272,17 @@ describe('public checkout gateway', () => {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     }), env, { waitUntil: vi.fn() } as any);
     const cart = { attemptId: first, items: [{ id: 'a-night-in-paradiso', price: 20, quantity: 1 }], customer: { email: 'fixture@example.com' }, tipPercent: 5 };
-    expect((await request('hold', cart, 'https://untrusted.example')).status).toBe(403);
-    expect((await request('hold', { ...cart, attemptId: 'guessable' })).status).toBe(400);
+    for (const action of ['hold', 'status', 'extend', 'release']) {
+      for (const origin of ['https://untrusted.example', 'null']) {
+        const rejected = await request(action, cart, origin);
+        expect(rejected.status).toBe(403);
+        expect(rejected.headers.get('cache-control')).toContain('no-store');
+      }
+      expect((await request(action, { ...cart, attemptId: 'guessable' })).status).toBe(400);
+    }
+    expect((await request('status', { attemptId: second })).status).toBe(404);
+    expect((await request('hold', { ...cart, items: [{ id: 'a-night-in-paradiso', price: 0.01, quantity: 1 }] })).status).toBe(422);
+    expect(createCount).toBe(0);
     const held = await request('hold', cart);
     expect(held.headers.get('cache-control')).toContain('no-store');
     expect(await held.json()).toMatchObject({ success: true, heldQuantity: 1, items: [{ productId: 'a-night-in-paradiso', eventDetails: { venue: expect.any(String) } }] });

@@ -34,6 +34,11 @@ Store performance depends on static public pages, lazy cart loading, generated m
 - Static inventory is the no-JavaScript/failure fallback. When tracked products are present, one small live projection response updates every card and variant on the page; untracked catalog pages do not make the request.
 - Public cart runtime loads lazily.
 - Product images should use optimized source files and responsive derivatives.
+  Catalog image/preload sizes share a portrait-aware calculation for contained
+  artwork; detail pages retain their full display width. Responsive WebP output
+  uses quality 80. Use `node scripts/optimize-media.mjs --write --force <source>`
+  to regenerate selected derivatives after encoder-policy changes, then inspect
+  the rendered image and run the existing Lighthouse/asset gates.
 - Generated CSS/JS should stay minified.
 
 Checks:

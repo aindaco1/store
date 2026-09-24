@@ -16,11 +16,14 @@ const noDevVars = args.includes('--no-dev-vars') ||
 const useDevVars = !noDevVars;
 const directWebhook = args.includes('--direct-webhook') ||
   process.env.PAYMENT_SMOKE_DIRECT_WEBHOOK === '1';
+const checkoutHolds = args.includes('--checkout-holds');
 
 if (help) {
   console.log(`Usage: npm run release:payment-smoke -- [options]
 
 Options:
+  --checkout-holds  Exercise the held checkout path, including intent replay
+                    and retryable declines. Omit to check legacy clients.
   --no-dev-vars      Do not read worker/.dev.vars. Use this for clean-shell CI
                      probes. Shell env still works.
   --direct-webhook   After creating and confirming a test PaymentIntent, sign
@@ -280,6 +283,7 @@ function paymentSmokeScenarios() {
     : (directWebhook
         ? ['paid-digital', 'paid-physical', 'paid-ticket', 'free-rsvp', 'failed-payment']
         : ['paid-digital']);
+  if (!requested && checkoutHolds && directWebhook) names.push('authentication-required');
   const definitions = new Map([
     ['paid-digital', {
       id: 'paid-digital',
@@ -315,7 +319,9 @@ function paymentSmokeScenarios() {
       label: 'free RSVP checkout',
       expectedStatus: 'confirmed',
       paid: false,
-      item: { id: 'rsvp-1', price: 0, quantity: 1 },
+      item: { id: 'rsvp-1', price: 0, quantity: 1, registration: {
+        answers: {}, attendees: [{ name: 'Release Test Guest', answers: { age_group: '18_plus' } }]
+      } },
       adminNotificationExpected: true
     }],
     ['failed-payment', {
@@ -324,6 +330,11 @@ function paymentSmokeScenarios() {
       expectedStatus: 'payment_failed',
       paid: true,
       eventType: 'payment_intent.payment_failed',
+      item: { id: 'download-1', price: 5, quantity: 1 }
+    }],
+    ['authentication-required', {
+      id: 'authentication-required', label: '3DS-required checkout', paid: true,
+      paymentMethod: 'pm_card_threeDSecure2Required',
       item: { id: 'download-1', price: 5, quantity: 1 }
     }]
   ]);
@@ -405,7 +416,7 @@ async function waitForOrderStatus(workerUrl, siteUrl, orderToken, expectedStatus
       headers: { Origin: siteUrl }
     });
     if (summary.ok && summary.body?.status === expectedStatus) {
-      add('PASS', `Store order state (${scenario.label})`, `order ${expectedStatus} for ${orderToken}`);
+      add('PASS', `Store order state (${scenario.label})`, `order ${expectedStatus}`);
       return summary.body;
     }
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -437,40 +448,49 @@ async function waitForOrderEmailDryRunDelivery(workerUrl, siteUrl, orderToken, s
 }
 
 async function runFreeScenario(workerUrl, siteUrl, scenario) {
-  const checkout = await fetchJson(`${workerUrl}/api/checkout/intent`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Origin: siteUrl,
-      ...localSyntheticClientHeaders(workerUrl)
-    },
-    body: JSON.stringify(paymentSmokePayload(scenario))
-  });
+  const checkout = await startCheckoutScenario(workerUrl, siteUrl, scenario);
   if (!checkout.ok || !checkout.body?.orderToken || checkout.body?.requiresPayment !== false) {
     add('FAIL', `Free checkout mutation (${scenario.label})`, `checkout intent returned ${checkout.status}`);
     return;
   }
-  add('PASS', `Free checkout mutation (${scenario.label})`, `confirmed ${checkout.body.orderToken} without Stripe`);
+  add('PASS', `Free checkout mutation (${scenario.label})`, 'confirmed without Stripe');
   const summary = await waitForOrderStatus(workerUrl, siteUrl, checkout.body.orderToken, scenario.expectedStatus, scenario);
   if (summary) await waitForOrderEmailDryRunDelivery(workerUrl, siteUrl, checkout.body.orderToken, scenario);
 }
 
-async function runPaidScenario(workerUrl, siteUrl, stripeKey, scenario) {
-  const checkout = await fetchJson(`${workerUrl}/api/checkout/intent`, {
+async function startCheckoutScenario(workerUrl, siteUrl, scenario) {
+  const payload = paymentSmokePayload(scenario);
+  const request = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Origin: siteUrl,
       ...localSyntheticClientHeaders(workerUrl)
-    },
-    body: JSON.stringify(paymentSmokePayload(scenario))
-  });
+    }
+  };
+  if (checkoutHolds) {
+    payload.attemptId = crypto.randomBytes(32).toString('hex');
+    const held = await fetchJson(`${workerUrl}/api/checkout/hold`, { ...request, body: JSON.stringify(payload) });
+    if (!held.ok || held.body?.phase !== 'held') return held;
+    add('PASS', `Checkout hold (${scenario.label})`, 'availability checked before payment preparation');
+  }
+  const checkout = await fetchJson(`${workerUrl}/api/checkout/intent`, { ...request, body: JSON.stringify(payload) });
+  if (checkoutHolds && checkout.ok) {
+    const replay = await fetchJson(`${workerUrl}/api/checkout/intent`, { ...request, body: JSON.stringify(payload) });
+    const same = replay.ok && replay.body?.orderToken === checkout.body?.orderToken && replay.body?.paymentIntentId === checkout.body?.paymentIntentId;
+    add(same ? 'PASS' : 'FAIL', `Checkout replay (${scenario.label})`, same ? 'same order and payment reused' : 'retry did not return the same checkout');
+  }
+  return { ...checkout, attemptId: payload.attemptId, request };
+}
+
+async function runPaidScenario(workerUrl, siteUrl, stripeKey, scenario) {
+  const checkout = await startCheckoutScenario(workerUrl, siteUrl, scenario);
   if (!checkout.ok || !checkout.body?.paymentIntentId || !checkout.body?.orderToken) {
     add('FAIL', `Stripe test-mode checkout mutation (${scenario.label})`, `checkout intent returned ${checkout.status}`);
     return;
   }
 
-  add('PASS', `Stripe test-mode checkout mutation (${scenario.label})`, `created PaymentIntent ${checkout.body.paymentIntentId} for ${checkout.body.orderToken}`);
+  add('PASS', `Stripe test-mode checkout mutation (${scenario.label})`, 'created test PaymentIntent for canonical order');
   const retrieved = await stripeRequest(stripeKey.key, 'GET', `/payment_intents/${encodeURIComponent(checkout.body.paymentIntentId)}`);
   if (!retrieved.ok || retrieved.body?.metadata?.orderToken !== checkout.body.orderToken) {
     add('FAIL', `Stripe PaymentIntent metadata verification (${scenario.label})`, `Stripe retrieve returned ${retrieved.status}`);
@@ -479,15 +499,27 @@ async function runPaidScenario(workerUrl, siteUrl, stripeKey, scenario) {
   add('PASS', `Stripe PaymentIntent metadata verification (${scenario.label})`, 'order token and Store metadata are present');
 
   if (scenario.eventType === 'payment_intent.payment_failed') {
+    const declined = await stripeRequest(stripeKey.key, 'POST', `/payment_intents/${encodeURIComponent(checkout.body.paymentIntentId)}/confirm`, {
+      payment_method: 'pm_card_chargeDeclined', return_url: `${siteUrl}/order-success/`
+    });
+    if (declined.status !== 402 || declined.body?.error?.payment_intent?.status !== 'requires_payment_method') {
+      add('FAIL', `Stripe test decline (${scenario.label})`, 'expected a retryable declined card');
+      return;
+    }
+    add('PASS', `Stripe test decline (${scenario.label})`, 'card declined without a successful charge');
     if (directWebhook) {
-      const delivered = await deliverDirectStripeWebhook(workerUrl, retrieved.body, scenario.eventType, `Direct signed Stripe webhook delivery (${scenario.label})`);
+      const delivered = await deliverDirectStripeWebhook(workerUrl, declined.body.error.payment_intent, scenario.eventType, `Direct signed Stripe webhook delivery (${scenario.label})`);
       if (!delivered) return;
     }
-    const summary = await waitForOrderStatus(workerUrl, siteUrl, checkout.body.orderToken, scenario.expectedStatus, scenario);
+    const summary = await waitForOrderStatus(workerUrl, siteUrl, checkout.body.orderToken, checkoutHolds ? 'payment_pending' : scenario.expectedStatus, scenario);
     if (summary) assertNoOrderEmailDelivery(summary, scenario);
     const canceled = await stripeRequest(stripeKey.key, 'POST', `/payment_intents/${encodeURIComponent(checkout.body.paymentIntentId)}/cancel`);
     if (canceled.ok) add('PASS', `Stripe test PaymentIntent cleanup (${scenario.label})`, 'pending failed-path test PaymentIntent canceled');
     else add('WARN', `Stripe test PaymentIntent cleanup (${scenario.label})`, `cancel returned ${canceled.status}`);
+    if (checkoutHolds && canceled.ok) {
+      const released = await fetchJson(`${workerUrl}/api/checkout/status`, { ...checkout.request, body: JSON.stringify({ attemptId: checkout.attemptId }) });
+      add(released.body?.phase === 'released' ? 'PASS' : 'FAIL', 'Canceled hold cleanup', 'processor cancellation checked before releasing the attempt');
+    }
     return;
   }
 
@@ -500,7 +532,7 @@ async function runPaidScenario(workerUrl, siteUrl, stripeKey, scenario) {
   }
 
   const confirmed = await stripeRequest(stripeKey.key, 'POST', `/payment_intents/${encodeURIComponent(checkout.body.paymentIntentId)}/confirm`, {
-    payment_method: 'pm_card_visa',
+    payment_method: scenario.paymentMethod || 'pm_card_visa',
     return_url: `${siteUrl}/order-success/?orderToken=${encodeURIComponent(checkout.body.orderToken)}`
   });
   if (!confirmed.ok) {
@@ -508,6 +540,16 @@ async function runPaidScenario(workerUrl, siteUrl, stripeKey, scenario) {
     return;
   }
   add('PASS', `Stripe test PaymentIntent confirmation (${scenario.label})`, `status ${confirmed.body?.status || 'unknown'}`);
+
+  if (scenario.id === 'authentication-required') {
+    const body = JSON.stringify({ attemptId: checkout.attemptId });
+    const pending = await fetchJson(`${workerUrl}/api/checkout/status`, { ...checkout.request, body });
+    add(confirmed.body?.status === 'requires_action' && pending.body?.phase === 'payment' ? 'PASS' : 'FAIL', '3DS pending checkout', 'authentication remains on the same payable attempt');
+    const released = await fetchJson(`${workerUrl}/api/checkout/release`, { ...checkout.request, body });
+    const final = await stripeRequest(stripeKey.key, 'GET', `/payment_intents/${encodeURIComponent(checkout.body.paymentIntentId)}`);
+    add(released.body?.phase === 'released' && final.body?.status === 'canceled' ? 'PASS' : 'FAIL', '3DS abandonment cleanup', 'provider cancellation verified before releasing the attempt');
+    return;
+  }
 
   if (directWebhook) {
     const delivered = await deliverDirectStripeWebhook(workerUrl, confirmed.body, scenario.eventType, `Direct signed Stripe webhook delivery (${scenario.label})`);

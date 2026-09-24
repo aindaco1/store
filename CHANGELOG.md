@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## v1.3.8 - 2026-09-24
+
+- Reserve finite tickets when checkout starts, with a visible ten-minute hold,
+  explicit extensions, safe expiry recovery, and idempotent payment settlement.
+- Load secure payment automatically after required details are complete. Collect
+  email once, simplify tax fields, preserve the 5% optional tip, and show the
+  canonical total on the explicit Pay button. Keep free order submission explicit.
+- Freeze submitted details during payment preparation, support explicit loading
+  retries, and prevent canceled or unresolved payments from being reused unsafely.
+- Extend checkout coverage through successful payment, declined cards, network
+  recovery, narrow mobile layouts, and real Stripe test-mode settlement.
+- Size catalog artwork and its preload consistently for portrait images.
+
 
 - Add an explicit local Jev pilot for synthetic customer messages and
   English/Spanish meaning, using Platform Test Core 0.3.0. Keep its reports

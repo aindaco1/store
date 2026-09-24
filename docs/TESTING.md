@@ -331,9 +331,16 @@ Release provider and payment probes read `worker/.dev.vars` by default, with she
 
 ```bash
 PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook
+# Also exercise the new held checkout and same-intent replay:
+PAYMENT_SMOKE_ALLOW_MUTATION=1 npm run release:payment-smoke -- --direct-webhook --checkout-holds
 ```
 
-That path creates Stripe test-mode PaymentIntents for paid digital, paid physical, paid ticket, and failed-payment paths, confirms successful intents with the Stripe test card, signs local `payment_intent.succeeded` or `payment_intent.payment_failed` webhooks with the configured test webhook secret, posts them to the non-production Worker, and polls Store orders until they settle. It also runs a free RSVP checkout without Stripe. Run the Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`; the smoke checks order `emailDelivery` markers to prove customer/admin order emails rendered without calling Resend. It never targets `checkout.dustwave.xyz`.
+That path creates Stripe test-mode PaymentIntents for paid digital, paid physical, paid ticket, and failed-payment paths, confirms successful intents with the Stripe test card, signs local `payment_intent.succeeded` or `payment_intent.payment_failed` webhooks with the configured test webhook secret, posts them to the non-production Worker, and polls Store orders until they settle. It also runs a free RSVP checkout without Stripe. Run the Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`; the smoke checks order `emailDelivery` markers to prove customer/admin order emails rendered without calling Resend. It never targets `checkout.dustwave.xyz`. The held variant also checks retryable
+card declines, confirmed cancellation, and a real Stripe `requires_action` test
+intent followed by safe abandonment. These API checks do not claim a completed
+wallet or interactive 3DS challenge. The synthetic ticket/RSVP catalog must have
+fixture stock in isolated local state; never change production stock to run them.
+RSVP smoke submits the configured attendee name and required answer.
 
 For optional interactive checkout rehearsal outside the release gate, run:
 

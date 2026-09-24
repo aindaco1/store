@@ -2182,32 +2182,32 @@
         {
           "path": "assets/images/products/product-a-night-in-paradiso-20260907-020545-320.webp",
           "publicPath": "/assets/images/products/product-a-night-in-paradiso-20260907-020545-320.webp",
-          "bytes": 32920,
-          "sha256": "930f3f14d7c2629f811c8449b1b7770c2e69edb49e3c670db22305f4ddd529b3",
+          "bytes": 28394,
+          "sha256": "b7636febd0faec6873287614125e17ae8e7a83ab295059902cc82cee8caaaf7b",
           "sourceSha256": "366ed33f73fac46670bfd5e1c112db35004c3450197b9459a88acc877fde3590",
           "width": 320
         },
         {
           "path": "assets/images/products/product-a-night-in-paradiso-20260907-020545-480.webp",
           "publicPath": "/assets/images/products/product-a-night-in-paradiso-20260907-020545-480.webp",
-          "bytes": 57468,
-          "sha256": "173de48dadc57fd84f3f4632c2d76c313acc4d67753856eae84633af6c0729eb",
+          "bytes": 48810,
+          "sha256": "97ee882f0f6ed995cc724225c2e841a220d890e191022a12128ad62bfda61bcf",
           "sourceSha256": "366ed33f73fac46670bfd5e1c112db35004c3450197b9459a88acc877fde3590",
           "width": 480
         },
         {
           "path": "assets/images/products/product-a-night-in-paradiso-20260907-020545-640.webp",
           "publicPath": "/assets/images/products/product-a-night-in-paradiso-20260907-020545-640.webp",
-          "bytes": 83294,
-          "sha256": "f2d0fb11376168702194ca49345b928b17c053849a5ba01d74bda6c8dd40d94a",
+          "bytes": 70876,
+          "sha256": "cb5f6f1ffe0a5f276082f587e8182a0162f981e0d12d325c094e049d1e7f0be5",
           "sourceSha256": "366ed33f73fac46670bfd5e1c112db35004c3450197b9459a88acc877fde3590",
           "width": 640
         },
         {
           "path": "assets/images/products/product-a-night-in-paradiso-20260907-020545-960.webp",
           "publicPath": "/assets/images/products/product-a-night-in-paradiso-20260907-020545-960.webp",
-          "bytes": 131256,
-          "sha256": "a7af8fb19d07925a7cf1ebfa326191f7169192a8193dffdb6049df1705c1ee09",
+          "bytes": 110280,
+          "sha256": "d56f2285cbce1defda6a87f6196c49e7da32016479cae8485c55d991815c49ce",
           "sourceSha256": "366ed33f73fac46670bfd5e1c112db35004c3450197b9459a88acc877fde3590",
           "width": 960
         }
@@ -2389,32 +2389,32 @@
         {
           "path": "assets/images/products/product-monster-bash-20260922-170930-320.webp",
           "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-320.webp",
-          "bytes": 50414,
-          "sha256": "42a68babe367bcf7cca400ae630184873c882c644da7a14c2bb853b125ac2a95",
+          "bytes": 42962,
+          "sha256": "f49e1e76c2a15e363934ea9854804ca4bbf66fe8c307d867a6a585ace67881b5",
           "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
           "width": 320
         },
         {
           "path": "assets/images/products/product-monster-bash-20260922-170930-480.webp",
           "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-480.webp",
-          "bytes": 95294,
-          "sha256": "684432ff7b9301f19a4095e9b672ae3902f87d7d5ca4c901b9f3632fdc1351b7",
+          "bytes": 79308,
+          "sha256": "d7a2a9dd9a534eb2d26ae616076997eb13e5bf986b37cf26e225cf47f609fa9d",
           "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
           "width": 480
         },
         {
           "path": "assets/images/products/product-monster-bash-20260922-170930-640.webp",
           "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-640.webp",
-          "bytes": 143444,
-          "sha256": "d75e8f681c47136776848520d2dc851286724888915857d5a0b168119d45b063",
+          "bytes": 118948,
+          "sha256": "a8257c047989dd62f000fe54979019db59523785e06a9e0faba108ec8e1775b5",
           "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
           "width": 640
         },
         {
           "path": "assets/images/products/product-monster-bash-20260922-170930-960.webp",
           "publicPath": "/assets/images/products/product-monster-bash-20260922-170930-960.webp",
-          "bytes": 245844,
-          "sha256": "e8b0d4153f0c63e096ba25c75dcb3150a05cb8f42973eff731ed790766134863",
+          "bytes": 204552,
+          "sha256": "3e4e915fa5101a15578af3ddde6bbcf9556d9f99443d1e6a0f12a26f5c50509b",
           "sourceSha256": "873bb4fed5ca16ef132c5cd08dbffa1fcdcfc00e8d4ceb0078b0e492a64ec919",
           "width": 960
         }
