@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.9 - 2026-09-25
+
+- Link every product offer, including variants and Spanish pages, to the configured
+  merchant return policy so Google can resolve the existing final-sale policy.
+- Audit rendered offer-policy references and test all supported return categories.
+  Document genuine shipping and review data requirements for optional Google warnings.
+- Restore the roadmap capability structure while retaining checkout hold behavior
+  and physical-device acceptance follow-ups.
+
 ## v1.3.8 - 2026-09-24
 
 - Reserve finite tickets when checkout starts, with a visible ten-minute hold,

@@ -257,6 +257,14 @@ npm run test:seo
 
 The rendered SEO audit checks non-admin HTML, canonical URLs, descriptions, social metadata, JSON-LD, XML/text sitemap parity, localized alternates, real/non-future sitemap dates, return-policy metadata, and crawl-control rules for `noindex` routes. The live crawl command is a post-deploy check; its unit suite should be used before the candidate is published.
 
+`tests/unit/seo-return-policy.test.ts` renders the actual Jekyll include for
+English/Spanish single and variant offers under all three supported return
+categories. It verifies every offer resolves to the configured policy, including
+non-default country/window values, without inventing shipping rates or reviews.
+The rendered audit also rejects missing or mismatched offer policy references
+across the built catalog. See [SEO](SEO.md#search-console-product-warnings) for
+the remaining data requirements behind optional Search Console warnings.
+
 ## Pre-Merge
 
 ```bash

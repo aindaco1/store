@@ -29,6 +29,9 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Tax calculation** — Worker-owned destination validation and tax quoting support New Mexico GRT defaults, optional provider lookup, persisted order tax details, and one canonical total across checkout, email, admin, analytics, and exports.
 - [x] **Coupons and price integrity** — Worker-side coupon validation enforces status, eligibility, windows, and discount bounds; variant and add-on pricing share one normalized contract, and confirmed orders preserve historical unit prices.
 
+- [x] **Payment-aware ticket holds** — Checkout reserves finite tickets for ten minutes by default, with ten explicit extensions, status on resume, expiry/reacquisition, safe cancellation, alarms, retained recovery checkpoints, same-intent retries, and idempotent stock confirmation. Mixed carts share checkout; ordinary RSVP forms have no countdown. See the [implementation and recovery contract](CHECKOUT_HOLDS.md).
+- [x] **Checkout clarity** — A canonical event recap, compact cart and mobile actions, accessible quantity and reservation timer controls, conditional destination fields, one email entry, automatic payment preparation after required details, explicit Pay, and the 5% optional tip keep checkout consistent in English and Spanish.
+
 ### Orders, fulfillment, and customer communication
 
 - [x] **Durable order state** — Store persists order drafts and confirmed orders, then renders token-scoped Order Success pages and fulfillment state in English and Spanish.
@@ -93,19 +96,13 @@ This file is a current capability inventory and forward plan, not release histor
 - [x] **Transactional pre-merge configuration** — The merge gate may derive production-shaped Worker configuration for validation, but always restores the checked-in localhost-safe defaults on success or failure and verifies that behavior automatically.
 - [x] **Docs as code** — Architecture, customization, payment, dashboard, security, performance, testing, workflows, backup, ethical risk, and release evidence stay versioned beside implementation.
 
-### Checkout clarity and ticket holds
-
-The [September checkout review](checkout-ux-review-2026-09-24.md) shipped in v1.3.8 on 2026-09-24. The owner authorized implementation, with the optional tip kept at **5% by default**. The objective is preventing competition for scarce tickets. [Implementation and recovery contract](CHECKOUT_HOLDS.md).
-
-- [x] Implement a stable checkout attempt and payment-aware inventory lifecycle: serialized early ticket reservations, same-intent retries, safe cancellation, alarms, retained recovery checkpoints, idempotent stock confirmation, and stock-aware direct claims.
-- [x] Implement visible finite-ticket holds: explicit Checkout trigger, ten-minute default, ten explicit extensions, status on resume, expiry/reacquisition, and English/Spanish recovery states. Mixed carts share the same checkout; ordinary RSVP forms have no ticket countdown.
-- [x] Implement checkout clarity: canonical event recap and delivery guidance, compact tip/cart/mobile summary/actions, a dedicated quantity accessible name, country/postal-first conditional tax fields, distinct Your details/Payment stages, one email entry, automatic payment loading after required details are complete, existing inline guidance, a labeled reservation timer, and canonical total on Pay. Preserve the 5% tip default.
-- [x] Complete automated release review: real Stripe test-mode payment matrices, 3DS-required/cancellation state, retry and processing recovery, mobile/zoom/keyboard checks, security and performance. See [v1.3.8 evidence and acceptance limits](release-evidence/v1.3.8-checkout-holds.md).
-- [ ] Extend device acceptance with physical-device wallets and VoiceOver speech; no new wallet component is included in v1.3.8.
-
 ## Future Features
 
 Keep these scoped to Store's goals and data model. Share implementation patterns with Pool where the underlying problem is the same, but do not import Pool-only concepts such as campaigns, pledges, Manage Pledge, embeds, creator diaries, votes, or supporter blasts. Prefer extending existing Store docs, email rendering, admin controls, setup tooling, Worker observability, and release scripts before adding parallel systems.
+
+### Checkout and device acceptance
+
+- [ ] Extend physical-device wallet and VoiceOver speech acceptance for the existing checkout, including mobile, zoom, keyboard, retry, and recovery behavior. No new wallet component is implied.
 
 ### RSVP and event operations
 

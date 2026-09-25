@@ -34,6 +34,48 @@ The rendered SEO audit checks localized product `inLanguage` against the HTML la
 
 `robots.txt` advertises the canonical XML sitemap only. The text sitemap is retained as a human- and tool-readable parity surface, not as a second canonical feed. `scripts/audit-seo.mjs` verifies both generated formats, while `npm run test:crawl-endpoints` verifies deployed status, MIME type, XML/text parity, private-route exclusion, canonical robots linkage, ordinary-versus-Google-Inspection responses, and every submitted URL. Deploy runs the live audit after Pages publication with bounded retries for propagation.
 
+## Search Console Product Warnings
+
+Every Offer, including each variant and both language routes, references the
+Organization's `hasMerchantReturnPolicy` by its canonical `@id`. The policy
+body and customer-facing Terms continue to use `seo.merchant_return_policy`;
+the default is `MerchantReturnNotPermitted`. The rendered SEO audit rejects
+missing or mismatched Offer references. This follows Google's supported
+[reference to a global return policy](https://developers.google.com/search/docs/appearance/structured-data/merchant-listing#offer).
+
+The other optional warnings need real business data, not placeholder markup:
+
+- **`shippingDetails`:** Store calculates USPS rates from the destination,
+  package, cart, and selected service. `shipping.fallback_flat_rate` is a
+  failure fallback, not the advertised rate. Do not publish it as a universal
+  charge, invent delivery times, or describe tickets/downloads as free physical
+  shipping. Google's offer markup needs a destination and numeric shipping
+  rate. For this carrier-calculated store, configure
+  [Merchant Center shipping](https://support.google.com/merchants/answer/12577710?hl=en)
+  against the actual checkout policy instead. Confirm account access, origin,
+  supported services, package weights/dimensions, handling days and cutoff,
+  and any rate adjustments before saving. Keep international and manual-rate
+  product exceptions separate. The repository does not yet supply approved
+  handling times or a Merchant Center feed. Until those settings are verified,
+  the shipping warning remains unresolved; adding an empty shipping object or
+  just a policy URL is not a valid fix.
+- **`review` / `aggregateRating`:** The catalog currently has no customer
+  review dataset or visible review UI. Leave these properties absent. Google
+  accepts `offers` for product-snippet eligibility and may still show these
+  [non-critical warnings](https://developers.google.com/search/docs/appearance/structured-data/product-snippet#product).
+  Only add ratings from genuine product reviews that are also visible to
+  shoppers, following the
+  [review guidelines](https://developers.google.com/search/docs/appearance/structured-data/review-snippet#guidelines).
+  Do not add fabricated reviews, zero-count aggregates, or store-level ratings
+  as product feedback.
+
+After the reviewed change is deployed, inspect the live English and Spanish
+mug pages with Google's Rich Results Test and Search Console URL Inspection.
+Confirm the Offer resolves to the configured return policy, then request
+validation for the return-policy issue. Record the optional warnings separately
+and allow Google to recrawl; a local passing audit does not establish that
+Search Console has cleared an issue.
+
 ## Private Routes
 
 These routes should stay out of search indexes:
