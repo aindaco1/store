@@ -30,6 +30,7 @@
     {%- assign available_languages = current_lang | split: '|' -%}
   {%- endif -%}
   {%- assign merchant_return_policy = site.seo.merchant_return_policy | default: empty -%}
+  {%- assign return_policy_id = site_base | append: "/terms/#returns-refunds" -%}
   {%- assign return_policy_country = merchant_return_policy.applicable_country | default: site.shipping.origin_country | default: "US" -%}
   {%- assign return_policy_category = merchant_return_policy.return_policy_category | default: "https://schema.org/MerchantReturnNotPermitted" -%}
   {%- assign return_policy_days = merchant_return_policy.merchant_return_days | default: 14 | plus: 0 -%}
@@ -99,7 +100,7 @@
       },
       "hasMerchantReturnPolicy": {
         "@type": "MerchantReturnPolicy",
-        "@id": {{ site_base | append: "/terms/#returns-refunds" | jsonify }},
+        "@id": {{ return_policy_id | jsonify }},
         "applicableCountry": {{ return_policy_country | jsonify }},
         "returnPolicyCategory": {{ return_policy_category | jsonify }}{% if finite_return_policy and return_policy_days > 0 %},
         "merchantReturnDays": {{ return_policy_days | jsonify }}{% endif %}{% if returns_permitted and return_method != "" %},
@@ -141,6 +142,9 @@
             "price": {{ variant_price | jsonify }},
             "availability": {{ variant_availability | jsonify }},
             "itemCondition": "https://schema.org/NewCondition",
+            "hasMerchantReturnPolicy": {
+              "@id": {{ return_policy_id | jsonify }}
+            },
             "seller": {
               "@id": {{ org_id | jsonify }}
             }
@@ -153,6 +157,9 @@
         "price": {{ product_price | jsonify }},
         "availability": {{ product_availability | jsonify }},
         "itemCondition": "https://schema.org/NewCondition",
+        "hasMerchantReturnPolicy": {
+          "@id": {{ return_policy_id | jsonify }}
+        },
         "seller": {
           "@id": {{ org_id | jsonify }}
         }
@@ -192,7 +199,7 @@
       },
       "hasMerchantReturnPolicy": {
         "@type": "MerchantReturnPolicy",
-        "@id": {{ site_base | append: "/terms/#returns-refunds" | jsonify }},
+        "@id": {{ return_policy_id | jsonify }},
         "applicableCountry": {{ return_policy_country | jsonify }},
         "returnPolicyCategory": {{ return_policy_category | jsonify }}{% if finite_return_policy and return_policy_days > 0 %},
         "merchantReturnDays": {{ return_policy_days | jsonify }}{% endif %}{% if returns_permitted and return_method != "" %},

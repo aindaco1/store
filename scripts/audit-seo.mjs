@@ -298,6 +298,10 @@ for (const filePath of htmlFiles) {
         for (const field of ['price', 'priceCurrency', 'availability', 'itemCondition', 'seller']) {
           if (!offer?.[field]) errors.push(`${route}: Offer JSON-LD missing ${field}`);
         }
+        const policyId = organization?.hasMerchantReturnPolicy?.['@id'];
+        if (!policyId || offer?.hasMerchantReturnPolicy?.['@id'] !== policyId) {
+          errors.push(`${route}: Offer JSON-LD must reference the Organization merchant return policy`);
+        }
       }
     }
     const breadcrumbs = graph.find((node) => hasType(node, 'BreadcrumbList'));

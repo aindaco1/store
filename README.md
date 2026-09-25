@@ -4,7 +4,7 @@ Store is Dust Wave's open-source, static-first commerce layer for products, tick
 
 ## Current State
 
-Current release: `v1.3.8`. See the [changelog](CHANGELOG.md) for changes and [release evidence](docs/release-evidence/) for verification and rollback records.
+Current release: `v1.3.9`. See the [changelog](CHANGELOG.md) for changes and [release evidence](docs/release-evidence/) for verification and rollback records.
 
 Jekyll renders the storefront from repository-backed products. The Worker owns canonical pricing, inventory reservations, payments, orders, fulfillment, email, and private administration. Store uses pinned shared Platform and Jekyll Template components while retaining its own catalog, configuration, provider policy, deployment, and rollback authority.
 
