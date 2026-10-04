@@ -32,10 +32,13 @@ update Store's immutable gitlink, manifest, lockfile and pin contract together.
 - Dependency-only candidate 24c0be6: full local premerge passed (612 unit,
   22 security and 65 browser tests); hosted Merge Smoke run 37218677502 passed.
 - New image integration: focused pin/version/lossless suites passed (17 tests).
-  Real FFmpeg decoded a padded source and unpadded candidate identically; the
-  replacement retained exactly the original image bytes and saved 1,024 bytes.
+  Real FFmpeg accepted a valid lossless PNG recompression (8,175 bytes saved)
+  and rejected a conversion that lost 16-bit precision, preserving the source.
+- Three focused browser regressions passed: settings, desktop English and mobile
+  Spanish; removal, previews, captions/alt text, late uploads, library selection,
+  gallery reordering, keyboard focus and axe checks.
 - Root and Worker npm audits: zero known vulnerabilities after clean installs.
-- Final image browser regression, complete release gate and deployment: pending.
+- Complete final premerge, hosted gate and deployment: pending.
 
 Ethical review: image removal clears an editor reference and retains repository
 media, alt text and captions. No new customer data, storage, provider mutations or

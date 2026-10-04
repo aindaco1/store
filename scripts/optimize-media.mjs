@@ -225,7 +225,7 @@ async function resolveMediaFiles(args) {
 
 async function decodedImageFrames(filePath) {
   const { stdout } = await execFileAsync('ffmpeg', [
-    '-v', 'error', '-i', filePath, '-map', '0:v:0', '-pix_fmt', 'rgba64le',
+    '-v', 'error', '-xerror', '-i', filePath, '-map', '0:v:0', '-pix_fmt', 'rgba64le',
     '-fps_mode', 'passthrough', '-f', 'framehash', '-hash', 'sha256', '-'
   ], { timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
   return normalizeFrameHashAspectRatios(stdout);
