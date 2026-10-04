@@ -761,14 +761,13 @@
     var opts = options || {};
     var inputId = ensureElementId(input, opts.idPrefix || 'admin-file-picker');
     var picker = createElement('div', 'admin-file-picker' + (opts.className ? ' ' + opts.className : ''));
-    var button = createElement('label', 'btn btn--secondary admin-file-picker__button' + (opts.buttonClass ? ' ' + opts.buttonClass : ''), opts.buttonLabel || 'Choose file');
+    var button = createElement('button', 'btn btn--secondary admin-file-picker__button' + (opts.buttonClass ? ' ' + opts.buttonClass : ''), opts.buttonLabel || 'Choose file');
     var filename = createElement('span', 'admin-file-picker__filename', opts.emptyLabel || 'No file chosen');
     input.classList.add('admin-file-picker__input');
     input.dataset.adminFilePickerInput = 'true';
     input.dataset.adminFilePickerEmptyLabel = opts.emptyLabel || 'No file chosen';
-    button.setAttribute('for', inputId);
-    button.setAttribute('role', 'button');
-    button.tabIndex = 0;
+    button.type = 'button';
+    button.dataset.adminFilePickerFor = inputId;
     filename.dataset.adminFilePickerFilenameFor = inputId;
     if (opts.filenameClass) filename.classList.add(opts.filenameClass);
     input.addEventListener('change', function() {
@@ -781,16 +780,10 @@
   }
 
   function setupAdminFilePickerEvents() {
-    document.addEventListener('keydown', function(event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      var label = event.target && event.target.closest
-        ? event.target.closest('.admin-file-picker__button[for]')
-        : null;
-      if (!label) return;
-      var input = document.getElementById(label.getAttribute('for') || '');
-      if (!input) return;
-      event.preventDefault();
-      input.click();
+    document.addEventListener('click', function(event) {
+      var button = event.target && event.target.closest && event.target.closest('[data-admin-file-picker-for]');
+      var input = button && document.getElementById(button.dataset.adminFilePickerFor);
+      if (input) input.click();
     });
   }
 
@@ -830,6 +823,7 @@
     var uploadRow = createElement('div', 'admin-settings__image-upload');
     var uploadInput = document.createElement('input');
     var uploadStatus = createElement('span', 'admin-settings__image-status', '');
+    var removal = createImageRemovalControl(control, uploadInput, uploadStatus);
 
     if (control.tagName === 'INPUT') control.type = 'hidden';
     control.classList.add('admin-settings__image-value');
@@ -857,6 +851,7 @@
         return;
       }
       setStatus(uploadStatus, 'Uploading ' + file.name + '...');
+      var ticket = removal.beginUpload();
       fileToDataUrl(file).then(function(content) {
         return requestJson(options.uploadPath, {
           method: 'POST',
@@ -870,6 +865,7 @@
           }
         });
       }).then(function(data) {
+        if (!removal.isCurrentUpload(ticket) || !control.isConnected) return;
         var nextPath = data.path || data.publicPath || '';
         if (!nextPath) throw new Error('Upload did not return an asset path.');
         control.value = nextPath;
@@ -878,11 +874,11 @@
         control.dispatchEvent(new Event('change', { bubbles: true }));
         setStatus(uploadStatus, options.uploadedText);
       }).catch(function(error) {
+        if (!removal.isCurrentUpload(ticket)) return;
         logger.error('Failed to upload admin image', error);
         setStatus(uploadStatus, formatError(error), true);
       }).finally(function() {
-        uploadInput.value = '';
-        updateAdminFilePickerFilename(uploadInput);
+        finishImageUpload(uploadInput, removal, ticket, file);
       });
     });
 
@@ -893,10 +889,41 @@
       emptyLabel: localizedAdminText('noFileChosen'),
       idPrefix: 'admin-settings-image-upload'
     }));
+    uploadRow.appendChild(removal.button);
     uploadRow.appendChild(uploadStatus);
     wrapper.appendChild(preview);
     wrapper.appendChild(uploadRow);
     return wrapper;
+  }
+
+  function createImageRemovalControl(control, uploadInput, status) {
+    var removal = window.DustWaveAdminShellEditorMedia.createMediaRemovalControl({
+      label: localizedAdminText('mediaRemoveImage'),
+      className: 'btn btn--secondary btn--small',
+      hasSelection: function() { return Boolean(control.value); },
+      clearSelection: function() {
+        control.value = '';
+        uploadInput.value = '';
+        updateAdminFilePickerFilename(uploadInput);
+        control.dispatchEvent(new Event('input', { bubbles: true }));
+        control.dispatchEvent(new Event('change', { bubbles: true }));
+        setStatus(status, localizedAdminText('mediaImageRemoved'));
+        var picker = uploadInput.closest('.admin-file-picker');
+        var button = picker && picker.querySelector('.admin-file-picker__button');
+        if (button) button.focus();
+      }
+    });
+    removal.button.dataset.mediaRemoveImage = 'true';
+    control.addEventListener('input', removal.changed);
+    return removal;
+  }
+
+  function finishImageUpload(input, removal, ticket, file) {
+    if (removal.isCurrentUpload(ticket)) removal.changed();
+    if (input.files && input.files[0] === file) {
+      input.value = '';
+      updateAdminFilePickerFilename(input);
+    }
   }
 
   function clear(element) {
@@ -6252,7 +6279,7 @@
     return null;
   }
 
-  function uploadStoreProductMedia(product, file, status, replacement) {
+  function uploadStoreProductMedia(product, file, status, replacement, isCurrent) {
     var config = storeProductMediaUploadConfig(file);
     if (!config) return Promise.reject(new Error(localizedAdminText('mediaTypeError')));
     if (file.size > config.maxBytes) return Promise.reject(new Error(localizedAdminText(config.sizeErrorKey)));
@@ -6283,7 +6310,7 @@
       if (previewContent) uploadedImagePreviews.set(new URL(nextPath, window.location.origin).pathname, previewContent);
       storeProductsWithPendingMedia.add(product.productId || '');
       rememberStoreProductMedia(product, nextPath, file.name || product.name, config.type);
-      productUploadStatus(status, localizedAdminText(replacement ? 'mediaReplaced' : 'mediaUploaded'));
+      if (!isCurrent || isCurrent()) productUploadStatus(status, localizedAdminText(replacement ? 'mediaReplaced' : 'mediaUploaded'));
       return nextPath;
     }).finally(function() {
       activeStoreMediaUploads -= 1;
@@ -6291,8 +6318,8 @@
     });
   }
 
-  function uploadStoreProductImage(product, file, status) {
-    return uploadStoreProductMedia(product, file, status);
+  function uploadStoreProductImage(product, file, status, isCurrent) {
+    return uploadStoreProductMedia(product, file, status, null, isCurrent);
   }
 
   function storeProductMediaMetadata(item) {
@@ -6482,7 +6509,7 @@
       }
     });
     container.hidden = false;
-    if (cached) {
+    if (cached && cached.catalogLoaded) {
       renderStoreProductMediaLibrary(container, cached, onSelect, renderOptions);
       return Promise.resolve(cached);
     }
@@ -6492,6 +6519,11 @@
       params: { productId: productId }
     }).then(function(data) {
       data.media = data.media || data.images || [];
+      var uploaded = storeProductMediaCache.get(productId);
+      (uploaded && uploaded.media || []).forEach(function(item) {
+        if (!data.media.some(function(known) { return known.path === item.path; })) data.media.push(item);
+      });
+      data.catalogLoaded = true;
       storeProductMediaCache.set(productId, data);
       renderStoreProductMediaLibrary(container, data, onSelect, renderOptions);
       return data.media;
@@ -6517,6 +6549,7 @@
     var uploadInput = document.createElement('input');
     var choose = createElement('button', 'btn btn--secondary', 'Choose existing');
     var status = createElement('span', 'admin-settings__image-status', '');
+    var removal = createImageRemovalControl(control, uploadInput, status);
     var library = createElement('div', 'admin-store-products__media-library');
 
     library.hidden = true;
@@ -6544,12 +6577,17 @@
       var form = uploadInput.closest('[data-store-product-editor]');
       var uploadProduct = currentStoreProductEditorProduct(form, product);
       if (storeProductIsCreateForm(form)) uploadProduct.isNew = true;
-      uploadStoreProductImage(uploadProduct, file, status).then(setImage).catch(function(error) {
+      var ticket = removal.beginUpload();
+      uploadStoreProductImage(uploadProduct, file, status, function() {
+        return removal.isCurrentUpload(ticket) && control.isConnected;
+      }).then(function(path) {
+        if (removal.isCurrentUpload(ticket) && control.isConnected) setImage(path);
+      }).catch(function(error) {
+        if (!removal.isCurrentUpload(ticket)) return;
         logger.error('Failed to upload Store product image', error);
         productUploadStatus(status, formatError(error), true);
       }).finally(function() {
-        uploadInput.value = '';
-        updateAdminFilePickerFilename(uploadInput);
+        finishImageUpload(uploadInput, removal, ticket, file);
       });
     });
 
@@ -6572,6 +6610,7 @@
       idPrefix: 'admin-store-product-image-upload'
     }));
     actions.appendChild(choose);
+    actions.appendChild(removal.button);
     actions.appendChild(status);
     wrapper.appendChild(control);
     wrapper.appendChild(preview);
@@ -7250,6 +7289,36 @@
     return wrap;
   }
 
+  function storeProductDescriptionImageRemoval(context, block, target) {
+    if (!context.imageRemovalControls) context.imageRemovalControls = new WeakMap();
+    var removal = context.imageRemovalControls.get(target);
+    if (removal) return removal;
+    removal = window.DustWaveAdminShellEditorMedia.createMediaRemovalControl({
+      label: localizedAdminText('mediaRemoveImage'),
+      className: 'btn btn--secondary btn--small',
+      hasSelection: function() { return Boolean(target.src); },
+      clearSelection: function() {
+        target.src = '';
+        var index = context.blocks.indexOf(block);
+        storeProductDescriptionRenderBlocks(context, index);
+        setStatus(context.status, localizedAdminText('mediaImageRemoved'));
+        var imageIndex = block.type === 'gallery' ? block.images.indexOf(target) : undefined;
+        var selector = '[data-content-index="' + index + '"][data-content-field="src"]';
+        if (imageIndex !== undefined) selector += '[data-content-image-index="' + imageIndex + '"]';
+        var input = context.root.querySelector(selector);
+        var panel = input && input.closest('[role="group"]');
+        if (panel) {
+          var toggle = context.root.querySelector('[aria-controls="' + panel.id + '"]');
+          if (toggle) storeProductDescriptionToggleSettings(context, toggle);
+        }
+        if (input) input.focus();
+      }
+    });
+    removal.button.dataset.mediaRemoveImage = 'true';
+    context.imageRemovalControls.set(target, removal);
+    return removal;
+  }
+
   function storeProductDescriptionMediaLibraryButton(index, imageIndex, mediaType) {
     var wrap = createElement('div', 'admin-content-block__field admin-content-block__media-library-field');
     var type = mediaType || 'image';
@@ -7424,6 +7493,7 @@
     if (block.type === 'image') {
       fields.appendChild(storeProductDescriptionUploadField(context, block, index, { buttonLabel: 'Upload image' }));
       fields.appendChild(storeProductDescriptionMediaLibraryButton(index));
+      fields.appendChild(storeProductDescriptionImageRemoval(context, block, block).button);
       fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'src', 'Source URL'));
       fields.appendChild(storeProductDescriptionField(context, 'input', block, index, 'alt', 'Alt text'));
       fields.appendChild(storeProductDescriptionField(context, 'select', block, index, 'decorative', localizedAdminText('mediaImageMeaning'), {
@@ -7502,6 +7572,7 @@
       imageIndex: imageIndex
     }));
     fields.appendChild(storeProductDescriptionMediaLibraryButton(index, imageIndex));
+    fields.appendChild(storeProductDescriptionImageRemoval(context, block, image).button);
     fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'src', 'Source URL'));
     fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'alt', 'Alt text'));
     fields.appendChild(storeProductDescriptionGalleryField(context, block, index, imageIndex, 'decorative', localizedAdminText('mediaImageMeaning')));
@@ -7666,7 +7737,8 @@
 
   function storeProductDescriptionRenderBlocks(context, focusIndex) {
     var root = context.root;
-    context.blocks = context.blocks && context.blocks.length ? context.blocks.map(storeProductDescriptionNormalizeBlock) : [storeProductDescriptionDefaultBlock('text')];
+    // Keep block identities stable so pending uploads follow reorders and removals.
+    if (!context.blocks.length) context.blocks = [storeProductDescriptionDefaultBlock('text')];
     root.replaceChildren();
     root.__storeProductDescriptionContext = context;
     root.__storeProductDescriptionBlocks = context.blocks;
@@ -7892,6 +7964,10 @@
       block[field] = field === 'decorative' ? control.value === 'true' : control.value;
       if (field === 'decorative' && block.decorative) block.alt = '';
     }
+    if (field === 'src' && (block.type === 'image' || block.type === 'gallery')) {
+      var image = block.type === 'gallery' ? block.images[Number(control.dataset.contentImageIndex)] : block;
+      if (image) storeProductDescriptionImageRemoval(context, block, image).changed();
+    }
     storeProductDescriptionSync(context);
   }
 
@@ -7981,14 +8057,23 @@
     return { block: block, target: block, index: index };
   }
 
-  function storeProductDescriptionApplyMediaPath(context, control, path, label) {
-    var target = storeProductDescriptionUploadTarget(context, control);
-    if (!target || !path) return;
+  function storeProductDescriptionTargetIndex(context, target) {
+    if (!target || !context.root.isConnected ||
+        target.block.type === 'gallery' && target.block.images.indexOf(target.target) < 0) return -1;
+    return context.blocks.indexOf(target.block);
+  }
+
+  function storeProductDescriptionApplyMediaPath(context, target, path, label) {
+    var index = storeProductDescriptionTargetIndex(context, target);
+    if (index < 0 || !path) return;
     target.target.src = path;
+    if (target.block.type === 'image' || target.block.type === 'gallery') {
+      storeProductDescriptionImageRemoval(context, target.block, target.target).changed();
+    }
     if ((target.block.type === 'image' || target.block.type === 'gallery') && !target.target.alt) {
       target.target.alt = label || context.product.name || localizedAdminText('mediaProductImageFallback');
     }
-    storeProductDescriptionRenderBlocks(context, target.index);
+    storeProductDescriptionRenderBlocks(context, index);
     setStatus(context.status, localizedAdminText('mediaSelected'));
   }
 
@@ -8002,18 +8087,33 @@
       updateAdminFilePickerFilename(control);
       return;
     }
-    uploadStoreProductMedia(context.product, file, context.status).then(function(path) {
+    var isImage = target.block.type === 'image' || target.block.type === 'gallery';
+    var removal = isImage ? storeProductDescriptionImageRemoval(context, target.block, target.target) : null;
+    var ticket = removal && removal.beginUpload();
+    if (control.dataset.contentAction === 'add-gallery-image-upload') {
+      storeProductDescriptionRenderBlocks(context, target.index);
+    }
+    uploadStoreProductMedia(context.product, file, context.status, null, function() {
+      return context.root.isConnected && (!removal || removal.isCurrentUpload(ticket));
+    }).then(function(path) {
+      var index = storeProductDescriptionTargetIndex(context, target);
+      if (index < 0 || removal && !removal.isCurrentUpload(ticket)) return;
       target.target.src = path;
       if ((target.block.type === 'image' || target.block.type === 'gallery') && !target.target.alt) {
         target.target.alt = file.name || context.product.name || localizedAdminText('mediaProductImageFallback');
       }
-      storeProductDescriptionRenderBlocks(context, target.index);
+      if (removal) removal.changed();
+      storeProductDescriptionRenderBlocks(context, index);
     }).catch(function(error) {
+      if (removal && !removal.isCurrentUpload(ticket)) return;
       logger.error('Failed to upload Store product description media', error);
       setStatus(context.status, formatError(error), true);
     }).finally(function() {
-      control.value = '';
-      updateAdminFilePickerFilename(control);
+      if (removal) finishImageUpload(control, removal, ticket, file);
+      else {
+        control.value = '';
+        updateAdminFilePickerFilename(control);
+      }
     });
   }
 
@@ -8021,8 +8121,9 @@
     context.library.hidden = !context.library.hidden;
     if (context.library.hidden) return;
     var mediaType = String(button.dataset.mediaType || 'image');
+    var target = storeProductDescriptionUploadTarget(context, button);
     loadStoreProductMediaLibrary(context.product, context.library, context.status, function(item) {
-      storeProductDescriptionApplyMediaPath(context, button, item.path || '', item.label || context.product.name);
+      storeProductDescriptionApplyMediaPath(context, target, item.path || '', item.label || context.product.name);
       context.library.hidden = true;
     }, { allowedTypes: [mediaType] });
   }
@@ -8182,7 +8283,9 @@
       if (event.key === 'Escape') {
         var panel = control instanceof HTMLElement ? control.closest('[data-content-media-settings], [data-content-gallery-image-settings]') : null;
         if (panel instanceof HTMLElement) {
-          panel.hidden = true;
+          var toggle = root.querySelector('[aria-controls="' + panel.id + '"]');
+          storeProductDescriptionClosePanels(context);
+          if (toggle) toggle.focus();
           event.preventDefault();
           return;
         }
@@ -8239,7 +8342,7 @@
       longContentField: longContentField,
       status: status,
       library: library,
-      blocks: storeProductDescriptionBlocksFromProduct(product),
+      blocks: storeProductDescriptionBlocksFromProduct(product).map(storeProductDescriptionNormalizeBlock),
       activeEditable: null,
       activeLink: null
     };

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { normalizeFrameHashAspectRatios } from '../shared/dust-wave-platform/packages/media-core/src/frame-hash.js';
 import {
   MEDIA_MANIFEST_PATH,
   MEDIA_MANIFEST_VERSION,
@@ -222,12 +223,28 @@ async function resolveMediaFiles(args) {
     .filter(isDashboardMediaFile);
 }
 
-async function replaceIfSmaller(sourcePath, candidatePath, write) {
+async function decodedImageFrames(filePath) {
+  const { stdout } = await execFileAsync('ffmpeg', [
+    '-v', 'error', '-xerror', '-i', filePath, '-map', '0:v:0', '-pix_fmt', 'rgba64le',
+    '-fps_mode', 'passthrough', '-f', 'framehash', '-hash', 'sha256', '-'
+  ], { timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+  return normalizeFrameHashAspectRatios(stdout);
+}
+
+export async function replaceIfSmaller(sourcePath, candidatePath, write) {
   const sourceSize = await fileSize(sourcePath);
   const candidateSize = await fileSize(candidatePath);
   if (!candidateSize || candidateSize >= sourceSize) {
     await fs.rm(candidatePath, { force: true });
     return { changed: false, bytesSaved: 0 };
+  }
+  try {
+    const sourceFrames = await decodedImageFrames(sourcePath);
+    const candidateFrames = await decodedImageFrames(candidatePath);
+    if (sourceFrames !== candidateFrames) throw new Error(`Lossless image validation failed: ${sourcePath}`);
+  } catch (error) {
+    await fs.rm(candidatePath, { force: true });
+    throw error;
   }
   if (write) {
     await fs.rename(candidatePath, sourcePath);
@@ -263,6 +280,7 @@ async function optimizeImage(repoPath, args, tools) {
   const filePath = path.resolve(repoPath);
   const before = await fileSize(filePath);
   if (!before) return { repoPath, changed: false, skipped: 'missing' };
+  if (!tools.ffmpeg) return { repoPath, changed: false, skipped: 'missing ffmpeg for lossless validation' };
 
   if (extension === '.png' && tools.oxipng) {
     const candidatePath = `${filePath}.optimized.png`;

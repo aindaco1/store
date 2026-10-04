@@ -353,6 +353,12 @@ npm run media:manifest
 npm run media:optimize:check
 ```
 
+Lossless source optimization requires FFmpeg and compares decoded RGBA frame
+hashes before replacing a smaller candidate. Media Core 0.5.0 normalizes equivalent
+sample aspect ratios without hiding pixel, dimension or timing changes. A failed
+decode or mismatch preserves the source and removes the candidate; without FFmpeg,
+source optimization is skipped. Product publication continues to preserve sources.
+
 Product publication runs `node scripts/optimize-media.mjs --write --publish` before building or deploying. It checks all product references because the deployment publishes the full catalog; unattached uploads are not encoded. Source and derivative hashes detect replacements even at the same path or timestamp. A manifest-only rebuild cannot certify stale derivatives. Intentionally skipped larger output remains valid, and video references fall back to the source when its replacement WebM would be larger.
 
 `scripts/commit-publish-media.mjs` verifies the original checkout and current publishing-branch SHA, allows only product/media/manifest changes, and performs a normal fast-forward push. A concurrent edit or branch policy rejection stops the run; it never forces a push or bypasses branch protection. Refresh and publish again after resolving the conflict. Forks that require PR-only changes must arrange an allowed publishing identity/policy before enabling automatic media incorporation.

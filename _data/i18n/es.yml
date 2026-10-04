@@ -134,6 +134,8 @@ admin:
   media_replace: Reemplazar
   media_replace_label: Reemplazar %{name}
   media_selected: Medio seleccionado.
+  media_remove_image: Quitar imagen
+  media_image_removed: Imagen quitada. Publica para guardar el cambio.
   media_choose_existing: Elegir archivo de %{type} existente
   media_upload_video: Subir video
   media_upload_audio: Subir audio

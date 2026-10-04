@@ -2,7 +2,7 @@
 
 Store is Dust Wave's static-first commerce layer for products, tickets, RSVPs, digital downloads, and services. It succeeds `aindaco1/dust-wave-shop` and replaces Snipcart with a first-party cart, Cloudflare Worker API, Stripe checkout, fulfillment, and admin workflow.
 
-Current release: `v1.3.9`. See the [changelog](../CHANGELOG.md) for release changes and [release evidence](release-evidence/) for validation and rollback records. The [roadmap](ROADMAP.md) owns the current capability inventory and future work.
+Current release: `v1.3.10`. See the [changelog](../CHANGELOG.md) for release changes and [release evidence](release-evidence/) for validation and rollback records. The [roadmap](ROADMAP.md) owns the current capability inventory and future work.
 
 ## Architecture
 
@@ -20,8 +20,8 @@ Current release: `v1.3.9`. See the [changelog](../CHANGELOG.md) for release chan
 
 ## Shared Foundations and Ownership
 
-Store pins Dust Wave Platform `0.40.0` (Test Core `0.3.0`, Tax Core `0.3.1`) at exact commit
-`60d439b887f1244f82ff232c849d74152b28c776` and Dust Wave Jekyll Template
+Store pins Dust Wave Platform `0.43.0` (Admin Shell `0.13.0`, Media Core `0.5.0`, Test Core `0.3.1`) at exact commit
+`2e5df578c08c4af0b827a08fefee8986acf5f24b` and Dust Wave Jekyll Template
 `v0.1.0` at exact commit `351281a5aec60fa85653a3d23391e66fb860aae6`.
 Platform supplies characterized Worker, admin, browser, design, build, release,
 shipping, tax, inventory, media, and test primitives. The Jekyll Template owns

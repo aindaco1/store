@@ -77,7 +77,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.unstubAllGlobals();
-  if (sidecar && sidecar.exitCode === null) {
+  if (sidecar && sidecar.exitCode === null && sidecar.signalCode === null) {
     const exited = once(sidecar, 'exit');
     sidecar.kill();
     await exited;
@@ -86,6 +86,33 @@ afterEach(async () => {
 });
 
 describe('local admin product publishing', () => {
+  it('finishes active catalog generation before stopping the sidecar', async () => {
+    const rebuild = () => fetch(`${base}/rebuild`, {
+      method: 'POST', headers: { Authorization: 'Bearer local-test-token' }, body: '{}'
+    });
+    await rebuild(); // Finish startup generation before installing the controlled fixture.
+    await writeFile(path.join(root, 'scripts/generate-catalog-snapshot.rb'), [
+      "File.write('shutdown-started', 'true')",
+      "sleep 0.01 until File.exist?('shutdown-release')",
+      "File.write('shutdown-completed', 'true')"
+    ].join('\n'));
+    await writeFile(path.join(root, '_products/local-product.md'), `${initialMarkdown}\nChanged.\n`);
+    const rebuilding = rebuild().catch(() => null);
+    const exited = once(sidecar, 'exit');
+    try {
+      await expect.poll(() => readFile(path.join(root, 'shutdown-started'), 'utf8').catch(() => '')).toBe('true');
+      sidecar.kill();
+      await expect.poll(() => fetch(`${base}/health`).then(() => true).catch(() => false)).toBe(false);
+      expect(sidecar.exitCode).toBeNull();
+      expect(sidecar.signalCode).toBeNull();
+    } finally {
+      await writeFile(path.join(root, 'shutdown-release'), 'true');
+      await rebuilding;
+    }
+    expect(await exited).toEqual([0, null]);
+    expect(await readFile(path.join(root, 'shutdown-completed'), 'utf8')).toBe('true');
+  });
+
   it('writes the repository, regenerates, and reports ready only after the Worker loads the saved hash', async () => {
     const response = await request('/admin/store/products/publish', {
       intent: 'publish', productId: 'local-product', fields: { name: 'Edited locally', price: 35 }

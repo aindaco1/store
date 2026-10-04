@@ -83,6 +83,11 @@ Lighthouse runs through `podman-stack-run.sh` by default. Production posture acc
 
 Use [contributor setup](CONTRIBUTING.md#local-setup) for service URLs and [configuration synchronization](CONTRIBUTING.md#configuration-and-product-changes) for local catalog recovery. The `local-catalog-sync` and `local-admin-publish` unit suites cover real temporary repository writes, regeneration, and Worker readiness without touching the shop's product files or external providers.
 
+The local repository sidecar stops polling and closes its HTTP server on SIGTERM
+or SIGINT, then lets active catalog generation finish before exiting. Tests wait
+for that exit before removing temporary repositories; a controlled in-flight
+generator regression guards against orphan Ruby writes during cleanup.
+
 ## Opt-in Jev Message Pilot
 
 `npm run test:jev` runs a local, advisory semantic review of built-in synthetic

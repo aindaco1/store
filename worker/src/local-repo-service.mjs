@@ -190,3 +190,12 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`Local repo service listening on 127.0.0.1:${port} for ${repoRoot}`);
 });
 server.on('close', () => catalogSync.stop());
+
+function shutdown() {
+  catalogSync.stop();
+  server.close();
+  // Let active requests and catalog generation finish before Node exits, so
+  // the Ruby child cannot write into a repository after its owner has stopped.
+}
+process.once('SIGTERM', shutdown);
+process.once('SIGINT', shutdown);

@@ -5367,7 +5367,7 @@ textarea.admin-settings__input--readonly {
     width: 100%;
   }
 
-  .admin-store-orders__import-controls > button {
+  #admin-store-orders-snipcart-import {
     grid-column: 2;
     grid-row: 1;
   }
@@ -5445,7 +5445,9 @@ textarea.admin-settings__input--readonly {
   }
 
   .admin-content-block.is-active > .admin-content-block__settings-button {
-    display: none;
+    display: inline-flex;
+    margin: 8px 0;
+    position: static;
   }
 
   .admin-content-block.is-active .admin-content-block__chrome,

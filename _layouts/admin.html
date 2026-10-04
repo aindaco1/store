@@ -177,7 +177,7 @@
             </div>
             <div class="admin-store-orders__import-controls">
               <input id="admin-store-orders-snipcart-file" class="admin-file-picker__input sr-only" type="file" accept=".csv,text/csv" data-admin-file-picker-input="true" data-admin-file-picker-empty-label="No file chosen">
-              <label class="btn btn--secondary admin-file-picker__button admin-store-orders__file-button" for="admin-store-orders-snipcart-file" role="button" tabindex="0">Choose CSV</label>
+              <button class="btn btn--secondary admin-file-picker__button admin-store-orders__file-button" type="button" data-admin-file-picker-for="admin-store-orders-snipcart-file">Choose CSV</button>
               <span id="admin-store-orders-snipcart-file-name" class="admin-file-picker__filename admin-store-orders__file-name" data-admin-file-picker-filename-for="admin-store-orders-snipcart-file">No file chosen</span>
               <button id="admin-store-orders-snipcart-import" class="btn btn--secondary" type="button">Import</button>
             </div>
@@ -324,6 +324,7 @@
   {% include form-control-identity-script.html asset_version=asset_version %}
   <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/tabs-browser.js?v={{ asset_version }}" defer></script>
   <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/dirty-controls-browser.js?v={{ asset_version }}" defer></script>
+  <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/editor-media-browser.js?v={{ asset_version }}" defer></script>
   <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/turnstile-browser.js?v={{ asset_version }}" defer></script>
   <script data-cfasync="false" src="/shared/dust-wave-platform/packages/admin-shell/src/vendor/qrcode-generator.js?v={{ asset_version }}" defer></script>
   <script
