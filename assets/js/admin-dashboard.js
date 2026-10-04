@@ -761,14 +761,13 @@
     var opts = options || {};
     var inputId = ensureElementId(input, opts.idPrefix || 'admin-file-picker');
     var picker = createElement('div', 'admin-file-picker' + (opts.className ? ' ' + opts.className : ''));
-    var button = createElement('label', 'btn btn--secondary admin-file-picker__button' + (opts.buttonClass ? ' ' + opts.buttonClass : ''), opts.buttonLabel || 'Choose file');
+    var button = createElement('button', 'btn btn--secondary admin-file-picker__button' + (opts.buttonClass ? ' ' + opts.buttonClass : ''), opts.buttonLabel || 'Choose file');
     var filename = createElement('span', 'admin-file-picker__filename', opts.emptyLabel || 'No file chosen');
     input.classList.add('admin-file-picker__input');
     input.dataset.adminFilePickerInput = 'true';
     input.dataset.adminFilePickerEmptyLabel = opts.emptyLabel || 'No file chosen';
-    button.setAttribute('for', inputId);
-    button.setAttribute('role', 'button');
-    button.tabIndex = 0;
+    button.type = 'button';
+    button.addEventListener('click', function() { input.click(); });
     filename.dataset.adminFilePickerFilenameFor = inputId;
     if (opts.filenameClass) filename.classList.add(opts.filenameClass);
     input.addEventListener('change', function() {
@@ -778,20 +777,6 @@
     picker.appendChild(button);
     picker.appendChild(filename);
     return picker;
-  }
-
-  function setupAdminFilePickerEvents() {
-    document.addEventListener('keydown', function(event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      var label = event.target && event.target.closest
-        ? event.target.closest('.admin-file-picker__button[for]')
-        : null;
-      if (!label) return;
-      var input = document.getElementById(label.getAttribute('for') || '');
-      if (!input) return;
-      event.preventDefault();
-      input.click();
-    });
   }
 
   function imageUploadOptions(row) {
@@ -8285,7 +8270,9 @@
       if (event.key === 'Escape') {
         var panel = control instanceof HTMLElement ? control.closest('[data-content-media-settings], [data-content-gallery-image-settings]') : null;
         if (panel instanceof HTMLElement) {
-          panel.hidden = true;
+          var toggle = root.querySelector('[aria-controls="' + panel.id + '"]');
+          storeProductDescriptionClosePanels(context);
+          if (toggle) toggle.focus();
           event.preventDefault();
           return;
         }
@@ -10563,7 +10550,6 @@
     setupAdminTabs();
     setupAuth();
     setupLogout();
-    setupAdminFilePickerEvents();
     setupSettingsEvents();
     setupStoreAnalyticsEvents();
     setupStoreMarketingEvents();

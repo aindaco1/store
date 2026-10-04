@@ -6,7 +6,9 @@ This release pins Dust Wave Platform 0.43.0 at immutable commit
 the shared removal control directly. Removal preserves authored descriptions,
 clears previews and pending file selections, and invalidates late upload results.
 Block identities survive rerenders and reorders. Uploads retain the full media
-catalog when the library is first opened after an upload.
+catalog when the library is first opened after an upload. File pickers use native
+buttons; mobile media settings stay reachable on active blocks, and Escape returns
+focus to the settings button.
 
 Lossless optimization compares decoded RGBA frame hashes before replacing source
 images. The shared aspect-ratio helper accepts equivalent density ratios while

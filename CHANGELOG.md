@@ -4,7 +4,8 @@
 
 - Adopt Dust Wave Platform 0.43.0, including shared image removal and upload
   cancellation controls in settings, product images, image blocks and galleries.
-  Preserve alt text and captions when clearing image selections.
+  Preserve alt text and captions when clearing image selections. Keep media
+  settings reachable on mobile and use native keyboard-accessible upload buttons.
 - Validate decoded frames before replacing images during lossless optimization,
   using Media Core's aspect-ratio normalization to accept equivalent density ratios.
 - Update Ruby CI, browser/test tools and Wrangler; remove the outdated Undici

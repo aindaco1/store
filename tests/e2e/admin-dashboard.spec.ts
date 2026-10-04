@@ -3678,7 +3678,9 @@ test.describe('Admin Dashboard', () => {
       await expect(remove).toBeDisabled();
       await expect(imageField.locator('.admin-file-picker__button')).toBeFocused();
       await expect(imageField.locator('.admin-settings__image-preview img')).toHaveCount(0);
-      await upload.setInputFiles(file);
+      const chooser = page.waitForEvent('filechooser');
+      await imageField.locator('.admin-file-picker__button').press('Enter');
+      await (await chooser).setFiles(file);
       await expect.poll(() => pending.length).toBe(1);
       await expect(remove).toBeEnabled();
       await remove.click();
@@ -3699,7 +3701,7 @@ test.describe('Admin Dashboard', () => {
       await expect(image).toHaveValue('/assets/images/fronteras-poster.png');
 
       const description = editor.locator('[data-store-product-description-editor]');
-      await description.locator('[data-content-action="insert-block"]').last().click({ force: true });
+      await description.locator('[data-content-action="insert-block"]').last().press('Enter');
       await description.getByLabel('Block type').last().selectOption('image');
       const block = description.locator('.admin-content-block').last();
       await block.locator('[data-content-field="caption"]').fill('Preserved caption');
@@ -3720,10 +3722,11 @@ test.describe('Admin Dashboard', () => {
       await pending.shift()!();
       await expect(source).toHaveValue('');
       await expect(block.locator('img')).toHaveCount(0);
+      await source.press('Escape');
       await expect(editor.getByRole('button', { name: 'Publish changes', exact: true })).toBeEnabled();
-      await description.locator('[data-content-action="insert-block"]').last().click({ force: true });
+      await description.locator('[data-content-action="insert-block"]').last().press('Enter');
       await description.getByLabel('Block type').last().selectOption('gallery');
-      const gallery = description.locator('.admin-content-block').last();
+      const gallery = description.locator('.content-block--gallery');
       await gallery.getByRole('button', { name: 'Gallery settings', exact: true }).click();
       await gallery.locator('[data-content-action="add-gallery-image-upload"]').setInputFiles(file);
       await expect.poll(() => pending.length).toBe(1);
@@ -3741,6 +3744,15 @@ test.describe('Admin Dashboard', () => {
       await expect(gallery.locator('textarea[data-content-field="caption"]')).toHaveValue('Gallery caption');
       await expect(galleryRemove).toBeDisabled();
       await expect(gallery.locator('img')).toHaveCount(0);
+      // Reordering a block while uploading must keep the result on that block.
+      await gallery.locator('input[data-content-action="select-media-upload"]').setInputFiles(file);
+      await expect.poll(() => pending.length).toBe(1);
+      await gallery.locator('[data-content-field="src"]').press('Escape');
+      await expect(gallery.locator('[data-content-action="toggle-gallery-image-settings"]')).toBeFocused();
+      await gallery.locator('[data-content-action="up"]').click({ force: true });
+      await pending.shift()!();
+      await expect(gallery.locator('img')).toHaveAttribute('src', /^data:image/);
+      await expect(gallery.locator('textarea[data-content-field="caption"]')).toHaveValue('Gallery caption');
       await expectNoHorizontalOverflow(page);
       await expectNoAxeViolations(page, '[data-store-product-field-wrapper="image"]');
       expect(calls.storeProductPublishes).toHaveLength(0);
