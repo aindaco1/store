@@ -4317,7 +4317,7 @@ test.describe('Admin Dashboard', () => {
     await expect.poll(() => importControls.evaluate((controls: HTMLElement) => {
       const chooseButton = controls.querySelector<HTMLElement>('.admin-store-orders__file-button');
       const filename = controls.querySelector<HTMLElement>('.admin-store-orders__file-name');
-      const importButton = controls.querySelector<HTMLElement>('button');
+      const importButton = controls.querySelector<HTMLElement>('#admin-store-orders-snipcart-import');
       if (!chooseButton || !filename || !importButton) return false;
       const chooseBounds = chooseButton.getBoundingClientRect();
       const filenameBounds = filename.getBoundingClientRect();
