@@ -34,9 +34,10 @@ update Store's immutable gitlink, manifest, lockfile and pin contract together.
 - New image integration: focused pin/version/lossless suites passed (17 tests).
   Real FFmpeg accepted a valid lossless PNG recompression (8,175 bytes saved)
   and rejected a conversion that lost 16-bit precision, preserving the source.
-- Three focused browser regressions passed: settings, desktop English and mobile
-  Spanish; removal, previews, captions/alt text, late uploads, library selection,
-  gallery reordering, keyboard focus and axe checks.
+- Four focused browser tests passed: the complete admin workflow plus settings,
+  desktop English and mobile Spanish image regressions; removal, previews, captions
+  and alt text, late uploads, library selection after reordering, CSV keyboard
+  activation, gallery uploads after reordering, focus and axe checks.
 - Root and Worker npm audits: zero known vulnerabilities after clean installs.
 - Complete final premerge, hosted gate and deployment: pending.
 

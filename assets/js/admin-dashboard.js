@@ -767,7 +767,7 @@
     input.dataset.adminFilePickerInput = 'true';
     input.dataset.adminFilePickerEmptyLabel = opts.emptyLabel || 'No file chosen';
     button.type = 'button';
-    button.addEventListener('click', function() { input.click(); });
+    button.dataset.adminFilePickerFor = inputId;
     filename.dataset.adminFilePickerFilenameFor = inputId;
     if (opts.filenameClass) filename.classList.add(opts.filenameClass);
     input.addEventListener('change', function() {
@@ -777,6 +777,14 @@
     picker.appendChild(button);
     picker.appendChild(filename);
     return picker;
+  }
+
+  function setupAdminFilePickerEvents() {
+    document.addEventListener('click', function(event) {
+      var button = event.target && event.target.closest && event.target.closest('[data-admin-file-picker-for]');
+      var input = button && document.getElementById(button.dataset.adminFilePickerFor);
+      if (input) input.click();
+    });
   }
 
   function imageUploadOptions(row) {
@@ -8049,9 +8057,15 @@
     return { block: block, target: block, index: index };
   }
 
-  function storeProductDescriptionApplyMediaPath(context, control, path, label) {
-    var target = storeProductDescriptionUploadTarget(context, control);
-    if (!target || !path) return;
+  function storeProductDescriptionTargetIndex(context, target) {
+    if (!target || !context.root.isConnected ||
+        target.block.type === 'gallery' && target.block.images.indexOf(target.target) < 0) return -1;
+    return context.blocks.indexOf(target.block);
+  }
+
+  function storeProductDescriptionApplyMediaPath(context, target, path, label) {
+    var index = storeProductDescriptionTargetIndex(context, target);
+    if (index < 0 || !path) return;
     target.target.src = path;
     if (target.block.type === 'image' || target.block.type === 'gallery') {
       storeProductDescriptionImageRemoval(context, target.block, target.target).changed();
@@ -8059,7 +8073,7 @@
     if ((target.block.type === 'image' || target.block.type === 'gallery') && !target.target.alt) {
       target.target.alt = label || context.product.name || localizedAdminText('mediaProductImageFallback');
     }
-    storeProductDescriptionRenderBlocks(context, target.index);
+    storeProductDescriptionRenderBlocks(context, index);
     setStatus(context.status, localizedAdminText('mediaSelected'));
   }
 
@@ -8082,10 +8096,8 @@
     uploadStoreProductMedia(context.product, file, context.status, null, function() {
       return context.root.isConnected && (!removal || removal.isCurrentUpload(ticket));
     }).then(function(path) {
-      var index = context.blocks.indexOf(target.block);
-      if (!context.root.isConnected || index < 0 ||
-          target.block.type === 'gallery' && target.block.images.indexOf(target.target) < 0 ||
-          removal && !removal.isCurrentUpload(ticket)) return;
+      var index = storeProductDescriptionTargetIndex(context, target);
+      if (index < 0 || removal && !removal.isCurrentUpload(ticket)) return;
       target.target.src = path;
       if ((target.block.type === 'image' || target.block.type === 'gallery') && !target.target.alt) {
         target.target.alt = file.name || context.product.name || localizedAdminText('mediaProductImageFallback');
@@ -8109,8 +8121,9 @@
     context.library.hidden = !context.library.hidden;
     if (context.library.hidden) return;
     var mediaType = String(button.dataset.mediaType || 'image');
+    var target = storeProductDescriptionUploadTarget(context, button);
     loadStoreProductMediaLibrary(context.product, context.library, context.status, function(item) {
-      storeProductDescriptionApplyMediaPath(context, button, item.path || '', item.label || context.product.name);
+      storeProductDescriptionApplyMediaPath(context, target, item.path || '', item.label || context.product.name);
       context.library.hidden = true;
     }, { allowedTypes: [mediaType] });
   }
@@ -10550,6 +10563,7 @@
     setupAdminTabs();
     setupAuth();
     setupLogout();
+    setupAdminFilePickerEvents();
     setupSettingsEvents();
     setupStoreAnalyticsEvents();
     setupStoreMarketingEvents();

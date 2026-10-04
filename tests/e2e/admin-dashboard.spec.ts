@@ -3649,6 +3649,10 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('[data-settings-path="seo.default_social_image_alt"]')).toHaveValue('Dust Wave Shop');
     await expect(page.locator('#admin-settings-publish')).toBeEnabled();
     expect(calls.logoUploads).toHaveLength(0);
+    await selectAdminSection(page, 'Orders');
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Choose CSV', exact: true }).press('Enter');
+    await (await chooser).setFiles([]);
   });
 
   for (const lang of ['en', 'es']) {
@@ -3753,6 +3757,13 @@ test.describe('Admin Dashboard', () => {
       await pending.shift()!();
       await expect(gallery.locator('img')).toHaveAttribute('src', /^data:image/);
       await expect(gallery.locator('textarea[data-content-field="caption"]')).toHaveValue('Gallery caption');
+      await gallery.locator('[data-content-action="toggle-gallery-image-settings"]').click();
+      await gallery.locator('[data-content-action="choose-media-library"]').click();
+      await gallery.locator('[data-content-field="src"]').press('Escape');
+      await gallery.locator('[data-content-action="down"]').press('Enter');
+      await editor.locator('.admin-store-products__media-library:not([hidden]) [data-store-product-media-path="/assets/images/fronteras-poster.png"]').click();
+      await expect(gallery.locator('img')).toHaveAttribute('src', /fronteras-poster\.png$/);
+      await expect(description.locator('.content-block--image img')).toHaveCount(0);
       await expectNoHorizontalOverflow(page);
       await expectNoAxeViolations(page, '[data-store-product-field-wrapper="image"]');
       expect(calls.storeProductPublishes).toHaveLength(0);
