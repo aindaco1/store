@@ -4,21 +4,21 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '60d439b887f1244f82ff232c849d74152b28c776';
+const expectedCommit = '2e5df578c08c4af0b827a08fefee8986acf5f24b';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.40.0',
-  '@dustwave/admin-shell': '0.12.0',
+  '@dustwave/platform-workspace': '0.43.0',
+  '@dustwave/admin-shell': '0.13.0',
   '@dustwave/build-core': '0.2.0',
   '@dustwave/design-core': '0.3.0',
   '@dustwave/inventory-core': '0.1.0',
-  '@dustwave/media-core': '0.4.0',
+  '@dustwave/media-core': '0.5.0',
   '@dustwave/product-video-core': '0.1.0',
-  '@dustwave/release-core': '0.4.0',
+  '@dustwave/release-core': '0.5.0',
   '@dustwave/shipping-core': '0.2.0',
   '@dustwave/site-shell': '0.3.0',
   '@dustwave/tax-core': '0.3.1',
-  '@dustwave/test-core': '0.3.0',
-  '@dustwave/timed-text': '0.11.1',
+  '@dustwave/test-core': '0.3.1',
+  '@dustwave/timed-text': '0.11.2',
   '@dustwave/worker-core': '0.15.0'
 };
 
@@ -66,6 +66,7 @@ describe('shared platform pin', () => {
     const consumedPaths = [
       'packages/admin-shell/src/tabs-browser.js',
       'packages/admin-shell/src/dirty-controls-browser.js',
+      'packages/admin-shell/src/editor-media-browser.js',
       'packages/admin-shell/src/turnstile-browser.js',
       'packages/admin-shell/src/vendor/qrcode-generator.js',
       'packages/admin-shell/src/credentialed-download.js',
@@ -81,6 +82,7 @@ describe('shared platform pin', () => {
       'packages/design-core/styles/_utilities.scss',
       'packages/inventory-core/src/index.js',
       'packages/media-core/src/site-catalog.js',
+      'packages/media-core/src/frame-hash.js',
       'packages/site-shell/src/a11y-live-browser.js',
       'packages/site-shell/src/video-first-frame-poster-browser.js',
       'packages/site-shell/src/cart-icon-browser.js',

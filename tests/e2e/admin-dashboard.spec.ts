@@ -3622,6 +3622,131 @@ test.describe('Admin Dashboard', () => {
     });
   }
 
+  test('shared image removal clears settings without deleting library media', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    let completeUpload: (() => Promise<void>) | undefined;
+    await page.route('**/admin/settings/logo-upload', route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: JSON_HEADERS });
+      completeUpload = () => route.fulfill({ headers: JSON_HEADERS, body: JSON.stringify({ path: '/assets/images/defaults/late.png' }) });
+    });
+    await gotoDomReady(page, '/admin/?admin_login=settings-image-removal');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Settings');
+    await selectSettingsSection(page, 'Brand & SEO');
+    const logo = page.locator('[data-settings-row-label="Logo"]');
+    const remove = logo.getByRole('button', { name: 'Remove image', exact: true });
+    await logo.locator('[data-logo-upload-input]').setInputFiles({
+      name: 'logo.png', mimeType: 'image/png', buffer: fs.readFileSync('assets/images/share-icons/facebook.png')
+    });
+    await expect.poll(() => Boolean(completeUpload)).toBe(true);
+    await remove.click();
+    await expect(logo.locator('.admin-file-picker__button')).toBeFocused();
+    await completeUpload!();
+    await expect(page.locator('[data-settings-path="platform.logo_path"]')).toHaveValue('');
+    await expect(remove).toBeDisabled();
+    await expect(logo.locator('img')).toHaveCount(0);
+    await expect(logo).toContainText('Image removed');
+    await expect(page.locator('[data-settings-path="seo.default_social_image_alt"]')).toHaveValue('Dust Wave Shop');
+    await expect(page.locator('#admin-settings-publish')).toBeEnabled();
+    expect(calls.logoUploads).toHaveLength(0);
+  });
+
+  for (const lang of ['en', 'es']) {
+    test(`shared image removal rejects late uploads and preserves descriptions (${lang})`, async ({ page }) => {
+      await page.setViewportSize({ width: lang === 'es' ? 390 : 1440, height: 1000 });
+      const calls = await routeAdminWorker(page);
+      const pending: Array<() => Promise<void>> = [];
+      await page.route('**/admin/settings/image-upload', async route => {
+        if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: JSON_HEADERS });
+        pending.push(() => route.fulfill({ headers: JSON_HEADERS, body: JSON.stringify({ path: '/assets/images/products/late.png' }) }));
+      });
+      await gotoDomReady(page, `${lang === 'es' ? '/es' : ''}/admin/?admin_login=image-removal`);
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await selectAdminSection(page, lang === 'es' ? 'Productos' : 'Products');
+      await page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' })
+        .getByRole('button', { name: 'Edit', exact: true }).click();
+      const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+      const imageField = editor.locator('[data-store-product-field-wrapper="image"]');
+      const removeLabel = lang === 'es' ? 'Quitar imagen' : 'Remove image';
+      const remove = imageField.getByRole('button', { name: removeLabel, exact: true });
+      const upload = editor.locator('[data-store-product-image-upload]');
+      const image = editor.locator('[data-store-product-field="image"]');
+      const file = { name: 'poster.png', mimeType: 'image/png', buffer: fs.readFileSync('assets/images/fronteras-poster.png') };
+      await remove.focus();
+      await page.keyboard.press('Enter');
+      await expect(image).toHaveValue('');
+      await expect(remove).toBeDisabled();
+      await expect(imageField.locator('.admin-file-picker__button')).toBeFocused();
+      await expect(imageField.locator('.admin-settings__image-preview img')).toHaveCount(0);
+      await upload.setInputFiles(file);
+      await expect.poll(() => pending.length).toBe(1);
+      await expect(remove).toBeEnabled();
+      await remove.click();
+      await pending.shift()!();
+      await expect(editor.getByRole('button', { name: 'Publish changes', exact: true })).toBeEnabled();
+      await expect(image).toHaveValue('');
+      await expect(remove).toBeDisabled();
+      await expect(imageField).toContainText(lang === 'es' ? 'Imagen quitada' : 'Image removed');
+
+      // A newer library selection also supersedes an in-flight upload.
+      await upload.setInputFiles(file);
+      await expect.poll(() => pending.length).toBe(1);
+      await imageField.getByRole('button', { name: 'Choose existing', exact: true }).click();
+      await imageField.locator('[data-store-product-media-path="/assets/images/fronteras-poster.png"]').click();
+      await expect(image).toHaveValue('/assets/images/fronteras-poster.png');
+      await pending.shift()!();
+      await expect(editor.getByRole('button', { name: 'Publish changes', exact: true })).toBeEnabled();
+      await expect(image).toHaveValue('/assets/images/fronteras-poster.png');
+
+      const description = editor.locator('[data-store-product-description-editor]');
+      await description.locator('[data-content-action="insert-block"]').last().click({ force: true });
+      await description.getByLabel('Block type').last().selectOption('image');
+      const block = description.locator('.admin-content-block').last();
+      await block.locator('[data-content-field="caption"]').fill('Preserved caption');
+      await block.getByRole('button', { name: 'Media settings', exact: true }).click();
+      const source = block.locator('[data-content-field="src"]');
+      await expect(block.getByRole('button', { name: removeLabel })).toBeDisabled();
+      await source.fill('/assets/images/fronteras-poster.png');
+      await block.locator('[data-content-field="alt"]').fill('Preserved description');
+      await block.getByRole('button', { name: removeLabel }).click();
+      await expect(source).toHaveValue('');
+      await expect(source).toBeFocused();
+      await expect(block.locator('[data-content-action="toggle-media-settings"]')).toHaveAttribute('aria-expanded', 'true');
+      await expect(block.locator('[data-content-field="alt"]')).toHaveValue('Preserved description');
+      await expect(block.locator('[data-content-field="caption"]')).toHaveText('Preserved caption');
+      await block.locator('input[type="file"]').setInputFiles(file);
+      await expect.poll(() => pending.length).toBe(1);
+      await block.getByRole('button', { name: removeLabel }).click();
+      await pending.shift()!();
+      await expect(source).toHaveValue('');
+      await expect(block.locator('img')).toHaveCount(0);
+      await expect(editor.getByRole('button', { name: 'Publish changes', exact: true })).toBeEnabled();
+      await description.locator('[data-content-action="insert-block"]').last().click({ force: true });
+      await description.getByLabel('Block type').last().selectOption('gallery');
+      const gallery = description.locator('.admin-content-block').last();
+      await gallery.getByRole('button', { name: 'Gallery settings', exact: true }).click();
+      await gallery.locator('[data-content-action="add-gallery-image-upload"]').setInputFiles(file);
+      await expect.poll(() => pending.length).toBe(1);
+      await gallery.locator('[data-content-action="toggle-gallery-image-settings"]').click();
+      const galleryRemove = gallery.getByRole('button', { name: removeLabel });
+      await expect(galleryRemove).toBeEnabled();
+      await gallery.locator('[data-content-field="alt"]').fill('Gallery description');
+      await gallery.locator('textarea[data-content-field="caption"]').fill('Gallery caption');
+      await galleryRemove.click();
+      await expect(gallery.locator('[data-content-field="src"]')).toBeFocused();
+      await pending.shift()!();
+      await expect(editor.getByRole('button', { name: 'Publish changes', exact: true })).toBeEnabled();
+      await expect(gallery.locator('[data-content-field="src"]')).toHaveValue('');
+      await expect(gallery.locator('[data-content-field="alt"]')).toHaveValue('Gallery description');
+      await expect(gallery.locator('textarea[data-content-field="caption"]')).toHaveValue('Gallery caption');
+      await expect(galleryRemove).toBeDisabled();
+      await expect(gallery.locator('img')).toHaveCount(0);
+      await expectNoHorizontalOverflow(page);
+      await expectNoAxeViolations(page, '[data-store-product-field-wrapper="image"]');
+      expect(calls.storeProductPublishes).toHaveLength(0);
+    });
+  }
+
   test('allows publishing to retry failed media preparation without reuploading', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     calls.storeDeploymentOverride = {

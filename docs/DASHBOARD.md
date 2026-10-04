@@ -164,6 +164,12 @@ After upload, the image field, media browser, and product preview use a shared i
 
 Source and derived assets are distinct. Generated derivatives do not appear as standalone selectable media. Broken references and missing/stale derivative warnings come from `_data/media-optimization-manifest.json`; the repository remains authoritative and the dashboard does not create a KV media catalog.
 
+Image fields use Platform's shared **Remove image** control. Removal clears only
+the editor selection, retains alt text and captions, and cancels pending upload
+selection results. The action is disabled when neither an image nor an upload is
+selected. Publish to persist the cleared reference; repository media remains
+available in the library and follows the existing reference-aware cleanup rules.
+
 Upload and replace operations are constrained to the matching Store media directory and type. Replacements use the current GitHub content SHA so concurrent changes fail with a conflict instead of overwriting newer work. Repair dispatch reuses the existing optimizer workflow with `changed` or reviewed super-admin `all` scope. Meaningful images require alt text; explicitly decorative images may use empty alt text.
 
 ## Coupons
