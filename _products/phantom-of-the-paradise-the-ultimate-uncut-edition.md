@@ -2,7 +2,7 @@
 identifier: "phantom-of-the-paradise-the-ultimate-uncut-edition"
 sku: "phantom-of-the-paradise-the-ultimate-uncut-edition"
 name: "Phantom of the Paradise: The Ultimate Uncut Edition!"
-description: "phantom of the paradise poster"
+description: "Free RSVP for Phantom of the Paradise: The Ultimate Uncut Edition at Dust Wave Microcinema in Albuquerque on November 5, 2026 at 7 PM."
 price: 0
 image: "/assets/images/products/product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp"
 type: "rsvp"

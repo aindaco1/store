@@ -16,6 +16,7 @@ async function focusedElementSummary(page: any) {
       ariaLabel: element.getAttribute('aria-label') || '',
       role: element.getAttribute('role') || '',
       id: element.id || '',
+      isPurchaseControl: element.matches('[data-store-product-card] button.store-add-item:not(:disabled)'),
       visible: rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none',
       outlineStyle: style.outlineStyle,
       outlineWidth: style.outlineWidth,
@@ -39,21 +40,22 @@ test.describe('Release Accessibility Evidence', () => {
     await gotoDomReady(page, '/');
     await expect(page.locator('main')).toBeVisible();
 
-    let foundAddToCart = false;
+    let foundPurchaseControl = false;
     const visited = [];
     for (let index = 0; index < 35; index += 1) {
       await page.keyboard.press('Tab');
       const focused = await focusedElementSummary(page);
       if (focused?.visible) visited.push(focused.text || focused.ariaLabel || focused.id || focused.tagName);
-      if (/Add to Cart/i.test(focused?.text || focused?.ariaLabel || '')) {
-        foundAddToCart = true;
+      if (focused?.isPurchaseControl) {
+        foundPurchaseControl = true;
+        await expect(page.locator('button.store-add-item:focus')).toHaveAccessibleName(/\S/);
         expect(focused.visible).toBe(true);
         expect(hasVisibleFocusStyle(focused)).toBe(true);
         break;
       }
     }
 
-    expect(foundAddToCart, `Visited focusables: ${visited.join(' -> ')}`).toBe(true);
+    expect(foundPurchaseControl, `Visited focusables: ${visited.join(' -> ')}`).toBe(true);
     await expectNoHorizontalOverflow(page);
   });
 

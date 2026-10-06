@@ -296,7 +296,8 @@ for (const filePath of htmlFiles) {
       if (offers.length < 1) errors.push(`${route}: Product JSON-LD has no offers`);
       for (const offer of offers) {
         for (const field of ['price', 'priceCurrency', 'availability', 'itemCondition', 'seller']) {
-          if (!offer?.[field]) errors.push(`${route}: Offer JSON-LD missing ${field}`);
+          const isFreePrice = field === 'price' && offer?.[field] === 0;
+          if (!offer?.[field] && !isFreePrice) errors.push(`${route}: Offer JSON-LD missing ${field}`);
         }
         const policyId = organization?.hasMerchantReturnPolicy?.['@id'];
         if (!policyId || offer?.hasMerchantReturnPolicy?.['@id'] !== policyId) {
