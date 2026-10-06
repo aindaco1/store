@@ -187,6 +187,72 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     },
     {
+      "id": "phantom-of-the-paradise-the-ultimate-uncut-edition",
+      "slug": "phantom-of-the-paradise-the-ultimate-uncut-edition",
+      "sku": "phantom-of-the-paradise-the-ultimate-uncut-edition",
+      "name": "Phantom of the Paradise: The Ultimate Uncut Edition!",
+      "description": "Free RSVP for Phantom of the Paradise: The Ultimate Uncut Edition at Dust Wave Microcinema in Albuquerque on November 5, 2026 at 7 PM.",
+      "body_description": "*Dust Wave presents* ... the **uncensored original version of Phantom of the Paradise**, before it was butchered pre-release due to a nasty lawsuit!\n\nImmediately prior to the release of Phantom of the Paradise, director Brian De Palma and editor Paul Hirsch were forced to remove nearly all references to \"Swan Song Enterprises\", the fictional record label owned by the character Swan. This was due to the name’s similarity to a real-life record company. The changes were made hastily, leaving visible scars that marred the look and integrity of the film.\n\n*Now, after 50 years, fans can finally experience Brian De Palma’s PHANTOM like never before.*\n\nThis version utilizes original footage salvaged by the incredible Swan Archives, transferred from 35mm to HD and meticulously restored. The goal is to present the film as it might have appeared prior to these last-minute alterations. All deleted footage has been enhanced and color-corrected to match the existing material. Some original audio and soundtrack cues associated with the excised footage were never located, and have been faithfully recreated and mixed with the original 1974 stereo track, preserved from a lossless source.\n\nBy comparing this version to the theatrical release, we can finally appreciate how the film was (ironically, given its story) disfigured against its creators’ wishes to satisfy corporate rights holders. This unofficial HD reconstruction of the director’s cut was lovingly restored for Brian De Palma, whose masterpiece should never have been mutilated by those greaseballs.\n\n**And fuck Peter Grant.**\n\nAlterations & restorations:\n\n- Original 1974 uncropped 20th Century Fox™ logo restored\n- Original “Brian De Palma’s PHANTOM” title restored\n- Restored: Swan Song marquee / Winslow in front of the Majestic.\n- Removed: transitional “Dead Bird” logo.\n- Extended shot reinstated: “Swan Song Plaza” street sign.\n- Uncut scene: Winslow meets Swan’s greasers in the hallway.\n- Restored: uncropped “Swan Song” Rolodex shot.\n- Restored: greasers kick Winslow out / “Swan Song Enterprises” sign visible.\n- Alternate/uncut footage: Winslow barges into Swan’s office.\n- Full-length unaltered shot: “Swan Song” black boxes at Swan’s factory.\n- Uncut footage from inside Swan’s vault (parts 1 & 2).\n- Reinserted: camera montage during “Beauty & The Beast” sequence.\n- Fixed: all Dead Bird vs. Swan Song logos during the airport scene.\n- Alternate “Swan Song” footage: Winslow spying on Swan from the rooftop.\n- Extended: Winslow explores Swan’s vault and finds the contract.\n- Extended: Swan arrives at the Paradise.\n- Fixed: all Dead Bird logos during Swan’s video contract sequence.\n- Fxed: video player logo during contract scene.\n- Restored: “Swan Song” logos on multiple monitors (three shots + end credits).\n- Added: dedication to Bill Finley after end credits.",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "*Dust Wave presents* ... the **uncensored original version of Phantom of the Paradise**, before it was butchered pre-release due to a nasty lawsuit!\n\nImmediately prior to the release of Phantom of the Paradise, director Brian De Palma and editor Paul Hirsch were forced to remove nearly all references to \"Swan Song Enterprises\", the fictional record label owned by the character Swan. This was due to the name’s similarity to a real-life record company. The changes were made hastily, leaving visible scars that marred the look and integrity of the film.\n\n*Now, after 50 years, fans can finally experience Brian De Palma’s PHANTOM like never before.*\n\nThis version utilizes original footage salvaged by the incredible Swan Archives, transferred from 35mm to HD and meticulously restored. The goal is to present the film as it might have appeared prior to these last-minute alterations. All deleted footage has been enhanced and color-corrected to match the existing material. Some original audio and soundtrack cues associated with the excised footage were never located, and have been faithfully recreated and mixed with the original 1974 stereo track, preserved from a lossless source.\n\nBy comparing this version to the theatrical release, we can finally appreciate how the film was (ironically, given its story) disfigured against its creators’ wishes to satisfy corporate rights holders. This unofficial HD reconstruction of the director’s cut was lovingly restored for Brian De Palma, whose masterpiece should never have been mutilated by those greaseballs.\n\n**And fuck Peter Grant.**\n\nAlterations & restorations:\n"
+        },
+        {
+          "type": "text",
+          "body": "- Original 1974 uncropped 20th Century Fox™ logo restored\n- Original “Brian De Palma’s PHANTOM” title restored\n- Restored: Swan Song marquee / Winslow in front of the Majestic.\n- Removed: transitional “Dead Bird” logo.\n- Extended shot reinstated: “Swan Song Plaza” street sign.\n- Uncut scene: Winslow meets Swan’s greasers in the hallway.\n- Restored: uncropped “Swan Song” Rolodex shot.\n- Restored: greasers kick Winslow out / “Swan Song Enterprises” sign visible.\n- Alternate/uncut footage: Winslow barges into Swan’s office.\n- Full-length unaltered shot: “Swan Song” black boxes at Swan’s factory.\n- Uncut footage from inside Swan’s vault (parts 1 & 2).\n- Reinserted: camera montage during “Beauty & The Beast” sequence.\n- Fixed: all Dead Bird vs. Swan Song logos during the airport scene.\n- Alternate “Swan Song” footage: Winslow spying on Swan from the rooftop.\n- Extended: Winslow explores Swan’s vault and finds the contract.\n- Extended: Swan arrives at the Paradise.\n- Fixed: all Dead Bird logos during Swan’s video contract sequence.\n- Fxed: video player logo during contract scene.\n- Restored: “Swan Song” logos on multiple monitors (three shots + end credits).\n- Added: dedication to Bill Finley after end credits.\n"
+        }
+      ],
+      "price": 0.0,
+      "price_cents": 0,
+      "currency": "USD",
+      "image": "/assets/images/products/product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp",
+      "url": "https://shop.dustwave.xyz/products/phantom-of-the-paradise-the-ultimate-uncut-edition/",
+      "type": "rsvp",
+      "fulfillment_type": "rsvp",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 30.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/phantom-of-the-paradise-the-ultimate-uncut-edition/",
+        "es": "/es/products/phantom-of-the-paradise-the-ultimate-uncut-edition/"
+      },
+      "inventory_tracking": true,
+      "inventory": 20,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-11-05T19:00:00-07:00",
+        "ends_at": "2026-11-05T21:00:00-07:00",
+        "venue": "Dust Wave Microcinema",
+        "address": "709 Haines Ave NW\nAlbuquerque, NM 87102",
+        "ticket_delivery": "qr",
+        "ics": true,
+        "followup": {
+          "enabled": true,
+          "enabled_at": "2026-10-06T03:31:29.730Z"
+        },
+        "registration": {
+          "max_party_size": 20,
+          "require_contact_name": false,
+          "require_attendee_names": true,
+          "questions": []
+        }
+      },
+      "turnstile_required": false
+    },
+    {
       "id": "t-shirt-1",
       "slug": "dust-wave-t-shirt",
       "sku": "t-shirt-1",
@@ -203,7 +269,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 30.0,
+      "order": 40.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -314,7 +380,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 40.0,
+      "order": 50.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -361,7 +427,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 50.0,
+      "order": 60.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -399,7 +465,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 60.0,
+      "order": 70.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -516,7 +582,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 70.0,
+      "order": 80.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -565,7 +631,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 80.0,
+      "order": 90.0,
       "collection": "dustwave",
       "category": "prints",
       "localized_paths": {
@@ -603,7 +669,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 90.0,
+      "order": 100.0,
       "collection": "dustwave",
       "category": "media",
       "localized_paths": {
@@ -641,7 +707,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 100.0,
+      "order": 110.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -679,7 +745,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 110.0,
+      "order": 120.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -717,7 +783,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 120.0,
+      "order": 130.0,
       "collection": "dustwave",
       "category": "prints",
       "localized_paths": {
@@ -755,7 +821,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 130.0,
+      "order": 140.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -866,7 +932,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 140.0,
+      "order": 150.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -904,7 +970,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 150.0,
+      "order": 160.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -1015,7 +1081,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 160.0,
+      "order": 170.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -1062,7 +1128,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 170.0,
+      "order": 180.0,
       "collection": "dustwave",
       "category": "apparel",
       "localized_paths": {
@@ -1173,7 +1239,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": true,
       "launch_test": false,
-      "order": 180.0,
+      "order": 190.0,
       "collection": "dustwave",
       "category": "stickers",
       "localized_paths": {
@@ -1226,7 +1292,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 190.0,
+      "order": 200.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1277,7 +1343,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 200.0,
+      "order": 210.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1328,7 +1394,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 210.0,
+      "order": 220.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1379,7 +1445,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 220.0,
+      "order": 230.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1430,7 +1496,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 230.0,
+      "order": 240.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1481,7 +1547,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 240.0,
+      "order": 250.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1532,7 +1598,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 250.0,
+      "order": 260.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1583,7 +1649,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 260.0,
+      "order": 270.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1634,7 +1700,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 270.0,
+      "order": 280.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1685,7 +1751,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 280.0,
+      "order": 290.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1736,7 +1802,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 290.0,
+      "order": 300.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1787,7 +1853,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 300.0,
+      "order": 310.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1838,7 +1904,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 310.0,
+      "order": 320.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1912,7 +1978,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 320.0,
+      "order": 330.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -1986,7 +2052,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 330.0,
+      "order": 340.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2037,7 +2103,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 340.0,
+      "order": 350.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2088,7 +2154,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 350.0,
+      "order": 360.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2139,7 +2205,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 360.0,
+      "order": 370.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2190,7 +2256,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 370.0,
+      "order": 380.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2241,7 +2307,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 380.0,
+      "order": 390.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2293,7 +2359,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 390.0,
+      "order": 400.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2344,7 +2410,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "archived",
       "public": false,
       "launch_test": false,
-      "order": 400.0,
+      "order": 410.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -2382,7 +2448,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 410.0,
+      "order": 420.0,
       "collection": "fronteras",
       "category": "apparel",
       "localized_paths": {
@@ -2493,7 +2559,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 420.0,
+      "order": 430.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2531,7 +2597,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 430.0,
+      "order": 440.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2569,7 +2635,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 440.0,
+      "order": 450.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2616,7 +2682,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 450.0,
+      "order": 460.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2663,7 +2729,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 460.0,
+      "order": 470.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2701,7 +2767,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 470.0,
+      "order": 480.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2739,7 +2805,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 480.0,
+      "order": 490.0,
       "collection": "fronteras",
       "category": "prints",
       "localized_paths": {
@@ -2777,7 +2843,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 490.0,
+      "order": 500.0,
       "collection": "fronteras",
       "category": "stickers",
       "localized_paths": {
@@ -2824,7 +2890,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 500.0,
+      "order": 510.0,
       "collection": "dustwave",
       "category": "downloads",
       "localized_paths": {
@@ -2867,7 +2933,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 510.0,
+      "order": 520.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -2936,7 +3002,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": false,
       "launch_test": true,
-      "order": 520.0,
+      "order": 530.0,
       "collection": "dustwave",
       "category": "event-access",
       "localized_paths": {
@@ -3027,7 +3093,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "status": "active",
       "public": true,
       "launch_test": false,
-      "order": 530.0,
+      "order": 540.0,
       "collection": "dustwave",
       "category": "objects",
       "localized_paths": {
@@ -3091,7 +3157,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     }
   ],
-  "source_hash": "e6f7002d8f6275efc510779e0a77f1b54ad63b5a92faaa5a8edec7e39abdf256"
+  "source_hash": "8eb047c91411c2da6e220e76afc8b360edf9b3a591099e6f97d2b537b33b5a1d"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
