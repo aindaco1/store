@@ -2500,6 +2500,31 @@
       ]
     },
     {
+      "path": "assets/images/products/product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp",
+      "publicPath": "/assets/images/products/product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp",
+      "name": "product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp",
+      "label": "product phantom of the paradise the ultimate uncut edition 20261006",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 356270,
+      "sha256": "50a1326ff4b373448da42ed2b7ad0465c3740ce466c79311f0428fe93262300a",
+      "width": 2500,
+      "height": 3750,
+      "optimizationStatus": "not_applicable",
+      "expectedDerivatives": [],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/phantom-of-the-paradise-the-ultimate-uncut-edition.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/raiders-guild.jpg",
       "publicPath": "/assets/images/raiders-guild.jpg",
       "name": "raiders-guild.jpg",
