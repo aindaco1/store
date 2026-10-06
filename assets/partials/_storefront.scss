@@ -185,6 +185,11 @@
   background: var(--color-surface-base);
 }
 
+.storefront--product .store-product-card {
+  // Long product copy must not stretch the event details and purchase controls.
+  height: auto;
+}
+
 .store-product-card__media {
   display: block;
   background: var(--color-surface-subtle);
@@ -279,6 +284,11 @@
 
 .store-product-card__event-line {
   margin: 0;
+}
+
+.store-product-card__event-line--date,
+.store-product-card__event-line--venue {
+  font-weight: 700;
 }
 
 .store-product-card__event-line--venue,
