@@ -9,7 +9,7 @@ type: "rsvp"
 fulfillment_type: "rsvp"
 status: "draft"
 category: "dustwave"
-order: 1000
+order: 30
 shipping_preset: ""
 tax_category: "admission"
 inventory_tracking: true

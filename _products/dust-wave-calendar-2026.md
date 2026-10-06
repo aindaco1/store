@@ -12,7 +12,7 @@ public: false
 sitemap: false
 indexable: false
 category: dustwave
-order: 400
+order: 410
 shipping_preset: parcel
 tax_category: standard
 inventory_tracking: false
