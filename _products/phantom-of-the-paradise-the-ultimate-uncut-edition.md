@@ -7,7 +7,7 @@ price: 0
 image: "/assets/images/products/product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp"
 type: "rsvp"
 fulfillment_type: "rsvp"
-status: "draft"
+status: "active"
 category: "dustwave"
 order: 30
 shipping_preset: ""
