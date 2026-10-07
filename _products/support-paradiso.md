@@ -14,7 +14,7 @@ fulfillment_type: "service"
 status: "active"
 category: dustwave
 storefront_category: support
-order: 11
+order: 550
 shipping_preset: ""
 tax_category: "standard"
 inventory_tracking: false
