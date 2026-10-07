@@ -4518,11 +4518,11 @@ textarea.admin-settings__input--readonly {
 }
 
 .admin-store-products__table th:nth-child(4) {
-  width: 10%;
+  width: 14%;
 }
 
 .admin-store-products__table th:nth-child(5) {
-  width: 25%;
+  width: 21%;
 }
 
 .admin-store-products__table th:nth-child(6) {
@@ -4635,12 +4635,12 @@ textarea.admin-settings__input--readonly {
   display: grid;
   gap: 2px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-store-products__price strong {
   color: $color--default;
   font-size: 0.88rem;
-  white-space: nowrap;
 }
 
 .admin-store-products__price small {

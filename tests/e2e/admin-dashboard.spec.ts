@@ -75,7 +75,7 @@ async function expectNoAxeViolations(page: any, selector = '') {
   ).toEqual([]);
 }
 
-async function routeAdminWorker(page: any, options: { role?: AdminRole; productStatus?: string; localCatalog?: boolean } = {}) {
+async function routeAdminWorker(page: any, options: { role?: AdminRole; productStatus?: string; localCatalog?: boolean; productsPayload?: ReturnType<typeof storeProductsPayload> } = {}) {
   const role = options.role || 'super_admin';
   const calls: Record<string, any> = {
     authStart: [],
@@ -620,7 +620,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     if (url.pathname === '/admin/store/products' && method === 'GET') {
       calls.storeProducts.push({ method });
       calls.storeProductEvents.push('products');
-      const payload = storeProductsPayload(options.productStatus, calls.storeProductSavedOrder);
+      const payload = options.productsPayload || storeProductsPayload(options.productStatus, calls.storeProductSavedOrder);
       if (options.localCatalog) {
         Object.assign(payload.catalog, { sourceHash: (calls.localCatalogReady && !calls.localCatalogStaleReadback ? 'b' : 'a').repeat(64) });
         if (calls.localCatalogReady) {
@@ -2117,6 +2117,41 @@ async function selectAdminSection(page: any, name: string) {
 }
 
 test.describe('Admin Dashboard', () => {
+  for (const { width, lang = 'en', textScale = 100 } of [
+    { width: 1440 }, { width: 1280 }, { width: 1024 }, { width: 768 },
+    { width: 390 }, { width: 320 }, { width: 1280, lang: 'es' }, { width: 1280, textScale: 200 }
+  ]) {
+    test(`keeps product price ranges inside their column at ${width}px (${lang}, ${textScale}%)`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 1000 });
+      const productsPayload = storeProductsPayload();
+      Object.assign(productsPayload.rows[1], {
+        label: 'A Night in Paradiso Sponsorship', fulfillmentType: 'service',
+        priceCents: 10000, priceMinCents: 10000, priceMaxCents: 100000,
+        variantCount: 4, public: true, launchTest: false
+      });
+      Object.assign(productsPayload.rows[2], { priceMinCents: 9999999, priceMaxCents: 100000000 });
+      await routeAdminWorker(page, { productsPayload });
+      await gotoDomReady(page, `${lang === 'es' ? '/es' : ''}/admin/?admin_login=product-price-layout`);
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await selectAdminSection(page, lang === 'es' ? 'Productos' : 'Products');
+      const table = page.locator('.admin-store-products__table');
+      await expect(table).toContainText('A Night in Paradiso Sponsorship');
+      if (textScale !== 100) await applyTextScale(page, textScale);
+      await waitForStableRendering(page);
+      const overflowingPrices = await table.locator('.admin-store-products__price').evaluateAll(prices => {
+        return prices.filter(price => {
+          const bounds = price.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(price);
+          return Array.from(range.getClientRects()).some(rect => rect.left < bounds.left - 1 || rect.right > bounds.right + 1);
+        }).map(price => price.textContent);
+      });
+      await table.screenshot({ path: testInfo.outputPath('product-price-ranges.png') });
+      expect(overflowingPrices).toEqual([]);
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+
   test('authors a pay what you want service with suggested amounts', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     await gotoDomReady(page, '/admin/?admin_login=contribution-setup');
