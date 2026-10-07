@@ -75,7 +75,7 @@ async function expectNoAxeViolations(page: any, selector = '') {
   ).toEqual([]);
 }
 
-async function routeAdminWorker(page: any, options: { role?: AdminRole; productStatus?: string; localCatalog?: boolean } = {}) {
+async function routeAdminWorker(page: any, options: { role?: AdminRole; productStatus?: string; localCatalog?: boolean; productsPayload?: ReturnType<typeof storeProductsPayload> } = {}) {
   const role = options.role || 'super_admin';
   const calls: Record<string, any> = {
     authStart: [],
@@ -620,7 +620,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
     if (url.pathname === '/admin/store/products' && method === 'GET') {
       calls.storeProducts.push({ method });
       calls.storeProductEvents.push('products');
-      const payload = storeProductsPayload(options.productStatus, calls.storeProductSavedOrder);
+      const payload = options.productsPayload || storeProductsPayload(options.productStatus, calls.storeProductSavedOrder);
       if (options.localCatalog) {
         Object.assign(payload.catalog, { sourceHash: (calls.localCatalogReady && !calls.localCatalogStaleReadback ? 'b' : 'a').repeat(64) });
         if (calls.localCatalogReady) {
@@ -2123,17 +2123,14 @@ test.describe('Admin Dashboard', () => {
   ]) {
     test(`keeps product price ranges inside their column at ${width}px (${lang}, ${textScale}%)`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 1000 });
-      await routeAdminWorker(page);
-      await page.route(`${WORKER_BASE}/admin/store/products`, route => {
-        const payload = storeProductsPayload();
-        Object.assign(payload.rows[1], {
-          label: 'A Night in Paradiso Sponsorship', fulfillmentType: 'service',
-          priceCents: 10000, priceMinCents: 10000, priceMaxCents: 100000,
-          variantCount: 4, public: true, launchTest: false
-        });
-        Object.assign(payload.rows[2], { priceMinCents: 9999999, priceMaxCents: 100000000 });
-        return route.fulfill({ headers: JSON_HEADERS, body: JSON.stringify(payload) });
+      const productsPayload = storeProductsPayload();
+      Object.assign(productsPayload.rows[1], {
+        label: 'A Night in Paradiso Sponsorship', fulfillmentType: 'service',
+        priceCents: 10000, priceMinCents: 10000, priceMaxCents: 100000,
+        variantCount: 4, public: true, launchTest: false
       });
+      Object.assign(productsPayload.rows[2], { priceMinCents: 9999999, priceMaxCents: 100000000 });
+      await routeAdminWorker(page, { productsPayload });
       await gotoDomReady(page, `${lang === 'es' ? '/es' : ''}/admin/?admin_login=product-price-layout`);
       await expect(page.locator('#admin-app')).toBeVisible();
       await selectAdminSection(page, lang === 'es' ? 'Productos' : 'Products');
