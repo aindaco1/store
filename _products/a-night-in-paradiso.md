@@ -26,7 +26,7 @@ long_content:
 event_details:
   starts_at: "2026-10-24T19:00:00-06:00"
   ends_at: "2026-10-24T21:00:00-06:00"
-  venue: "The Cell Theatre at FUSION"
+  venue: "FUSION | The Cell"
   address: "708 1st St NW\nAlbuquerque, NM 87102"
   ticket_delivery: "qr"
   ics: true
