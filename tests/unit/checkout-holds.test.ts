@@ -258,20 +258,23 @@ describe('checkout inventory lifecycle', () => {
 });
 
 describe('public checkout gateway', () => {
-  it('checks origin and capability, returns canonical event details, and reuses a paid attempt', async () => {
+  it.each(['ticket', 'contribution'])('checks origin, settles and reuses a paid %s attempt', async (kind) => {
     const { default: worker } = await import('../../worker/src/index.js');
     const env: any = { ...(coordinator as any).env,
       SITE_BASE: 'http://127.0.0.1:4002', CORS_ALLOWED_ORIGIN: 'http://127.0.0.1:4002',
       STRIPE_WEBHOOK_SECRET_TEST: 'whsec_fixture',
+      ABANDONED_CART_TOKEN_SECRET: 'fixture_reminder_secret',
       STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_fixture', TAX_PROVIDER: 'flat', SALES_TAX_RATE: '0',
       OBSERVABILITY_SAMPLE_RATE: '0', STORE_EMAIL_DRY_RUN: 'true', ADMIN_SESSION_SECRET: 'fixture_admin_secret',
       RATELIMIT: { get: async () => null, put: async () => {} },
       STORE_INVENTORY_COORDINATOR: { idFromName: () => 'store', get: () => ({ fetch: (url: string, options: any) => coordinator.fetch(new Request(url, options)) }) }
     };
+    const background: Promise<unknown>[] = [];
     const request = (action: string, body: any, origin = 'http://127.0.0.1:4002') => worker.fetch(new Request(`http://127.0.0.1:8989/api/checkout/${action}`, {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    }), env, { waitUntil: vi.fn() } as any);
-    const cart = { attemptId: first, items: [{ id: 'a-night-in-paradiso', price: 20, quantity: 1 }], customer: { email: 'fixture@example.com' }, tipPercent: 5 };
+    }), env, { waitUntil: (task: Promise<unknown>) => background.push(task) } as any);
+    const contribution = kind === 'contribution';
+    const cart = { attemptId: first, items: [contribution ? { id: 'support-paradiso', price: 25.37, customAmountCents: 2537, quantity: 1 } : { id: 'a-night-in-paradiso', price: 20, quantity: 1 }], customer: { email: 'fixture@example.com' }, ...(contribution ? { abandonedCartConsent: true } : { tipPercent: 5 }) };
     for (const action of ['hold', 'status', 'extend', 'release']) {
       for (const origin of ['https://untrusted.example', 'null']) {
         const rejected = await request(action, cart, origin);
@@ -285,11 +288,21 @@ describe('public checkout gateway', () => {
     expect(createCount).toBe(0);
     const held = await request('hold', cart);
     expect(held.headers.get('cache-control')).toContain('no-store');
-    expect(await held.json()).toMatchObject({ success: true, heldQuantity: 1, items: [{ productId: 'a-night-in-paradiso', eventDetails: { venue: expect.any(String) } }] });
+    expect(await held.json()).toMatchObject({ success: true, heldQuantity: contribution ? 0 : 1, items: [contribution ? { productId: 'support-paradiso', eventDetails: null } : { productId: 'a-night-in-paradiso', eventDetails: { venue: expect.any(String) } }] });
     const paid = await request('intent', cart);
-    expect(await paid.json()).toMatchObject({ success: true, orderToken: `store-order-${first}`, totals: { tipPercent: 5, tipAmountCents: 100 }, paymentIntentId: 'pi_fixture' });
+    expect(await paid.json()).toMatchObject({ success: true, orderToken: `store-order-${first}`, totals: { tipPercent: contribution ? 0 : 5, tipAmountCents: contribution ? 0 : 100 }, paymentIntentId: 'pi_fixture' });
     expect((await request('intent', cart)).status).toBe(200);
     expect(createCount).toBe(1);
+    if (contribution) expect(providerAmount).toBe(2537);
+    await Promise.all(background);
+    if (contribution) {
+      const reminder = [...orders.entries()].find(([key]) => key.startsWith('abandoned-cart:'));
+      expect(reminder).toBeDefined();
+      expect(JSON.parse(reminder![1]).resumeSnapshot.cart).toMatchObject({
+        tipPercent: 0,
+        items: [{ customAmountCents: 2537, price: 25.37, pricingMode: 'pay_what_you_want' }]
+      });
+    }
     const stored = JSON.parse(orders.get(`orders:store-order-${first}`)!);
     const intent = { id: 'pi_fixture', amount: stored.payment.amountCents, currency: 'usd', status: 'requires_payment_method',
       metadata: { checkoutProvider: 'first_party', orderToken: stored.orderToken, orderHash: stored.orderHash } };
@@ -309,6 +322,7 @@ describe('public checkout gateway', () => {
     expect((await webhook('payment_intent.succeeded', 'evt_success')).status).toBe(200);
     expect((await webhook('payment_intent.succeeded', 'evt_success_replay')).status).toBe(200);
     expect(JSON.parse(orders.get(`orders:store-order-${first}`)!).status).toBe('confirmed');
-    expect((await call('snapshot')).inventory['a-night-in-paradiso'].claimed).toBe(1);
+    if (!contribution) expect((await call('snapshot')).inventory['a-night-in-paradiso'].claimed).toBe(1);
+    else expect(JSON.parse(orders.get(`orders:store-order-${first}`)!).orderDraft.items[0]).toMatchObject({ unitPriceCents: 2537, fulfillmentType: 'service' });
   });
 });

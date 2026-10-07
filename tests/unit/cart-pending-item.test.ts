@@ -129,6 +129,35 @@ describe('first-party pending cart handoff', () => {
     expect(persisted.tipTouched).toBe(true);
   });
 
+  it('preserves a chosen contribution across add, replacement and reload with an opt-in tip', async () => {
+    localStorage.clear();
+    (window as any).STORE_CONFIG.addOns = { enabled: false, products: [{
+      id: 'support-paradiso', name: 'Support Paradiso', price: 10,
+      fulfillment_type: 'service', category: 'service', pricing_mode: 'pay_what_you_want', variants: []
+    }] };
+    await import('../../assets/js/cart-provider.js');
+    let provider = (window as any).StoreCartProvider;
+    let api = await provider.whenReady();
+    const contribution = { id: 'support-paradiso', name: 'Support Paradiso', price: 25.37, customAmountCents: 2537, quantity: 1, stackable: true, customFields: [{ name: '_product_type', value: 'service' }] };
+    await api.api.cart.items.add(contribution);
+    expect(provider.store.getState().cart).toMatchObject({ subtotal: 25.37, total: 25.37, tipPercent: 0, tipTouched: false });
+    expect(provider.store.getState().cart.items.items[0]).toMatchObject({ customAmountCents: 2537, price: 25.37, quantity: 1, maxQuantity: 1 });
+    await api.api.cart.items.add({ ...contribution, customAmountCents: 5000, price: 50 });
+    expect(provider.store.getState().cart.items.items).toHaveLength(1);
+    expect(provider.store.getState().cart.items.items[0]).toMatchObject({ customAmountCents: 5000, price: 50, quantity: 1 });
+    const saved = JSON.parse(localStorage.getItem('store_first_party_cart_state') || '{}');
+    expect(saved.items[0]).toMatchObject({ customAmountCents: 5000, pricingMode: 'pay_what_you_want' });
+    delete (window as any).StoreCartProvider;
+    vi.resetModules();
+    await import('../../assets/js/cart-provider.js');
+    provider = (window as any).StoreCartProvider;
+    api = await provider.whenReady();
+    expect(provider.store.getState().cart).toMatchObject({ subtotal: 50, tipPercent: 0 });
+    expect(provider.store.getState().cart.items.items[0].price).toBe(50);
+    await api.api.cart.update({ tipPercent: 5 });
+    expect(provider.store.getState().cart).toMatchObject({ total: 52.5, tipPercent: 5, tipTouched: true });
+  });
+
   it('preserves postal-code edits and clearing across tax-quote and form aliases', async () => {
     await import('../../assets/js/cart-provider.js');
     const provider = (window as any).StoreCartProvider;

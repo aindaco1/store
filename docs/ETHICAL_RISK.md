@@ -136,3 +136,23 @@ bound provider use and prevent a failed evaluator from implying approval.
 Its English/Spanish controls are engineering judgments: operator review remains
 necessary before adopting a gate or changing customer copy. No payment, email
 send, deployment, or translation approval follows automatically from a score.
+
+## Pay what you want — 2026-10-07
+
+- **Money and understanding:** Presets are suggestions, the custom field remains
+  available, standard tax is disclosed before checkout, coupons cannot reduce the
+  chosen contribution, and the optional tip defaults to zero. Integer-cent bounds,
+  canonical product eligibility, explicit Pay and existing payment hashes/retries
+  prevent hidden multiplication or a new charge during recovery.
+- **Claims and visibility:** The Paradiso product describes a one-time contribution
+  without admission or sponsorship benefits. It makes no tax-deductibility promise.
+  Structured data publishes a minimum price specification rather than presenting
+  the starting suggestion as a mandatory price.
+- **Data and messaging:** Existing private order storage, retention and transactional
+  receipts are reused. No donor list, public total, new customer field, background
+  campaign send, or new storage family is introduced.
+- **Access and administration:** Presets and custom entry use labeled keyboard
+  controls and existing English/Spanish system copy. Admin preview/publish uses
+  the same role, origin, CSRF and repository boundaries. The user selected presets,
+  standalone fulfillment, coupon exclusion, zero default tip and standard tax in
+  this task; local verification and production release remain separate.

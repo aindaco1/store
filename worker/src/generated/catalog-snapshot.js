@@ -89,7 +89,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "price": 20.0,
       "price_cents": 2000,
       "currency": "USD",
-      "image": "/assets/images/products/product-a-night-in-paradiso-20260907-020545.png",
+      "image": "/assets/images/products/product-a-night-in-paradiso-20261007-212149.png",
       "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso/",
       "type": "ticket",
       "fulfillment_type": "ticket",
@@ -119,7 +119,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "event_details": {
         "starts_at": "2026-10-24T19:00:00-06:00",
         "ends_at": "2026-10-24T21:00:00-06:00",
-        "venue": "The Cell Theatre at FUSION",
+        "venue": "FUSION | The Cell",
         "address": "708 1st St NW\nAlbuquerque, NM 87102",
         "ticket_delivery": "qr",
         "ics": true,
@@ -128,6 +128,56 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "enabled_at": "2026-09-03T20:42:19.881Z"
         }
       },
+      "turnstile_required": false
+    },
+    {
+      "id": "support-paradiso",
+      "slug": "support-paradiso",
+      "sku": "support-paradiso",
+      "name": "Support Paradiso",
+      "description": "Help bring R. Barela's short film Paradiso to life with a contribution of your choice.",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Help bring *Paradiso*, the psychological-thriller short film written and directed by **R. Barela**, to life.\n\nWhether you're joining **A Night in Paradiso** or supporting from afar, choose a suggested amount or enter your own. Your contribution supports the film's production.\n\nThis is a one-time contribution. Event admission and sponsorship benefits are sold separately. You'll receive an order confirmation by email.\n\n[Get tickets for A Night in Paradiso](/products/a-night-in-paradiso/) · [Explore sponsorships](/products/a-night-in-paradiso-sponsorship/)\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "pricing_mode": "pay_what_you_want",
+      "suggested_amounts": [
+        10,
+        25,
+        50,
+        100
+      ],
+      "currency": "USD",
+      "image": "/assets/images/products/product-a-night-in-paradiso-20261007-212149.png",
+      "url": "https://shop.dustwave.xyz/products/support-paradiso/",
+      "type": "service",
+      "fulfillment_type": "service",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 11.0,
+      "collection": "dustwave",
+      "category": "support",
+      "localized_paths": {
+        "en": "/products/support-paradiso/",
+        "es": "/es/products/support-paradiso/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "standard",
       "turnstile_required": false
     },
     {
@@ -3157,7 +3207,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     }
   ],
-  "source_hash": "8eb047c91411c2da6e220e76afc8b360edf9b3a591099e6f97d2b537b33b5a1d"
+  "source_hash": "54ede9d7b07547f7f281a7e2ceef40d24ff50a2bd0544b9d424c4ebb9ddd7cf8"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

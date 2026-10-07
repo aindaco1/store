@@ -381,6 +381,7 @@
 }
 
 .store-product-card__select,
+.store-product-card__amount-input,
 .store-product-card__qty {
   @include field-shell;
   min-width: 0;
@@ -756,3 +757,39 @@
     display: none;
   }
 }
+
+// Contributions share product controls on catalog and detail pages.
+.store-product-card__controls--contribution {
+  grid-template-columns: minmax(0, 1fr);
+}
+.store-product-card__contribution {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  grid-column: 1 / -1;
+}
+.store-product-card__amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.store-product-card__amount {
+  flex: 1 1 auto;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: var(--button-radius, 4px);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.store-product-card__amount[aria-pressed="true"] {
+  border-width: 3px;
+  font-weight: bold;
+}
+.store-product-card__amount:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.store-product-card__amount-input { min-height: 44px; }

@@ -1,3 +1,5 @@
+import { PAY_WHAT_YOU_WANT } from './product-pricing.js';
+
 export const STORE_COUPONS_STORAGE_KEY = 'store-coupons:v1';
 
 const COUPON_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{1,39}$/;
@@ -358,7 +360,7 @@ function getCouponEligibleItemIndexes(items = [], coupon = {}) {
   if (appliesTo === 'cart') {
     return items
       .map((_item, index) => index)
-      .filter((index) => normalizeCents(items[index]?.subtotalCents) > 0);
+      .filter((index) => items[index]?.pricingMode !== PAY_WHAT_YOU_WANT && normalizeCents(items[index]?.subtotalCents) > 0);
   }
   const productIds = new Set((Array.isArray(coupon.productIds) ? coupon.productIds : [])
     .map((productId) => String(productId || '').trim())
@@ -366,7 +368,7 @@ function getCouponEligibleItemIndexes(items = [], coupon = {}) {
   if (productIds.size === 0) return [];
   return items
     .map((item, index) => productIds.has(String(item?.productId || '').trim()) ? index : -1)
-    .filter((index) => index >= 0 && normalizeCents(items[index]?.subtotalCents) > 0);
+    .filter((index) => index >= 0 && items[index]?.pricingMode !== PAY_WHAT_YOU_WANT && normalizeCents(items[index]?.subtotalCents) > 0);
 }
 
 function allocateDiscountCents(items = [], eligibleIndexes = [], targetDiscountCents = 0) {

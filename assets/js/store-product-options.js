@@ -418,6 +418,20 @@
     var unitPrice = variant && Number.isFinite(variant.price) && variant.price >= 0
       ? variant.price
       : basePrice;
+    var amountInput = controls.querySelector('[data-store-contribution-amount]');
+    var amountValid = true;
+    if (amountInput) {
+      quantity = 1;
+      amountValid = /^\d+(?:\.\d{1,2})?$/.test(amountInput.value) && amountInput.validity.valid;
+      unitPrice = amountValid ? Number(amountInput.value) : 0;
+      button.setAttribute('data-custom-amount-cents', amountValid ? String(Math.round(unitPrice * 100)) : '');
+      amountInput.setAttribute('aria-invalid', amountValid ? 'false' : 'true');
+      var error = controls.querySelector('[data-store-amount-error]');
+      if (error) error.hidden = amountValid;
+      controls.querySelectorAll('[data-store-suggested-amount]').forEach(function(preset) {
+        preset.setAttribute('aria-pressed', amountValid && Number(preset.dataset.storeSuggestedAmount) === unitPrice ? 'true' : 'false');
+      });
+    }
     var labelBase = button.getAttribute('data-store-button-label') || 'Add to Cart';
     var priceElement = getPriceElement(controls);
 
@@ -439,8 +453,8 @@
     }
     var currentAvailability = syncAvailability(controls, variant, button);
     var isUnavailable = currentAvailability.state === 'unavailable';
-    button.disabled = isUnavailable;
-    button.setAttribute('aria-disabled', isUnavailable ? 'true' : 'false');
+    button.disabled = isUnavailable || !amountValid;
+    button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
 
     var total = unitPrice * quantity;
     var soldOutLabel = button.getAttribute('data-store-sold-out-label') || 'Sold out';
@@ -542,6 +556,12 @@
     });
 
     document.addEventListener('click', function(event) {
+      var preset = event.target?.closest?.('[data-store-suggested-amount]');
+      if (preset) {
+        event.preventDefault();
+        var amount = getControls(preset)?.querySelector('[data-store-contribution-amount]');
+        if (amount) amount.value = preset.dataset.storeSuggestedAmount;
+      }
       var stepTrigger = event.target?.closest?.('[data-store-quantity-step]');
       if (stepTrigger) {
         event.preventDefault();

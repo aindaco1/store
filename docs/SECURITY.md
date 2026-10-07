@@ -150,6 +150,12 @@ The browser cart is convenience state only. The Worker recalculates and validate
 - free-order versus paid PaymentIntent behavior
 - configured RSVP registration windows, party size, exact attendee rows, required names/answers, and allowed choices from the current repository product
 
+Contribution amounts are an explicit catalog-authorized input, never a general
+price override. `worker/src/product-pricing.js` is shared by admin normalization,
+content auditing and canonical checkout. Invalid, missing, fractional, negative,
+below-floor or above-ceiling cents fail before payment; fixed-price products
+reject the field. Coupon eligibility derives from canonical pricing mode.
+
 Tampered carts must fail closed with `422` before Stripe work begins. Paid Store orders become confirmed only through a valid Stripe `payment_intent.succeeded` webhook whose metadata and order hash match the stored draft. Failed/canceled payments release reservations.
 
 Guest names and RSVP answers are submission data, not cart persistence. They remain in memory before checkout, are excluded from Stripe metadata, logs, audit payloads, public catalog data, and transactional email answers, and become authoritative only inside the protected order record after Worker validation. The non-sensitive form schema may be persisted so a cart can recover its fields.

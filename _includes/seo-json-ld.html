@@ -154,7 +154,7 @@
         "@type": "Offer",
         "url": {{ site_base | append: page.url | jsonify }},
         "priceCurrency": "USD",
-        "price": {{ product_price | jsonify }},
+        {% if page.pricing_mode == 'pay_what_you_want' %}"priceSpecification": { "@type": "PriceSpecification", "minPrice": 0.5, "priceCurrency": "USD" },{% else %}"price": {{ product_price | jsonify }},{% endif %}
         "availability": {{ product_availability | jsonify }},
         "itemCondition": "https://schema.org/NewCondition",
         "hasMerchantReturnPolicy": {

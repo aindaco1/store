@@ -57,6 +57,7 @@
             "name": {{ product.name | jsonify }},
             "description": {{ product.description | default: product.content | strip_html | strip | jsonify }},
             "image_url": {{ product.image | jsonify }},
+            "pricing_mode": {{ product.pricing_mode | default: "fixed" | jsonify }},
             "price": {{ product.price | default: 0 | plus: 0 }},
             "inventory": {{ product.inventory | jsonify }},
             "inventory_tracking": {{ product.inventory_tracking | default: false | jsonify }},

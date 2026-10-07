@@ -297,7 +297,10 @@ for (const filePath of htmlFiles) {
       for (const offer of offers) {
         for (const field of ['price', 'priceCurrency', 'availability', 'itemCondition', 'seller']) {
           const isFreePrice = field === 'price' && offer?.[field] === 0;
-          if (!offer?.[field] && !isFreePrice) errors.push(`${route}: Offer JSON-LD missing ${field}`);
+          const isVariablePrice = field === 'price' && offer?.priceSpecification?.['@type'] === 'PriceSpecification' &&
+            Number.isFinite(offer.priceSpecification.minPrice) && offer.priceSpecification.minPrice > 0 &&
+            offer.priceSpecification.priceCurrency === offer.priceCurrency;
+          if (!offer?.[field] && !isFreePrice && !isVariablePrice) errors.push(`${route}: Offer JSON-LD missing ${field}`);
         }
         const policyId = organization?.hasMerchantReturnPolicy?.['@id'];
         if (!policyId || offer?.hasMerchantReturnPolicy?.['@id'] !== policyId) {

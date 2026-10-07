@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add opt-in pay-what-you-want service pricing with suggested amounts, custom USD
+  entry, canonical validation, coupon exclusion and a 0% default optional tip.
+  Reuse Store checkout, receipts, private orders and reporting.
+- Add the standalone Support Paradiso product with $10 / $25 / $50 / $100
+  suggestions and standard tax; add English/Spanish controls and dashboard editing.
+
 ## v1.3.10 - 2026-10-04
 
 - Adopt Dust Wave Platform 0.43.0, including shared image removal and upload

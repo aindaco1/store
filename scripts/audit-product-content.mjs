@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import { normalizeProductPricing } from '../worker/src/product-pricing.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -260,6 +261,23 @@ export function auditProductContent(repoRoot) {
     }
 
     const variants = parseVariantBlocks(frontMatter);
+    const pricingMode = readTopLevelScalar(frontMatter, 'pricing_mode') || 'fixed';
+    let suggestedAmounts = [];
+    try {
+      const inline = readTopLevelScalar(frontMatter, 'suggested_amounts');
+      const block = frontMatter.match(/^suggested_amounts:[ \t]*\r?\n((?:[ \t]*-[^\n]*\n?)+)/m);
+      suggestedAmounts = inline ? JSON.parse(inline) : block ? block[1].trim().split(/\r?\n/).map((line) => Number(line.replace(/^\s*-\s*/, ''))) : [];
+    } catch (_) { suggestedAmounts = null; }
+    const pricing = normalizeProductPricing({
+      pricing_mode: pricingMode,
+      suggested_amounts: suggestedAmounts === null ? false : suggestedAmounts,
+      price_cents: Math.round(Number(fields.price) * 100),
+      fulfillment_type: fields.fulfillment_type,
+      currency: readTopLevelScalar(frontMatter, 'currency') || 'USD',
+      inventory_tracking: inventoryTracking,
+      variants
+    });
+    failures.push(...pricing.errors.map((message) => `${relPath}: ${message}`));
     const seenVariantIds = new Set();
     for (const variant of variants) {
       if (!variant.id) {

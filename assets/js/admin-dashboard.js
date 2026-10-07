@@ -5078,6 +5078,8 @@
   var storeProductFieldHelpText = {
     name: 'Public product name shown on product cards, checkout, receipts, and admin lists.',
     sku: 'Legacy product SKU used for historical orders and grandfathered product IDs. Read-only.',
+    pricingMode: localizedAdminText('pricingModeHelp'),
+    suggestedAmounts: localizedAdminText('suggestedAmountsHelp'),
     price: 'Base product price in US dollars. Variants can override this when Variant Based is Yes.',
     status: 'Controls whether the product is public, draft-only, archived, or sold out.',
     fulfillmentType: 'Determines whether this product ships, unlocks a download, creates a ticket, records an RSVP, or represents a service with no automatic fulfillment artifact.',
@@ -8559,6 +8561,10 @@
     commerce.appendChild(productField('Calendar', 'eventIcs', product.eventIcs === false ? 'false' : 'true', 'select', {
       options: [['true', 'Yes'], ['false', 'No']]
     }));
+    commerce.appendChild(productField(localizedAdminText('pricingMode'), 'pricingMode', product.pricingMode || 'fixed', 'select', {
+      options: [['fixed', localizedAdminText('fixedPrice')], ['pay_what_you_want', localizedAdminText('payWhatYouWant')]]
+    }));
+    commerce.appendChild(productField(localizedAdminText('suggestedAmounts'), 'suggestedAmounts', (product.suggestedAmounts || []).join(', '), 'text'));
     eventDetails.appendChild(productField('Starts at', 'eventStartsAt', product.eventStartsAt || product.eventDetails?.startsAt || '', 'datetime-local'));
     eventDetails.appendChild(productField('Ends at', 'eventEndsAt', product.eventEndsAt || product.eventDetails?.endsAt || '', 'datetime-local'));
     var eventFollowupLocked = product.eventFollowupLocked === true;
@@ -8617,7 +8623,7 @@
         syncStoreProductTaxCategoryForFulfillment(form, event.target);
         syncStoreProductFulfillmentDependentFields(form);
       }
-      if (event.target && event.target.dataset && event.target.dataset.storeProductField === 'inventoryTracking') {
+      if (event.target && event.target.dataset && ['inventoryTracking', 'pricingMode'].includes(event.target.dataset.storeProductField)) {
         syncStoreProductFulfillmentDependentFields(form);
       }
       if (event.target && event.target.dataset && event.target.dataset.storeProductField === 'rsvpRegistrationEnabled') {
@@ -8702,6 +8708,9 @@
   function syncStoreProductFulfillmentDependentFields(form) {
     var fulfillment = $('[data-store-product-field="fulfillmentType"]', form);
     var fulfillmentType = fulfillment ? fulfillment.value : 'physical';
+    var pricingMode = $('[data-store-product-field="pricingMode"]', form);
+    var contribution = pricingMode && pricingMode.value === 'pay_what_you_want';
+    setStoreProductFieldVisible(form, 'suggestedAmounts', contribution);
     var physical = isPhysicalFulfillment(fulfillmentType);
     var digital = isDigitalFulfillment(fulfillmentType);
     var eventProduct = isEventFulfillment(fulfillmentType);
@@ -9082,7 +9091,8 @@
     $all('[data-store-product-field]', form).forEach(function(input) {
       if (input.disabled) return;
       var key = input.dataset.storeProductField;
-      if (key === 'price') fields[key] = Number(input.value || 0);
+      if (key === 'suggestedAmounts') fields[key] = input.value.trim() ? input.value.split(',').map(function(value) { return value.trim() ? Number(value.trim()) : null; }) : [];
+      else if (key === 'price') fields[key] = Number(input.value || 0);
       else if (key === 'inventory' || key === 'rsvpMaxPartySize') fields[key] = input.value === '' ? '' : Number(input.value);
       else if (key === 'inventoryTracking') fields[key] = input.value === 'true';
       else if (key === 'eventIcs' || key === 'eventFollowupEnabled' || key === 'rsvpRegistrationEnabled' || key === 'rsvpRequireContactName' || key === 'rsvpRequireAttendeeNames') fields[key] = input.value === 'true';

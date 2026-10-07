@@ -2117,6 +2117,28 @@ async function selectAdminSection(page: any, name: string) {
 }
 
 test.describe('Admin Dashboard', () => {
+  test('authors a pay what you want service with suggested amounts', async ({ page }) => {
+    const calls = await routeAdminWorker(page);
+    await gotoDomReady(page, '/admin/?admin_login=contribution-setup');
+    await expect(page.locator('#admin-app')).toBeVisible();
+    await selectAdminSection(page, 'Products');
+    await page.locator('#admin-store-product-create').click();
+    const editor = page.locator('[data-store-product-editor="__new_store_product__"]');
+    await editor.locator('[data-store-product-field="name"]').fill('Support Test Film');
+    await editor.locator('[data-store-product-field="fulfillmentType"]').selectOption('service');
+    await editor.locator('[data-store-product-field="inventoryTracking"]').selectOption('false');
+    await editor.locator('[data-store-product-field="pricingMode"]').selectOption('pay_what_you_want');
+    await expect(editor.locator('[data-store-product-field="suggestedAmounts"]')).toBeVisible();
+    await editor.locator('[data-store-product-field="price"]').fill('10');
+    await editor.locator('[data-store-product-field="suggestedAmounts"]').fill('10, 25, 50, 100');
+    await expect.poll(() => calls.storeProductPreviews.some((body: any) => body.fields?.suggestedAmounts?.length === 4)).toBe(true);
+    await editor.locator('[data-store-product-publish]').click();
+    await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
+    expect(calls.storeProductPublishes[0]).toMatchObject({ createProduct: true, fields: {
+      fulfillmentType: 'service', pricingMode: 'pay_what_you_want', suggestedAmounts: [10, 25, 50, 100], price: 10, inventoryTracking: false
+    }, variants: [] });
+  });
+
   test('covers Store admin login, settings, readiness, plan usage, analytics, marketing, orders, products, downloads, and inventory', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     const sandboxScriptErrors: string[] = [];

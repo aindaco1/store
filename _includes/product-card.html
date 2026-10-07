@@ -9,6 +9,8 @@
 {%- if unavailable_statuses contains product_status -%}
   {%- assign product_unavailable = true -%}
 {%- endif -%}
+{%- assign contribution = false -%}
+{%- if product.pricing_mode == 'pay_what_you_want' -%}{%- assign contribution = true -%}{%- endif -%}
 {%- assign product_price = product.price | plus: 0 -%}
 {%- assign product_inventory = product.inventory | default: 0 | plus: 0 -%}
 {%- assign tracks_inventory = false -%}
@@ -240,7 +242,7 @@
     </div>
     {%- endif -%}
     <div class="store-product-card__purchase">
-      <p class="store-product-card__price" data-store-price>{% if selected_is_free %}Free{% else %}{{ selected_product_price | money }}{% endif %}</p>
+      <p class="store-product-card__price" {% unless contribution %}data-store-price{% endunless %}>{% if contribution %}{% include t.html key="storefront.pay_what_you_want" lang=current_lang %}{% else %}{% if selected_is_free %}Free{% else %}{{ selected_product_price | money }}{% endif %}{% endif %}</p>
       <p
         class="store-product-card__availability"
         data-store-availability
@@ -265,7 +267,7 @@
         {%- endif -%}
       </p>
 
-      <div class="store-product-card__controls{% if has_variants or product.type == 'shirt' %} store-product-card__controls--with-option{% else %} store-product-card__controls--simple{% endif %}" data-store-product-controls>
+      <div class="store-product-card__controls{% if contribution %} store-product-card__controls--contribution{% endif %}{% if has_variants or product.type == 'shirt' %} store-product-card__controls--with-option{% else %} store-product-card__controls--simple{% endif %}" data-store-product-controls>
         {%- if has_variants -%}
         <div class="store-product-card__field store-product-card__field--option">
           {%- assign variant_option_name = product.variant_option_name | default: "" | strip -%}
@@ -317,6 +319,17 @@
         </div>
         {%- endif -%}
 
+        {% if contribution %}
+        <div class="store-product-card__contribution">
+          <div class="store-product-card__amounts" role="group" aria-label="{% include t.html key='storefront.suggested_amounts' lang=current_lang %}">
+            {% for amount in product.suggested_amounts %}<button type="button" class="store-product-card__amount" data-store-suggested-amount="{{ amount }}" aria-pressed="{% if amount == product_price %}true{% else %}false{% endif %}">{{ amount | money }}</button>{% endfor %}
+          </div>
+          <label class="store-product-card__label" for="{{ product_id }}-amount">{% include t.html key="storefront.your_amount" lang=current_lang %}</label>
+          <input class="store-product-card__amount-input" id="{{ product_id }}-amount" type="number" inputmode="decimal" min="0.50" max="1000000" step="0.01" required value="{{ product_price }}" data-store-contribution-amount aria-describedby="{{ product_id }}-amount-help {{ product_id }}-amount-error">
+          <small id="{{ product_id }}-amount-help">{% include t.html key="storefront.contribution_help" lang=current_lang %}</small>
+          <small id="{{ product_id }}-amount-error" data-store-amount-error role="status" hidden>{% include t.html key="storefront.contribution_error" lang=current_lang %}</small>
+        </div>
+        {% else %}
         <div class="store-product-card__field store-product-card__field--quantity">
           <label class="store-product-card__label" for="{{ product_id }}-qty">{% include t.html key="storefront.quantity_label" lang=current_lang %}</label>
           <div class="store-product-card__stepper">
@@ -326,7 +339,9 @@
           </div>
         </div>
 
+        {% endif %}
         <button
+          {% if contribution %}data-pricing-mode="pay_what_you_want" data-custom-amount-cents="{{ product_price | times: 100 | round }}" data-item-max-quantity="1"{% endif %}
           class="store-add-item store-product-card__button"
           data-item-id="{{ selected_product_item_id }}"
           data-item-name="{{ product_display_name | escape }}"

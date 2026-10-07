@@ -12,6 +12,12 @@ nav:
   close_menu: Close menu
   home_aria: "%{title} home"
 admin:
+  pricingMode: "Pricing"
+  fixedPrice: "Fixed price"
+  payWhatYouWant: "Pay what you want"
+  suggestedAmounts: "Suggested amounts (USD)"
+  pricingModeHelp: "Pay what you want is available for services without variants or inventory tracking. Price is the starting amount. Coupons are excluded and the optional tip starts at 0%."
+  suggestedAmountsHelp: "Enter up to six amounts separated by commas, such as 10, 25, 50, 100."
   user_role_help: Super admins can manage everything, including Store settings and users. Limited admins can manage all Store operations but cannot change settings or manage users.
   page_title: Admin Dashboard
   login_title: Admin sign-in
@@ -292,6 +298,11 @@ misc:
   skip_to_main: Skip to main content
   video_not_supported: Your browser does not support the video tag.
 storefront:
+  pay_what_you_want: "Pay what you want"
+  suggested_amounts: "Suggested amounts"
+  your_amount: "Your amount (USD)"
+  contribution_help: "Choose an amount or enter your own. Minimum $0.50. Tax is calculated at checkout."
+  contribution_error: "Enter an amount from $0.50 to $1,000,000 with no more than two decimal places."
   filters:
     product_collections: Product collections
     collection: Collection

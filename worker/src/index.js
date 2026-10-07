@@ -1,3 +1,4 @@
+import { PAY_WHAT_YOU_WANT, normalizeProductPricing } from './product-pricing.js';
 /**
  * Store Worker
  *
@@ -4953,6 +4954,7 @@ function buildAbandonedCartResumeItem(item = {}) {
     id: variantId ? `${productId}__${variantId}` : productId,
     name: String(item.name || productId),
     price: Math.max(0, Number(item.unitPriceCents || 0) || 0) / 100,
+    ...(item.pricingMode === PAY_WHAT_YOU_WANT ? { pricingMode: PAY_WHAT_YOU_WANT, customAmountCents: item.unitPriceCents } : {}),
     quantity: Math.max(1, Number(item.quantity || 1) || 1),
     url: String(item.url || '/'),
     description: '',
@@ -9018,6 +9020,8 @@ function buildAdminStoreProductRow({
     variantCount,
     shippingPreset: fulfillmentType === 'physical' ? String(product.shipping_preset || '').trim() : '',
     taxCategory: String(product.tax_category || '').trim(),
+    pricingMode: product.pricing_mode || 'fixed',
+    suggestedAmounts: product.suggested_amounts || [],
     variantOptionName: String(product.variant_option_name || '').trim(),
     image,
     url,
@@ -9121,6 +9125,8 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}, env = {}) 
         ? product.longContent
         : [],
     priceCents: adminStoreProductPriceCents(product),
+    pricingMode: product.pricing_mode || 'fixed',
+    suggestedAmounts: product.suggested_amounts || [],
     currency: String(product?.currency || 'USD').trim() || 'USD',
     image: String(product?.image || '').trim(),
     url: String(product?.url || '').trim(),
@@ -9954,6 +9960,27 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
     changedFields.push('variants');
   }
 
+  const pricingProduct = {
+    ...product,
+    pricing_mode: fields.pricingMode ?? product?.pricing_mode ?? 'fixed',
+    suggested_amounts: fields.suggestedAmounts ?? product?.suggested_amounts ?? [],
+    fulfillment_type: nextFulfillmentType,
+    inventory_tracking: fields.inventoryTracking ?? fields.inventory_tracking ?? product?.inventory_tracking,
+    variants: variantBased ? (submittedVariants ?? product?.variants ?? []) : [],
+    price_cents: hasAdminStoreProductPatchField(fields, 'priceCents') ? fields.priceCents
+      : hasAdminStoreProductPatchField(fields, 'price') ? Math.round(Number(fields.price) * 100) : product?.price_cents
+  };
+  const pricing = normalizeProductPricing(pricingProduct);
+  errors.push(...pricing.errors);
+  if (hasAdminStoreProductPatchField(fields, 'pricingMode')) {
+    frontMatter.push({ key: 'pricing_mode', replacement: adminStoreProductScalarLine('pricing_mode', pricing.mode, 'string') });
+    changedFields.push('pricingMode');
+  }
+  if (hasAdminStoreProductPatchField(fields, 'suggestedAmounts') || hasAdminStoreProductPatchField(fields, 'pricingMode')) {
+    frontMatter.push({ key: 'suggested_amounts', replacement: `suggested_amounts: ${JSON.stringify(pricing.suggestedAmounts)}` });
+    changedFields.push('suggestedAmounts');
+  }
+
   if (!changedFields.length && !errors.length && options.requireChanges !== false) {
     errors.push('No product fields were submitted.');
   }
@@ -10461,6 +10488,8 @@ function buildAdminStoreProductPreviewVariantOptions(product = {}, selectedVaria
 function buildAdminStoreProductPreviewProduct(product = {}, body = {}) {
   const fields = body?.fields && typeof body.fields === 'object' ? body.fields : {};
   const preview = { ...product };
+  if (hasAdminStoreProductPatchField(fields, 'pricingMode')) preview.pricing_mode = fields.pricingMode;
+  if (hasAdminStoreProductPatchField(fields, 'suggestedAmounts')) preview.suggested_amounts = fields.suggestedAmounts;
   if (hasAdminStoreProductPatchField(fields, 'name')) preview.name = String(fields.name || '').trim();
   if (hasAdminStoreProductPatchField(fields, 'seoDescription')) preview.description = String(fields.seoDescription || '').trim();
   else if (hasAdminStoreProductPatchField(fields, 'seo_description')) preview.description = String(fields.seo_description || '').trim();
@@ -10621,7 +10650,8 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
   const eventHtml = buildAdminStoreProductPreviewEventHtml(product, env);
   const variants = Array.isArray(product.variants) ? product.variants : [];
   const hasVariants = variants.length > 0;
-  const controlsClass = hasVariants ? 'store-product-card__controls--with-option' : 'store-product-card__controls--simple';
+  const contribution = product.pricing_mode === PAY_WHAT_YOU_WANT;
+  const controlsClass = contribution ? 'store-product-card__controls--contribution' : hasVariants ? 'store-product-card__controls--with-option' : 'store-product-card__controls--simple';
   const optionLabel = String(product.variant_option_name || 'Option').trim();
   const imageHtml = image
     ? `<img class="store-product-card__image" src="${escapeAdminStorePreviewAttribute(image)}" alt="${escapeAdminStorePreviewAttribute(name)}" loading="eager" decoding="async" fetchpriority="high">`
@@ -10655,11 +10685,16 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
         <div class="store-product-card__body">
           ${eventHtml}
           <div class="store-product-card__purchase">
-            <p class="store-product-card__price" data-store-price>${isFree ? 'Free' : escapeAdminStorePreviewHtml(price)}</p>
+            <p class="store-product-card__price" data-store-price>${contribution ? 'Pay what you want' : isFree ? 'Free' : escapeAdminStorePreviewHtml(price)}</p>
             <p class="store-product-card__availability" data-store-availability data-store-inventory-state="none"></p>
             <div class="store-product-card__controls ${controlsClass}" data-store-product-controls>
               ${optionHtml}
-              <div class="store-product-card__field store-product-card__field--quantity">
+              ${contribution ? `<div class="store-product-card__contribution">
+                <div class="store-product-card__amounts">${(product.suggested_amounts || []).map((amount) => `<button class="store-product-card__amount" type="button" disabled>${escapeAdminStorePreviewHtml(formatAdminStorePreviewPrice(Math.round(amount * 100), 'USD'))}</button>`).join('')}</div>
+                <label class="store-product-card__label" for="preview-amount">Your amount (USD)</label>
+                <input class="store-product-card__amount-input" id="preview-amount" type="number" value="${selectedPriceCents / 100}" disabled>
+                <small>Choose an amount or enter your own. Minimum $0.50. Tax is calculated at checkout.</small>
+              </div>` : `<div class="store-product-card__field store-product-card__field--quantity">
                 <label class="store-product-card__label" for="${escapeAdminStorePreviewAttribute(productId)}-qty">Quantity</label>
                 <div class="store-product-card__stepper">
                   <button class="store-product-card__stepper-button" type="button" disabled aria-disabled="true" aria-label="Decrease quantity">-</button>
@@ -10667,6 +10702,7 @@ function buildAdminStoreProductPreviewHtml(product = {}, env = {}) {
                   <button class="store-product-card__stepper-button" type="button" disabled aria-disabled="true" aria-label="Increase quantity">+</button>
                 </div>
               </div>
+              `}
               <button class="store-add-item store-product-card__button" type="button" disabled aria-disabled="true" data-store-button-label="${escapeAdminStorePreviewAttribute(buttonLabel)}">${escapeAdminStorePreviewHtml(buttonText)}</button>
             </div>
           </div>

@@ -1430,7 +1430,16 @@
     return { candidateCount, totalCents, invalid };
   }
 
+  function isContributionItem(item) {
+    return item?.pricingMode === 'pay_what_you_want';
+  }
+
+  function cartDefaultTipPercent(items) {
+    return items.some(isContributionItem) ? 0 : getDefaultPlatformTipPercent();
+  }
+
   function getItemQuantityCap(item) {
+    if (isContributionItem(item)) return 1;
     const inventoryCap = Number.isFinite(item?.maxQuantity) && item.maxQuantity > 0 ? item.maxQuantity : Infinity;
     const registrationCap = getEventRegistrationConfig(item)?.maxPartySize || Infinity;
     return Math.min(inventoryCap, registrationCap);
@@ -1913,40 +1922,9 @@
       item.maxQuantity = 1;
     }
 
-    const customFields = getButtonCustomFieldDefinitions(button);
-    if (customFields.length > 0) {
-      item.customFields = customFields;
-    }
-
-    const shipping = buildButtonShippingMetadata(button);
-    if (shipping) {
-      item.shipping = shipping;
-    }
-    const eventRegistration = getButtonEventRegistration(button);
-    if (eventRegistration) {
-      item.eventRegistration = eventRegistration;
-    }
-
-    return item;
-  }
-
-  function buildPendingCartItemFromButton(button) {
-    const isStackable = button.getAttribute('data-item-stackable') === 'true' ||
-      button.getAttribute('data-item-stackable') === 'always';
-    const maxQty = button.getAttribute('data-item-max-quantity');
-    const item = {
-      id: button.getAttribute('data-item-id'),
-      name: button.getAttribute('data-item-name'),
-      price: parseFloat(button.getAttribute('data-item-price') || '0'),
-      quantity: Math.max(1, parseInt(button.getAttribute('data-item-quantity') || '1', 10) || 1),
-      url: button.getAttribute('data-item-url'),
-      description: button.getAttribute('data-item-description'),
-      stackable: isStackable,
-      shippable: button.getAttribute('data-item-shippable') === 'true'
-    };
-    if (maxQty) {
-      item.maxQuantity = parseInt(maxQty, 10);
-    } else if (!isStackable) {
+    if (button.getAttribute('data-pricing-mode') === 'pay_what_you_want') {
+      item.pricingMode = 'pay_what_you_want';
+      item.customAmountCents = Number(button.getAttribute('data-custom-amount-cents'));
       item.maxQuantity = 1;
     }
 
@@ -1965,6 +1943,10 @@
     }
 
     return item;
+  }
+
+  function buildPendingCartItemFromButton(button) {
+    return buildCartItemFromButton(button);
   }
 
   function redirectWindow(url) {
@@ -2150,7 +2132,9 @@
     const coupon = normalizeAppliedCoupon(state?.cart?.coupon);
     const discountCents = Math.min(subtotalCents, coupon ? coupon.discountCents : 0);
     const discountedSubtotalCents = Math.max(0, subtotalCents - discountCents);
-    const tipPercent = sanitizeTipPercent(state?.cart?.tipPercent, getDefaultPlatformTipPercent());
+    const tipPercent = state?.cart?.tipTouched === true
+      ? sanitizeTipPercent(state.cart.tipPercent, cartDefaultTipPercent(items))
+      : cartDefaultTipPercent(items);
     const tipAmountCents = Math.round((discountedSubtotalCents * tipPercent) / 100);
     const shippingCents = getStoreFallbackShippingCents(items);
     const taxCents = 0;
@@ -2449,6 +2433,7 @@
 
   function renderCartCouponBox(state, pricing) {
     const cart = state?.cart || {};
+    if (cart.items?.items?.length && cart.items.items.every(isContributionItem)) return '';
     const coupon = pricing?.coupon || normalizeAppliedCoupon(cart.coupon);
     const couponCode = normalizeCouponCodeInput(cart.couponCode || coupon?.code || '');
     const status = String(cart.couponStatus || '').trim();
@@ -2606,7 +2591,7 @@
       : [];
 
     return productCards.filter((product) => {
-      return !product.inCart;
+      return !product.inCart && addOnUtils.findProduct(ADD_ON_CATALOG, product.productId)?.pricing_mode !== 'pay_what_you_want';
     });
   }
 
@@ -3041,7 +3026,8 @@
         )
       : null;
     const catalogShipping = product.shipping && typeof product.shipping === 'object' ? product.shipping : null;
-    const price = typeof addOnUtils.resolveUnitPrice === 'function'
+    const contribution = product.pricing_mode === 'pay_what_you_want';
+    const price = contribution ? Number(item?.customAmountCents) / 100 : typeof addOnUtils.resolveUnitPrice === 'function'
       ? addOnUtils.resolveUnitPrice(product, variant)
       : Number(
         variant?.price !== undefined && variant?.price !== null && String(variant.price).trim() !== ''
@@ -3067,6 +3053,8 @@
     return {
       ...item,
       id: normalizedId || item?.id,
+      pricingMode: contribution ? 'pay_what_you_want' : 'fixed',
+      ...(contribution ? { quantity: 1, maxQuantity: 1 } : {}),
       name: item?.name || product.name || productId,
       price: Number.isFinite(price) ? price : Number(item?.price || 0),
       url: item?.url || product.source_url || product.url || '',
@@ -3128,6 +3116,7 @@
           id: item?.id || '',
           name: item?.name || '',
           price: Number(item?.price || 0),
+          ...(item?.customAmountCents !== undefined ? { customAmountCents: item.customAmountCents, pricingMode: item.pricingMode } : {}),
           quantity: Math.max(1, Number(item?.quantity || 1)),
           url: item?.url || '',
           description: item?.description || '',
@@ -3389,6 +3378,7 @@
         uniqueId: String(item?.uniqueId || ''),
         name: String(item?.name || ''),
         price: Number(item?.price || 0),
+        ...(item?.customAmountCents !== undefined ? { customAmountCents: item.customAmountCents, pricingMode: item.pricingMode } : {}),
         quantity: Math.max(1, Number(item?.quantity || 1)),
         url: String(item?.url || ''),
         description: String(item?.description || ''),
@@ -3514,6 +3504,7 @@
         variantId,
         name: String(item?.name || ''),
         price: Number(item?.price || 0),
+        ...(item?.customAmountCents !== undefined ? { customAmountCents: item.customAmountCents, pricingMode: item.pricingMode } : {}),
         quantity: Math.max(1, Number(item?.quantity || 1)),
         url: String(item?.url || ''),
         image: String(item?.imageUrl || item?.image || ''),
@@ -3576,7 +3567,8 @@
     const persisted = readPersistedFirstPartyCartState();
     const draft = readFirstPartyCartDraftState();
     const persistedItems = persisted?.items || [];
-    const persistedTipPercent = resolveStoredTipPercent(persisted?.tipPercent, persisted?.tipTouched === true);
+    const persistedTipPercent = persisted?.tipTouched === true
+      ? resolveStoredTipPercent(persisted.tipPercent, true) : cartDefaultTipPercent(persistedItems);
     const persistedTotals = calculateCartTotals(
       persistedItems,
       persistedTipPercent
@@ -3653,6 +3645,11 @@
     function updateCartState(updater) {
       const currentState = store.getState();
       const nextState = updater(currentState);
+      if (nextState.cart && nextState.cart.tipTouched !== true) {
+        const items = nextState.cart.items?.items || [];
+        nextState.cart.tipPercent = cartDefaultTipPercent(items);
+        Object.assign(nextState.cart, calculateCartTotals(items, nextState.cart.tipPercent));
+      }
       store.setState(nextState);
       writePersistedFirstPartyCartState(nextState);
       return nextState;
@@ -3902,7 +3899,8 @@
       const nextItems = snapshot.cart.items.map((item) => normalizeCartItem(item));
       const draft = readFirstPartyCartDraftState();
       const nextEmail = String(draft?.email || snapshot?.cart?.email || '');
-      const nextTipPercent = resolveStoredTipPercent(snapshot?.cart?.tipPercent, snapshot?.cart?.tipTouched === true);
+      const nextTipPercent = snapshot?.cart?.tipTouched === true
+        ? resolveStoredTipPercent(snapshot.cart.tipPercent, true) : cartDefaultTipPercent(nextItems);
       const totals = calculateCartTotals(
         nextItems,
         nextTipPercent
@@ -4210,11 +4208,12 @@
           </div>
           <div class="store-first-party-cart__item-actions">
             <span class="store-first-party-cart__item-price">${formatCurrency((item.price || 0) * itemQuantity)}</span>
-            <div class="store-first-party-cart__quantity" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantityInput', 'Quantity for %{item}').replace('%{item}', item.name || item.id))}">
+            ${isContributionItem(item) ? '' : `<div class="store-first-party-cart__quantity" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantityInput', 'Quantity for %{item}').replace('%{item}', item.name || item.id))}">
               <button type="button" class="store-first-party-cart__quantity-button" data-cart-item-quantity-step="-1" data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.decreaseQuantity', 'Decrease quantity'))}"${itemQuantity <= 1 ? ' disabled' : ''}>-</button>
               <input class="store-first-party-cart__quantity-input" type="number" inputmode="numeric" min="1"${hasFiniteMaxQuantity ? ` max="${escapeAttribute(String(itemMaxQuantity))}"` : ''} value="${escapeAttribute(String(itemQuantity))}" data-cart-item-quantity data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.quantityInput', 'Quantity for %{item}').replace('%{item}', item.name || item.id))}">
               <button type="button" class="store-first-party-cart__quantity-button" data-cart-item-quantity-step="1" data-cart-item-id="${escapeAttribute(item.uniqueId)}" aria-label="${escapeAttribute(getRuntimeMessage('cart.increaseQuantity', 'Increase quantity'))}"${hasFiniteMaxQuantity && itemQuantity >= itemMaxQuantity ? ' disabled' : ''}>+</button>
             </div>
+            `}
             <button type="button" class="store-first-party-cart__remove" data-remove-item="${item.uniqueId}">${escapeHtml(getRuntimeMessage('cart.remove', 'Remove'))}</button>
           </div>
         </li>
@@ -4848,10 +4847,14 @@
         await checkoutCapability(renew);
         const payload = buildFirstPartyCheckoutPayload(store.getState());
         if (!payload.valid) throw new Error(payload.error);
-        const data = await checkoutHoldAction('hold', { items: payload.payload.items.map(({ id, productId, sku, variantId, price, quantity }) => ({ id, productId, sku, variantId, price, quantity })) });
+        const holdItems = payload.payload.items.map(({ id, productId, sku, variantId, price, quantity, customAmountCents }) => ({
+          id, productId, sku, variantId, price, quantity,
+          ...(customAmountCents !== undefined ? { customAmountCents } : {})
+        }));
+        const data = await checkoutHoldAction('hold', { items: holdItems });
         if (['released', 'expired'].includes(data.phase)) {
           await checkoutCapability(true);
-          await checkoutHoldAction('hold', { items: payload.payload.items.map(({ id, productId, sku, variantId, price, quantity }) => ({ id, productId, sku, variantId, price, quantity })) });
+          await checkoutHoldAction('hold', { items: holdItems });
         } else if (data.phase === 'confirmed') {
           clearStoreCartAfterOrder(); redirectWindow(buildStoreOrderSuccessPath(data.orderToken)); return;
         }
