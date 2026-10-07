@@ -266,6 +266,15 @@ The Worker rebuilds the order from trusted inputs:
 
 The resulting order draft stores cent values and an `orderHash`. For an RSVP with `event_details.registration`, it also stores the Worker-canonicalized contact, attendee roster, and historical question/answer snapshots after enforcing the current repository definition, deadline, party size, and allowed choices. The draft is persisted under `orders:<orderToken>`. For scarce inventory, the Worker reserves positive-count SKUs through `STORE_INVENTORY_COORDINATOR` before confirming a free order or creating a paid PaymentIntent.
 
+For opt-in `pricing_mode: pay_what_you_want` services, the catalog authorizes a
+customer-selected `customAmountCents` rather than a fixed price. The Worker
+requires integer cents, the USD processor floor, Store's ceiling, quantity one,
+active service status, and no variants or inventory tracking. Fixed-price products
+reject custom amounts. Coupons exclude contribution rows and an omitted tip
+defaults to zero when a contribution is present. The existing order draft, hash,
+checkout attempt, PaymentIntent and signed settlement retain this validated unit
+price. See [product configuration](ADD_ON_PRODUCTS.md#pay-what-you-want).
+
 ### 3. Free Order Confirmation
 
 When `orderDraft.totals.requiresPayment` is false, the Worker:

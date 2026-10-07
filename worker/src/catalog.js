@@ -1,6 +1,7 @@
 import STORE_CATALOG_SNAPSHOT from './generated/catalog-snapshot.js';
 import { validateEventRegistrationSubmission } from './event-registration.js';
 import { isValidAmount } from './validation.js';
+import { PAY_WHAT_YOU_WANT, isContributionAmount, normalizeProductPricing } from './product-pricing.js';
 
 const ACTIVE_STATUSES = new Set(['active', 'available', 'live']);
 const NON_SHIPPABLE_TYPES = new Set(['digital', 'ticket', 'rsvp', 'service']);
@@ -75,6 +76,7 @@ export function validateStoreOrderDraft(draft = {}, options = {}) {
   }
 
   const subtotalCents = items.reduce((sum, item) => sum + item.subtotalCents, 0);
+  if (!isValidAmount(subtotalCents)) errors.push(buildValidationIssue('invalid_cart_amount', 'Cart total exceeds the Store amount limit.'));
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return {
@@ -160,7 +162,21 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
     ));
   }
 
-  const unitPriceCents = normalizeMoneyCents(variant?.price_cents ?? product.price_cents);
+  const pricing = normalizeProductPricing(product);
+  const contribution = pricing.mode === PAY_WHAT_YOU_WANT;
+  pricing.errors.forEach((message) => errors.push(buildValidationIssue('catalog_pricing_invalid', message, { index, productId: product.id })));
+  if (contribution && !isContributionAmount(rawItem.customAmountCents)) {
+    errors.push(buildValidationIssue('invalid_contribution_amount', 'Enter an amount of at least $0.50 within the Store amount limit.', { index, productId: product.id }));
+  }
+  if (contribution && rawItem.quantity !== 1) {
+    errors.push(buildValidationIssue('invalid_contribution_quantity', 'A contribution must have a quantity of one.', { index, productId: product.id }));
+  }
+  if (!contribution && rawItem.customAmountCents !== undefined) {
+    errors.push(buildValidationIssue('custom_amount_not_allowed', 'This product has a fixed price.', { index, productId: product.id }));
+  }
+  const unitPriceCents = contribution
+    ? (isContributionAmount(rawItem.customAmountCents) ? rawItem.customAmountCents : 0)
+    : normalizeMoneyCents(variant?.price_cents ?? product.price_cents);
   if (!isValidAmount(unitPriceCents)) {
     errors.push(buildValidationIssue(
       'catalog_price_invalid',
@@ -243,6 +259,7 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
       name: product.name || product.id,
       variantLabel: variant?.label || '',
       quantity,
+      ...(contribution ? { pricingMode: PAY_WHAT_YOU_WANT } : {}),
       unitPriceCents,
       subtotalCents: unitPriceCents * quantity,
       currency: product.currency || catalog.defaults?.currency || 'USD',

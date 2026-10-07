@@ -1,3 +1,4 @@
+import { PAY_WHAT_YOU_WANT } from './product-pricing.js';
 import { validateStoreOrderDraft } from './catalog.js';
 import { getValidationDiscountedSubtotalCents } from './coupons.js';
 import { normalizeStoredEventRegistration } from './event-registration.js';
@@ -80,7 +81,8 @@ export function buildStoreOrderDraft(input = {}, options = {}) {
   const discountedSubtotalCents = getValidationDiscountedSubtotalCents(validation);
   const coupon = normalizeStoreCouponSnapshot(validation.totals.coupon);
   const maxTipPercent = getMaxPlatformTipPercent(options.env || {});
-  const defaultTipPercent = getDefaultPlatformTipPercent(options.env || {});
+  const defaultTipPercent = validation.items.some((item) => item.pricingMode === PAY_WHAT_YOU_WANT)
+    ? 0 : getDefaultPlatformTipPercent(options.env || {});
   const tipPercent = sanitizePlatformTipPercent(
     options.tipPercent ?? input.tipPercent,
     defaultTipPercent,
@@ -248,6 +250,7 @@ function compactStoreOrderItem(item = {}) {
     sku: normalizeString(item.sku),
     name: normalizeString(item.name),
     variantLabel: normalizeString(item.variantLabel),
+    ...(item.pricingMode === PAY_WHAT_YOU_WANT ? { pricingMode: PAY_WHAT_YOU_WANT } : {}),
     quantity: normalizeQuantity(item.quantity),
     unitPriceCents: normalizeCents(item.unitPriceCents),
     subtotalCents: normalizeCents(item.subtotalCents),

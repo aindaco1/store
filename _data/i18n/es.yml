@@ -12,6 +12,12 @@ nav:
   close_menu: Cerrar menú
   home_aria: Inicio de %{title}
 admin:
+  pricingMode: "Precio"
+  fixedPrice: "Precio fijo"
+  payWhatYouWant: "Paga lo que quieras"
+  suggestedAmounts: "Montos sugeridos (USD)"
+  pricingModeHelp: "Disponible para servicios sin variantes ni inventario. El precio es el monto inicial. No se aplican cupones y la propina opcional comienza en 0%."
+  suggestedAmountsHelp: "Ingresa hasta seis montos separados por comas, como 10, 25, 50, 100."
   user_role_help: Los superadministradores pueden gestionar todo, incluida la configuración de Store y los usuarios. Los administradores limitados pueden gestionar todas las operaciones de Store, pero no la configuración ni los usuarios.
   page_title: Panel de administración
   login_title: Iniciar sesión de administración
@@ -292,6 +298,11 @@ misc:
   skip_to_main: Saltar al contenido principal
   video_not_supported: Tu navegador no es compatible con la etiqueta de video.
 storefront:
+  pay_what_you_want: "Paga lo que quieras"
+  suggested_amounts: "Montos sugeridos"
+  your_amount: "Tu aporte (USD)"
+  contribution_help: "Elige un monto o ingresa el tuyo. Mínimo $0.50. El impuesto se calcula al pagar."
+  contribution_error: "Ingresa un monto entre $0.50 y $1,000,000 con un máximo de dos decimales."
   filters:
     product_collections: Colecciones de productos
     collection: Colección

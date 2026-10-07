@@ -100,6 +100,44 @@ download:
 
 That key maps to a private `STORE_DOWNLOADS` R2 object or Worker-only fallback URL and is fulfilled through token-scoped signed links after the order is confirmed. Confirmed digital entitlements do not expire unless an admin explicitly revokes access.
 
+## Pay what you want
+
+Use the Products editor's **Pricing → Pay what you want** option for one-time
+contributions. This mode uses `service` fulfillment without variants or inventory
+tracking. **Price (USD)** is the starting amount; **Suggested amounts (USD)** accepts
+up to six distinct comma-separated amounts. Customers can always enter their own.
+
+```yaml
+price: 10
+pricing_mode: pay_what_you_want
+suggested_amounts: [10, 25, 50, 100]
+currency: USD
+fulfillment_type: service
+inventory_tracking: false
+tax_category: standard
+```
+
+Omitted `pricing_mode` means fixed pricing. The browser submits
+`customAmountCents` as an integer; the Worker permits it only for a currently
+available contribution product, from 50 cents through the existing Store amount
+ceiling. The $0.50 floor supports standalone USD payments. Quantity is one:
+adding the same contribution again replaces its chosen amount. Selected amounts
+survive cart reload and payment return; final validation and the payment hash bind
+the canonical amount. Existing receipts, Orders, Analytics and CSVs use the stored
+unit price, including after later changes to suggestions or the starting price.
+
+Contributions are excluded from every coupon, including product-scoped codes.
+Mixed-cart coupons still discount eligible ordinary items. Any cart containing a
+contribution defaults the optional tip to 0% unless the customer already chose a
+tip; removing the contribution restores the normal default for an untouched tip.
+Tax still follows the product's existing tax category. Contribution-only carts
+hide the coupon field and use the normal contact, tax and explicit payment flow.
+They issue no ticket, calendar, RSVP, download or shipping entitlement.
+
+`support-paradiso` is the initial product, with $10 / $25 / $50 / $100 suggestions
+and standard tax. Its ticket and sponsorship products are separate. There is no
+public fundraising meter, recurring billing or new payment/storage provider.
+
 ## Shipping And Tax
 
 Physical products should use a shared shipping preset unless they need explicit package dimensions.

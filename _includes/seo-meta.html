@@ -155,7 +155,7 @@
   {%- assign product_availability = "oos" -%}
 {%- endif -%}
 {%- assign product_retailer_item_id = page.sku | default: page.identifier | default: page.slug | default: product_display_name -%}
-<meta property="product:price:amount" content="{{ product_price }}">
+{% unless page.pricing_mode == "pay_what_you_want" %}<meta property="product:price:amount" content="{{ product_price }}">{% endunless %}
 <meta property="product:price:currency" content="USD">
 <meta property="product:availability" content="{{ product_availability }}">
 <meta property="product:condition" content="new">

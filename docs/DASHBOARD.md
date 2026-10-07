@@ -138,6 +138,15 @@ Fulfillment-aware fields:
 - Digital variant-based products hide the product-level File field and show a File column per variant.
 - RSVP products may enable registration and configure opening/closing timestamps, maximum party size, contact and attendee name requirements, and bounded party- or attendee-scoped questions. The guided question builder supports stable IDs, text/long-text/single-choice/multiple-choice/checkbox answers, party or per-attendee scope, required state, text limits, and 2–20 choice rows. Question IDs and choice values derive automatically from labels for new rows, are read-only like generated product and variant identifiers, and remain unchanged when an existing label is edited. Every builder field includes localized keyboard- and pointer-accessible help. The builder serializes into the existing product field; preview and publish still use the same Worker normalizer, so an invalid definition cannot be published through the dashboard.
 
+Pricing:
+
+- **Pricing** selects Fixed price or Pay what you want. Contributions use Service,
+  no variants and no inventory tracking; invalid combinations fail before publishing.
+- **Price (USD)** supplies the starting contribution. **Suggested amounts (USD)**
+  accepts up to six comma-separated amounts and appears only in contribution mode.
+- Preview shows the amount field and presets. The existing repository publisher
+  saves `pricing_mode` and `suggested_amounts` with the product.
+
 Variants:
 
 - Variant Based controls whether the Variants section is visible.
