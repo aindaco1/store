@@ -5965,7 +5965,10 @@
     var max = Number(row.priceMaxCents ?? row.priceCents ?? min);
     var price = createElement('div', 'admin-store-products__price');
     if (max > min) {
-      price.appendChild(createElement('strong', '', moneyFromCents(min) + '-' + moneyFromCents(max)));
+      var range = createElement('strong', '', moneyFromCents(min) + '-');
+      range.appendChild(document.createElement('wbr'));
+      range.appendChild(document.createTextNode(moneyFromCents(max)));
+      price.appendChild(range);
     } else {
       price.appendChild(createElement('strong', '', moneyFromCents(min)));
     }
