@@ -2,6 +2,9 @@
 
 Date: October 7, 2026. Branch: `feat/pay-what-you-want`.
 
+This is the original local candidate evidence. See the later authorized
+[production deployment record](2026-10-07-pay-what-you-want-production.md).
+
 ## Scope
 
 The owner selected a standalone contribution, $10 / $25 / $50 / $100 suggestions,
