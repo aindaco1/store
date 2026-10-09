@@ -4,7 +4,7 @@ sku: a-night-in-paradiso
 name: "A Night in Paradiso"
 description: "A Night in Paradiso, an October 24, 2026 live benefit at FUSION in Albuquerque supporting the short film Paradiso."
 price: 20
-image: "/assets/images/products/product-a-night-in-paradiso-20261007-212149.png"
+image: "/assets/images/products/product-a-night-in-paradiso-20261009-000018.png"
 image_alt: "Retro orange, red, and avocado green A Night in Paradiso poster."
 type: service
 fulfillment_type: "ticket"
@@ -33,6 +33,8 @@ event_details:
   followup:
     enabled: true
     enabled_at: "2026-09-03T20:42:19.881Z"
+pricing_mode: "fixed"
+suggested_amounts: []
 ---
 Presented by [**Poppy Rat Productions**](https://www.instagram.com/poppyratproductions) and **Dust Wave**, this one-night-only benefit raises production funds for *Paradiso*, an original psychological-thriller short film written and directed by [**R. Barela**](https://www.instagram.com/r._barela).
 
