@@ -88,8 +88,9 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       ],
       "price": 20.0,
       "price_cents": 2000,
+      "pricing_mode": "fixed",
       "currency": "USD",
-      "image": "/assets/images/products/product-a-night-in-paradiso-20261007-212149.png",
+      "image": "/assets/images/products/product-a-night-in-paradiso-20261009-000018.png",
       "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso/",
       "type": "ticket",
       "fulfillment_type": "ticket",
@@ -128,56 +129,6 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "enabled_at": "2026-09-03T20:42:19.881Z"
         }
       },
-      "turnstile_required": false
-    },
-    {
-      "id": "support-paradiso",
-      "slug": "support-paradiso",
-      "sku": "support-paradiso",
-      "name": "Support Paradiso",
-      "description": "Help bring R. Barela's short film Paradiso to life with a contribution of your choice.",
-      "long_content": [
-        {
-          "type": "text",
-          "body": "Help bring *Paradiso*, the psychological-thriller short film written and directed by **R. Barela**, to life.\n\nWhether you're joining **A Night in Paradiso** or supporting from afar, choose a suggested amount or enter your own. Your contribution supports the film's production.\n\nThis is a one-time contribution. Event admission and sponsorship benefits are sold separately. You'll receive an order confirmation by email.\n\n[Get tickets for A Night in Paradiso](/products/a-night-in-paradiso/) · [Explore sponsorships](/products/a-night-in-paradiso-sponsorship/)\n"
-        }
-      ],
-      "price": 10.0,
-      "price_cents": 1000,
-      "pricing_mode": "pay_what_you_want",
-      "suggested_amounts": [
-        10,
-        25,
-        50,
-        100
-      ],
-      "currency": "USD",
-      "image": "/assets/images/products/product-a-night-in-paradiso-20261007-212149.png",
-      "url": "https://shop.dustwave.xyz/products/support-paradiso/",
-      "type": "service",
-      "fulfillment_type": "service",
-      "status": "active",
-      "public": true,
-      "launch_test": false,
-      "order": 11.0,
-      "collection": "dustwave",
-      "category": "support",
-      "localized_paths": {
-        "en": "/products/support-paradiso/",
-        "es": "/es/products/support-paradiso/"
-      },
-      "inventory_tracking": false,
-      "inventory": 0,
-      "shipping_preset": "parcel",
-      "shipping": {
-        "weight_oz": 12,
-        "packaging_weight_oz": 4,
-        "length_in": 12,
-        "width_in": 9,
-        "height_in": 4,
-        "stack_height_in": 1
-      },
-      "tax_category": "standard",
       "turnstile_required": false
     },
     {
@@ -298,6 +249,95 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
           "require_contact_name": false,
           "require_attendee_names": true,
           "questions": []
+        }
+      },
+      "turnstile_required": false
+    },
+    {
+      "id": "the-perfect-casino-night",
+      "slug": "the-perfect-casino-night",
+      "sku": "the-perfect-casino-night",
+      "name": "The Perfect Casino Night",
+      "description": "The Perfect Casino Night: a black-tie film mixer with card games and screenings, November 7, 2026, 7–11 p.m. at UNM SUB Ballroom C. Tickets from $27.",
+      "body_description": "Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.\n\n**Saturday, November 7, 2026 · 7–11 p.m.**\n**Black-tie dress code.**\n\n## Ticket tiers\n\n### Player — $27\n\n- Full access to the event and film screenings.\n- 100 chips for the card games and raffle.\n- Complimentary hors d’oeuvres and beverages.\n\n### Pit-Boss — $45\n\nEverything in Player, plus:\n\n- 150 extra chips for the card games and raffle (250 total).\n- Entry into the “Best Dressed” contest and “Lucky Shot Raffle.”\n- A social media shout-out and photo op.\n\n### Executive — $70\n\nEverything in Pit-Boss, plus:\n\n- Specially assigned seating.\n- A plated meal served at your table.\n- Your name in a special “Thank You” section of the film.\n\n## Executive menu\n\nYour meal includes Greek salad, pan-roasted vegetables, and a red velvet thimble cake, with your choice of entrée:\n\n- Orange-glazed grilled salmon.\n- Asiago chicken in a roasted red pepper sauce.\n- Plant-based shepherd’s pie.\n\n**Executive meal choices will be arranged after purchase.**",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.\n\n**Saturday, November 7, 2026 · 7–11 p.m.**\n**Black-tie dress code.**\n\n## Ticket tiers\n\n### Player — $27\n\n- Full access to the event and film screenings.\n- 100 chips for the card games and raffle.\n- Complimentary hors d’oeuvres and beverages.\n\n### Pit-Boss — $45\n\nEverything in Player, plus:\n\n- 150 extra chips for the card games and raffle (250 total).\n- Entry into the “Best Dressed” contest and “Lucky Shot Raffle.”\n- A social media shout-out and photo op.\n\n### Executive — $70\n\nEverything in Pit-Boss, plus:\n\n- Specially assigned seating.\n- A plated meal served at your table.\n- Your name in a special “Thank You” section of the film.\n\n## Executive menu\n\nYour meal includes Greek salad, pan-roasted vegetables, and a red velvet thimble cake, with your choice of entrée:\n\n- Orange-glazed grilled salmon.\n- Asiago chicken in a roasted red pepper sauce.\n- Plant-based shepherd’s pie.\n\n**Executive meal choices will be arranged after purchase.**\n"
+        }
+      ],
+      "price": 27.0,
+      "price_cents": 2700,
+      "pricing_mode": "fixed",
+      "currency": "USD",
+      "image": "/assets/images/products/the-perfect-casino-night.jpeg",
+      "url": "https://shop.dustwave.xyz/products/the-perfect-casino-night/",
+      "type": "ticket",
+      "fulfillment_type": "ticket",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 35.0,
+      "collection": "dustwave",
+      "category": "event-access",
+      "localized_paths": {
+        "en": "/products/the-perfect-casino-night/",
+        "es": "/es/products/the-perfect-casino-night/"
+      },
+      "variant_option_name": "Ticket tier",
+      "variants": [
+        {
+          "id": "player",
+          "label": "Player",
+          "sku": "the-perfect-casino-night-player",
+          "price": 27.0,
+          "price_cents": 2700,
+          "price_override": true,
+          "inventory": 67,
+          "status": "active"
+        },
+        {
+          "id": "pit-boss",
+          "label": "Pit-Boss",
+          "sku": "the-perfect-casino-night-pit-boss",
+          "price": 45.0,
+          "price_cents": 4500,
+          "price_override": true,
+          "inventory": 67,
+          "status": "active"
+        },
+        {
+          "id": "executive",
+          "label": "Executive",
+          "sku": "the-perfect-casino-night-executive",
+          "price": 70.0,
+          "price_cents": 7000,
+          "price_override": true,
+          "inventory": 66,
+          "status": "active"
+        }
+      ],
+      "inventory_tracking": true,
+      "inventory": 0,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "admission",
+      "event_details": {
+        "starts_at": "2026-11-07T19:00:00-07:00",
+        "ends_at": "2026-11-07T23:00:00-07:00",
+        "venue": "UNM SUB Ballroom C",
+        "address": "203 Cornell Dr NE\nAlbuquerque, NM 87122",
+        "ticket_delivery": "qr",
+        "ics": true,
+        "followup": {
+          "enabled": false
         }
       },
       "turnstile_required": false
@@ -3205,9 +3245,60 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       },
       "tax_category": "standard",
       "turnstile_required": false
+    },
+    {
+      "id": "support-paradiso",
+      "slug": "support-paradiso",
+      "sku": "support-paradiso",
+      "name": "Support Paradiso",
+      "description": "Help bring R. Barela's short film Paradiso to life with a contribution of your choice.",
+      "body_description": "Help bring *Paradiso*, the psychological-thriller short film written and directed by **R. Barela**, to life.\n\nWhether you're joining **A Night in Paradiso** or supporting from afar, choose a suggested amount or enter your own. Your contribution supports the film's production.\n\nThis is a one-time, non-tax-deductible contribution. Event admission and sponsorship benefits are sold separately. You'll receive an order confirmation by email.",
+      "long_content": [
+        {
+          "type": "text",
+          "body": "Help bring *Paradiso*, the psychological-thriller short film written and directed by **R. Barela**, to life.\n\nWhether you're joining **A Night in Paradiso** or supporting from afar, choose a suggested amount or enter your own. Your contribution supports the film's production.\n\nThis is a one-time, non-tax-deductible contribution. Event admission and sponsorship benefits are sold separately. You'll receive an order confirmation by email.\n"
+        }
+      ],
+      "price": 10.0,
+      "price_cents": 1000,
+      "pricing_mode": "pay_what_you_want",
+      "suggested_amounts": [
+        10,
+        25,
+        50,
+        100
+      ],
+      "currency": "USD",
+      "image": "/assets/images/products/product-a-night-in-paradiso-20261007-212149.png",
+      "url": "https://shop.dustwave.xyz/products/support-paradiso/",
+      "type": "service",
+      "fulfillment_type": "service",
+      "status": "active",
+      "public": true,
+      "launch_test": false,
+      "order": 550.0,
+      "collection": "dustwave",
+      "category": "support",
+      "localized_paths": {
+        "en": "/products/support-paradiso/",
+        "es": "/es/products/support-paradiso/"
+      },
+      "inventory_tracking": false,
+      "inventory": 0,
+      "shipping_preset": "parcel",
+      "shipping": {
+        "weight_oz": 12,
+        "packaging_weight_oz": 4,
+        "length_in": 12,
+        "width_in": 9,
+        "height_in": 4,
+        "stack_height_in": 1
+      },
+      "tax_category": "standard",
+      "turnstile_required": false
     }
   ],
-  "source_hash": "54ede9d7b07547f7f281a7e2ceef40d24ff50a2bd0544b9d424c4ebb9ddd7cf8"
+  "source_hash": "f26648287fd0d3a49ee5094d63584cb9ddece9b37f289ec281502cd83100b9e1"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
