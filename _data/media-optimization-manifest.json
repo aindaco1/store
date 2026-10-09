@@ -2664,6 +2664,69 @@
       ]
     },
     {
+      "path": "assets/images/products/the-perfect-casino-night.jpeg",
+      "publicPath": "/assets/images/products/the-perfect-casino-night.jpeg",
+      "name": "the-perfect-casino-night.jpeg",
+      "label": "the perfect casino night",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 883063,
+      "sha256": "d33f7b664157e1438e7be5d2c5e6995425e5d2586243e736e48ad30325a0b96d",
+      "width": 1545,
+      "height": 1999,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/products/the-perfect-casino-night-320.webp",
+        "assets/images/products/the-perfect-casino-night-480.webp",
+        "assets/images/products/the-perfect-casino-night-640.webp",
+        "assets/images/products/the-perfect-casino-night-960.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/products/the-perfect-casino-night-320.webp",
+          "publicPath": "/assets/images/products/the-perfect-casino-night-320.webp",
+          "bytes": 31870,
+          "sha256": "96f83bc277154beb0bf1b8c08b6659c93e7bf074eb8a4d16f1617827eb1697c3",
+          "sourceSha256": "d33f7b664157e1438e7be5d2c5e6995425e5d2586243e736e48ad30325a0b96d",
+          "width": 320
+        },
+        {
+          "path": "assets/images/products/the-perfect-casino-night-480.webp",
+          "publicPath": "/assets/images/products/the-perfect-casino-night-480.webp",
+          "bytes": 57338,
+          "sha256": "57c43dd77d24a9d74e2869e58cf11cb3d675afaeb140e65aade9ea3d3c2a37f6",
+          "sourceSha256": "d33f7b664157e1438e7be5d2c5e6995425e5d2586243e736e48ad30325a0b96d",
+          "width": 480
+        },
+        {
+          "path": "assets/images/products/the-perfect-casino-night-640.webp",
+          "publicPath": "/assets/images/products/the-perfect-casino-night-640.webp",
+          "bytes": 85886,
+          "sha256": "012ba8044c25755d9dbd1c11447e362a208c1039a137dfb7b4638e34783a97ab",
+          "sourceSha256": "d33f7b664157e1438e7be5d2c5e6995425e5d2586243e736e48ad30325a0b96d",
+          "width": 640
+        },
+        {
+          "path": "assets/images/products/the-perfect-casino-night-960.webp",
+          "publicPath": "/assets/images/products/the-perfect-casino-night-960.webp",
+          "bytes": 160324,
+          "sha256": "dd7540620ac2584f5f62f8ed71954a904ab8657edc4e04ba30f9f1d165bc4a87",
+          "sourceSha256": "d33f7b664157e1438e7be5d2c5e6995425e5d2586243e736e48ad30325a0b96d",
+          "width": 960
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
+          "path": "_products/the-perfect-casino-night.md",
+          "count": 1
+        }
+      ]
+    },
+    {
       "path": "assets/images/raiders-guild.jpg",
       "publicPath": "/assets/images/raiders-guild.jpg",
       "name": "raiders-guild.jpg",
