@@ -2282,6 +2282,78 @@
       "warnings": [],
       "references": [
         {
+          "path": "_products/support-paradiso.md",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "path": "assets/images/products/product-a-night-in-paradiso-20261009-000018.png",
+      "publicPath": "/assets/images/products/product-a-night-in-paradiso-20261009-000018.png",
+      "name": "product-a-night-in-paradiso-20261009-000018.png",
+      "label": "product a night in paradiso 20261009",
+      "type": "image",
+      "scope": "product",
+      "productSlug": "",
+      "bytes": 1597108,
+      "sha256": "1fcddebfd9467773968eeee4b7d3f9ba804ddf100062bceb8ce3217df4056b2f",
+      "width": 2160,
+      "height": 2700,
+      "optimizationStatus": "ready",
+      "expectedDerivatives": [
+        "assets/images/products/product-a-night-in-paradiso-20261009-000018-320.webp",
+        "assets/images/products/product-a-night-in-paradiso-20261009-000018-480.webp",
+        "assets/images/products/product-a-night-in-paradiso-20261009-000018-640.webp",
+        "assets/images/products/product-a-night-in-paradiso-20261009-000018-960.webp",
+        "assets/images/products/product-a-night-in-paradiso-20261009-000018-1600.webp"
+      ],
+      "missingDerivatives": [],
+      "skippedDerivatives": [],
+      "derivatives": [
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-20261009-000018-320.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-20261009-000018-320.webp",
+          "bytes": 35192,
+          "sha256": "ba31547231891ba1165e88fe1ae04695c90975cd1a16d1d0c1dbf529a1252029",
+          "sourceSha256": "1fcddebfd9467773968eeee4b7d3f9ba804ddf100062bceb8ce3217df4056b2f",
+          "width": 320
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-20261009-000018-480.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-20261009-000018-480.webp",
+          "bytes": 64048,
+          "sha256": "fd291afadc1b64b57e12db95fadbb3bc0d7de5fbae6831b7ff7c188bccd5eda6",
+          "sourceSha256": "1fcddebfd9467773968eeee4b7d3f9ba804ddf100062bceb8ce3217df4056b2f",
+          "width": 480
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-20261009-000018-640.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-20261009-000018-640.webp",
+          "bytes": 94944,
+          "sha256": "9c01b9544ba13e25b689bb977a6cd2d57aec81bd95c2dd2cbca8b804b6a54b10",
+          "sourceSha256": "1fcddebfd9467773968eeee4b7d3f9ba804ddf100062bceb8ce3217df4056b2f",
+          "width": 640
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-20261009-000018-960.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-20261009-000018-960.webp",
+          "bytes": 159334,
+          "sha256": "3a57de7eb0d0354fd64aca3ce78a97e013498a38caaf4174eeeaa7d027706078",
+          "sourceSha256": "1fcddebfd9467773968eeee4b7d3f9ba804ddf100062bceb8ce3217df4056b2f",
+          "width": 960
+        },
+        {
+          "path": "assets/images/products/product-a-night-in-paradiso-20261009-000018-1600.webp",
+          "publicPath": "/assets/images/products/product-a-night-in-paradiso-20261009-000018-1600.webp",
+          "bytes": 279948,
+          "sha256": "df9e83276f9ec4eda3d6dcd68c08d3e41ce73683c139b89cc35cb3cc8890279a",
+          "sourceSha256": "1fcddebfd9467773968eeee4b7d3f9ba804ddf100062bceb8ce3217df4056b2f",
+          "width": 1600
+        }
+      ],
+      "warnings": [],
+      "references": [
+        {
           "path": "_products/a-night-in-paradiso.md",
           "count": 1
         }
