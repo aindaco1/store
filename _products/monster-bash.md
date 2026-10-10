@@ -24,7 +24,7 @@ long_content:
       
       **Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102
       
-      **Tickets: $15 online · $20 at the door.**
+      **Tickets: $15 online · $20 at the door. 21+ only.**
 event_details:
   starts_at: "2026-10-22T19:00:00-06:00"
   ends_at: "2026-10-22T22:00:00-06:00"
@@ -35,6 +35,8 @@ event_details:
   followup:
     enabled: true
     enabled_at: "2026-09-22T17:53:32.989Z"
+pricing_mode: "fixed"
+suggested_amounts: []
 ---
 Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.
 
@@ -42,4 +44,4 @@ Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, 
 
 **Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102
 
-**Tickets: $15 online · $20 at the door.**
+**Tickets: $15 online · $20 at the door. 21+ only.**
