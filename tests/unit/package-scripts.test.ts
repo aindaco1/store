@@ -153,7 +153,7 @@ describe('package test scripts', () => {
     expect(playwrightContainer).toContain('FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble');
     expect(playwrightContainer).not.toMatch(/playwright:v\d/);
     expect(playwrightRun).toContain('lock.packages?.["node_modules/@playwright/test"]?.version');
-    expect(playwrightRun).toContain('PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:${PLAYWRIGHT_VERSION}"');
+    expect(playwrightRun).toContain('PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:${PLAYWRIGHT_VERSION}-node-24.22.1"');
     expect(playwrightRun).toContain('--build-arg "PLAYWRIGHT_VERSION=$PLAYWRIGHT_VERSION"');
   });
 

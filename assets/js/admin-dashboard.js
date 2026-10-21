@@ -8044,6 +8044,16 @@
   }
 
   function storeProductDescriptionUploadTarget(context, control) {
+    function capture(block, target, index, imageIndex) {
+      var originalSource = target.src;
+      return { block: block, target: target, index: index, imageIndex: imageIndex,
+        selection: window.DustWaveAdminShellEditorMedia.captureMediaTarget({
+          item: block, target: target, getItems: function() { return context.blocks; },
+          isAttached: function() { return context.root.isConnected; },
+          isCurrent: function() { return target.src === originalSource; },
+          contains: function(item, member) { return item.type !== 'gallery' || item.images.indexOf(member) >= 0; }
+        }) };
+    }
     var index = Number(control.dataset.contentIndex);
     var block = context.blocks[index];
     if (!block) return null;
@@ -8052,20 +8062,18 @@
       if (!Array.isArray(block.images)) block.images = [];
       var image = { src: '', alt: '', caption: '' };
       block.images.push(image);
-      return { block: block, target: image, index: index, imageIndex: block.images.length - 1 };
+      return capture(block, image, index, block.images.length - 1);
     }
     if (control.dataset.contentImageIndex !== undefined && block.type === 'gallery') {
       var imageIndex = Number(control.dataset.contentImageIndex);
       if (!Number.isInteger(imageIndex) || !block.images[imageIndex]) return null;
-      return { block: block, target: block.images[imageIndex], index: index, imageIndex: imageIndex };
+      return capture(block, block.images[imageIndex], index, imageIndex);
     }
-    return { block: block, target: block, index: index };
+    return capture(block, block, index);
   }
 
   function storeProductDescriptionTargetIndex(context, target) {
-    if (!target || !context.root.isConnected ||
-        target.block.type === 'gallery' && target.block.images.indexOf(target.target) < 0) return -1;
-    return context.blocks.indexOf(target.block);
+    return target?.selection?.index() ?? -1;
   }
 
   function storeProductDescriptionApplyMediaPath(context, target, path, label) {

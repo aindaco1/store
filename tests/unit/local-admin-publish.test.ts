@@ -102,7 +102,14 @@ describe('local admin product publishing', () => {
     try {
       await expect.poll(() => readFile(path.join(root, 'shutdown-started'), 'utf8').catch(() => '')).toBe('true');
       sidecar.kill();
-      await expect.poll(() => fetch(`${base}/health`).then(() => true).catch(() => false)).toBe(false);
+      // Probe a new connection: fetch may reuse a connection admitted before
+      // shutdown while the in-flight rebuild is deliberately still draining.
+      await expect.poll(() => new Promise<boolean>((resolve) => {
+        const url = new URL(base);
+        const socket = net.createConnection({ host: url.hostname, port: Number(url.port) });
+        socket.once('connect', () => { socket.destroy(); resolve(true); });
+        socket.once('error', () => { socket.destroy(); resolve(false); });
+      }), { timeout: 5000 }).toBe(false);
       expect(sidecar.exitCode).toBeNull();
       expect(sidecar.signalCode).toBeNull();
     } finally {

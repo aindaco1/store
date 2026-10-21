@@ -36,6 +36,11 @@
       }
     },
     {
+      file: '/shared/dust-wave-platform/packages/site-shell/src/script-loader-browser.js',
+      key: 'script-loader',
+      ready: function() { return Boolean(window.DustWaveScriptLoader); }
+    },
+    {
       file: 'stripe-checkout-sidecar.js',
       key: 'stripe-checkout-sidecar',
       ready: function() {

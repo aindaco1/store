@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v1.3.11 - 2026-10-21
+
+- Adopt Platform 0.44.0 with shared retryable Stripe loading, identity-safe media
+  selection and patched-Node bootstrap. Preserve checkout and editor policy.
+- Reuse graceful local publisher drain and CSP-compatible layout test fixtures.
+- Retain the patched runtime/tooling trust baseline for the eMudhra incident.
 
 - Add opt-in pay-what-you-want service pricing with suggested amounts, custom USD
   entry, canonical validation, coupon exclusion and a 0% default optional tip.

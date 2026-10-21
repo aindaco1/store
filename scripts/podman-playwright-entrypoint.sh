@@ -3,6 +3,9 @@ set -euo pipefail
 
 cd /workspace
 
+source /workspace/scripts/node-runtime.sh
+prefer_current_node_path || exit 1
+
 LOCKFILE_HASH_FILE="node_modules/.store-package-lock.sha256"
 CURRENT_LOCKFILE_HASH="$(sha256sum package-lock.json | awk '{print $1}')"
 INSTALLED_LOCKFILE_HASH="$(cat "$LOCKFILE_HASH_FILE" 2>/dev/null || true)"

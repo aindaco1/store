@@ -4,20 +4,21 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '2e5df578c08c4af0b827a08fefee8986acf5f24b';
+const expectedCommit = '57cc033e248f92835c4c5ee29c823cadbb5050a2';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.43.0',
-  '@dustwave/admin-shell': '0.13.0',
+  '@dustwave/platform-workspace': '0.44.0',
+  '@dustwave/admin-shell': '0.14.0',
   '@dustwave/build-core': '0.2.0',
   '@dustwave/design-core': '0.3.0',
   '@dustwave/inventory-core': '0.1.0',
+  '@dustwave/node-core': '0.1.0',
   '@dustwave/media-core': '0.5.0',
   '@dustwave/product-video-core': '0.1.0',
-  '@dustwave/release-core': '0.5.0',
+  '@dustwave/release-core': '0.5.1',
   '@dustwave/shipping-core': '0.2.0',
-  '@dustwave/site-shell': '0.3.0',
+  '@dustwave/site-shell': '0.4.0',
   '@dustwave/tax-core': '0.3.1',
-  '@dustwave/test-core': '0.3.1',
+  '@dustwave/test-core': '0.4.0',
   '@dustwave/timed-text': '0.11.2',
   '@dustwave/worker-core': '0.15.0'
 };
@@ -47,6 +48,7 @@ describe('shared platform pin', () => {
       'shared/dust-wave-platform/packages/build-core/package.json',
       'shared/dust-wave-platform/packages/design-core/package.json',
       'shared/dust-wave-platform/packages/inventory-core/package.json',
+      'shared/dust-wave-platform/packages/node-core/package.json',
       'shared/dust-wave-platform/packages/media-core/package.json',
       'shared/dust-wave-platform/packages/product-video-core/package.json',
       'shared/dust-wave-platform/packages/release-core/package.json',
@@ -90,6 +92,9 @@ describe('shared platform pin', () => {
       'packages/site-shell/src/form-control-identity-browser.js',
       'packages/site-shell/src/header-nav-browser.js',
       'packages/site-shell/src/shipping-option-utils-browser.js',
+      'packages/site-shell/src/script-loader-browser.js',
+      'packages/node-core/bin/node-runtime.sh',
+      'packages/node-core/src/server-drain.js',
       'packages/tax-core/src/index.js',
       'packages/tax-core/src/nm-grt-starter.js',
       'packages/tax-core/src/provider.js',

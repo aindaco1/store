@@ -1,3 +1,4 @@
+import '../../shared/dust-wave-platform/packages/site-shell/src/script-loader-browser.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('stripe checkout sidecar helper', () => {
