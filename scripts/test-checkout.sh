@@ -14,23 +14,9 @@ for arg in "$@"; do
     fi
 done
 
-prefer_current_node_path() {
-    local candidate=""
-    for candidate in \
-        "$HOME/.nvm/versions/node/v24.*/bin" \
-        "$HOME/.nvm/versions/node/v22.*/bin"
-    do
-        for resolved in $candidate; do
-            if [ -x "$resolved/node" ]; then
-                export PATH="$resolved:$PATH"
-                return 0
-            fi
-        done
-    done
-    return 1
-}
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/node-runtime.sh"
 
-prefer_current_node_path || true
+prefer_current_node_path || exit 1
 
 prefer_podman_path() {
   command -v podman >/dev/null 2>&1 && return 0

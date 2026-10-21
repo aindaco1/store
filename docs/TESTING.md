@@ -38,6 +38,13 @@ site at port `4002`, Worker at port `8989`, and matching localhost CORS origin.
 
 ## Quick Commands
 
+Host launchers preserve patched Node on PATH or select an NVM release at least
+22.23.4, 24.22.1, or 26.12.1 on those major lines. They fail if none is installed.
+This prevents an older NVM cache from replacing a repaired system runtime.
+Worker and Playwright container builds copy the verified Node 24.22.1 executable;
+their new image tags bypass old local images, and entrypoints check the runtime
+before installing dependencies. Existing running containers must be restarted.
+
 ```bash
 bundle exec jekyll build --quiet
 npm run test:unit

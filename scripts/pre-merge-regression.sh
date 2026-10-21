@@ -35,21 +35,7 @@ prefer_podman_path() {
   return 1
 }
 
-prefer_current_node_path() {
-  local candidate=""
-  for candidate in \
-    "$HOME/.nvm/versions/node/v24.*/bin" \
-    "$HOME/.nvm/versions/node/v22.*/bin"
-  do
-    for resolved in $candidate; do
-      if [[ -x "$resolved/node" ]]; then
-        export PATH="$resolved:$PATH"
-        return 0
-      fi
-    done
-  done
-  return 1
-}
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/node-runtime.sh"
 
 stabilize_podman_connection() {
   prefer_podman_path || return 0
@@ -293,7 +279,7 @@ stop_worker() {
 
 start_worker() {
   (
-    prefer_current_node_path || true
+    prefer_current_node_path || exit 1
     cd worker && npx wrangler dev --env dev --port 8989 >/tmp/store-premerge-worker.log 2>&1
   ) &
   WORKER_PID=$!
@@ -443,7 +429,7 @@ export ADMIN_BOOTSTRAP_EMAILS="${ADMIN_BOOTSTRAP_EMAILS:-admin@example.com}"
 export MAGIC_LINK_SECRET="${MAGIC_LINK_SECRET:-test-magic-link-secret}"
 export RESEND_API_KEY="${RESEND_API_KEY:-re_test_smoke}"
 
-prefer_current_node_path || true
+prefer_current_node_path || exit 1
 stabilize_podman_connection
 
 run_phase "1. Secret audit" npm run test:secrets
@@ -502,12 +488,8 @@ else
   print_host_jekyll_fallback_reason
   USE_PODMAN_JEKYLL=true
   run_phase "7. Store build artifact checks" bash -lc '
-    for candidate in "$HOME"/.nvm/versions/node/v24.*/bin "$HOME"/.nvm/versions/node/v22.*/bin; do
-      if [[ -x "$candidate/node" ]]; then
-        PATH="$candidate:$PATH"
-        break
-      fi
-    done
+    source scripts/node-runtime.sh
+    prefer_current_node_path || exit 1
     PATH="/opt/podman/bin:$PATH"
     scripts/pre-merge-regression.sh __podman_build_check
   '

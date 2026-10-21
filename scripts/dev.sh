@@ -18,21 +18,7 @@ STRIPE_LOG="/tmp/store-stripe-listen.log"
 USES_FIRST_PARTY_LOCAL=true
 SKIP_STRIPE="${SKIP_STRIPE:-false}"
 
-prefer_current_node_path() {
-  local candidate=""
-  for candidate in \
-    "$HOME/.nvm/versions/node/v24.*/bin" \
-    "$HOME/.nvm/versions/node/v22.*/bin"
-  do
-    for resolved in $candidate; do
-      if [ -x "$resolved/node" ]; then
-        export PATH="$resolved:$PATH"
-        return 0
-      fi
-    done
-  done
-  return 1
-}
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/node-runtime.sh"
 
 prefer_stripe_path() {
   local candidate=""
@@ -128,7 +114,7 @@ kill_port_if_busy() {
 
 echo "🚀 Starting development environment..."
 
-prefer_current_node_path || true
+prefer_current_node_path || exit 1
 prefer_stripe_path || true
 
 ruby ./scripts/sync-worker-config.rb
@@ -159,7 +145,7 @@ bundle exec jekyll serve --config _config.yml,_config.local.yml --port "$JEKYLL_
 # Note: production orders live in remote Cloudflare resources, not local dev state.
 echo "⚡ Starting Wrangler (local KV)..."
 (cd worker && {
-  prefer_current_node_path || true
+  prefer_current_node_path || exit 1
   node src/local-repo-service.mjs &
   LOCAL_REPO_SERVICE_PID=$!
   trap 'kill "$LOCAL_REPO_SERVICE_PID" >/dev/null 2>&1 || true' EXIT INT TERM

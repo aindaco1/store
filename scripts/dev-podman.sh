@@ -18,7 +18,7 @@ POD_NAME="store-dev-pod"
 SITE_CONTAINER="store-dev-site"
 WORKER_CONTAINER="store-dev-worker"
 SITE_IMAGE="localhost/store-dev-site:latest"
-WORKER_IMAGE="localhost/store-dev-worker:latest"
+WORKER_IMAGE="localhost/store-dev-worker:node-24.22.1"
 PODMAN_DEV_LABEL="store.dev.stack=store"
 WORKER_NODE_IMAGE="${PODMAN_WORKER_NODE_IMAGE:-}"
 SITE_VOLUME="store-dev-bundle"
@@ -94,21 +94,7 @@ detect_os_family() {
   esac
 }
 
-prefer_current_node_path() {
-  local candidate=""
-  for candidate in \
-    "$HOME/.nvm/versions/node/v24.*/bin" \
-    "$HOME/.nvm/versions/node/v22.*/bin"
-  do
-    for resolved in $candidate; do
-      if [ -x "$resolved/node" ]; then
-        export PATH="$resolved:$PATH"
-        return 0
-      fi
-    done
-  done
-  return 1
-}
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/node-runtime.sh"
 
 prefer_podman_path() {
   command -v podman >/dev/null 2>&1 && return 0
@@ -538,7 +524,7 @@ if [ "$PODMAN_DETACH" != "true" ]; then
   trap 'cleanup' EXIT
 fi
 
-prefer_current_node_path || true
+prefer_current_node_path || exit 1
 prefer_podman_path || true
 prefer_stripe_path || true
 ensure_podman_ready
@@ -552,7 +538,7 @@ ensure_podman_ready
 
 build_image_if_needed "$SITE_IMAGE" "$ROOT_DIR" "$ROOT_DIR/Containerfile.dev"
 if [ -z "$WORKER_NODE_IMAGE" ] && \
-   ! podman image exists "docker.io/library/node:24-bookworm-slim" && \
+   ! podman image exists "docker.io/library/node:24.22.1-bookworm-slim" && \
    podman image exists "mcr.microsoft.com/playwright:v1.57.0-noble"; then
   WORKER_NODE_IMAGE="mcr.microsoft.com/playwright:v1.57.0-noble"
   echo "ℹ️  Using cached Playwright Node 24 image for the Worker dev base."

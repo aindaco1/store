@@ -12,7 +12,7 @@ PLAYWRIGHT_VERSION="$(node -e '
   if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) process.exit(1);
   process.stdout.write(version);
 ')"
-PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:${PLAYWRIGHT_VERSION}"
+PLAYWRIGHT_IMAGE="localhost/store-dev-playwright:${PLAYWRIGHT_VERSION}-node-24.22.1"
 PLAYWRIGHT_NODE_MODULES_VOLUME="store-dev-playwright-node-modules"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_STACK_STARTED=false

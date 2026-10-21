@@ -3,6 +3,9 @@ set -euo pipefail
 
 cd /workspace/worker
 
+source /workspace/scripts/node-runtime.sh
+prefer_current_node_path || exit 1
+
 PACKAGE_LOCK_HASH_FILE="node_modules/.package-lock.sha256"
 CURRENT_PACKAGE_LOCK_HASH="$(sha256sum package-lock.json | awk '{print $1}')"
 INSTALLED_PACKAGE_LOCK_HASH=""

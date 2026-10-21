@@ -14,7 +14,7 @@
     "wrangler": "^4.144.0"
   },
   "overrides": {
-    "sharp": "0.35.4"
+    "sharp": "0.35.5"
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
