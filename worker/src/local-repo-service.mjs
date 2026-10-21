@@ -1,3 +1,4 @@
+import { installServerDrain } from '../../shared/dust-wave-platform/packages/node-core/src/server-drain.js';
 import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import fs from 'node:fs/promises';
@@ -191,11 +192,4 @@ server.listen(port, '127.0.0.1', () => {
 });
 server.on('close', () => catalogSync.stop());
 
-function shutdown() {
-  catalogSync.stop();
-  server.close();
-  // Let active requests and catalog generation finish before Node exits, so
-  // the Ruby child cannot write into a repository after its owner has stopped.
-}
-process.once('SIGTERM', shutdown);
-process.once('SIGINT', shutdown);
+installServerDrain({ server, stopScheduling: () => catalogSync.stop() });

@@ -19,7 +19,7 @@ function fixture(current: string, fallback: string[] = []) {
   makeNode(currentDir, current);
   for (const version of fallback) makeNode(join(root, '.nvm/versions/node', version, 'bin'), version);
   const result = spawnSync('/bin/bash', ['-c', 'source "$1"; prefer_current_node_path && command -v node', 'test', resolve('scripts/node-runtime.sh')], {
-    env: { HOME: root, PATH: currentDir + ':/usr/bin:/bin' }, encoding: 'utf8'
+    env: { DUSTWAVE_NODE_VERSION_ROOT: join(root, '.nvm/versions/node'), PATH: currentDir + ':/usr/bin:/bin' }, encoding: 'utf8'
   });
   return { ...result, root, currentDir };
 }
