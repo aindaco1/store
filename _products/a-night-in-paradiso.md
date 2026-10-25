@@ -8,7 +8,7 @@ image: "/assets/images/products/product-a-night-in-paradiso-20261009-000018.png"
 image_alt: "Retro orange, red, and avocado green A Night in Paradiso poster."
 type: service
 fulfillment_type: "ticket"
-status: "active"
+status: "archived"
 category: dustwave
 storefront_category: support
 order: 10
