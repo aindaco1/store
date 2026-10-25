@@ -8,7 +8,7 @@ image: "/assets/images/products/product-monster-bash-20260922-170930.png"
 image_alt: "Pink and green Monster Bash poster with vintage monsters and dancing skeletons, advertising DJ Neuromancer and a costume contest at Juno Brewery."
 type: "ticket"
 fulfillment_type: "ticket"
-status: "active"
+status: "archived"
 category: "dustwave"
 order: 20
 shipping_preset: ""
