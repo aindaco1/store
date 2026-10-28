@@ -1,3 +1,4 @@
+import { getAddressConsistencyError } from './address-consistency.js';
 import {
   getFreeShippingDefault,
   getShippingFallbackFeeCents,
@@ -78,6 +79,8 @@ export function normalizeShippingDestination(address = {}) {
     return { valid: false, error: 'Shipping postal code is required' };
   }
   if (!postalCode) return { valid: false, error: 'Shipping postal code is invalid' };
+  const consistencyError = getAddressConsistencyError({ ...address, country, postalCode });
+  if (consistencyError) return { valid: false, error: consistencyError };
 
   return {
     valid: true,

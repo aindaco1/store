@@ -347,6 +347,10 @@ runtime:
     tax_location: Tax location
     tax_location_note: We use your billing country and postal code to calculate tax.
     tax_location_note_nm: We also need your street address, city, and state to calculate New Mexico tax.
+    zip_state_mismatch: ZIP code %{zip} belongs to %{states}. Check the ZIP code or state.
+    city_suggestion: For ZIP %{zip}, the listed city is %{city}. You can keep your city if it is an alternate mailing name.
+    use_city: Use %{city}
+    checking_address: Checking ZIP code and state…
     tax_location_required: Enter your billing country and postal code to finalize tax before continuing.
     tax_location_required_nm: Enter your billing street address, city, state, and postal code to finalize New Mexico tax before continuing.
     payment_method: Payment method
@@ -371,6 +375,8 @@ runtime:
     tax_label: Tax
     sales_tax_pending_label: Tax
     tax_label_with_rate: Tax (%{rate}%)
+    tax_estimate_label: Estimated tax (%{rate}%)
+    tax_estimate_local_missing: Estimated tax (%{rate}%; local taxes may be missing)
     shipping: Shipping
     shipping_estimate: Estimated shipping
     shipping_estimate_postal_code: ZIP for shipping estimate
@@ -546,6 +552,7 @@ fulfillment:
     where: Where
     quantity: Quantity
     holder: Holder
+    order_email: Order email
     order_reference: Order reference
     checked_in_at: Checked in
     event_pending: Event details pending

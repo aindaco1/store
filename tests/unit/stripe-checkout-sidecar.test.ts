@@ -18,6 +18,26 @@ describe('stripe checkout sidecar helper', () => {
     delete (window as any).Stripe;
   });
 
+  it('reuses the Stripe instance prepared before details are complete across payment intents', async () => {
+    const elements = vi.fn(() => ({ create: () => ({ mount: vi.fn(), unmount: vi.fn() }) }));
+    const constructor = vi.fn(() => ({ elements, confirmPayment: vi.fn() }));
+    (window as any).Stripe = constructor;
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const sidecar = (window as any).StoreStripeCheckoutSidecar;
+    const config = { publishableKey: 'pk_test_first', locale: 'en' };
+    await Promise.all([sidecar.prepareStripe(config), sidecar.prepareStripe(config)]);
+    expect(elements).not.toHaveBeenCalled();
+    for (const clientSecret of ['first_intent', 'replacement_intent']) {
+      const mount = await sidecar.mountPaymentIntent({ ...config, clientSecret, paymentContainer: document.createElement('div') });
+      mount.unmount();
+    }
+    expect(constructor).toHaveBeenCalledTimes(1);
+    expect(elements).toHaveBeenCalledTimes(2);
+    await sidecar.prepareStripe({ ...config, locale: 'es' });
+    await sidecar.prepareStripe({ ...config, publishableKey: 'pk_test_second' });
+    expect(constructor).toHaveBeenCalledTimes(3);
+  });
+
   it('mounts a payment element and optional shipping address element from Stripe custom checkout using theme vars', async () => {
     document.documentElement.style.setProperty('--store-color-primary', '#654321');
     document.documentElement.style.setProperty('--store-color-primary-hover', '#102f52');
@@ -111,7 +131,7 @@ describe('stripe checkout sidecar helper', () => {
             borderRadius: '8px',
             spacingUnit: '4px',
             fontFamily: '"Inter", sans-serif',
-            fontSizeBase: '13px',
+            fontSizeBase: '16px',
             fontWeightNormal: '400'
           },
           rules: {
@@ -126,7 +146,7 @@ describe('stripe checkout sidecar helper', () => {
               border: '1px solid #c8bbaa',
               boxShadow: 'none',
               color: '#223344',
-              fontSize: '13px',
+              fontSize: 'var(--fontSizeBase)',
               fontWeight: '400',
               lineHeight: '1.4',
               padding: '10px 12px'
@@ -281,7 +301,11 @@ describe('stripe checkout sidecar helper', () => {
       clientSecret: 'pi_test_secret_123',
       appearance: expect.objectContaining({
         theme: 'flat',
-        labels: 'floating'
+        labels: 'floating',
+        variables: expect.objectContaining({ fontSizeBase: '16px' }),
+        rules: expect.objectContaining({
+          '.Input': expect.objectContaining({ fontSize: 'var(--fontSizeBase)' })
+        })
       })
     });
     expect(elements.create).toHaveBeenCalledWith('payment', {
@@ -468,5 +492,26 @@ describe('stripe checkout sidecar helper', () => {
     injectedScript?.dispatchEvent(new Event('load'));
 
     await expect(ensurePromise).resolves.toBe((window as any).Stripe);
+  });
+
+  it('retries a failed early load without waiting on the failed script tag', async () => {
+    document.querySelectorAll('script[data-store-stripe-js]').forEach(node => node.remove());
+    await import('../../assets/js/stripe-checkout-sidecar.js');
+    const sidecar = (window as any).StoreStripeCheckoutSidecar;
+    const config = { publishableKey: 'pk_test_retry', locale: 'en' };
+    const warmup = sidecar.prepareStripe(config);
+    const failed = expect(warmup).rejects.toThrow('Failed to load Stripe.js.');
+    await vi.waitFor(() => expect(document.querySelector('script[data-store-stripe-js]')).not.toBeNull());
+    const script = document.querySelector('script[data-store-stripe-js]')!;
+    script.dispatchEvent(new Event('error'));
+    await failed;
+    expect(script.isConnected).toBe(false);
+    const retry = sidecar.prepareStripe(config);
+    await vi.waitFor(() => expect(document.querySelector('script[data-store-stripe-js]')).not.toBeNull());
+    const stripe = {};
+    (window as any).Stripe = vi.fn(() => stripe);
+    document.querySelector('script[data-store-stripe-js]')!.dispatchEvent(new Event('load'));
+    await expect(retry).resolves.toBe(stripe);
+    document.querySelectorAll('script[data-store-stripe-js]').forEach(node => node.remove());
   });
 });

@@ -74,6 +74,7 @@ shared_stack_ready() {
   podman info >/dev/null 2>&1 || return 1
   podman exec store-dev-worker true >/dev/null 2>&1 || return 1
   podman exec store-dev-site true >/dev/null 2>&1 || return 1
+  store_podman_test_state_isolated || return 1
   curl -fsS http://127.0.0.1:4002/ >/dev/null 2>&1 || return 1
 
   local status=""

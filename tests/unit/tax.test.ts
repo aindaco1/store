@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTaxProvider, normalizeTaxDestination, quoteTax } from '../../worker/src/tax.js';
 
 describe('tax engine scaffold', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-27T12:00:00Z')); });
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -135,7 +137,7 @@ describe('tax engine scaffold', () => {
     });
   });
 
-  it('uses offline state rules for non-New Mexico ZIP-only destinations while nm_grt is configured', async () => {
+  it('uses bundled local rates for covered non-New Mexico ZIP-only destinations', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
 
@@ -152,13 +154,13 @@ describe('tax engine scaffold', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(quote).toMatchObject({
-      provider: 'offline_rules',
-      source: 'offline_rules',
-      effectiveRate: 0.0825,
+      provider: 'open_us',
+      source: 'opensalestax_zip_snapshot',
+      effectiveRate: 0.105,
       taxableSubtotalCents: 2500,
       taxableShippingCents: 0,
       shippingTaxed: false,
-      taxCents: 206,
+      taxCents: 263,
       shippingCents: 955,
       destination: {
         country: 'US',
@@ -169,9 +171,55 @@ describe('tax engine scaffold', () => {
         country: 'US',
         state: 'CA',
         postalCode: '90210',
-        type: 'national'
+        type: 'zip_local'
       }
     });
+  });
+
+  it.each(['', 'New York', 'NY'])('resolves edited ZIP 10467 before selecting a tax provider with state "%s"', async (state) => {
+    const fetchMock = vi.fn(() => Promise.reject(new Error('Unexpected NM lookup')));
+    vi.stubGlobal('fetch', fetchMock);
+    const quote = await quoteTax({ TAX_PROVIDER: 'nm_grt', TAX_ORIGIN_COUNTRY: 'US', TAX_USE_REGIONAL_ORIGIN: 'true' }, {
+      subtotalCents: 2000,
+      destination: { country: 'US', postalCode: '10467', state, city: 'Corrales', line1: '123 Test Street' }
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(quote).toMatchObject({ provider: 'open_us', taxCents: 178, effectiveRate: 0.08875, estimated: true, coverage: 'zip_local', destination: { postalCode: '10467', state: 'NY' } });
+  });
+
+  it('keeps a labeled offline estimate for unsupported or stale local coverage', async () => {
+    const uncovered = await quoteTax({ TAX_PROVIDER: 'nm_grt' }, {
+      subtotalCents: 2000, destination: { country: 'US', postalCode: '80205', state: 'CO' }
+    });
+    expect(uncovered).toMatchObject({ provider: 'offline_rules', estimated: true, coverage: 'state_only', destination: { state: 'CO' } });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2027-01-01T12:00:00Z'));
+    const stale = await quoteTax({ TAX_PROVIDER: 'nm_grt' }, {
+      subtotalCents: 2000, destination: { country: 'US', postalCode: '10467', state: 'NY' }
+    });
+    expect(stale).toMatchObject({ provider: 'offline_rules', estimated: true, coverage: 'state_only', taxCents: 80 });
+  });
+
+  it.each([10, 2000, 1999])('keeps rounded jurisdiction cents equal to the combined tax for %i cents', async (subtotalCents) => {
+    const quote = await quoteTax({ TAX_PROVIDER: 'offline_rules' }, {
+      subtotalCents, destination: { country: 'US', postalCode: '10467' }
+    });
+    expect(quote.breakdown.reduce((sum, entry) => sum + entry.taxCents, 0)).toBe(quote.taxCents);
+    expect(quote.taxCents).toBe(Math.round(subtotalCents * 0.08875));
+  });
+
+  it.each([
+    { postalCode: '10467-1234', state: 'New York', expectedState: 'NY', provider: 'open_us' },
+    { postalCode: '87048', state: 'NM', expectedState: 'NM', provider: 'nm_grt' },
+    { postalCode: '96799', state: 'AS', expectedState: 'AS', provider: 'offline_rules' },
+    { postalCode: '06390', state: '', expectedState: 'NY', provider: 'open_us' },
+    { postalCode: '00501', state: 'NY', expectedState: 'NY', provider: 'offline_rules' }
+  ])('resolves ZIP $postalCode without losing overlapping or unmapped state codes', async ({ postalCode, state, expectedState, provider }) => {
+    const quote = await quoteTax({ TAX_PROVIDER: 'nm_grt', SALES_TAX_RATE: '0.07625' }, {
+      subtotalCents: 2000,
+      destination: { country: 'US', postalCode, state }
+    });
+    expect(quote).toMatchObject({ provider, destination: { postalCode, state: expectedState } });
   });
 
   it('quotes vendored New Mexico GRT starter data by city and postal code', async () => {

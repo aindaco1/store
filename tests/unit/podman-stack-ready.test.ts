@@ -30,6 +30,21 @@ function waitForStack({ readyAfter = 0, timeout = '', alive = true, probeSeconds
 }
 
 describe('Podman stack startup deadline', () => {
+  it.each([
+    ['store-test-worker-wrangler', 0],
+    ['store-dev-worker-wrangler', 1],
+    ['', 1]
+  ])('only reuses an isolated test storage volume (%s)', (volume, status) => {
+    const result = spawnSync('bash', ['-c', `
+      source "$1"
+      podman() { printf '%s' "$STORE_TEST_STATE_VOLUME"; }
+      store_podman_test_state_isolated
+    `, 'podman-state-isolation-test', resolve('scripts/podman-stack-ready.sh')], {
+      encoding: 'utf8', env: { ...process.env, STORE_TEST_STATE_VOLUME: volume }
+    });
+    expect(result.status).toBe(status);
+  });
+
   it('accepts a ready stack immediately', () => {
     const result = waitForStack();
     expect(result.status, result.stderr).toBe(0);

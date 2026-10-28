@@ -16,13 +16,30 @@ The Podman path uses the same local URLs as the host flow:
 - Storefront: `http://127.0.0.1:4002`
 - Worker: `http://127.0.0.1:8989`
 
+### Credit-card autofill needs HTTPS
+
+The default HTTP stack supports Stripe test-mode entry, but it cannot validate
+Proton Pass credit-card autofill. Proton Pass requires HTTPS for the top page
+and the payment frame; it can show saved cards on HTTP and then fill nothing
+when one is selected. Its [frame validation](https://github.com/ProtonMail/WebClients/blob/df5c7ae76a454a68812ab1a9a6fe3e6450a96b72/applications/pass-extension/src/lib/utils/frames.ts)
+and [URL parser](https://github.com/ProtonMail/WebClients/blob/df5c7ae76a454a68812ab1a9a6fe3e6450a96b72/packages/pass/lib/urls/utils/parser.ts)
+enforce this even for loopback HTTP addresses.
+
+For a real extension check, use trusted local HTTPS for both services and align
+`_config.local.yml` with `SITE_BASE`, `WORKER_BASE`, and `CORS_ALLOWED_ORIGIN` in
+the ignored `worker/.dev.vars`. Keep certificates and private keys outside the
+synced repository, bind local proxies to loopback, and retain Stripe test keys.
+Return those overrides to the default HTTP origins before running the standard
+Podman browser suite. A synthetic popup test does not prove saved-card autofill
+works in the actual extension and browser.
+
 ## Scope
 
 Included:
 
 - rootless Podman containers for Jekyll and the Worker
 - bind-mounted repo source for fast iteration
-- local Wrangler state for KV, Durable Objects, and R2
+- local Wrangler state for KV, Durable Objects, and R2 in the `store-dev-worker-wrangler` Podman volume
 - Worker dev image based on Node 24
 - ignored `worker/.dev.vars` support
 - local admin dashboard defaults and CORS wiring for `http://127.0.0.1:4002`
@@ -117,7 +134,9 @@ The Worker smoke validates:
 - tampered Store carts fail closed
 - malformed checkout intent payloads fail closed
 
-Podman-backed test wrappers reset `worker/.wrangler/state` and `worker/.wrangler/tmp` before starting their isolated stack. That keeps release, security, Worker smoke, and headless E2E runs from reusing corrupt or stale Miniflare SQLite state. Manual `./scripts/dev.sh --podman` keeps local Wrangler state unless you opt in with `PODMAN_RESET_WRANGLER_STATE=true`.
+The Worker mounts the `store-dev-worker-wrangler` named volume at `worker/.wrangler` inside its container. SQLite databases and temporary Wrangler files therefore stay on the Podman filesystem, outside the host bind mount and any cloud sync. On the first manual start, existing host `worker/.wrangler/state` is copied into a new volume; the original files remain untouched. Subsequent starts reuse the volume. Host-mode development continues to use the host files separately.
+
+The security and browser test wrappers use the separate `store-test-worker-wrangler` volume and only reuse a stack already attached to that test volume. `PODMAN_RESET_WRANGLER_STATE=true` selects and resets this test volume; it never resets `store-dev-worker-wrangler` or imports host state. Normal `./scripts/dev.sh --podman` continues using the preserved preview volume. Stop a preview before running the wrappers because they share the same ports and container names, then restart it normally afterward. The read-only Worker smoke may inspect an existing preview; if it starts a stack, it also uses the test volume. This separation preserves checkout attempts and Stripe idempotency records between local preview sessions; resetting storage while a browser retains its attempt ID can otherwise leave a checkout in payment resolution.
 
 The Playwright container keeps root dependencies in a named volume. When `package-lock.json` changes, it refreshes that volume with `npm ci`, so the bind-mounted repository lockfile is never rewritten by the container's npm version. It also mounts the running Worker's dependency volume read-only, so browser fixtures that import Worker modules resolve packages such as `sales-tax` on a fresh checkout. The Worker owns installation and lockfile-based refresh of those dependencies; host `worker/node_modules` is not required or used by the Playwright container.
 
@@ -257,7 +276,7 @@ npm run podman:doctor
 ./scripts/dev.sh --podman
 ```
 
-If Worker requests return `503` with `Rate limiting unavailable` and the Worker log mentions a malformed SQLite database, stop the stack and rerun the failing test wrapper. The wrapper resets local Wrangler state automatically; for manual dev, run:
+If Worker requests return `503` with `Rate limiting unavailable`, inspect `podman logs store-dev-worker`. SQLite `disk I/O error` or malformed-database errors indicate a local storage failure, not a customer exceeding the rate limit. Restart the Worker first. The named volume avoids SQLite shared-memory failures on synced host folders. If imported state is corrupt, stop the stack and export any local test data you need before resetting the volume:
 
 ```bash
 PODMAN_RESET_WRANGLER_STATE=true SKIP_STRIPE=true ./scripts/dev.sh --podman

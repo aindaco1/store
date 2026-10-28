@@ -7,6 +7,7 @@ const longReference = [
   'd990fc50-2e3b-4f14-a42a-fce90ea8413c',
   'customer-supplied-reference-that-must-remain-inside-the-card'
 ].join('-');
+const orderEmail = `${'buyer'.repeat(12)}@${'example'.repeat(8)}.com`;
 
 const checkInHtml = buildStoreCheckInDocument({
   lang: 'es',
@@ -27,6 +28,7 @@ const checkInHtml = buildStoreCheckInDocument({
       label: 'Titular',
       value: 'Una Compradora con un nombre deliberadamente largo que debe permanecer dentro de la tarjeta'
     },
+    { label: 'Correo del pedido', value: orderEmail },
     { label: 'Referencia del pedido', value: longReference, reference: true }
   ],
   notice: 'Esta página verifica el boleto. Los cambios de asistencia siguen disponibles solo para el personal autorizado en la administración de la Tienda.',
@@ -47,6 +49,7 @@ test.describe('Store ticket check-in page', () => {
 
       await expect(page.getByRole('heading', { name: 'Este boleto es válido.' }), viewport.name).toBeVisible();
       await expect(page.getByText(longReference), viewport.name).toBeVisible();
+      await expect(page.getByText(orderEmail, { exact: true }), viewport.name).toBeVisible();
       await expectNoHorizontalOverflow(page);
       expect(await page.locator('main, .card, dl, .detail, dd').evaluateAll((elements) => (
         elements.every((element) => {

@@ -347,6 +347,10 @@ runtime:
     tax_location: Ubicación fiscal
     tax_location_note: Usamos tu país y código postal de facturación para calcular el impuesto.
     tax_location_note_nm: También necesitamos tu dirección, ciudad y estado para calcular el impuesto de Nuevo México.
+    zip_state_mismatch: El código postal %{zip} corresponde a %{states}. Revisa el código postal o el estado.
+    city_suggestion: Para el código postal %{zip}, la ciudad indicada es %{city}. Puedes conservar tu ciudad si es un nombre postal alternativo.
+    use_city: Usar %{city}
+    checking_address: Comprobando el código postal y el estado…
     tax_location_required: Introduce tu país y código postal de facturación para finalizar el impuesto antes de continuar.
     tax_location_required_nm: Introduce tu dirección de facturación, ciudad, estado y código postal para finalizar el impuesto de Nuevo México antes de continuar.
     payment_method: Método de pago
@@ -371,6 +375,8 @@ runtime:
     tax_label: Impuesto
     sales_tax_pending_label: Impuesto
     tax_label_with_rate: Impuesto (%{rate}%)
+    tax_estimate_label: Impuesto estimado (%{rate}%)
+    tax_estimate_local_missing: Impuesto estimado (%{rate}%; pueden faltar impuestos locales)
     shipping: Envío
     shipping_estimate: Envío estimado
     shipping_estimate_postal_code: Código postal para estimar el envío
@@ -546,6 +552,7 @@ fulfillment:
     where: Dónde
     quantity: Cantidad
     holder: Titular
+    order_email: Correo del pedido
     order_reference: Referencia del pedido
     checked_in_at: Registrado
     event_pending: Detalles del evento pendientes

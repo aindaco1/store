@@ -505,9 +505,9 @@ async function run() {
       publicCheckIn.status === 200 &&
         publicBody.valid === true &&
         publicBody.checkedIn === false &&
-        !publicBody.customer?.email,
+        publicBody.customer?.email === 'ticket@example.com',
       'Ticket public check-in preview',
-      'signed check-in link validates before admin check-in without exposing customer email'
+      'signed check-in link validates before admin check-in and identifies the purchaser email'
     );
 
     const browserCheckIn = await workerRequest(checkInAction.href, {
@@ -521,9 +521,9 @@ async function run() {
         String(browserCheckIn.headers.get('content-security-policy') || '').includes("default-src 'none'") &&
         browserCheckInHtml.includes('This ticket is valid.') &&
         browserCheckInHtml.includes('overflow-wrap: anywhere') &&
-        !browserCheckInHtml.includes('ticket@example.com'),
+        browserCheckInHtml.includes('<dd>ticket@example.com</dd>'),
       'Ticket browser check-in page',
-      'responsive private HTML verifies the ticket without exposing customer email'
+      'responsive private HTML verifies the ticket and identifies the purchaser email'
     );
   }
 

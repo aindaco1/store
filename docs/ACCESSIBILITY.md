@@ -11,6 +11,8 @@ Store accessibility coverage focuses on public product browsing, cart/checkout c
 - The RSVP Products builder uses native labeled inputs/selects, fieldset/legend question groups, semantic buttons, disabled move/remove limits, visible counts, and localized English/Spanish control names; the internal JSON serialization field is hidden from the accessibility tree.
 - Public Spanish shells for home, Terms, Orders, and Order Success reuse the same structural layout as the English routes; product/user-generated content remains canonical unless a product provides explicit localized copy.
 - iOS Safari auto-link styling is suppressed with `format-detection` metadata and inherited form/button colors so detected addresses, emails, dates, and hamburger controls do not turn blue unexpectedly.
+- ZIP/state conflicts use inline status text associated with both fields and `aria-invalid`, without repeating the message in the checkout footer. Optional city suggestions are associated with the city input; their separate, underlined action keeps a 44px touch target and applies the suggestion only on request. Typing and delayed validation preserve focus and scroll. Payment autoscroll happens on its first reveal only, respecting reduced motion.
+- Platform's shared form styles enforce a 16px minimum (or a larger root text size) for text-like inputs, selects, and textareas on narrow screens and touch devices, including tablets. Stripe payment inputs use the same 16px minimum through Store's shared appearance builder. Pinch-to-zoom remains available; validation still focuses the field that needs correction.
 - `v1.0.6` release evidence keeps the axe, keyboard add-to-cart, focus order, order lookup live status, reduced motion, 200% text scaling, mobile overflow, and optional VoiceOver/Whisper transcript coverage from `v1.0.5`, and covers the super-admin Workers Cache clear status through the admin dashboard E2E path.
 - VoiceOver/Whisper transcript evidence can be attached when a release explicitly requires assistive-technology speech evidence.
 
@@ -20,6 +22,7 @@ Store accessibility coverage focuses on public product browsing, cart/checkout c
 - Product detail pages.
 - Add-to-cart buttons, variant controls, and quantity steppers.
 - Cart drawer quantity controls and checkout actions.
+- Cart/checkout background locking targets Store's page landmarks and skip/live-region elements, leaving payment-provider and password-manager overlays interactive. Keyboard wrapping and focus return remain within Store's drawer controls. The checkout browser regression exercises a separate shadow-root autofill overlay. Proton Pass/Helium card filling was manually confirmed on local HTTPS on 2026-10-24; the default HTTP stack cannot validate that flow (see [local HTTPS requirements](PODMAN.md#credit-card-autofill-needs-https)).
 - Configured RSVP party and attendee questions, zero-total **Complete order**, and paid-checkout payment controls.
 - Terms, Orders, and Order Success pages in English and Spanish.
 - Admin login.
@@ -32,6 +35,7 @@ Store accessibility coverage focuses on public product browsing, cart/checkout c
 npm run test:unit
 npx playwright test tests/e2e/accessibility-public-pages.spec.ts --project=chromium --workers=1
 npx playwright test tests/e2e/public-page-controls.spec.ts --project=chromium --workers=1
+npx playwright test tests/e2e/mobile-form-controls.spec.ts --project=chromium --workers=1
 npx playwright test tests/e2e/admin-dashboard.spec.ts --project=chromium --workers=1
 ```
 
@@ -55,6 +59,7 @@ The release E2E path also covers 200% text scaling for public checkout/order sur
 - Focus order in the cart drawer and admin dashboard.
 - Error/status announcements for checkout, order lookup, admin saves, uploads, coupon edits, reminder suppression, and check-in actions.
 - Mobile text wrapping in product cards, product pages, buttons, coupon editors, download rows, order rows, and admin tables.
+- On physical iPhone/iPad Safari, move between cart quantities, coupon, contact, address, RSVP, and Stripe payment fields; verify that opening/dismissing the keyboard does not unexpectedly zoom the page. Browser emulation checks the CSS sizing and layout but does not prove native keyboard/viewport behavior.
 
 When a release explicitly requires assistive-technology speech evidence, run one VoiceOver pass on macOS/Safari for the covered surfaces above. Record blockers with the affected route, viewport, assistive technology, browser, and exact control label.
 

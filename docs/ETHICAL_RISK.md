@@ -156,3 +156,29 @@ send, deployment, or translation approval follows automatically from a score.
   the same role, origin, CSRF and repository boundaries. The user selected presets,
   standalone fulfillment, coupon exclusion, zero default tip and standard tax in
   this task; local verification and production release remain separate.
+
+## Ticket QR Order Email — 2026-10-24
+
+The signed QR verification page displays the purchaser's order email to anyone holding a valid ticket link, as selected by the Store operator for order identification at check-in. Forwarding the link therefore shares the email as well as ticket details. The change reuses the authoritative order field, adds no storage or logging, preserves signature/expiry validation and private/no-store/noindex responses, and keeps attendance mutations behind existing admin authorization. Missing emails are omitted, displayed values are escaped, and English/Spanish labels and narrow-screen wrapping are covered by tests.
+
+## Checkout ZIP Edits — 2026-10-27
+
+Address edits can hide corrections, submit incomplete values, or retain a tax quote for the previous destination. Billing fields now stay editable once revealed, U.S. quotes/preparation wait for a complete ZIP, and the Worker resolves the tax state from an exact postal reference, with existing ZIP ranges as fallback, before provider selection. Tax totals refresh before the explicit Pay action; replacing payment still requires successful cancellation of the prior intent. Browser regressions cover interrupted typing, preserved focus/values and updated totals, while address tests reject known ZIP/state conflicts and keep city aliases as optional corrections. No new customer data, storage, provider or tax-rate policy is introduced; existing regional/offline rate coverage remains an operator responsibility.
+
+## Open US local-rate estimates — 2026-10-27
+
+The owner selected subscription-free public data and continued checkout with a
+labeled offline estimate when local coverage cannot be resolved. The bundled
+OpenSalesTax subset adds local components without disclosing customer addresses
+to a new service. Ambiguous, missing, or expired coverage keeps the existing
+regional fallback and explicitly says local taxes may be missing, including at
+zero. ZIP-based local quotes also disclose that they are estimates. This policy
+can undercollect; it does not claim complete nationwide compliance or determine
+nexus, product exemptions, shipping taxability, or event sourcing. Data refreshes
+require checksum/schema validation and review before release. Server-generated
+rate provenance is retained with the order; existing retention and private
+order boundaries apply. See [Tax data](TAX.md) for coverage and refresh details.
+
+### Postal consistency review
+
+The open postal reference can be incomplete or stale. Store blocks only a supplied state that conflicts with a known ZIP assignment; unknown entries and city aliases remain usable. City changes require an explicit choice, and validation never clears fields or moves focus. Feedback sends no street, name, or email and uses private/no-store responses with no new persistence. Lookup outages do not label addresses invalid; server validation still protects canonical checkout. Snapshot refreshes require review. This check is distinct from delivery validation and tax jurisdiction accuracy.

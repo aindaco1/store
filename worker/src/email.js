@@ -844,11 +844,11 @@ export async function sendStoreEventReminderEmail(env, {
     [t('store_event_reminder.order', 'Order'), orderToken]
   ].filter(([, value]) => String(value || '').trim());
   const detailsTable = detailsRows.length ? `
-    <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+    <table style="width: 100%; table-layout: fixed; border-collapse: collapse; margin-top: 16px;">
       ${detailsRows.map(([label, value]) => `
         <tr>
-          <td style="padding: 6px 12px 6px 0; color: ${theme.mutedTextColor}; width: 96px;">${escapeHtml(label)}</td>
-          <td style="padding: 6px 0; color: ${theme.textColor}; font-weight: 600;">${escapeHtml(value)}</td>
+          <td style="padding: 6px 12px 6px 0; color: ${theme.mutedTextColor}; width: 25%; vertical-align: top;">${escapeHtml(label)}</td>
+          <td style="padding: 6px 0; color: ${theme.textColor}; font-weight: 600; vertical-align: top; overflow-wrap: anywhere; word-wrap: break-word; word-break: break-word;">${escapeHtml(value)}</td>
         </tr>`).join('')}
     </table>` : '';
   const attachmentLine = safeAttachments.length
