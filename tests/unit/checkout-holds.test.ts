@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoreInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
+import catalog from '../../worker/src/generated/catalog-snapshot.js';
 
 // Serial transactions with rollback/cloning: concurrent calls cannot share a
 // mutable object, as they could in a simplistic Map mock.
@@ -261,6 +262,9 @@ describe('public checkout gateway', () => {
   it.each(['ticket', 'contribution'])('checks origin, settles and reuses a paid %s attempt', async (kind) => {
     const { default: worker } = await import('../../worker/src/index.js');
     const env: any = { ...(coordinator as any).env,
+      // Keep this lifecycle fixture purchasable when the real event is archived.
+      STORE_CATALOG_JSON: JSON.stringify({ ...catalog, products: catalog.products.map((product) =>
+        product.id === 'a-night-in-paradiso' ? { ...product, status: 'active' } : product) }),
       SITE_BASE: 'http://127.0.0.1:4002', CORS_ALLOWED_ORIGIN: 'http://127.0.0.1:4002',
       STRIPE_WEBHOOK_SECRET_TEST: 'whsec_fixture',
       ABANDONED_CART_TOKEN_SECRET: 'fixture_reminder_secret',
