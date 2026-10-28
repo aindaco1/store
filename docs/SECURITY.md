@@ -43,7 +43,7 @@ Default posture:
 | API/admin recovery secrets | Operator routes | Bearer/header secrets stay in Worker secrets or ignored local files. |
 | Cache evidence secret | `POST /admin/workers-cache/evidence` | Dedicated read-only bearer; returns bounded metrics only and cannot purge or expose Store rows. |
 | Download abuse lock | Signed download routes | Ten failures per order plus keyed network fingerprint in 15 minutes cause a 30-minute soft lock. |
-| Ticket check-in capability | Signed ticket/RSVP QR routes | Browser navigation returns localized private/no-store/noindex verification without customer email. New links expire after the event check-in window; legacy HMAC-valid links receive only that same event-bounded grace period. The public route cannot mutate attendance. |
+| Ticket check-in capability | Signed ticket/RSVP QR routes | Browser navigation returns localized private/no-store/noindex verification including the purchaser's email from the stored order; the JSON representation includes the same email. Anyone holding the valid signed link can view it without an admin login. New links expire after the event check-in window; legacy HMAC-valid links receive only that same event-bounded grace period. The public route cannot mutate attendance. |
 
 Secret storage rules:
 
@@ -145,6 +145,7 @@ The browser cart is convenience state only. The Worker recalculates and validate
 - coupon code validity, eligibility, status, date windows, and discount amount
 - tax category and NM GRT destination handling, with shared two-letter country and bounded postal-code validation before provider access
 - shipping presets, USPS quote/fallback behavior, non-shippable product handling, and the same provider-bound country/postal allowlist
+- exact US ZIP/state consistency for supplied billing/shipping states before tax or payment; city aliases remain nonblocking suggestions
 - tip/platform fee policy
 - inventory availability and reservation ownership
 - free-order versus paid PaymentIntent behavior

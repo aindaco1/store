@@ -81,6 +81,8 @@ Reminder cadence:
 
 Each reminder includes the event name, time, venue/address when configured, a link to the order page, and the same event attachments used by order confirmations.
 
+The shared reminder details table keeps labels top-aligned and wraps long venue addresses and complete order references inside the card, including at phone widths.
+
 Queue and sent records live in `STORE_STATE` KV:
 
 - `store-event-reminder:*`
@@ -157,6 +159,8 @@ The order page calendar download uses `METHOD:PUBLISH`. Email attachments use `M
 
 Check-in QR codes point to signed Worker check-in URLs. Email QR tokens are signed to remain valid through the event window plus one day.
 
+The signed verification page shows the purchaser's email from the order record to help identify the order at check-in. Anyone holding the valid link can view that email; the QR URL itself does not embed the address. Attendance changes still require authorized staff in the dashboard.
+
 ## Copy And Localization
 
 Human-facing copy should stay short, direct, and localized through `_data/i18n/en.yml` and `_data/i18n/es.yml`.
@@ -181,6 +185,7 @@ Run the focused suite with:
 
 ```sh
 npm run test:unit -- tests/unit/email-store.test.ts tests/unit/event-reminders.test.ts tests/unit/event-followup-audience.test.ts tests/unit/email-outbox.test.ts tests/unit/order-lookup-email.test.ts
+npx playwright test tests/e2e/store-event-reminder-email.spec.ts tests/e2e/store-check-in-page.spec.ts --project=chromium
 ```
 
 For release payment evidence, run the target Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The Worker records email delivery markers without calling Resend, and `npm run release:payment-smoke -- --direct-webhook` verifies customer/admin order emails would render for the local signed-webhook matrix.

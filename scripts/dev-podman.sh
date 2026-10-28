@@ -23,6 +23,7 @@ PODMAN_DEV_LABEL="store.dev.stack=store"
 WORKER_NODE_IMAGE="${PODMAN_WORKER_NODE_IMAGE:-}"
 SITE_VOLUME="store-dev-bundle"
 WORKER_NODE_MODULES_VOLUME="store-dev-worker-node-modules"
+WORKER_WRANGLER_VOLUME="store-dev-worker-wrangler"
 SKIP_STRIPE="${SKIP_STRIPE:-false}"
 PODMAN_REBUILD="${PODMAN_REBUILD:-0}"
 PODMAN_SOCKET=""
@@ -321,6 +322,7 @@ start_pod_containers() {
     --restart=unless-stopped \
     -v "$ROOT_DIR:/workspace" \
     -v "$WORKER_NODE_MODULES_VOLUME:/workspace/worker/node_modules" \
+    -v "$WORKER_WRANGLER_VOLUME:/workspace/worker/.wrangler" \
     "$WORKER_IMAGE" >/dev/null || return 1
 }
 
@@ -343,13 +345,34 @@ start_dev_stack_once() {
   wait_for_worker_http "http://127.0.0.1:${WORKER_PORT}/notfound" "Worker" || return 1
 }
 
-reset_wrangler_local_state_if_requested() {
-  if [ "$PODMAN_RESET_WRANGLER_STATE" != "true" ]; then
+prepare_wrangler_local_state() {
+  # Regression runs must never reset the preview's payment/idempotency records.
+  if [ "$PODMAN_RESET_WRANGLER_STATE" = "true" ]; then
+    WORKER_WRANGLER_VOLUME="store-test-worker-wrangler"
+  fi
+  if [ "$PODMAN_RESET_WRANGLER_STATE" = "true" ] && \
+     podman volume exists "$WORKER_WRANGLER_VOLUME"; then
+    echo "🧹 Resetting local Wrangler volume for Podman test run..."
+    podman volume rm "$WORKER_WRANGLER_VOLUME" >/dev/null || return 1
+  fi
+
+  if podman volume exists "$WORKER_WRANGLER_VOLUME"; then
     return 0
   fi
 
-  echo "🧹 Resetting local Wrangler state for Podman test run..."
-  rm -rf "$ROOT_DIR/worker/.wrangler/state" "$ROOT_DIR/worker/.wrangler/tmp"
+  podman volume create "$WORKER_WRANGLER_VOLUME" >/dev/null || return 1
+  if [ "$PODMAN_RESET_WRANGLER_STATE" != "true" ] && \
+     [ -d "$ROOT_DIR/worker/.wrangler/state" ]; then
+    echo "Moving local Wrangler storage into Podman (keeping the original files)..."
+    if ! podman run --rm \
+      -v "$ROOT_DIR:/workspace:ro" \
+      -v "$WORKER_WRANGLER_VOLUME:/wrangler" \
+      "$WORKER_IMAGE" \
+      cp -a /workspace/worker/.wrangler/state /wrangler/state; then
+      podman volume rm "$WORKER_WRANGLER_VOLUME" >/dev/null || true
+      return 1
+    fi
+  fi
 }
 
 start_dev_stack() {
@@ -554,7 +577,7 @@ fi
 podman volume exists "$SITE_VOLUME" >/dev/null 2>&1 || podman volume create "$SITE_VOLUME" >/dev/null
 podman volume exists "$WORKER_NODE_MODULES_VOLUME" >/dev/null 2>&1 || podman volume create "$WORKER_NODE_MODULES_VOLUME" >/dev/null
 
-reset_wrangler_local_state_if_requested
+prepare_wrangler_local_state
 start_dev_stack
 
 if [ "$SKIP_STRIPE" != "true" ]; then

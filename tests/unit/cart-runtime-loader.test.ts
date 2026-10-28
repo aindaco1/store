@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const runtimeScriptKeys = [
+  'checkout-utils',
   'add-on-utils',
   'shipping-option-utils',
   'script-loader',
@@ -47,6 +48,9 @@ function installRuntimeScriptHarness(providerClick = vi.fn()) {
     appended.push(script.dataset.storeCartRuntimeScript);
     queueMicrotask(() => {
       switch (script.dataset.storeCartRuntimeScript) {
+        case 'checkout-utils':
+          (window as any).DustWaveCheckoutUtils = {};
+          break;
         case 'add-on-utils':
           (window as any).StoreAddOnUtils = {};
           break;
@@ -103,6 +107,7 @@ async function flushAsyncWork() {
 
 describe('cart runtime loader', () => {
   beforeEach(() => {
+    delete (window as any).DustWaveCheckoutUtils;
     vi.resetModules();
     localStorage.clear();
     sessionStorage.clear();

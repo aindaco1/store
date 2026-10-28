@@ -27,6 +27,7 @@ Start with the guide for the work you are doing. The [root README](../README.md)
 | Guide | Use it for |
 | --- | --- |
 | [Payment processor](PAYMENT_PROCESSOR.md) | Canonical checkout, Stripe setup, webhooks, order data, and reconciliation |
+| [Tax data](TAX.md) | Open US local-rate coverage, estimate fallback, source licensing, and periodic refresh |
 | [Shipping](SHIPPING.md) | Shipping presets, USPS quotes, tax interaction, and fulfillment |
 | [Downloads](DOWNLOADS.md) | R2 files, signed access, entitlement behavior, and fallback mappings |
 | [Email](EMAIL.md) | Senders, message types, local dry runs, durable delivery, suppression, and localization |

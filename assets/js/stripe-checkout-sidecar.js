@@ -3,7 +3,6 @@
 
   const STRIPE_JS_URL = 'https://js.stripe.com/clover/stripe.js';
 
-
   function readThemeVar(names, fallback) {
     try {
       const candidates = Array.isArray(names) ? names : [names];
@@ -46,7 +45,7 @@
         borderRadius: radiusMd,
         spacingUnit: '4px',
         fontFamily: fontFamily,
-        fontSizeBase: '13px',
+        fontSizeBase: '16px',
         fontWeightNormal: '400'
       },
       rules: {
@@ -61,7 +60,7 @@
           border: '1px solid ' + colorBorder,
           boxShadow: 'none',
           color: colorText,
-          fontSize: '13px',
+          fontSize: 'var(--fontSizeBase)',
           fontWeight: '400',
           lineHeight: '1.4',
           padding: '10px 12px'
@@ -128,13 +127,23 @@
   }
 
   const ensureStripeJs = globalThis.DustWaveScriptLoader.createScriptLoader({
-    document: document, src: STRIPE_JS_URL,
+    document, src: STRIPE_JS_URL,
     selector: 'script[data-store-stripe-js="true"]',
     mark: script => { script.dataset.storeStripeJs = 'true'; },
     getValue: () => typeof window.Stripe === 'function' ? window.Stripe : null,
     missingValueError: 'Stripe.js loaded without exposing Stripe.',
     loadError: 'Failed to load Stripe.js.'
   });
+  const loadStripeInstance = globalThis.DustWaveScriptLoader.createInstanceLoader({
+    load: ensureStripeJs, create: (Stripe, key, options) => Stripe(key, options)
+  });
+
+  async function prepareStripe({ publishableKey, locale } = {}) {
+    const key = String(publishableKey || '');
+    if (!key) throw new Error('Missing Stripe publishable key.');
+    const language = String(locale || document.documentElement.lang || 'en').trim().toLowerCase() || 'en';
+    return loadStripeInstance(key, { locale: language });
+  }
 
   async function mountCustomCheckout(options) {
     const publishableKey = String(options?.publishableKey || '');
@@ -157,11 +166,7 @@
       throw new Error('Missing Payment Element container.');
     }
 
-    await ensureStripeJs();
-
-    const stripe = window.Stripe(publishableKey, {
-      locale: locale || 'en'
-    });
+    const stripe = await prepareStripe({ publishableKey, locale });
     if (!stripe || typeof stripe.initCheckout !== 'function') {
       throw new Error('Stripe custom checkout is unavailable.');
     }
@@ -196,6 +201,9 @@
         }
       }
     });
+    if (typeof paymentElement.on === 'function' && typeof options?.onReady === 'function') {
+      paymentElement.on('ready', options.onReady);
+    }
     paymentElement.mount(paymentContainer);
 
     let linkAuthenticationElement = null;
@@ -301,11 +309,7 @@
       throw new Error('Missing Payment Element container.');
     }
 
-    await ensureStripeJs();
-
-    const stripe = window.Stripe(publishableKey, {
-      locale: locale || 'en'
-    });
+    const stripe = await prepareStripe({ publishableKey, locale });
     if (!stripe || typeof stripe.elements !== 'function' || typeof stripe.confirmPayment !== 'function') {
       throw new Error('Stripe Payment Element is unavailable.');
     }
@@ -393,6 +397,7 @@
 
   const stripeCheckoutSidecar = {
     ensureStripeJs,
+    prepareStripe,
     mount: mountCustomCheckout,
     mountPaymentIntent
   };

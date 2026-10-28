@@ -4,23 +4,23 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '57cc033e248f92835c4c5ee29c823cadbb5050a2';
+const expectedCommit = '68b9b3073e0f4dc167dc638f56003f6bfcf49f8e';
 const expectedVersions = {
-  '@dustwave/platform-workspace': '0.44.0',
-  '@dustwave/admin-shell': '0.14.0',
-  '@dustwave/build-core': '0.2.0',
-  '@dustwave/design-core': '0.3.0',
-  '@dustwave/inventory-core': '0.1.0',
-  '@dustwave/node-core': '0.1.0',
-  '@dustwave/media-core': '0.5.0',
-  '@dustwave/product-video-core': '0.1.0',
-  '@dustwave/release-core': '0.5.1',
-  '@dustwave/shipping-core': '0.2.0',
-  '@dustwave/site-shell': '0.4.0',
-  '@dustwave/tax-core': '0.3.1',
-  '@dustwave/test-core': '0.4.0',
-  '@dustwave/timed-text': '0.11.2',
-  '@dustwave/worker-core': '0.15.0'
+  "@dustwave/platform-workspace": "0.46.0",
+  "@dustwave/admin-shell": "0.14.0",
+  "@dustwave/build-core": "0.2.0",
+  "@dustwave/design-core": "0.3.1",
+  "@dustwave/inventory-core": "0.1.0",
+  "@dustwave/media-core": "0.5.0",
+  "@dustwave/node-core": "0.1.0",
+  "@dustwave/product-video-core": "0.1.0",
+  "@dustwave/release-core": "0.5.1",
+  "@dustwave/shipping-core": "0.2.0",
+  "@dustwave/site-shell": "0.6.0",
+  "@dustwave/tax-core": "0.4.0",
+  "@dustwave/test-core": "0.4.0",
+  "@dustwave/timed-text": "0.11.2",
+  "@dustwave/worker-core": "0.15.0"
 };
 
 function readJson(relativePath: string) {
@@ -66,6 +66,13 @@ describe('shared platform pin', () => {
 
   it('retains every shared browser and Worker source consumed by Store', () => {
     const consumedPaths = [
+      'packages/site-shell/src/script-loader-browser.js',
+      'packages/site-shell/src/checkout-utils-browser.js',
+      'packages/site-shell/src/checkout-utils.js',
+      'packages/tax-core/src/address-consistency.js',
+      'packages/tax-core/src/open-us-tax.js',
+      'packages/tax-core/data/us-postal.json',
+      'packages/tax-core/data/open-us-tax.json',
       'packages/admin-shell/src/tabs-browser.js',
       'packages/admin-shell/src/dirty-controls-browser.js',
       'packages/admin-shell/src/editor-media-browser.js',

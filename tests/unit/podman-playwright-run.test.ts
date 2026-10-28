@@ -7,6 +7,10 @@ function runPlaywright({ volume = 'test-worker-dependencies', inspectStatus = 0,
     podman() {
       case "$1" in
         inspect)
+          if [[ "$3" == *'/workspace/worker/.wrangler'* ]]; then
+            printf '%s' 'store-test-worker-wrangler'
+            return 0
+          fi
           printf '%s' "$STORE_TEST_WORKER_VOLUME"
           return "$STORE_TEST_INSPECT_STATUS"
           ;;

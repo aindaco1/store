@@ -32,7 +32,7 @@ declared and resolved versions against the shared manifests.
 
 `npm run test:premerge` temporarily synchronizes Worker configuration for its
 release-shaped checks and restores the tracked `worker/wrangler.toml`
-byte-for-byte on success or failure. A focused unit regression exercises that
+byte-for-byte on success or failure. Podman test wrappers use `store-test-worker-wrangler`, separately from the preview’s `store-dev-worker-wrangler`; they must not reuse or reset preview payment records. `podman-wrangler-state.test.ts` and the wrapper tests cover this isolation. A focused unit regression exercises that
 setup/cleanup path. The checked-in top-level defaults must remain the localhost
 site at port `4002`, Worker at port `8989`, and matching localhost CORS origin.
 
@@ -44,6 +44,27 @@ This prevents an older NVM cache from replacing a repaired system runtime.
 Worker and Playwright container builds copy the verified Node 24.22.1 executable;
 their new image tags bypass old local images, and entrypoints check the runtime
 before installing dependencies. Existing running containers must be restarted.
+
+US local-tax changes use `tests/unit/open-us-tax.test.ts` and
+`tests/unit/tax.test.ts`; checkout ZIP-edit browser cases also cover the combined
+NYC rate and the explicit local-coverage fallback label. Tests pin their clock
+to the reviewed snapshot date so future source expiry is separately exercised.
+See [Tax data](TAX.md) before accepting a rate refresh.
+
+Address consistency uses `tests/unit/address-consistency.test.ts` (exact ZIPs,
+state names, aliases, unknown/international data and canonical API rejection)
+and `tests/e2e/address-consistency.spec.ts` (billing/shipping, English/Spanish,
+optional city corrections and delayed responses). `checkout-holds.spec.ts`
+starts with prepared payment, then edits ZIP/state and verifies payment pauses,
+totals refresh, fields survive, focus stays put and scrolling happens only on
+the first payment reveal.
+
+The same checkout browser suite checks email edits after payment is prepared,
+including pauses at an unfinished domain and an address longer than 254
+characters. Its intent fixture uses the Worker's email validator so browser
+readiness drift fails the test; completing the email must resume automatically
+while preserving fields, focus and scroll. Slow-preview cases also keep tax responses pending during initial preparation and ZIP edits: payment fields must mount before those previews finish, while Pay stays disabled until the estimates settle. The Worker remains authoritative for shipping and tax. Genuine preparation failures still
+require Retry, and uncertain cancellation must still block another payment.
 
 ```bash
 bundle exec jekyll build --quiet
@@ -314,7 +335,7 @@ npm run cache:observability
 npm run recovery:traffic-preflight
 ```
 
-`npm run release:i18n-seo-evidence` rebuilds the rendered site, runs the i18n and SEO test suites, and samples English/Spanish public, product, order, admin, sitemap, and robots routes for canonical, hreflang, noindex, copy, and Product JSON-LD expectations. `npm run release:fulfillment-evidence` runs an in-process Worker with mock KV/R2 data and proves signed downloads, download revoke/refresh, event-scoped ticket links, the private browser check-in page, API check-in verification without customer email, admin ticket/RSVP check-in, and order/attendee/reconciliation/audit CSV behavior without calling external providers. The Playwright check-in coverage exercises deliberately oversized ticket data at 320, 390, 768, and 1280 pixel widths and rejects horizontal overflow.
+`npm run release:i18n-seo-evidence` rebuilds the rendered site, runs the i18n and SEO test suites, and samples English/Spanish public, product, order, admin, sitemap, and robots routes for canonical, hreflang, noindex, copy, and Product JSON-LD expectations. `npm run release:fulfillment-evidence` runs an in-process Worker with mock KV/R2 data and proves signed downloads, download revoke/refresh, event-scoped ticket links, private browser and API check-in verification with the purchaser's order email, admin ticket/RSVP check-in, and order/attendee/reconciliation/audit CSV behavior without calling external providers. The Playwright check-in and reminder email coverage exercises long addresses, emails, and order references at 320, 390, 768, and 1280 pixel widths and rejects horizontal overflow.
 
 `npm run release:screen-reader-evidence` checks whether Whisper and the host platform can support transcript-assisted VoiceOver evidence. Pass `--audio-file <recording>` to transcribe an existing VoiceOver run, or `--record-voiceover` with `VOICEOVER_AUDIO_DEVICE` on macOS to capture VoiceOver output for a target URL. Transcript evidence is optional unless a release explicitly requires assistive-technology speech evidence.
 
@@ -431,7 +452,9 @@ The preparation fixtures cover source preservation, same-path replacements, stal
 
 ## Checkout holds
 
-Run `npx vitest run tests/unit/checkout-holds.test.ts tests/unit/cart-pending-item.test.ts` and `npx playwright test tests/e2e/checkout-holds.spec.ts --project=chromium`. The coordinator suite uses serialized, rollback-capable storage and mocked Stripe; the browser suite covers English/Spanish mobile fields, extensions, expiry/reacquisition and the retained 5% tip. The public gateway test checks origin/capability, canonical metadata and same-intent reuse. These are separate from real-provider 3DS/processing/cancellation and deployed webhook acceptance. `APP_MODE=test` exercises new attempt reservations; only the legacy no-attempt helper skips them. Run the complete pre-merge gate with the preview stack stopped so its isolated Worker can own port 8989.
+Run `npx vitest run tests/unit/checkout-holds.test.ts tests/unit/cart-pending-item.test.ts` and `npx playwright test tests/e2e/checkout-holds.spec.ts --project=chromium`. The coordinator suite uses serialized, rollback-capable storage and mocked Stripe; the browser suite covers English/Spanish mobile fields, extensions, expiry/reacquisition and the retained 5% tip. It also verifies that automatic payment appends below the original editable fields, preserves the form and focus, scrolls only the drawer to ready payment fields (including reduced-motion mode), cancels stale responses after edits during preparation, refreshes completed details safely, and blocks replacement payments after uncertain cancellation. The public gateway test checks origin/capability, canonical metadata and same-intent reuse. These are separate from real-provider 3DS/processing/cancellation and deployed webhook acceptance. `APP_MODE=test` exercises new attempt reservations; only the legacy no-attempt helper skips them. Run the complete pre-merge gate with the preview stack stopped so its isolated Worker can own port 8989.
+
+ZIP-edit regressions change `87048` to `10467` after payment is ready, pause on empty/partial/invalid ZIPs, and verify that no invalid tax or payment request is sent, address fields retain their identity/values/focus, and tax and Pay totals refresh after completion. Both `NM` and spelled-out `New Mexico` autofill values are covered. Street-edit cases clear and retype required shipping and billing addresses after payment is ready, verify preparation waits while incomplete, and assert both the replacement request and final Stripe confirmation use the corrected street. `tests/unit/tax.test.ts` separately verifies the real configured tax engine resolves the edited ZIP before selecting a provider.
 
 Podman's Jekyll preview serves generated files from `/tmp/store-jekyll-site` inside the container. `_site` remains excluded explicitly, so older host build output is neither watched nor published when using this alternate destination. This prevents cloud-synced `_site` renames/removals from breaking the live preview. Production/static build destinations are unchanged.
 
@@ -448,3 +471,27 @@ keyboard controls, reload, checkout payload, mobile layout and 200% text.
 The admin browser suite covers creating the pricing mode through Products.
 These use synthetic payment/provider fixtures; they do not prove live charges or
 email delivery. Run `npm run test:premerge` before release.
+
+
+## Shared checkout regression coverage
+
+Platform `packages/site-shell/test/checkout-utils.test.js` characterizes shared
+email/ZIP readiness, debouncing, A → B → A response races and first-only reveal.
+Platform tax-core tests verify postal aliases, unknown/stale coverage, integer
+component allocation and updater validation. Consumer `platform-pin.test.ts`
+checks the immutable commit, package versions and consumed sources.
+
+Store's `checkout-holds.spec.ts` and `address-consistency.spec.ts` exercise
+immediate-payment preparation, editable address/email changes, tax refresh,
+field/focus/scroll preservation, optional city correction and safe failure
+recovery on desktop/mobile. The shared extraction must continue passing these
+alongside free orders, RSVP, inventory holds and confirmation tests.
+
+### Early Stripe regression coverage
+
+Sidecar tests cover instance reuse between warmup and payment mounting, separation
+by public key/locale, and retries after a failed warmup. Platform tests characterize
+concurrent loading, failed-tag removal and failed-initializer eviction.
+Store payment browser cases assert zero initialization during catalog browsing,
+one instance after opening the paid cart, no PaymentIntent or Element before
+complete details, and reuse of that instance during immediate-payment checkout.

@@ -22,6 +22,11 @@
 
   var runtimeScripts = [
     {
+      file: '/shared/dust-wave-platform/packages/site-shell/src/checkout-utils-browser.js',
+      key: 'checkout-utils',
+      ready: function() { return Boolean(window.DustWaveCheckoutUtils); }
+    },
+    {
       file: 'add-on-utils.js',
       key: 'add-on-utils',
       ready: function() {

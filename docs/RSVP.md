@@ -72,6 +72,7 @@ Use stable question IDs after publication. The dashboard enforces this by preser
 - The private order page shows the submitted attendee roster and responses. Customer email lists attendee names but omits custom answers.
 - An RSVP product can explicitly enable the one-time post-event purchaser email under `event_details.followup.enabled`. It targets the confirmed order email, not attendee addresses or registration answers, and remains disabled for legacy products until an admin opts in.
 - Admin Orders supports attendee search, per-attendee check-in, partial attendance totals, response review, and one-row-per-attendee CSV export. Desktop response/action content is constrained to its table column, while tablet/mobile rows use the existing card layout. Older item-level check-ins remain readable and mutable.
+- Scanning a ticket or RSVP QR opens a signed verification page showing the purchaser's order email when available, including for already-checked-in items. Anyone holding that valid link can view the email without an admin login. Scanning only verifies the ticket; attendance changes still require authorized staff in Admin Orders.
 - A direct-linked cart that predates the registration schema can repair the non-sensitive schema from the current product page. Names and answers remain memory-only, and the Worker still performs the authoritative validation.
 
 ## Privacy and operations

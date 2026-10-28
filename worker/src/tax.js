@@ -1,3 +1,5 @@
+import { buildOpenUsTaxQuote } from './open-us-tax.js';
+import { checkAddressConsistency, getAddressConsistencyError, normalizeUsState } from './address-consistency.js';
 import SalesTax from 'sales-tax';
 import { calculateManualTax } from '../../shared/dust-wave-platform/packages/tax-core/src/index.js';
 
@@ -137,6 +139,10 @@ export function normalizeTaxDestination(value) {
     };
   }
 
+  const consistencyError = getAddressConsistencyError(destination);
+  if (consistencyError) return { valid: false, destination: null, error: consistencyError };
+  if (country === 'US') destination.state = normalizeUsState(destination.state);
+
   return {
     valid: true,
     destination
@@ -236,7 +242,7 @@ async function quoteOfflineRulesTax(env = {}, {
   shippingCents = 0,
   destination
 } = {}) {
-  const normalizedDestination = normalizeJurisdictionDestination(destination);
+  const normalizedDestination = inferUsStateFromPostalCode(destination);
   const originCountry = String(env.TAX_ORIGIN_COUNTRY || getShippingOriginCountry(env) || 'US').trim().toUpperCase();
   const useRegionalOrigin = normalizeBooleanish(env.TAX_USE_REGIONAL_ORIGIN) === true;
 
@@ -247,6 +253,8 @@ async function quoteOfflineRulesTax(env = {}, {
   );
 
   const directCharge = result?.charge?.direct !== false;
+  const localQuote = buildOpenUsTaxQuote({ destination: normalizedDestination, subtotalCents, shippingCents, directCharge });
+  if (localQuote) return localQuote;
   const effectiveRate = directCharge ? Math.max(0, Number(result?.rate) || 0) : 0;
   const shippingTaxed = false;
   const taxableShippingCents = shippingTaxed ? Math.max(0, Number(shippingCents) || 0) : 0;
@@ -257,6 +265,8 @@ async function quoteOfflineRulesTax(env = {}, {
   return {
     provider: 'offline_rules',
     source: 'offline_rules',
+    estimated: normalizedDestination.country === 'US',
+    coverage: normalizedDestination.country === 'US' ? 'state_only' : null,
     taxCents,
     effectiveRate,
     taxableSubtotalCents,
@@ -353,7 +363,7 @@ async function quoteNewMexicoGrossReceiptsTax(env = {}, {
   shippingCents = 0,
   destination
 } = {}) {
-  const normalizedDestination = normalizeJurisdictionDestination(destination);
+  const normalizedDestination = inferUsStateFromPostalCode(destination);
   const isNewMexicoDestination = normalizedDestination?.country === 'US' && (
     normalizedDestination?.state === 'NM' ||
     isNewMexicoPostalCode(normalizedDestination?.postalCode)
@@ -362,7 +372,7 @@ async function quoteNewMexicoGrossReceiptsTax(env = {}, {
     return quoteOfflineRulesTax(env, {
       subtotalCents,
       shippingCents,
-      destination: inferUsStateFromPostalCode(normalizedDestination)
+      destination: normalizedDestination
     });
   }
   const nmDestination = normalizedDestination.state === 'NM'
@@ -553,7 +563,7 @@ function isNewMexicoPostalCode(postalCode = '') {
 
 function inferUsStateFromPostalCode(destination) {
   const normalizedDestination = normalizeJurisdictionDestination(destination);
-  if (!normalizedDestination || normalizedDestination.country !== 'US' || normalizedDestination.state) {
+  if (!normalizedDestination || normalizedDestination.country !== 'US') {
     return normalizedDestination;
   }
 
@@ -562,8 +572,14 @@ function inferUsStateFromPostalCode(destination) {
     return normalizedDestination;
   }
 
+  const postal = checkAddressConsistency(normalizedDestination);
+  if (postal.checked && postal.states.length === 1) return { ...normalizedDestination, state: postal.states[0] };
+
   const zip = Number(match[1]);
-  const range = US_STATE_ZIP_RANGES.find(([_state, start, end]) => zip >= start && zip <= end);
+  // Resolve before choosing NM vs. other state rules: an edited ZIP must not
+  // keep a stale or spelled-out state from browser autofill in the tax lookup.
+  const ranges = US_STATE_ZIP_RANGES.filter(([_state, start, end]) => zip >= start && zip <= end);
+  const range = ranges.find(([state]) => state === normalizedDestination.state) || ranges[0];
   return range
     ? { ...normalizedDestination, state: range[0] }
     : normalizedDestination;

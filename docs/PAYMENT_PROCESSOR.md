@@ -44,6 +44,17 @@ fallback policy when the address provider fails. The tax regression suite
 emulates Cloudflare's accepted redirect modes and verifies the provider source
 as well as the amount, so a silent flat-rate fallback cannot pass as a live quote.
 
+The Worker rejects a supplied US state that conflicts with a known exact ZIP
+assignment before quoting tax or creating payment. State names and abbreviations
+are accepted. City differences remain optional suggestions; unknown ZIPs and
+non-US addresses retain the existing policy. Exact postal entries take precedence
+over broad ZIP ranges when inferring the tax state. The form keeps entered
+values and scroll position; no city or state is silently overwritten. Historical
+order totals remain unchanged.
+The [tax data guide](TAX.md) documents the open snapshot, estimate labels,
+coverage limits, and weekly refresh review. The configured sourcing and
+taxability policy is unchanged.
+
 ### No Lost State
 
 The Worker must be able to explain what happened to an order even when Stripe webhooks are delayed, duplicated, or retried.
@@ -592,3 +603,49 @@ For processor behavior, prefer Stripe test mode and the Stripe CLI over hand-bui
 - [EMAIL.md](./EMAIL.md)
 - [BACKUP_RESTORE.md](./BACKUP_RESTORE.md)
 - [worker/README.md](../worker/README.md)
+
+
+## Editable inline checkout and shared helpers
+
+Custom checkout keeps contact and address inputs mounted while preparing payment.
+Complete details trigger preparation after a short pause. Payment fields appear
+below those inputs and scroll into the drawer once per checkout visit, without
+moving keyboard focus; subsequent edits preserve scroll position. US ZIP/state
+conflicts appear once beside the fields, and city corrections remain optional.
+Incomplete email/ZIP edits never prepare payment. Editing prepared details
+invalidates the old preparation, waits for release, then prepares the new details.
+Late lookup/preparation responses cannot replace current input. Provider failures
+remain visible and offer an explicit retry rather than an automatic retry loop.
+
+Platform site-shell owns email/ZIP readiness, debouncing, stale lookup rejection,
+detail signatures and first-reveal scrolling. Platform tax-core owns postal/local
+rate references; design-core supplies mobile inputs at least 16px. Each consumer
+owns its form markup, localized messages, routes, canonical totals and recovery.
+
+Store continues to create and confirm immediate Stripe PaymentIntents, including
+its own inventory holds, free-order path and order fulfillment. Pool's card-setup
+and funded-campaign settlement flow is not part of this adapter.
+
+### Early Stripe loading
+
+Opening a paid cart immediately loads Stripe.js and initializes the configured
+public key while details are still incomplete. Checkout route entry also warms
+the SDK when a restored flow bypasses cart opening. Platform site-shell shares
+script loading and one instance per key/locale; a failed warmup can retry with a
+fresh script. Anonymous catalog browsing and free checkout do not start Stripe.
+Warmup does not create a PaymentIntent, collect card details, or confirm payment.
+The actual Elements still use the Worker-created PaymentIntent secret and
+canonical totals. Use matching test publishable keys in the local site and Worker.
+Payment-specific downloads still depend on the valid intent, so early SDK loading
+is a head start, not a guarantee that the fields will appear instantly.
+
+
+### Payment preparation and tax previews
+
+Payment preparation does not wait for a separate browser tax preview. The
+Worker calculates canonical tax and shipping while the preview updates in
+parallel, including after an address edit. Once the PaymentIntent is prepared,
+the summary uses its returned totals and tax details; a late preview cannot
+replace the amount shown beside Pay. Pay remains disabled while estimates are
+loading or details are invalid. The existing release-before-replacement rule
+still applies to every prepared payment.

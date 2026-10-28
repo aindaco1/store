@@ -1,3 +1,4 @@
+import '../../shared/dust-wave-platform/packages/site-shell/src/checkout-utils-browser.js';
 import { beforeEach } from 'vitest';
 import { syncBrowserStorageGlobals } from '../../shared/dust-wave-platform/packages/test-core/src/index.js';
 

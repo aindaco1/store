@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.12 - 2026-10-28
+
+- Keep checkout fields and scroll position stable through ZIP, address, and email edits; validate ZIP/state consistency and suggest city corrections.
+- Add reviewed open US local-tax references with explicit state-only estimates where local coverage is unresolved.
+- Start Stripe loading earlier, remove serial tax-preview waits, and keep prepared payment summaries aligned with canonical Worker totals.
+- Fix reminder address/order wrapping and include the purchaser email on signed ticket verification pages.
+- Isolate regression-test storage from local preview payment and inventory records.
+- Adopt Platform 0.46.0 while retaining the latest catalog changes and patched runtime/tooling dependencies.
+
 ## v1.3.11 - 2026-10-21
 
 - Adopt Platform 0.44.0 with shared retryable Stripe loading, identity-safe media

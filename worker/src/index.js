@@ -93,6 +93,7 @@ import {
 } from './provider-config.js';
 import { normalizeShippingDestination, quoteStoreShipment } from './shipping.js';
 import { normalizeTaxDestination, quoteTax } from './tax.js';
+import { checkAddressConsistency } from './address-consistency.js';
 import { parseSnipcartOrdersCsv, SNIPCART_IMPORT_MAX_CSV_BYTES } from './snipcart-import.js';
 import {
   ADMIN_STORE_ORDER_INDEX_KEY,
@@ -1900,6 +1901,10 @@ function sanitizeStoredTaxDetails(taxDetails, fallback = {}) {
   return {
     provider: String(taxDetails.provider || fallback.provider || 'flat'),
     source: String(taxDetails.source || fallback.source || 'flat_rate'),
+    estimated: taxDetails.estimated === true,
+    coverage: ['zip_local', 'state_only'].includes(taxDetails.coverage) ? taxDetails.coverage : null,
+    dataVersion: typeof taxDetails.dataVersion === 'string' ? taxDetails.dataVersion.slice(0, 120) : null,
+    sourceUpdatedAt: typeof taxDetails.sourceUpdatedAt === 'string' ? taxDetails.sourceUpdatedAt.slice(0, 30) : null,
     effectiveRate: Number(taxDetails.effectiveRate ?? fallback.effectiveRate ?? 0) || 0,
     locationCode: typeof (taxDetails.locationCode ?? fallback.locationCode) === 'string' && String(taxDetails.locationCode ?? fallback.locationCode).trim()
       ? String(taxDetails.locationCode ?? fallback.locationCode).trim()
@@ -3496,6 +3501,21 @@ export default {
         const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
         if (!bodyLimit.ok) return bodyLimit.response;
         return withObservedOperation(env, ctx, 'shipping_quote', () => handleShippingQuote(request, env));
+      }
+
+      if (path === '/address/check' && method === 'POST') {
+        const bodyLimit = requireBodySizeWithinLimit(request, env, MAX_STANDARD_JSON_BODY_BYTES, { privateResponse: true });
+        if (!bodyLimit.ok) return bodyLimit.response;
+        const trustedOrigin = requireTrustedSiteOrigin(request, env);
+        if (!trustedOrigin.ok) return trustedOrigin.response;
+        const rateLimit = await checkRateLimit(request, env, { ...RATE_LIMITS.tax, privateResponse: true });
+        if (!rateLimit.allowed) return rateLimit.response;
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: MAX_STANDARD_JSON_BODY_BYTES, privateResponse: true });
+        if (!parsed.ok) return parsed.response;
+        return privateJsonResponse({
+          billing: checkAddressConsistency(parsed.body?.billing),
+          shipping: checkAddressConsistency(parsed.body?.shipping)
+        }, 200, env);
       }
 
       if (path === '/tax/quote' && method === 'POST') {
@@ -8026,7 +8046,8 @@ async function handleStoreCheckIn(request, env, storedOrder = {}, item = {}, ite
       fulfillmentType: getStoreFulfillmentType(item)
     },
     customer: {
-      name: storedOrder.orderDraft?.customer?.name || ''
+      name: storedOrder.orderDraft?.customer?.name || '',
+      email: storedOrder.orderDraft?.customer?.email || ''
     },
     event,
     launchTest: item.launchTest === true,
@@ -8064,6 +8085,7 @@ async function handleStoreCheckIn(request, env, storedOrder = {}, item = {}, ite
       { label: t('check_in.where', 'Where'), value: eventLocation },
       { label: t('check_in.quantity', 'Quantity'), value: String(Math.max(1, Number(item.quantity || 1) || 1)) },
       { label: t('check_in.holder', 'Holder'), value: holder },
+      { label: t('check_in.order_email', 'Order email'), value: payload.customer.email },
       {
         label: t('check_in.order_reference', 'Order reference'),
         value: getStoreOrderDisplayReference(storedOrder.orderToken || storedOrder.orderDraft?.orderToken),
@@ -14865,6 +14887,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     ? normalizedBillingAddress.destination
     : (normalizedShippingTaxAddress.valid ? normalizedShippingTaxAddress.destination : null);
   let computedTaxCents = Math.max(0, Number(body.taxCents) || 0);
+  let computedTaxDetails = null;
   if (taxDestination && validatedTaxableSubtotalCents > 0) {
     try {
       const taxQuote = await quoteTax(env, {
@@ -14873,6 +14896,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
         destination: taxDestination
       });
       computedTaxCents = Math.max(0, Number(taxQuote.taxCents) || 0);
+      computedTaxDetails = sanitizeStoredTaxDetails(taxQuote);
     } catch (error) {
       return privateJsonResponse({
         error: error instanceof Error ? error.message : 'Tax quote failed'
@@ -14906,6 +14930,7 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
   const orderHash = await hashStoreOrderDraft(draftResult.orderDraft);
   const orderDraft = {
     ...draftResult.orderDraft,
+    taxDetails: computedTaxDetails,
     orderHash
   };
   const challenge = orderDraft.totals.requiresTurnstile

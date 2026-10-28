@@ -36,6 +36,7 @@ const I18N_CATALOG = {
         where: 'Where',
         quantity: 'Quantity',
         holder: 'Holder',
+        order_email: 'Order email',
         order_reference: 'Order reference',
         staff_note: 'This page verifies the ticket. Attendance changes remain available only to authorized staff in the Store admin.',
         error_title: 'Unable to verify ticket',
@@ -54,6 +55,7 @@ const I18N_CATALOG = {
         where: 'Dónde',
         quantity: 'Cantidad',
         holder: 'Titular',
+        order_email: 'Correo del pedido',
         order_reference: 'Referencia del pedido',
         staff_note: 'Esta página verifica el boleto. Los cambios de asistencia siguen disponibles solo para el personal autorizado en la administración de la Tienda.',
         error_title: 'No se pudo verificar el boleto',
@@ -131,9 +133,9 @@ function storeRequest(url: string, env: any, accept = 'application/json') {
   }), env);
 }
 
-async function seedOrder() {
+async function seedOrder(order = buildTicketOrder()) {
   const storeState = new MockKVNamespace();
-  await storeState.put(`orders:${ORDER_TOKEN}`, JSON.stringify(buildTicketOrder()));
+  await storeState.put(`orders:${ORDER_TOKEN}`, JSON.stringify(order));
   const env = buildEnv(storeState);
   return { env, storeState };
 }
@@ -174,6 +176,7 @@ describe('Store ticket check-in page', () => {
 
     expect(checkInUrl.searchParams.get('format')).toBe('html');
     expect(checkInUrl.searchParams.get('token')).toBeTruthy();
+    expect(checkInUrl.href).not.toContain('buyer@example.com');
     expect(artifacts?.tokenTtlSeconds).toBeGreaterThan(72 * 60 * 60);
   });
 
@@ -188,7 +191,7 @@ describe('Store ticket check-in page', () => {
     expect(artifacts?.tokenTtlSeconds).toBeLessThan(72 * 60 * 60);
   });
 
-  it('renders a localized, private browser page without exposing customer email', async () => {
+  it('renders the canonical order email on the localized, private signed browser page', async () => {
     const { env } = await seedOrder();
     const summary = await getSummary(env);
     const response = await storeRequest(summary.items[0].actions.checkIn.href, env, 'text/html');
@@ -207,7 +210,8 @@ describe('Store ticket check-in page', () => {
     expect(html).toContain('Compradora Ejemplo');
     expect(html).toContain('d990fc50-2e3b-4f14-a42a-fce90ea8413c');
     expect(html).not.toContain(ORDER_TOKEN);
-    expect(html).not.toContain('buyer@example.com');
+    expect(html).toContain('<dt>Correo del pedido</dt>');
+    expect(html).toContain('<dd>buyer@example.com</dd>');
     expect(html).toContain('max-width: 100%');
     expect(html).toContain('overflow-wrap: anywhere');
   });
@@ -227,10 +231,53 @@ describe('Store ticket check-in page', () => {
       checkedIn: false,
       orderToken: ORDER_TOKEN,
       customer: {
-        name: 'Compradora Ejemplo'
+        name: 'Compradora Ejemplo',
+        email: 'buyer@example.com'
       }
     });
-    expect(body.customer).not.toHaveProperty('email');
+  });
+
+  it('omits the email row when a historical order has no email', async () => {
+    const order = buildTicketOrder();
+    order.orderDraft.customer.email = '';
+    const { env } = await seedOrder(order);
+    const summary = await getSummary(env);
+    const response = await storeRequest(summary.items[0].actions.checkIn.href, env, 'text/html');
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).not.toContain('<dt>Correo del pedido</dt>');
+  });
+
+  it('escapes the order email and shows it on already-checked-in RSVP pages', async () => {
+    const order = {
+      ...buildTicketOrder(),
+      fulfillmentCheckIns: { [ITEM_ID]: { checkedIn: true, quantity: 1 } }
+    };
+    order.orderDraft.preferredLang = 'en';
+    order.orderDraft.customer.email = '<buyer>&test@example.com';
+    order.orderDraft.items[0].fulfillmentType = 'rsvp';
+    const { env } = await seedOrder(order);
+    const summary = await getSummary(env);
+    const response = await storeRequest(summary.items[0].actions.checkIn.href, env, 'text/html');
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(html).toContain('RSVP verification');
+    expect(html).toContain('Already checked in');
+    expect(html).toContain('<dt>Order email</dt>');
+    expect(html).toContain('<dd>&lt;buyer&gt;&amp;test@example.com</dd>');
+    expect(html).not.toContain('<buyer>');
+  });
+
+  it.each(['text/html', 'application/json'])('does not expose email without a valid signature (%s)', async (accept) => {
+    const { env } = await seedOrder();
+    const summary = await getSummary(env);
+    const url = new URL(summary.items[0].actions.checkIn.href);
+    url.searchParams.set('token', 'invalid-signature');
+    const response = await storeRequest(url.href, env, accept);
+
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain('buyer@example.com');
   });
 
   it('honors an already-issued 72-hour QR through the event window, then expires it', async () => {
@@ -253,5 +300,6 @@ describe('Store ticket check-in page', () => {
     expect(afterEventWindow.status).toBe(410);
     expect(afterEventWindow.headers.get('Content-Type')).toContain('text/html');
     expect(expiredHtml).toContain('Este enlace de boleto ha caducado.');
+    expect(expiredHtml).not.toContain('buyer@example.com');
   });
 });
