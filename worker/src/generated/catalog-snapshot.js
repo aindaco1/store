@@ -94,7 +94,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "url": "https://shop.dustwave.xyz/products/a-night-in-paradiso/",
       "type": "ticket",
       "fulfillment_type": "ticket",
-      "status": "active",
+      "status": "archived",
       "public": true,
       "launch_test": false,
       "order": 10.0,
@@ -137,21 +137,22 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "sku": "monster-bash",
       "name": "Monster Bash",
       "description": "Monster Bash at Juno Brewery on October 22, 2026, 7–10 p.m. DJ Neuromancer, dancing, and a costume contest with prizes. Tickets: $15 online, $20 at the door.",
-      "body_description": "Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**",
+      "body_description": "Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door. 21+ only.**",
       "long_content": [
         {
           "type": "text",
-          "body": "Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door.**\n"
+          "body": "Dust Wave invites you to ***Monster Bash!*** A spooky night of drinks, dancing, and costumes at **Juno Brewery**, featuring **DJ Neuromancer** and a **costume contest with prizes**.\n\n**Thursday, October 22, 2026 · 7–10 p.m.**\n\n**Juno Brewery** · 1501 1st St NW, Albuquerque, NM 87102\n\n**Tickets: $15 online · $20 at the door. 21+ only.**\n"
         }
       ],
       "price": 15.0,
       "price_cents": 1500,
+      "pricing_mode": "fixed",
       "currency": "USD",
       "image": "/assets/images/products/product-monster-bash-20260922-170930.png",
       "url": "https://shop.dustwave.xyz/products/monster-bash/",
       "type": "ticket",
       "fulfillment_type": "ticket",
-      "status": "active",
+      "status": "archived",
       "public": true,
       "launch_test": false,
       "order": 20.0,
@@ -258,12 +259,12 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "slug": "the-perfect-casino-night",
       "sku": "the-perfect-casino-night",
       "name": "The Perfect Casino Night",
-      "description": "The Perfect Casino Night: a black-tie film mixer with card games and screenings, November 7, 2026, 7–11 p.m. at UNM SUB Ballroom C. Tickets from $27.",
-      "body_description": "Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.\n\n**Saturday, November 7, 2026 · 7–11 p.m.**\n**Black-tie dress code.**\n\n## Ticket tiers\n\n### Player — $27\n\n- Full access to the event and film screenings.\n- 100 chips for the card games and raffle.\n- Complimentary hors d’oeuvres and beverages.\n\n### Pit-Boss — $45\n\nEverything in Player, plus:\n\n- 150 extra chips for the card games and raffle (250 total).\n- Entry into the “Best Dressed” contest and “Lucky Shot Raffle.”\n- A social media shout-out and photo op.\n\n### Executive — $70\n\nEverything in Pit-Boss, plus:\n\n- Specially assigned seating.\n- A plated meal served at your table.\n- Your name in a special “Thank You” section of the film.\n\n## Executive menu\n\nYour meal includes Greek salad, pan-roasted vegetables, and a red velvet thimble cake, with your choice of entrée:\n\n- Orange-glazed grilled salmon.\n- Asiago chicken in a roasted red pepper sauce.\n- Plant-based shepherd’s pie.\n\n**Executive meal choices will be arranged after purchase.**",
+      "description": "The Perfect Casino Night: a black-tie film mixer with card games and screenings, November 7, 2026, 7–10 p.m. at UNM SUB Ballroom C. Tickets from $27.",
+      "body_description": "Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.\n\n**Saturday, November 7, 2026 · 7–10 p.m.** **Black-tie dress code.**\n\n## Ticket tiers\n\n### Player — $27\n\n- Full access to the event and film screenings.\n- 100 chips for the card games and raffle.\n- Complimentary hors d’oeuvres and beverages.\n\n### Pit-Boss — $45\n\nEverything in Player, plus:\n\n- 150 extra chips for the card games and raffle (250 total).\n- Entry into the “Best Dressed” contest and “Lucky Shot Raffle.”\n- A social media shout-out and photo op.\n\n### Executive — $70\n\nEverything in Pit-Boss, plus:\n\n- Specially assigned seating.\n- A plated meal served at your table.\n- Your name in a special “Thank You” section of the film.\n\n## Executive menu\n\nYour meal includes Greek salad, pan-roasted vegetables, and a red velvet thimble cake, with your choice of entrée:\n\n- Orange-glazed grilled salmon.\n- Asiago chicken in a roasted red pepper sauce.\n- Plant-based shepherd’s pie.\n\n**Executive meal choices will be arranged after purchase.**",
       "long_content": [
         {
           "type": "text",
-          "body": "Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.\n\n**Saturday, November 7, 2026 · 7–11 p.m.**\n**Black-tie dress code.**\n\n## Ticket tiers\n\n### Player — $27\n\n- Full access to the event and film screenings.\n- 100 chips for the card games and raffle.\n- Complimentary hors d’oeuvres and beverages.\n\n### Pit-Boss — $45\n\nEverything in Player, plus:\n\n- 150 extra chips for the card games and raffle (250 total).\n- Entry into the “Best Dressed” contest and “Lucky Shot Raffle.”\n- A social media shout-out and photo op.\n\n### Executive — $70\n\nEverything in Pit-Boss, plus:\n\n- Specially assigned seating.\n- A plated meal served at your table.\n- Your name in a special “Thank You” section of the film.\n\n## Executive menu\n\nYour meal includes Greek salad, pan-roasted vegetables, and a red velvet thimble cake, with your choice of entrée:\n\n- Orange-glazed grilled salmon.\n- Asiago chicken in a roasted red pepper sauce.\n- Plant-based shepherd’s pie.\n\n**Executive meal choices will be arranged after purchase.**\n"
+          "body": "Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.\n\n**Saturday, November 7, 2026 · 7–10 p.m.** **Black-tie dress code.**\n\n## Ticket tiers\n\n### Player — $27\n\n- Full access to the event and film screenings.\n- 100 chips for the card games and raffle.\n- Complimentary hors d’oeuvres and beverages.\n\n### Pit-Boss — $45\n\nEverything in Player, plus:\n\n- 150 extra chips for the card games and raffle (250 total).\n- Entry into the “Best Dressed” contest and “Lucky Shot Raffle.”\n- A social media shout-out and photo op.\n\n### Executive — $70\n\nEverything in Pit-Boss, plus:\n\n- Specially assigned seating.\n- A plated meal served at your table.\n- Your name in a special “Thank You” section of the film.\n\n## Executive menu\n\nYour meal includes Greek salad, pan-roasted vegetables, and a red velvet thimble cake, with your choice of entrée:\n\n- Orange-glazed grilled salmon.\n- Asiago chicken in a roasted red pepper sauce.\n- Plant-based shepherd’s pie.\n\n**Executive meal choices will be arranged after purchase.**\n"
         }
       ],
       "price": 27.0,
@@ -331,7 +332,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "tax_category": "admission",
       "event_details": {
         "starts_at": "2026-11-07T19:00:00-07:00",
-        "ends_at": "2026-11-07T23:00:00-07:00",
+        "ends_at": "2026-11-07T22:00:00-07:00",
         "venue": "UNM SUB Ballroom C",
         "address": "203 Cornell Dr NE\nAlbuquerque, NM 87122",
         "ticket_delivery": "qr",
@@ -3298,7 +3299,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     }
   ],
-  "source_hash": "f26648287fd0d3a49ee5094d63584cb9ddece9b37f289ec281502cd83100b9e1"
+  "source_hash": "ad110bca5299222a00f9a56048bfae0b6502274a79859343b1d8e8e1cdeae10b"
 });
 
 export default STORE_CATALOG_SNAPSHOT;
