@@ -124,15 +124,23 @@ test.describe('Store Public Page Controls', () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test('mobile portrait cards preload the same appropriately sized artwork they display', async ({ browser }) => {
+  test('mobile cards preload the first visible artwork and size responsive portraits appropriately', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1.75 });
     try {
       const page = await context.newPage();
       await gotoDomReady(page, '/');
+      const firstCard = page.locator(PRODUCT_CARD).first();
+      const preload = page.locator('link[rel="preload"][as="image"]');
+      const firstSource = firstCard.locator('source');
+      if (await firstSource.count()) {
+        await expect(preload).toHaveAttribute('imagesrcset', (await firstSource.getAttribute('srcset'))!);
+        await expect(preload).toHaveAttribute('imagesizes', (await firstSource.getAttribute('sizes'))!);
+      } else {
+        await expect(preload).toHaveAttribute('href', (await firstCard.locator('img').getAttribute('src'))!);
+      }
       const picture = page.locator(`${PRODUCT_CARD} picture`).first();
       const sizes = await picture.locator('source').getAttribute('sizes');
       expect(sizes).toBeTruthy();
-      await expect(page.locator('link[rel="preload"][as="image"]')).toHaveAttribute('imagesizes', sizes!);
       await expect.poll(() => picture.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.currentSrc)).toMatch(/-(?:320|480|640)\.webp$/);
     } finally {
       await context.close();

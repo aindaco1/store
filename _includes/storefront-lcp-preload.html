@@ -14,5 +14,7 @@
     {%- assign lcp_fallback_entry = lcp_srcset | split: ", " | last -%}
     {%- assign lcp_fallback = lcp_fallback_entry | split: " " | first -%}
 <link rel="preload" as="image" type="image/webp" href="{{ lcp_fallback | escape }}" imagesrcset="{{ lcp_srcset | escape }}" imagesizes="{{ lcp_sizes | escape }}" fetchpriority="high">
+  {%- else -%}
+<link rel="preload" as="image" href="{{ lcp_product.image | escape }}" fetchpriority="high">
   {%- endif -%}
 {%- endif -%}
