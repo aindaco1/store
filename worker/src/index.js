@@ -1,3 +1,4 @@
+import { normalizeProductReportEmails, productReportRecipients, processProductReports } from './product-reports.js';
 import { PAY_WHAT_YOU_WANT, normalizeProductPricing } from './product-pricing.js';
 /**
  * Store Worker
@@ -76,7 +77,7 @@ import { reconcileIndexedStorePayments, STORE_PAYMENT_RECONCILIATION_STATE_KEY }
 import { getAddOns, getAddOnInventorySnapshot, mutateAddOnInventoryOverride } from './add-ons.js';
 import { getStoreCatalogSnapshot, normalizeStoreCatalogSnapshot, validateStoreOrderDraft } from './catalog.js';
 import { applyStoreCouponCode, getValidationTaxableSubtotalCents, loadStoreCoupons, saveStoreCoupons, upsertStoreCoupon } from './coupons.js';
-import { buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
+import { isStoreOrderFulfillmentReady, buildStoreOrderDraft, getStoreOrderStorageKey, hashStoreOrderDraft, STORE_ORDER_DRAFT_TTL_SECONDS, STORE_ORDER_DRAFT_VERSION, STORE_ORDER_STATUS_CONFIRMED, STORE_ORDER_STATUS_DRAFT, STORE_ORDER_STATUS_PAYMENT_FAILED, STORE_ORDER_STATUS_PAYMENT_PENDING } from './orders.js';
 import { normalizeEventRegistrationConfig, normalizeStoredEventRegistration } from './event-registration.js';
 import { getGitHubTextFile, getGitHubWorkflowRun, listGitHubDirectory, putGitHubBase64File, putGitHubTextFile, putGitHubTextFiles, triggerMediaOptimization, triggerSiteRebuild } from './github.js';
 import { MEDIA_MANIFEST_PATH, classifyMediaPath, mediaPathLabel, mediaPlacementBudget, normalizeMediaManifest } from './media-catalog.js';
@@ -3641,6 +3642,31 @@ export default {
 
     if (emailOutboxEnabled(env)) {
       try {
+        const reports = await processProductReports(env, now, {
+          loadOrders: async () => {
+            const listed = await listAdminStoreOrderKeys(env);
+            if (!listed.ok || listed.truncated) throw new Error('Product reports require a complete order scan');
+            const orders = [];
+            for (let offset = 0; offset < listed.keys.length; offset += ADMIN_STORE_ORDER_BULK_READ_LIMIT) {
+              const batch = await readAdminStoreOrderBatch(env, listed.keys.slice(offset, offset + ADMIN_STORE_ORDER_BULK_READ_LIMIT));
+              if (batch.some((order) => !order)) throw new Error('Product report order read incomplete');
+              orders.push(...batch);
+            }
+            return orders;
+          },
+          enqueue: enqueueEmailOutbox
+        });
+        if (reports.attempted) console.log('Store daily product reports queued:', reports);
+      } catch (err) {
+        console.error('Store daily product reports failed:', err);
+        await env.STORE_STATE.put('cron:lastError', JSON.stringify({
+          at: now.toISOString(), error: err?.message || String(err)
+        }), { expirationTtl: 604800 });
+      }
+    }
+
+    if (emailOutboxEnabled(env)) {
+      try {
         const outboxResults = await processEmailOutbox(env, { now });
         console.log('Store email outbox cron complete:', outboxResults);
       } catch (err) {
@@ -6146,15 +6172,6 @@ function isStoreTicketLikeItem(item = {}) {
 
 function isStoreDownloadItem(item = {}) {
   return getStoreFulfillmentType(item) === 'digital';
-}
-
-function isStoreOrderFulfillmentReady(storedOrder = {}) {
-  if (storedOrder.status !== STORE_ORDER_STATUS_CONFIRMED) return false;
-  const paymentStatus = String(storedOrder.payment?.status || '').trim().toLowerCase();
-  if (storedOrder.payment?.required === true) {
-    return paymentStatus === 'succeeded';
-  }
-  return paymentStatus === 'not_required' || storedOrder.payment?.required === false;
 }
 
 async function loadStoreOrderForRead(env, orderToken) {
@@ -9176,6 +9193,7 @@ function buildAdminStoreEditableProduct(product = {}, overrides = {}, env = {}) 
     eventVenue: eventDetails.venue,
     eventAddress: eventDetails.address,
     eventIcs: eventDetails.ics,
+    dailyReportEmails: productReportRecipients(product),
     eventFollowupEnabled: eventDetails.followupEnabled === true,
     eventFollowupEnabledAt: eventDetails.followupEnabledAt,
     eventFollowupScheduledAt: getStoreEventFollowupScheduledAt(env, product?.event_details),
@@ -9593,6 +9611,14 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
   }
   const frontMatter = [];
   const changedFields = [];
+  if (hasAdminStoreProductPatchField(fields, 'dailyReportEmails')) {
+    const recipients = normalizeProductReportEmails(fields.dailyReportEmails);
+    if (!recipients.ok) errors.push(recipients.error);
+    else {
+      frontMatter.push({ key: 'daily_report_emails', replacement: `daily_report_emails: ${JSON.stringify(recipients.value)}` });
+      changedFields.push('dailyReportEmails');
+    }
+  }
   let descriptionChanged = false;
   let description = '';
 

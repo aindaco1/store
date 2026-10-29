@@ -892,10 +892,13 @@ textarea.admin-settings__input--readonly {
 
 .admin-settings__email-list {
   align-items: center;
+  box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
   font-size: $type--ui;
+  max-width: 100%;
   min-height: 2.625rem;
+  min-width: 0;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 
   &:focus-within,
@@ -915,9 +918,16 @@ textarea.admin-settings__input--readonly {
   background: $surface--subtle;
   border: 1px solid $border--default;
   border-radius: $radius--sm;
+  box-sizing: border-box;
   display: inline-flex;
   gap: 6px;
+  max-width: 100%;
   padding: 4px 6px;
+}
+
+.admin-settings__email-token > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-settings__email-token button {
@@ -925,6 +935,7 @@ textarea.admin-settings__input--readonly {
   border: 0;
   color: $color--secondary;
   cursor: pointer;
+  flex: 0 0 auto;
   font: inherit;
   padding: 0 2px;
 }
@@ -941,7 +952,7 @@ textarea.admin-settings__input--readonly {
   line-height: 1.5;
   margin: 0;
   min-height: 1.75rem;
-  min-width: 12rem;
+  min-width: 0;
   outline: 0;
   padding: 0;
 }

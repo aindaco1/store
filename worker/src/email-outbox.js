@@ -1,3 +1,4 @@
+import { isProductReportRecipient } from './product-reports.js';
 export const EMAIL_OUTBOX_PREFIX = 'email-outbox:v1:';
 export const EMAIL_OUTBOX_QUEUE_STATE_KEY = 'email-outbox-queue:v1';
 export const EMAIL_DELIVERY_PREFIX = 'email-delivery:v1:';
@@ -11,9 +12,10 @@ const EMAIL_PROCESSING_LEASE_MS = 10 * 60 * 1000;
 const RESEND_IDEMPOTENCY_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 const MAX_FROZEN_PROVIDER_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
-const MARKETING_KINDS = new Set(['store_event_reminder', 'store_abandoned_cart', 'store_event_followup']);
+const MARKETING_KINDS = new Set(['store_event_reminder', 'store_abandoned_cart', 'store_event_followup', 'store_product_report']);
 const OPTIONAL_PROMOTIONAL_KINDS = new Set(['store_event_followup']);
 const TEMPLATE_SENDERS = Object.freeze({
+  store_product_report: 'sendStoreProductReportEmail',
   store_order: 'sendStoreOrderEmail',
   store_event_reminder: 'sendStoreEventReminderEmail',
   store_abandoned_cart: 'sendStoreAbandonedCartEmail',
@@ -118,6 +120,7 @@ async function renderProviderPayload(env, job) {
 
 async function recipientSuppressed(env, job) {
   const email = normalizeEmail(job.payload?.email || job.payload?.to);
+  if (job.kind === 'store_product_report' && !isProductReportRecipient(env, job.payload?.productId, email)) return true;
   return email ? isEmailOutboxRecipientSuppressed(env, job.kind, email) : false;
 }
 

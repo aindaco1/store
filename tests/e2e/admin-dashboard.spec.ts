@@ -2152,6 +2152,45 @@ test.describe('Admin Dashboard', () => {
     });
   }
 
+  for (const width of [320, 390, 1280]) {
+    test(`adds and removes daily product report recipients in Create and Edit at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      const productsPayload = storeProductsPayload();
+      Object.assign(productsPayload.products[0], { dailyReportEmails: ['existing@example.com'] });
+      const calls = await routeAdminWorker(page, { productsPayload });
+      await gotoDomReady(page, '/admin/?admin_login=product-reports');
+      await expect(page.locator('#admin-app')).toBeVisible();
+      await selectAdminSection(page, 'Products');
+      await page.locator('tr[data-store-product-order-row]').filter({ hasText: 'Fronteras Poster (Big)' })
+        .getByRole('button', { name: 'Edit', exact: true }).click();
+      const editor = page.locator('[data-store-product-editor="fronteras-poster-big"]');
+      const emails = editor.getByRole('textbox', { name: 'Daily product report emails', exact: true });
+      await expect(editor.getByRole('button', { name: 'Remove email existing@example.com' })).toBeVisible();
+      await emails.fill('a-long-report-recipient-address@example.com');
+      await emails.press('Enter');
+      await expect(editor.getByRole('button', { name: 'Remove email a-long-report-recipient-address@example.com' })).toBeVisible();
+      await editor.getByRole('button', { name: 'Remove email existing@example.com' }).click();
+      await editor.getByRole('button', { name: 'Remove email a-long-report-recipient-address@example.com' }).click();
+      await expectNoHorizontalOverflow(page);
+      await expectNoAxeViolations(page, '[data-store-product-field="dailyReportEmails"]');
+      await editor.getByRole('button', { name: 'Publish changes', exact: true }).click();
+      await expect.poll(() => calls.storeProductPublishes.length).toBe(1);
+      expect(calls.storeProductPublishes[0].fields.dailyReportEmails).toEqual([]);
+      await expect.poll(() => calls.storeProducts.length).toBe(2);
+      await page.locator('#admin-store-product-create').click();
+      const create = page.locator('[data-store-product-editor="__new_store_product__"]');
+      await create.locator('[data-store-product-field="name"]').fill('Report test service');
+      await create.locator('[data-store-product-field="fulfillmentType"]').selectOption('service');
+      const newEmails = create.getByRole('textbox', { name: 'Daily product report emails', exact: true });
+      await newEmails.fill('first@example.com,');
+      await newEmails.fill('a-long-report-recipient-address@example.com');
+      await expectNoHorizontalOverflow(page);
+      await create.getByRole('button', { name: 'Create product', exact: true }).click();
+      await expect.poll(() => calls.storeProductPublishes.length).toBe(2);
+      expect(calls.storeProductPublishes[1].fields.dailyReportEmails).toEqual(['first@example.com', 'a-long-report-recipient-address@example.com']);
+    });
+  }
+
   test('authors a pay what you want service with suggested amounts', async ({ page }) => {
     const calls = await routeAdminWorker(page);
     await gotoDomReady(page, '/admin/?admin_login=contribution-setup');

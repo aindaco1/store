@@ -50,6 +50,50 @@ For ticket or RSVP items, confirmations attach only low-risk calendar artifacts 
 
 Tickets and check-in QR codes stay on the authenticated order page instead of being attached as SVG files. SVG attachments are avoided for deliverability and usability: many clients treat SVGs as risky active content, preview them inconsistently, or hide them behind attachment warnings.
 
+### Daily product reports
+
+Products → Create and Edit includes **Daily product report emails**, using the
+existing email-list control. Add up to 20 addresses with Enter or a comma and
+remove individual addresses with their remove button. Saving an empty list
+turns reports off. Addresses are validated, normalized, and deduplicated by the
+Worker, then published as `daily_report_emails` in product front matter. Existing
+products default to no recipients. This setting is included only in the private
+Worker catalog, not `/api/products.json`; it is still visible to anyone who can
+read the source repository. Only add intended recipients.
+
+The minute scheduler becomes eligible at **7 AM in `platform.timezone`** and
+retries later ticks that day if a pass fails. Each report covers the previous
+local calendar day, based on order confirmation time, including DST changes.
+Days without matching orders send no mail. There is no automatic historical
+backfill. Recipient changes after a completed daily pass apply the following
+day; recipients removed before outbox delivery are suppressed immediately once
+the updated Worker catalog is deployed.
+
+Each row represents one stored product/variant line in one confirmed,
+fulfillment-ready first-party order. Physical, digital, ticket, RSVP, service,
+and pay-what-you-want products use the same path. Rows contain only purchaser
+email, selected variant (column omitted when none), quantity when present, and
+that line's amount after discounts. Free orders show $0. Shipping, taxes, tips,
+and other products in a mixed order are excluded. Pending/failed orders,
+legacy imports, and launch-test products are excluded. This is a new-order
+report, not a refund or settlement ledger.
+
+Reports use the updates sender (falling back to the orders sender), existing
+branding, localized copy, HTML and plain text. Each recipient receives a
+separate message, so the recipient list is never shared. No admin login links,
+customer names, street addresses, attendee answers, order tokens, or fulfillment
+links are included.
+
+Production requires `EMAIL_OUTBOX_ENABLED=true`. Jobs use kind
+`store_product_report` and stable product/date/recipient identities in the
+existing durable outbox. Enqueue success is not proof of provider delivery.
+Provider bounce/complaint suppressions also apply. The complete-pass marker is
+`cron:product-reports:<report-date>` with a two-day TTL. A complete bounded bulk
+order scan is required (the existing 5,000-order limit); incomplete reads fail
+without sending a partial report or consuming the day and surface in
+`cron:lastError`. Increase the supported scan strategy before exceeding that
+limit. There is no additional order database or reporting service.
+
 ### Order Lookup
 
 Sent when a customer requests order lookup by email and matching orders exist. The email contains a one-time link to `/orders/` backed by `store-order-lookup:*` KV records. Tokens currently expire after 15 minutes.

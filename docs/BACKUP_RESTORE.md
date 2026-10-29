@@ -4,6 +4,13 @@ The Store owner/operator approved the documented RPO/RTO, four-hour active-sales
 
 This runbook covers Store Git/config/build artifacts, Cloudflare KV, private R2 downloads, provider evidence, and guarded recovery. Do not commit snapshots, exports, decrypted archives, or customer data.
 
+Daily product reports reuse existing recovery families: published recipient
+configuration is in repository product front matter; `store_product_report`
+payloads use the quarantined email outbox, provider evidence uses the existing
+email-delivery ledger, and `cron:product-reports:*` markers are ephemeral. Restore
+recipient configuration and delivery evidence before considering any report
+replay. Never restore pending report emails or cron markers automatically.
+
 ## Store admin storage isolation
 
 The Dust Wave production cutover completed on 2026-09-09; see the

@@ -807,6 +807,45 @@ export async function sendStoreOrderAdminNotificationEmail(env, { email, orderTo
   return { sent: true, dryRun: result?.dryRun === true };
 }
 
+export async function sendStoreProductReportEmail(env, { email, productName, date, timeZone, rows = [], preferredLang } = {}) {
+  configureEmailLogging(env);
+  const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
+  const title = t('store_product_report.heading', 'Daily orders: %{product}', { product: safeEmailHeaderText(productName) });
+  const columns = [
+    { key: 'email', label: t('store_product_report.email', 'Email') },
+    ...(rows.some((row) => row.variant) ? [{ key: 'variant', label: t('store_product_report.variant', 'Variant') }] : []),
+    ...(rows.some((row) => Number.isInteger(row.quantity) && row.quantity > 0) ? [{ key: 'quantity', label: t('store_product_report.quantity', 'Quantity') }] : []),
+    { key: 'amount', label: t('store_product_report.amount', 'Amount spent') }
+  ];
+  const displayRows = rows.map((row) => ({
+    ...row,
+    amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: row.currency || 'USD' }).format(row.amountCents / 100)
+  }));
+  const period = `${date} (${timeZone})`;
+  const note = t('store_product_report.note', 'Confirmed orders for this product, after discounts. Shipping, tax, and tips are excluded.');
+  const footer = t('store_product_report.footer', 'You receive this report because you are listed in this product’s daily report recipients. Ask a store administrator to update the list.');
+  const cellStyle = `padding: 10px 6px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; border-bottom: 1px solid ${theme.borderColor};`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="${getEmailBodyStyle(theme)}">
+${renderEmailHeader(theme, escapeHtml(title))}
+<div style="${getEmailCardStyle(theme)}">
+<p>${escapeHtml(period)}</p><p>${escapeHtml(note)}</p>
+<table style="width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 14px;">
+<thead><tr>${columns.map((column) => `<th scope="col" style="${cellStyle}">${escapeHtml(column.label)}</th>`).join('')}</tr></thead>
+<tbody>${displayRows.map((row) => `<tr>${columns.map((column) => `<td style="${cellStyle}">${escapeHtml(row[column.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
+</table></div><div style="${getEmailFooterStyle(theme)}"><p>${escapeHtml(footer)}</p></div></body></html>`;
+  await sendResendEmail(env, {
+    from: getUpdatesEmailFrom(env) || getOrdersEmailFrom(env),
+    to: safeEmailHeaderText(email),
+    subject: buildEmailSubject(title, date),
+    html,
+    text: [title, period, note, '', columns.map((column) => column.label).join(' | '),
+      ...displayRows.map((row) => columns.map((column) => String(row[column.key] ?? '')).join(' | ')), '', footer].join('\n')
+  }, { errorLabel: 'Product report delivery failed', failureLabel: 'Failed to send product report' });
+  return { sent: true };
+}
+
 export async function sendStoreEventReminderEmail(env, {
   email,
   orderToken = '',

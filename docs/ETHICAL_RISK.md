@@ -182,3 +182,20 @@ order boundaries apply. See [Tax data](TAX.md) for coverage and refresh details.
 ### Postal consistency review
 
 The open postal reference can be incomplete or stale. Store blocks only a supplied state that conflicts with a known ZIP assignment; unknown entries and city aliases remain usable. City changes require an explicit choice, and validation never clears fields or moves focus. Feedback sends no street, name, or email and uses private/no-store responses with no new persistence. Lookup outages do not label addresses invalid; server validation still protects canonical checkout. Snapshot refreshes require review. This check is distinct from delivery validation and tax jurisdiction accuracy.
+
+## Daily product reports review (2026-10-28)
+
+The product owner explicitly requested per-product reports to configurable email
+recipients and approved the 7 AM, previous-day, empty-day-skip and minimal-row
+rules. The implementation adds no recipients to existing products. Only existing
+authorized Store product editors can change the list through the existing
+CSRF-protected publishing path. The editor explains that recipients see purchaser
+emails and product amounts. Delivery is one message per recipient and excludes
+names, addresses, attendee answers, order tokens and access links. Published
+recipient removal is checked again before outbox delivery. Stable identities and
+existing provider retry limits prevent blind duplicate sends; reports do not
+change orders, inventory or money. Source-repository visibility and the existing
+outbox retention/quarantine policy remain explicit in the email and recovery
+docs. Store operations owns recipient accuracy and any forwarded/exported mail;
+removal cannot revoke a message already delivered. Validation uses synthetic
+orders and captured email payloads, with no real recipient sends.

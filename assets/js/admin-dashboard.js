@@ -1567,7 +1567,7 @@
       text.textContent = email;
       var remove = document.createElement('button');
       remove.type = 'button';
-      remove.setAttribute('aria-label', 'Remove email ' + email);
+      remove.setAttribute('aria-label', row.removeLabel ? row.removeLabel(email) : 'Remove email ' + email);
       remove.textContent = 'x';
       remove.addEventListener('click', function() {
         item.remove();
@@ -8511,6 +8511,28 @@
     }, delay === undefined ? 500 : delay));
   }
 
+  function createStoreProductReportField(product) {
+    var field = createElement('div', 'admin-store-products__field');
+    var inputId = 'store-product-report-emails-' + String(++adminFieldIdCounter);
+    var helpId = inputId + '-help';
+    var label = createElement('label', '', localizedAdminText('dailyReportEmails'));
+    label.htmlFor = inputId;
+    var input = createEmailListInput({
+      label: localizedAdminText('dailyReportEmails'),
+      inputId: inputId,
+      describedBy: helpId,
+      rawValue: product.dailyReportEmails || [],
+      removeLabel: function(email) { return localizedAdminText('removeReportEmail', { email: email }); }
+    });
+    input.dataset.storeProductField = 'dailyReportEmails';
+    var help = createElement('small', 'admin-app__muted admin-store-products__field-note', localizedAdminText('dailyReportEmailsHelp'));
+    help.id = helpId;
+    field.appendChild(label);
+    field.appendChild(input);
+    field.appendChild(help);
+    return field;
+  }
+
   function renderStoreProductEditor(product, options) {
     var opts = options || {};
     var isNewProduct = product && product.isNew === true;
@@ -8608,6 +8630,7 @@
     fields.appendChild(basics);
     fields.appendChild(commerce);
     fields.appendChild(eventDetails);
+    fields.appendChild(createStoreProductReportField(product));
     fields.appendChild(mediaDescription);
     form.appendChild(fields);
     form.appendChild(renderStoreProductVariants(product));
@@ -9102,7 +9125,11 @@
     $all('[data-store-product-field]', form).forEach(function(input) {
       if (input.disabled) return;
       var key = input.dataset.storeProductField;
-      if (key === 'suggestedAmounts') fields[key] = input.value.trim() ? input.value.split(',').map(function(value) { return value.trim() ? Number(value.trim()) : null; }) : [];
+      if (key === 'dailyReportEmails') {
+        var pendingEmail = $('input', input).value.trim();
+        fields[key] = input.emailValues().concat(pendingEmail ? [pendingEmail] : []);
+      }
+      else if (key === 'suggestedAmounts') fields[key] = input.value.trim() ? input.value.split(',').map(function(value) { return value.trim() ? Number(value.trim()) : null; }) : [];
       else if (key === 'price') fields[key] = Number(input.value || 0);
       else if (key === 'inventory' || key === 'rsvpMaxPartySize') fields[key] = input.value === '' ? '' : Number(input.value);
       else if (key === 'inventoryTracking') fields[key] = input.value === 'true';
