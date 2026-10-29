@@ -8514,22 +8514,20 @@
   function createStoreProductReportField(product) {
     var field = createElement('div', 'admin-store-products__field');
     var inputId = 'store-product-report-emails-' + String(++adminFieldIdCounter);
-    var helpId = inputId + '-help';
-    var label = createElement('label', '', localizedAdminText('dailyReportEmails'));
+    var label = createElement('label');
     label.htmlFor = inputId;
     var input = createEmailListInput({
       label: localizedAdminText('dailyReportEmails'),
       inputId: inputId,
-      describedBy: helpId,
       rawValue: product.dailyReportEmails || [],
       removeLabel: function(email) { return localizedAdminText('removeReportEmail', { email: email }); }
     });
     input.dataset.storeProductField = 'dailyReportEmails';
-    var help = createElement('small', 'admin-app__muted admin-store-products__field-note', localizedAdminText('dailyReportEmailsHelp'));
-    help.id = helpId;
+    label.appendChild(createStoreProductFieldLabel(
+      localizedAdminText('dailyReportEmails'), 'dailyReportEmails', $('input', input), localizedAdminText('dailyReportEmailsHelp')
+    ));
     field.appendChild(label);
     field.appendChild(input);
-    field.appendChild(help);
     return field;
   }
 

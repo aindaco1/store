@@ -2941,6 +2941,10 @@ textarea.admin-settings__input--readonly {
 
 .admin-store-products__event-address-status {
   min-height: 1rem;
+
+  &:empty {
+    display: none;
+  }
 }
 
 .admin-store-products__image-field {

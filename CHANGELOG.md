@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.13 - 2026-10-28
+
+- Add per-product daily order reports with multiple recipients in Create and Edit, sent at 7 AM in the store time zone on days with confirmed purchases.
+- Include purchaser email, selected variant, quantity and discounted product amount; exclude shipping, taxes and tips. Reuse the durable email outbox and recipient suppression checks.
+- Match report field labels and info bubbles to the product editor, contain long email addresses on mobile, and collapse empty address-lookup spacing.
+
 ## v1.3.12 - 2026-10-28
 
 - Keep checkout fields and scroll position stable through ZIP, address, and email edits; validate ZIP/state consistency and suggest city corrections.
