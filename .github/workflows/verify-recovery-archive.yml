@@ -1,0 +1,53 @@
+name: Verify Recovery Archive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recovery-archive-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-recovery
+    steps:
+      - name: Checkout reviewed shared audit tool
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: aindaco1/dust-wave-platform
+          ref: 45b2402e65bcbd0f1be8a4a98b0c2dd2144ac440
+          persist-credentials: false
+
+      - name: Install decryption tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y age
+          aws --version
+          python3 --version
+
+      - name: Verify latest encrypted archive without restoring
+        run: python3 scripts/verify-recovery-archive.py
+        env:
+          RECOVERY_ARCHIVE_URI: ${{ secrets.STORE_RECOVERY_ARCHIVE_S3_URI }}
+          RECOVERY_ARCHIVE_ENDPOINT: ${{ vars.STORE_RECOVERY_ARCHIVE_S3_ENDPOINT }}
+          RECOVERY_ARCHIVE_NAME: store-backup.tar.gz.age
+          RECOVERY_AGE_IDENTITY: ${{ secrets.STORE_BACKUP_AGE_IDENTITY }}
+          RECOVERY_MAX_AGE_HOURS: '4'
+          RECOVERY_EVIDENCE_OUTPUT: ${{ runner.temp }}/recovery-archive-verification.json
+          AWS_ACCESS_KEY_ID: ${{ secrets.STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.STORE_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.STORE_RECOVERY_ARCHIVE_REGION || 'auto' }}
+
+      - name: Retain sanitized archive verification
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: recovery-archive-verification-${{ github.run_id }}
+          path: ${{ runner.temp }}/recovery-archive-verification.json
+          if-no-files-found: ignore
+          retention-days: 90
