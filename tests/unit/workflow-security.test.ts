@@ -28,6 +28,7 @@ describe('workflow security posture', () => {
     expect(workflow.jobs.capture.environment).toBe('production-backup');
     expect(workflow.jobs.capture.if).toContain("github.ref == 'refs/heads/main'");
     expect(workflow.jobs.capture.if).toContain("vars.BACKUP_SCHEDULE_ENABLED == 'true'");
+    expect(workflow.concurrency.group).toBe('production-backup');
     expect(workflow.concurrency['cancel-in-progress']).toBe(false);
     const steps = workflow.jobs.capture.steps;
     expect(steps[0].with['fetch-depth']).toBe(0);
