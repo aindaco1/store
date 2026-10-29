@@ -199,3 +199,19 @@ outbox retention/quarantine policy remain explicit in the email and recovery
 docs. Store operations owns recipient accuracy and any forwarded/exported mail;
 removal cannot revoke a message already delivered. Validation uses synthetic
 orders and captured email payloads, with no real recipient sends.
+
+
+### Lifetime product history (2026-10-29)
+
+The requested historical record extends the same recipient access to all retained
+confirmed purchases of that product through the report day, including imported
+purchases. The email states the cutoff and excludes names, addresses, attendee
+answers and bearer order tokens. Each recipient receives a separate CSV; removed
+recipients and provider suppressions are rechecked before delivery. Spreadsheet
+formula prefixes are neutralized, and full history is attached rather than
+silently omitted when the inline table reaches 50 rows. Summary currencies are
+kept separate, and original discounted line amounts remain authoritative. This
+is a purchase history, not net settlement or refund accounting. Storage reuses
+the quarantined outbox and existing limits/retention. Store operations owns
+recipient accuracy and retention of forwarded/downloaded attachments; removal
+cannot revoke delivered history. Tests and previews use synthetic records only.

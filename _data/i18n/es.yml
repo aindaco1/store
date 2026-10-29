@@ -13,7 +13,7 @@ nav:
   home_aria: Inicio de %{title}
 admin:
   dailyReportEmails: "Correos para el informe diario del producto"
-  dailyReportEmailsHelp: "Envía los pedidos confirmados de ayer a las 7:00 en la zona horaria de la tienda. Se omiten los días sin pedidos. Añade hasta 20 destinatarios con Intro o una coma; elimina todos para desactivar los informes. Los destinatarios pueden ver los correos de compradores y los importes del producto."
+  dailyReportEmailsHelp: "Envía los pedidos confirmados de ayer, los totales históricos y un CSV con todas las ventas a las 7:00 en la zona horaria de la tienda. Se omiten los días sin pedidos. Añade hasta 20 destinatarios con Intro o una coma; elimina todos para desactivar los informes. Los destinatarios pueden ver los correos de compradores y los importes del producto."
   removeReportEmail: "Eliminar correo %{email}"
   pricingMode: "Precio"
   fixedPrice: "Precio fijo"
@@ -612,6 +612,17 @@ email:
     admin_cta: Revisar pedido en administración
     admin_footer: Enviado a superadministradores de %{platform}.
   store_product_report:
+    summary: "Resumen"
+    daily: "Pedidos del %{date}"
+    daily_orders: "Pedidos nuevos: %{value}"
+    daily_units: "Unidades nuevas: %{value}"
+    daily_sales: "Ventas nuevas: %{value}"
+    lifetime_orders: "Pedidos históricos: %{value}"
+    lifetime_units: "Unidades históricas: %{value}"
+    lifetime_sales: "Ventas históricas: %{value}"
+    history_note: "Historial hasta el %{date} (%{timeZone}), incluidas las importaciones de pedidos confirmados del sistema anterior. Es un registro de compras, no de reembolsos ni liquidaciones."
+    attachment: "Historial completo de ventas adjunto: %{filename}"
+    more_rows: "Se muestran las primeras %{count} filas. El CSV adjunto incluye todas las compras hasta la fecha del informe."
     heading: "Pedidos diarios: %{product}"
     email: "Correo electrónico"
     variant: "Variante"

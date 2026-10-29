@@ -62,21 +62,36 @@ Worker catalog, not `/api/products.json`; it is still visible to anyone who can
 read the source repository. Only add intended recipients.
 
 The minute scheduler becomes eligible at **7 AM in `platform.timezone`** and
-retries later ticks that day if a pass fails. Each report covers the previous
-local calendar day, based on order confirmation time, including DST changes.
-Days without matching orders send no mail. There is no automatic historical
-backfill. Recipient changes after a completed daily pass apply the following
+retries later ticks that day if a pass fails. Each report highlights the previous
+local calendar day, based on order confirmation time, including DST changes,
+and includes lifetime totals and a full sales-history CSV through that day.
+Days without matching orders send no mail. History alone does not trigger a
+message; there is no automatic missed-day email backfill. Recipient changes after a completed daily pass apply the following
 day; recipients removed before outbox delivery are suppressed immediately once
 the updated Worker catalog is deployed.
 
 Each row represents one stored product/variant line in one confirmed,
-fulfillment-ready first-party order. Physical, digital, ticket, RSVP, service,
-and pay-what-you-want products use the same path. Rows contain only purchaser
+fulfillment-ready order. New-order activity includes only first-party purchases;
+the lifetime history also includes confirmed legacy imports matched by the
+canonical product identifier, using their original confirmation date. Physical,
+digital, ticket, RSVP, service, and pay-what-you-want products use the same path.
+Daily rows contain purchaser
 email, selected variant (column omitted when none), quantity when present, and
 that line's amount after discounts. Free orders show $0. Shipping, taxes, tips,
-and other products in a mixed order are excluded. Pending/failed orders,
-legacy imports, and launch-test products are excluded. This is a new-order
-report, not a refund or settlement ledger.
+and other products in a mixed order are excluded. Pending/failed orders and
+launch-test products are excluded. This is a purchase record, not a refund or
+settlement ledger; totals do not claim net proceeds after refunds or fees.
+
+The summary shows orders (counted once even when multiple variants were bought),
+units, and discounted sales for the report day and lifetime through that day.
+Currencies remain separate. The body shows up to 50 daily rows; the attachment
+contains every historical line, including the full report day, oldest first.
+CSV columns are `date_local`, `confirmed_at_utc`, `email`, `variant`, `quantity`,
+`amount`, `currency`, and `source` (`store` or `legacy_import`). Amounts are decimal
+currency values, including zero. The reporting time zone is stated in the email.
+CSV fields are quoted and spreadsheet formula prefixes are neutralized.
+History comes from retained canonical orders, with no new sales database.
+Older queued jobs without historical data retain their daily-only format.
 
 Reports use the updates sender (falling back to the orders sender), existing
 branding, localized copy, HTML and plain text. Each recipient receives a
@@ -88,11 +103,17 @@ Production requires `EMAIL_OUTBOX_ENABLED=true`. Jobs use kind
 `store_product_report` and stable product/date/recipient identities in the
 existing durable outbox. Enqueue success is not proof of provider delivery.
 Provider bounce/complaint suppressions also apply. The complete-pass marker is
-`cron:product-reports:<report-date>` with a two-day TTL. A complete bounded bulk
+`cron:product-reports:<report-date>` with a two-day TTL, a configured-product
+count, and a queued-recipient count.
+A successful marker with `queued: 0` can mean no configured product had new
+orders: check the deployed private catalog recipients and the product
+confirmation dates before investigating provider delivery. A complete bounded bulk
 order scan is required (the existing 5,000-order limit); incomplete reads fail
 without sending a partial report or consuming the day and surface in
 `cron:lastError`. Increase the supported scan strategy before exceeding that
-limit. There is no additional order database or reporting service.
+limit. Report snapshots and rendered attachments also obey the existing 8 MiB
+outbox limits; an oversized report fails explicitly rather than silently
+truncating its history. There is no additional order database or reporting service.
 
 ### Order Lookup
 

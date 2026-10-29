@@ -107,7 +107,7 @@ List behavior:
 - Reordering changes the browser view immediately but is not persisted until Save order is clicked. After saving, the arranged rows remain in place while deployment progresses; the list refreshes only after the exact matching run succeeds.
 - Bulk status changes support active, draft, archived, and sold out.
 - Product creation uses the same editor as product editing.
-- **Daily product report emails** appears in both Create and Edit for every fulfillment type. Add/remove up to 20 recipients; publish an empty list to disable. Reports cover yesterday’s confirmed product purchases at 7 AM in the store time zone and skip empty days. Recipients receive purchaser emails and product amounts; see [daily product reports](EMAIL.md#daily-product-reports).
+- **Daily product report emails** appears in both Create and Edit for every fulfillment type. Add/remove up to 20 recipients; publish an empty list to disable. Reports show yesterday’s confirmed product purchases, lifetime totals, and a full sales-history CSV at 7 AM in the store time zone and skip empty days. Recipients receive purchaser emails and product amounts; see [daily product reports](EMAIL.md#daily-product-reports).
 
 Editor behavior:
 

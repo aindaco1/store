@@ -6,7 +6,8 @@ This runbook covers Store Git/config/build artifacts, Cloudflare KV, private R2 
 
 Daily product reports reuse existing recovery families: published recipient
 configuration is in repository product front matter; `store_product_report`
-payloads use the quarantined email outbox, provider evidence uses the existing
+payloads (including lifetime purchaser rows and the rendered CSV attachment)
+use the quarantined email outbox and its existing 30-day retention; provider evidence uses the existing
 email-delivery ledger, and `cron:product-reports:*` markers are ephemeral. Restore
 recipient configuration and delivery evidence before considering any report
 replay. Never restore pending report emails or cron markers automatically.

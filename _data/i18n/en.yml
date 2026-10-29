@@ -13,7 +13,7 @@ nav:
   home_aria: "%{title} home"
 admin:
   dailyReportEmails: "Daily product report emails"
-  dailyReportEmailsHelp: "Send yesterday’s confirmed orders at 7 AM in the store time zone. Empty days are skipped. Add up to 20 recipients with Enter or a comma; remove all to turn reports off. Recipients can see purchaser emails and product amounts."
+  dailyReportEmailsHelp: "Send yesterday’s confirmed orders, lifetime totals, and a full sales-history CSV at 7 AM in the store time zone. Empty days are skipped. Add up to 20 recipients with Enter or a comma; remove all to turn reports off. Recipients can see purchaser emails and product amounts."
   removeReportEmail: "Remove email %{email}"
   pricingMode: "Pricing"
   fixedPrice: "Fixed price"
@@ -612,6 +612,17 @@ email:
     admin_cta: Review order in admin
     admin_footer: Sent to super admins for %{platform}.
   store_product_report:
+    summary: "Summary"
+    daily: "Orders on %{date}"
+    daily_orders: "New orders: %{value}"
+    daily_units: "New units: %{value}"
+    daily_sales: "New sales: %{value}"
+    lifetime_orders: "Lifetime orders: %{value}"
+    lifetime_units: "Lifetime units: %{value}"
+    lifetime_sales: "Lifetime sales: %{value}"
+    history_note: "Lifetime history through %{date} (%{timeZone}), including confirmed legacy imports. This is a purchase record, not a refund or settlement ledger."
+    attachment: "Full sales history attached: %{filename}"
+    more_rows: "Showing the first %{count} rows. The attached CSV includes every purchase through the report date."
     heading: "Daily orders: %{product}"
     email: "Email"
     variant: "Variant"

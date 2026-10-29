@@ -27,6 +27,8 @@ import {
 } from './i18n.js';
 import { getScopedConsole } from './logger.js';
 import { WORKER_USER_AGENT } from './version.js';
+import { productReportCsv } from './product-reports.js';
+import { Buffer } from 'node:buffer';
 import {
   classifyResendFailure,
   ResendApiError
@@ -807,41 +809,60 @@ export async function sendStoreOrderAdminNotificationEmail(env, { email, orderTo
   return { sent: true, dryRun: result?.dryRun === true };
 }
 
-export async function sendStoreProductReportEmail(env, { email, productName, date, timeZone, rows = [], preferredLang } = {}) {
+export async function sendStoreProductReportEmail(env, { email, productId, productName, date, timeZone, rows = [], historyRows, summary, preferredLang } = {}) {
   configureEmailLogging(env);
   const { t } = await getEmailTranslator(env, preferredLang);
   const theme = getEmailTheme(env);
   const title = t('store_product_report.heading', 'Daily orders: %{product}', { product: safeEmailHeaderText(productName) });
+  const money = (row) => new Intl.NumberFormat('en-US', { style: 'currency', currency: row.currency || 'USD' }).format(row.amountCents / 100);
   const columns = [
     { key: 'email', label: t('store_product_report.email', 'Email') },
     ...(rows.some((row) => row.variant) ? [{ key: 'variant', label: t('store_product_report.variant', 'Variant') }] : []),
     ...(rows.some((row) => Number.isInteger(row.quantity) && row.quantity > 0) ? [{ key: 'quantity', label: t('store_product_report.quantity', 'Quantity') }] : []),
     { key: 'amount', label: t('store_product_report.amount', 'Amount spent') }
   ];
-  const displayRows = rows.map((row) => ({
-    ...row,
-    amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: row.currency || 'USD' }).format(row.amountCents / 100)
-  }));
+  // Historical detail belongs in the attachment so the message stays readable.
+  const displayRows = rows.slice(0, Array.isArray(historyRows) ? 50 : rows.length).map((row) => ({ ...row, amount: money(row) }));
   const period = `${date} (${timeZone})`;
   const note = t('store_product_report.note', 'Confirmed orders for this product, after discounts. Shipping, tax, and tips are excluded.');
   const footer = t('store_product_report.footer', 'You receive this report because you are listed in this product’s daily report recipients. Ask a store administrator to update the list.');
+  const summaryTitle = t('store_product_report.summary', 'Summary');
+  const dailyTitle = t('store_product_report.daily', 'Orders on %{date}', { date });
+  const historyNote = t('store_product_report.history_note', 'Lifetime history through %{date} (%{timeZone}), including confirmed legacy imports. This is a purchase record, not a refund or settlement ledger.', { date, timeZone });
+  const summaryLines = summary ? [
+    t('store_product_report.daily_orders', 'New orders: %{value}', { value: summary.daily.orders }),
+    t('store_product_report.daily_units', 'New units: %{value}', { value: summary.daily.quantity }),
+    t('store_product_report.daily_sales', 'New sales: %{value}', { value: summary.daily.amounts.map(money).join(' + ') }),
+    t('store_product_report.lifetime_orders', 'Lifetime orders: %{value}', { value: summary.lifetime.orders }),
+    t('store_product_report.lifetime_units', 'Lifetime units: %{value}', { value: summary.lifetime.quantity }),
+    t('store_product_report.lifetime_sales', 'Lifetime sales: %{value}', { value: summary.lifetime.amounts.map(money).join(' + ') })
+  ] : [];
+  // Jobs queued before this template update only have daily rows; do not label them as lifetime history.
+  const hasHistory = Array.isArray(historyRows);
+  const filename = `${String(productId || productName || 'product').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0,100) || 'product'}-sales-history-${safeEmailHeaderText(date)}.csv`;
+  const attachmentNote = hasHistory ? t('store_product_report.attachment', 'Full sales history attached: %{filename}', { filename }) : '';
+  const overflowNote = rows.length > displayRows.length ? t('store_product_report.more_rows', 'Showing the first %{count} rows. The attached CSV includes every purchase through the report date.', { count: displayRows.length }) : '';
   const cellStyle = `padding: 10px 6px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; border-bottom: 1px solid ${theme.borderColor};`;
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="${getEmailBodyStyle(theme)}">
 ${renderEmailHeader(theme, escapeHtml(title))}
+${summaryLines.length ? `<div style="${getEmailCardStyle(theme)}"><h2 style="font-size: 18px;">${escapeHtml(summaryTitle)}</h2><p>${escapeHtml(period)}</p><ul>${summaryLines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul><p>${escapeHtml(historyNote)}</p></div>` : ''}
 <div style="${getEmailCardStyle(theme)}">
-<p>${escapeHtml(period)}</p><p>${escapeHtml(note)}</p>
+<h2 style="font-size: 18px;">${escapeHtml(dailyTitle)}</h2><p>${escapeHtml(period)}</p><p>${escapeHtml(note)}</p>
 <table style="width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: 14px;">
 <thead><tr>${columns.map((column) => `<th scope="col" style="${cellStyle}">${escapeHtml(column.label)}</th>`).join('')}</tr></thead>
 <tbody>${displayRows.map((row) => `<tr>${columns.map((column) => `<td style="${cellStyle}">${escapeHtml(row[column.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
-</table></div><div style="${getEmailFooterStyle(theme)}"><p>${escapeHtml(footer)}</p></div></body></html>`;
+</table>${overflowNote ? `<p>${escapeHtml(overflowNote)}</p>` : ''}</div>
+${attachmentNote ? `<div style="${getEmailCardStyle(theme)}"><p style="overflow-wrap: anywhere;">${escapeHtml(attachmentNote)}</p></div>` : ''}
+<div style="${getEmailFooterStyle(theme)}"><p>${escapeHtml(footer)}</p></div></body></html>`;
   await sendResendEmail(env, {
     from: getUpdatesEmailFrom(env) || getOrdersEmailFrom(env),
     to: safeEmailHeaderText(email),
     subject: buildEmailSubject(title, date),
     html,
-    text: [title, period, note, '', columns.map((column) => column.label).join(' | '),
-      ...displayRows.map((row) => columns.map((column) => String(row[column.key] ?? '')).join(' | ')), '', footer].join('\n')
+    text: [title, period, ...(summaryLines.length ? ['', summaryTitle, ...summaryLines, historyNote] : []), '', dailyTitle, note, '', columns.map((column) => column.label).join(' | '),
+      ...displayRows.map((row) => columns.map((column) => String(row[column.key] ?? '')).join(' | ')), overflowNote, '', attachmentNote, '', footer].join('\n'),
+    ...(hasHistory ? { attachments: [{ filename, content: Buffer.from(productReportCsv(historyRows), 'utf8').toString('base64') }] } : {})
   }, { errorLabel: 'Product report delivery failed', failureLabel: 'Failed to send product report' });
   return { sent: true };
 }
