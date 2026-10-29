@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildProductReportRows, normalizeProductReportEmails, processProductReports, productReportDate } from '../../worker/src/product-reports.js';
+import { buildProductReport, buildProductReportRows, productReportCsv, normalizeProductReportEmails, processProductReports, productReportDate } from '../../worker/src/product-reports.js';
 import { enqueueEmailOutbox, processEmailOutbox, EMAIL_OUTBOX_PREFIX } from '../../worker/src/email-outbox.js';
 import { sendStoreProductReportEmail } from '../../worker/src/email.js';
 import worker, { applyAdminStoreProductPatchToMarkdown, normalizeAdminStoreProductPublishBody } from '../../worker/src/index.js';
@@ -28,7 +28,7 @@ describe('daily product reports', () => {
     const records = [order(), order({ confirmedAt: '2026-10-28T06:00:00Z' }), order({ confirmedAt: '2026-10-29T05:59:59.999Z' }), order({ confirmedAt: '2026-10-28T05:59:59Z' }), order({ confirmedAt: '2026-10-29T06:00:00Z' }), order({ status: 'payment_pending' }), order({ payment: { required: true, status: 'processing' } }), order({ importedAt: '2026-10-28T12:00:00Z' }), order({ confirmedAt: '' })];
     const rows = buildProductReportRows(records, 'sample', '2026-10-28', env());
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toEqual({ email: 'buyer@example.com', variant: 'Blue', quantity: 2, amountCents: 4000, currency: 'USD' });
+    expect(rows[0]).toMatchObject({ email: 'buyer@example.com', variant: 'Blue', quantity: 2, amountCents: 4000, currency: 'USD' });
   });
   it.each(['physical', 'digital', 'ticket', 'rsvp', 'service'])('supports %s free orders and non-variant items', (fulfillmentType) => {
     const record = order({ payment: { required: false, status: 'not_required' }, orderDraft: { customer: { email: 'free@example.com' }, items: [item({ fulfillmentType, variantId: '', variantLabel: '', subtotalCents: 0, discountedSubtotalCents: 0, discountCents: 0 })] } });
@@ -38,6 +38,54 @@ describe('daily product reports', () => {
     const record = order();
     delete (record.orderDraft.items[0] as any).discountedSubtotalCents;
     expect(buildProductReportRows([record], 'sample', '2026-10-28', env())[0].amountCents).toBe(4000);
+  });
+  it('summarizes lifetime purchases through the local report day, including imports without triggering daily sends', async () => {
+    const older = order({ confirmedAt: '2026-09-01T12:00:00Z' });
+    const legacy = order({ confirmedAt: '2023-01-01T12:00:00Z', importedAt: '2026-10-28T12:00:00Z', source: 'snipcart' });
+    const multi = order({ orderDraft: { customer: { email: 'variants@example.com' }, items: [item(), item({ variantLabel: 'Red', quantity: 1, discountedSubtotalCents: 500 })] } });
+    const report = buildProductReport([order({ confirmedAt: '2026-10-29T06:00:00Z' }), older, multi, legacy, order({ status: 'payment_pending' })], 'sample', '2026-10-28', env());
+    expect(report.rows).toHaveLength(2);
+    expect(report.historyRows).toHaveLength(4);
+    expect(report.historyRows[0]).toMatchObject({ date: '2023-01-01', source: 'legacy_import', confirmedAt: '2023-01-01T12:00:00.000Z' });
+    expect(report.summary).toEqual({ daily: { orders: 1, quantity: 3, amounts: [{ currency: 'USD', amountCents: 4500 }] }, lifetime: { orders: 3, quantity: 7, amounts: [{ currency: 'USD', amountCents: 12500 }] } });
+    const enqueue = vi.fn();
+    await processProductReports(env(), due, { loadOrders: async () => [older, legacy], enqueue });
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+  it('keeps currency totals separate and includes free lifetime lines', () => {
+    const free = order({ confirmedAt: '2026-10-01T00:00:00Z', payment: { required: false, status: 'not_required' }, orderDraft: { customer: { email: 'free@example.com' }, items: [item({ discountedSubtotalCents: 0 })] } });
+    const eur = order({ orderDraft: { customer: { email: 'eur@example.com' }, items: [item({ currency: 'eur', discountedSubtotalCents: 2500 })] } });
+    const report = buildProductReport([order(), eur, free], 'sample', '2026-10-28', env());
+    expect(report.summary.lifetime.amounts).toEqual([{ currency: 'EUR', amountCents: 2500 }, { currency: 'USD', amountCents: 4000 }]);
+    expect(report.summary.lifetime.orders).toBe(3);
+    expect(report.historyRows[0].amountCents).toBe(0);
+  });
+  it('exports chronological UTF-8 history with safe CSV quoting and formula neutralization', () => {
+    const rows = buildProductReport([order()], 'sample', '2026-10-28', env()).historyRows;
+    const csv = productReportCsv([{ ...rows[0], email: '+formula@example.com', variant: '  =HYPERLINK("bad")' }, { ...rows[0], variant: 'Azul, "edición"\nDos' }]);
+    expect(csv).toContain('"date_local","confirmed_at_utc","email","variant","quantity","amount","currency","source"');
+    expect(csv).toContain('"\'+formula@example.com"');
+    expect(csv).toContain('"\'  =HYPERLINK(""bad"")"');
+    expect(csv).toContain('"Azul, ""edición""\nDos"');
+    expect(csv).toContain('"40.00","USD","store"');
+    expect(csv).not.toContain('Private name');
+    expect(csv).not.toContain('orderToken');
+  });
+  it('renders lifetime summary and complete CSV while bounding the inline daily table', async () => {
+    const e: any = { ...env(), STORE_EMAIL_CAPTURE_PAYLOAD: 'true' };
+    const records = Array.from({ length: 55 }, () => order());
+    const report = buildProductReport(records, 'sample', '2026-10-28', e);
+    await sendStoreProductReportEmail(e, { email: 'runner@example.com', productId: 'sample', productName: product.name, date: '2026-10-28', timeZone: 'America/Denver', ...report });
+    const mail = e.__STORE_CAPTURED_EMAIL_PAYLOAD;
+    expect(mail.text).toContain('Lifetime orders: 55');
+    expect(mail.text).toContain('Lifetime units: 110');
+    expect(mail.text).toContain('Lifetime sales: $2,200.00');
+    expect(mail.text).toContain('Showing the first 50 rows');
+    expect(mail.html.match(/buyer@example.com/g)).toHaveLength(50);
+    expect(mail.attachments[0].filename).toBe('sample-sales-history-2026-10-28.csv');
+    const csv = Buffer.from(mail.attachments[0].content, 'base64').toString('utf8');
+    expect(csv.match(/buyer@example.com/g)).toHaveLength(55);
+    expect(mail.text).not.toContain('Private name');
   });
   it('waits until 7 AM, catches delayed ticks, and scans only once after success', async () => {
     const e = env(); const loadOrders = vi.fn(async () => [order()]);
@@ -66,7 +114,10 @@ describe('daily product reports', () => {
     await processProductReports(e, due, { loadOrders: async () => [order()], enqueue });
     const jobs = (await e.STORE_STATE.list({ prefix: EMAIL_OUTBOX_PREFIX })).keys;
     expect(jobs).toHaveLength(2);
-    expect((await e.STORE_STATE.get(jobs[0].name, { type: 'json' })).payload.rows).toHaveLength(1);
+    const payload = (await e.STORE_STATE.get(jobs[0].name, { type: 'json' })).payload;
+    expect(payload.rows).toHaveLength(1);
+    expect(payload.historyRows).toHaveLength(1);
+    expect(payload.summary.lifetime.orders).toBe(1);
   });
   it('does not consume the day if order reads fail', async () => {
     const e = env(); await expect(processProductReports(e, due, { loadOrders: async () => { throw new Error('incomplete scan'); }, enqueue: enqueueEmailOutbox })).rejects.toThrow('incomplete scan');
@@ -109,6 +160,8 @@ describe('daily product reports', () => {
     expect(mail.text).toContain('buyer@example.com | Blue | 2 | $40.00');
     expect(mail.html).not.toContain('Private name');
     await sendStoreProductReportEmail(e, { email: 'runner@example.com', productName: 'Free', date: '2026-10-28', timeZone: 'America/Denver', rows: [{ email: 'buyer@example.com', variant: '', quantity: 1, amountCents: 0 }] });
+    expect(e.__STORE_CAPTURED_EMAIL_PAYLOAD.attachments).toBeUndefined();
+    expect(e.__STORE_CAPTURED_EMAIL_PAYLOAD.text).not.toContain('Lifetime orders');
     expect(e.__STORE_CAPTURED_EMAIL_PAYLOAD.html).not.toContain('>Variant<');
     expect(e.__STORE_CAPTURED_EMAIL_PAYLOAD.html).toContain('$0.00');
   });

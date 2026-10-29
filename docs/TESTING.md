@@ -502,7 +502,10 @@ complete details, and reuse of that instance during immediate-payment checkout.
 covers local-day/DST boundaries, confirmed paid and free orders across fulfillment
 types, variants and mixed carts, stored discounts, recipient validation,
 Create/Edit serialization, empty-day suppression, delayed ticks, partial enqueue
-retry, recipient removal before delivery, and HTML/plain-text rendering.
+retry, recipient removal before delivery, lifetime cutoff and legacy imports,
+order counting across variants, separate currency totals, CSV formula protection
+and UTF-8 quoting, complete attachments with bounded inline rows, compatibility
+with older queued jobs, and HTML/plain-text rendering.
 `tests/e2e/admin-dashboard.spec.ts` exercises recipient additions/removals in both
 Create and Edit at 320, 390, and 1280 pixel widths, including long addresses,
 keyboard entry and accessibility.
