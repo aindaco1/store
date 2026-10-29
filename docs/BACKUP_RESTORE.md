@@ -381,3 +381,9 @@ by GitHub; they contain no plaintext secrets. Delete the transfer artifact after
 installation. Run capture manually and verify its result before enabling the
 schedule. This uses the existing R2 destinations and identities; independent key
 escrow and additional backup destinations are outside the operator-approved scope.
+
+Local archive/encryption/decryption commands have a five-minute timeout for larger
+repository bundles; provider reads retain their shorter bounds. The shared runner
+reports capture/upload/verification phases and fixed failure categories without
+logging provider stderr or captured values. A failed run does not enable scheduling
+or count as a verified recovery point.
