@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(__dirname, '..', '..');
@@ -16,6 +17,23 @@ function workflowFiles() {
 }
 
 describe('workflow security posture', () => {
+  it('keeps archive verification manual, protected, and limited to sanitized evidence', () => {
+    const text = readWorkflow('verify-recovery-archive.yml');
+    const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))', path.join(repoRoot, '.github/workflows/verify-recovery-archive.yml')
+    ], { encoding: 'utf8' }));
+    expect(text).toContain('workflow_dispatch:');
+    expect(text).not.toMatch(/\n  (push|schedule|pull_request):/);
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.jobs.verify.environment).toBe('production-recovery');
+    const steps = workflow.jobs.verify.steps;
+    expect(steps[0].with.ref).toMatch(/^[a-f0-9]{40}$/);
+    expect(steps.find((step: any) => step.env?.RECOVERY_ARCHIVE_URI).run)
+      .toBe('python3 scripts/verify-recovery-archive.py');
+    expect(steps.at(-1).with.path).toBe('${{ runner.temp }}/recovery-archive-verification.json');
+    expect(text).not.toMatch(/RECOVERY_DRILL_ENABLED|ADMIN_SECRET|STRIPE_SECRET_KEY|restore --/);
+  });
+
   it('keeps immutable action and npm dependency updates automated', () => {
     const dependabot = fs.readFileSync(path.join(repoRoot, '.github', 'dependabot.yml'), 'utf8');
 

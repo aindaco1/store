@@ -322,3 +322,19 @@ Also verify Settings -> Store readiness, orders/audit/reconciliation exports, a 
 ## Checkout coordinator recovery
 
 The checkout candidate stores payment recovery checkpoints alongside inventory in the existing DO (`checkout:` and `checkout-due:`). These cannot be reconstructed from claimed-stock projections alone. Preserve the live coordinator; never import or revive ephemeral holds from backups. Stop sales and resolve processor/order discrepancies before the existing maker/checker inventory rebuild. Replacement now rejects active checkout reservations, including pinned uncertain payments. Terminal records expire after 30 days; unresolved money evidence is retained for reconciliation. See [checkout holds](CHECKOUT_HOLDS.md).
+
+## Verify the current R2 archive without a restore
+
+Run **Verify Recovery Archive** manually from `main`. The `production-recovery`
+environment retains its existing reviewer and branch restrictions. This job
+uses the configured R2 credentials and recovery identity to list and download
+the newest encrypted snapshot, check its four-hour freshness, verify its size
+and SHA-256, decrypt it, and validate every internal checksum. It does not
+restore records, write to R2, change the scheduled drill setting, or send messages.
+
+The shared audit tool is pinned by immutable Platform commit separately from
+the application runtime pin. Missing, stale, corrupt, undecryptable, or incomplete
+archives fail the run. Only sanitized counts/status are retained as an artifact;
+temporary plaintext and key files are removed. This verifies the archive with
+the configured key, not independent key escrow, bucket-lock policy, historical
+retention coverage, or application restore behavior.
