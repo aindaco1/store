@@ -338,3 +338,46 @@ archives fail the run. Only sanitized counts/status are retained as an artifact;
 temporary plaintext and key files are removed. This verifies the archive with
 the configured key, not independent key escrow, bucket-lock policy, historical
 retention coverage, or application restore behavior.
+
+
+## Four-hour captured-production backups
+
+**Capture Production Backup** runs every four hours at minute 17 UTC and can
+also be dispatched manually from `main`. `BACKUP_SCHEDULE_ENABLED=true` enables
+scheduled capture. The `production-backup` environment admits only `main` and has
+no per-run reviewer, so unattended runs do not stall at the restore approval gate.
+The existing `production-recovery` reviewer and disabled quarterly restore-drill
+setting are unchanged.
+
+Each run uses the existing Store snapshot tool to capture Git history/config and
+all inventory-approved authoritative/control KV values. Store also captures the full private R2 download library via provider enumeration, without requiring a one-time admin login. It encrypts with the
+existing age recipient, verifies decryptability and complete checksums/data
+coverage locally, uploads to a new unique prefix in the existing R2 archive,
+publishes its receipt last, then downloads and verifies that exact archive again.
+No production writes, restore, payment mutation, notification sends, or archive
+pruning occur. Live KV capture is not a transactional database snapshot; the
+existing restore/reconciliation procedure remains necessary during recovery.
+
+Only sanitized `backup-verification.json` is retained as a 90-day GitHub artifact.
+Ciphertext stays in R2 under its existing 400-day lock; private temporary identity
+and plaintext files are removed on completion or failure. Capture or verification
+failure fails the Actions run. Operators should keep GitHub Actions failure
+notifications enabled. GitHub schedules can be delayed and are not a hard RPO
+clock; inspect the recorded snapshot timestamp and investigate failed or missed
+runs. UTC scheduling keeps the interval stable through daylight-saving changes.
+
+The capture workflow uses the repository's existing Cloudflare source credential
+for read operations and five environment secrets: `RECOVERY_AGE_IDENTITY`,
+`RECOVERY_ENCRYPTION_RECIPIENT`, `RECOVERY_ARCHIVE_URI`, `AWS_ACCESS_KEY_ID`, and
+`AWS_SECRET_ACCESS_KEY`. No admin login or Stripe credential is needed.
+
+For initial provisioning/rotation, create the main-only `production-backup`
+environment, read its GitHub environment public key, and set repository variables
+`BACKUP_ENV_PUBLIC_KEY`/`BACKUP_ENV_KEY_ID`. Dispatch **Provision Backup Credentials**
+through the existing `production-recovery` approval gate. Install its five sealed
+values through GitHub's environment-secrets API only after matching the target
+key ID to a fresh public-key read. These LibSodium envelopes can only be decrypted
+by GitHub; they contain no plaintext secrets. Delete the transfer artifact after
+installation. Run capture manually and verify its result before enabling the
+schedule. This uses the existing R2 destinations and identities; independent key
+escrow and additional backup destinations are outside the operator-approved scope.

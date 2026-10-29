@@ -17,6 +17,50 @@ function workflowFiles() {
 }
 
 describe('workflow security posture', () => {
+
+  it('captures every four hours without admitting restore or payment authority', () => {
+    const text = readWorkflow('capture-production-backup.yml');
+    const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))', path.join(repoRoot, '.github/workflows/capture-production-backup.yml')
+    ], { encoding: 'utf8' }));
+    expect(text).toContain("cron: '17 */4 * * *'");
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.jobs.capture.environment).toBe('production-backup');
+    expect(workflow.jobs.capture.if).toContain("github.ref == 'refs/heads/main'");
+    expect(workflow.jobs.capture.if).toContain("vars.BACKUP_SCHEDULE_ENABLED == 'true'");
+    expect(workflow.concurrency.group).toBe('production-backup');
+    expect(workflow.concurrency['cancel-in-progress']).toBe(false);
+    const steps = workflow.jobs.capture.steps;
+    expect(steps[0].with['fetch-depth']).toBe(0);
+    expect(steps[0].with['persist-credentials']).toBe(false);
+    expect(steps[1].with.ref).toMatch(/^[a-f0-9]{40}$/);
+    const capture = steps.find((step: any) => step.env?.RECOVERY_ARCHIVE_URI);
+    expect(capture.run).toContain('capture-recovery-archive.py');
+    expect(capture.run).toContain('scripts/store-backup.mjs --remote --kv-values --skip-build');
+    expect(capture.env.RECOVERY_REQUIRE_R2).toBe('true');
+    expect(capture.env.RECOVERY_IDENTITY_VARIABLE).toBe('STORE_BACKUP_AGE_IDENTITY');
+    expect(steps.at(-1).with.path).toBe('${{ runner.temp }}/backup-verification.json');
+    expect(text).not.toMatch(/--admin-exports|ADMIN_SECRET|STRIPE_SECRET_KEY|--execute|s3 rm|--delete|restore\.mjs/);
+  });
+
+  it('provisions only GitHub-sealed backup credentials behind the existing recovery approval gate', () => {
+    const text = readWorkflow('provision-backup-credentials.yml');
+    const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))', path.join(repoRoot, '.github/workflows/provision-backup-credentials.yml')
+    ], { encoding: 'utf8' }));
+    expect(text).not.toMatch(/\n  (push|schedule|pull_request):/);
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.jobs.seal.environment).toBe('production-recovery');
+    expect(workflow.jobs.seal.if).toBe("github.ref == 'refs/heads/main'");
+    const steps = workflow.jobs.seal.steps;
+    expect(steps[0].with.ref).toMatch(/^[a-f0-9]{40}$/);
+    expect(steps.find((step: any) => step.env?.BACKUP_ENV_PUBLIC_KEY).run)
+      .toBe('/usr/bin/python3 scripts/seal-backup-credentials.py');
+    expect(steps.at(-1).with.path).toBe('${{ runner.temp }}/sealed-backup-credentials.json');
+    expect(steps.at(-1).with['retention-days']).toBe(1);
+    expect(text).not.toMatch(/CLOUDFLARE_API_TOKEN|ADMIN_SECRET|STRIPE_SECRET_KEY|STRIPE_RECOVERY_READ_KEY|GH_TOKEN|contents: write/);
+  });
+
   it('keeps archive verification manual, protected, and limited to sanitized evidence', () => {
     const text = readWorkflow('verify-recovery-archive.yml');
     const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',

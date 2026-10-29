@@ -609,12 +609,17 @@ export async function discoverR2ObjectKeys(options = {}) {
     }
     const objects = Array.isArray(body?.result)
       ? body.result
-      : (Array.isArray(body?.result?.objects) ? body.result.objects : []);
+      : (Array.isArray(body?.result?.objects) ? body.result.objects : null);
+    if (!objects) throw new Error('R2 object inventory returned an invalid object list.');
     for (const object of objects) {
       const key = String(object?.key || '').trim();
       if (key) keys.push(key);
     }
     const nextCursor = String(body?.result_info?.cursor || body?.result?.cursor || '').trim();
+    if (body?.result_info?.is_truncated === true && !nextCursor) {
+      throw new Error('R2 object inventory was truncated without a continuation cursor.');
+    }
+    if (body?.result_info?.is_truncated === false) return Array.from(new Set(keys)).sort();
     if (!nextCursor) return Array.from(new Set(keys)).sort();
     if (seenCursors.has(nextCursor)) throw new Error('R2 object inventory returned a repeated cursor.');
     seenCursors.add(nextCursor);
