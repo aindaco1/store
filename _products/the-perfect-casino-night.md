@@ -86,6 +86,7 @@ variants:
   status: "active"
 pricing_mode: "fixed"
 suggested_amounts: []
+daily_report_emails: ["mcl.j76@gmail.com"]
 ---
 Join **The Perfect Casino Night**, a one-night film mixer with card games, film screenings, hors d’oeuvres, beverages, and a ticketed raffle. All proceeds support *How To Run A Perfect Casino*, a 35mm short film written and directed by **Jack McLaughlin**.
 
