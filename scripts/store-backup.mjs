@@ -144,7 +144,11 @@ export function parseBackupArgs(args = []) {
 }
 
 function run(command, args = [], options = {}) {
-  return runCommand(command, args, { ...options, cwd: options.cwd || ROOT });
+  return runCommand(command, args, {
+    timeoutMs: ['tar', 'age', 'gpg'].includes(command) ? 300_000 : 30_000,
+    ...options,
+    cwd: options.cwd || ROOT
+  });
 }
 
 function ensureDir(dirPath, options = {}) {
