@@ -251,6 +251,7 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
     'shipping_preset' => shipping_preset,
     'shipping' => configured_shipping,
     'tax_category' => present_string(product['tax_category']) || 'standard',
+    'daily_report_emails' => product['daily_report_emails'].is_a?(Array) ? product['daily_report_emails'] : [],
     'event_details' => product['event_details'].is_a?(Hash) ? product['event_details'] : nil,
     'download' => product['download'].is_a?(Hash) ? product['download'] : nil,
     'turnstile_required' => product.fetch('turnstile_required', false) == true

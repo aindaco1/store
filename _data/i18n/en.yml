@@ -12,6 +12,9 @@ nav:
   close_menu: Close menu
   home_aria: "%{title} home"
 admin:
+  dailyReportEmails: "Daily product report emails"
+  dailyReportEmailsHelp: "Send yesterday’s confirmed orders at 7 AM in the store time zone. Empty days are skipped. Add up to 20 recipients with Enter or a comma; remove all to turn reports off. Recipients can see purchaser emails and product amounts."
+  removeReportEmail: "Remove email %{email}"
   pricingMode: "Pricing"
   fixedPrice: "Fixed price"
   payWhatYouWant: "Pay what you want"
@@ -608,6 +611,14 @@ email:
     cta: View order
     admin_cta: Review order in admin
     admin_footer: Sent to super admins for %{platform}.
+  store_product_report:
+    heading: "Daily orders: %{product}"
+    email: "Email"
+    variant: "Variant"
+    quantity: "Quantity"
+    amount: "Amount spent"
+    note: "Confirmed orders for this product, after discounts. Shipping, tax, and tips are excluded."
+    footer: "You receive this report because you are listed in this product’s daily report recipients. Ask a store administrator to update the list."
   store_event_reminder:
     fallback_title: Your event
     heading: "%{event} is coming up"

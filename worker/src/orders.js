@@ -397,3 +397,12 @@ function stableStringify(value) {
   const parts = keys.map((key) => JSON.stringify(key) + ':' + stableStringify(value[key]));
   return '{' + parts.join(',') + '}';
 }
+
+export function isStoreOrderFulfillmentReady(storedOrder = {}) {
+  if (storedOrder.status !== STORE_ORDER_STATUS_CONFIRMED) return false;
+  const paymentStatus = String(storedOrder.payment?.status || '').trim().toLowerCase();
+  if (storedOrder.payment?.required === true) {
+    return paymentStatus === 'succeeded';
+  }
+  return paymentStatus === 'not_required' || storedOrder.payment?.required === false;
+}

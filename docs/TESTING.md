@@ -495,3 +495,16 @@ concurrent loading, failed-tag removal and failed-initializer eviction.
 Store payment browser cases assert zero initialization during catalog browsing,
 one instance after opening the paid cart, no PaymentIntent or Element before
 complete details, and reuse of that instance during immediate-payment checkout.
+
+## Daily product reports
+
+`npx vitest run tests/unit/product-reports.test.ts tests/unit/email-outbox.test.ts tests/unit/local-catalog-sync.test.ts`
+covers local-day/DST boundaries, confirmed paid and free orders across fulfillment
+types, variants and mixed carts, stored discounts, recipient validation,
+Create/Edit serialization, empty-day suppression, delayed ticks, partial enqueue
+retry, recipient removal before delivery, and HTML/plain-text rendering.
+`tests/e2e/admin-dashboard.spec.ts` exercises recipient additions/removals in both
+Create and Edit at 320, 390, and 1280 pixel widths, including long addresses,
+keyboard entry and accessibility.
+All fixtures are synthetic and rendering uses capture/dry-run mode; these tests
+send no real email. Run `npm run test:premerge` before release.

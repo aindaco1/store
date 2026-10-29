@@ -12,6 +12,9 @@ nav:
   close_menu: Cerrar menú
   home_aria: Inicio de %{title}
 admin:
+  dailyReportEmails: "Correos para el informe diario del producto"
+  dailyReportEmailsHelp: "Envía los pedidos confirmados de ayer a las 7:00 en la zona horaria de la tienda. Se omiten los días sin pedidos. Añade hasta 20 destinatarios con Intro o una coma; elimina todos para desactivar los informes. Los destinatarios pueden ver los correos de compradores y los importes del producto."
+  removeReportEmail: "Eliminar correo %{email}"
   pricingMode: "Precio"
   fixedPrice: "Precio fijo"
   payWhatYouWant: "Paga lo que quieras"
@@ -608,6 +611,14 @@ email:
     cta: Ver pedido
     admin_cta: Revisar pedido en administración
     admin_footer: Enviado a superadministradores de %{platform}.
+  store_product_report:
+    heading: "Pedidos diarios: %{product}"
+    email: "Correo electrónico"
+    variant: "Variante"
+    quantity: "Cantidad"
+    amount: "Importe gastado"
+    note: "Pedidos confirmados de este producto, después de descuentos. No se incluyen envío, impuestos ni propinas."
+    footer: "Recibes este informe porque figuras entre los destinatarios del informe diario de este producto. Pide a un administrador de la tienda que actualice la lista."
   store_event_reminder:
     fallback_title: Tu evento
     heading: "%{event} se acerca"

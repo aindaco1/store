@@ -55,6 +55,13 @@ describe('local catalog synchronization', () => {
     await expect.poll(async () => (await readFile(outputPath(), 'utf8')).includes('http://127.0.0.1:4999/products/renamed/')).toBe(true);
   });
 
+  it('includes product report recipients in the private Worker snapshot', async () => {
+    await writeFile(path.join(root, '_products/local-product.md'), product().replace('status: draft', 'status: draft\ndaily_report_emails: [runner@example.com]'));
+    await sync.sync();
+    expect(await readFile(outputPath(), 'utf8')).toContain('"runner@example.com"');
+    expect(await readFile('api/products.json', 'utf8')).not.toContain('daily_report_emails');
+  });
+
   it('preserves the last valid output on malformed YAML and recovers after correction', async () => {
     const first = await sync.sync();
     const goodOutput = await readFile(outputPath(), 'utf8');
