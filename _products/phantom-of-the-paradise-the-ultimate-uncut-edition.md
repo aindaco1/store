@@ -67,6 +67,9 @@ event_details:
     require_contact_name: false
     require_attendee_names: true
     questions: []
+daily_report_emails: ["mcl.j76@gmail.com"]
+pricing_mode: "fixed"
+suggested_amounts: []
 ---
 *Dust Wave presents* ... the **uncensored original version of Phantom of the Paradise**, before it was butchered pre-release due to a nasty lawsuit!
 
