@@ -218,6 +218,30 @@ Body.
     })).resolves.toEqual(['downloads/catalog.pdf', 'unattached/private.bin']);
   });
 
+  it.each([
+    { success: true },
+    { success: true, result: [], result_info: { is_truncated: true } }
+  ])('rejects malformed or incomplete R2 enumeration instead of claiming an empty backup', async (body) => {
+    await expect(discoverR2ObjectKeys({
+      accountId: '0123456789abcdef0123456789abcdef',
+      bucket: 'store-downloads',
+      apiToken: 'r2-read-secret',
+      fetchImpl: async () => new Response(JSON.stringify(body))
+    })).rejects.toThrow(/R2 object inventory/);
+  });
+
+  it('accepts an explicitly complete R2 page even when the provider retains a cursor', async () => {
+    await expect(discoverR2ObjectKeys({
+      accountId: '0123456789abcdef0123456789abcdef',
+      bucket: 'store-downloads',
+      apiToken: 'r2-read-secret',
+      fetchImpl: async () => new Response(JSON.stringify({
+        success: true, result: [{ key: 'downloads/catalog.pdf' }],
+        result_info: { is_truncated: false, cursor: 'final-page' }
+      }))
+    })).resolves.toEqual(['downloads/catalog.pdf']);
+  });
+
   it('records secret presence without exporting values', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-backup-secrets-'));
     const devVars = path.join(root, '.dev.vars');
