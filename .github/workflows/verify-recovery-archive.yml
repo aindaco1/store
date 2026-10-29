@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: aindaco1/dust-wave-platform
-          ref: 45b2402e65bcbd0f1be8a4a98b0c2dd2144ac440
+          ref: e413c921b96b09f8139460d0b2596972a3ff7454
           persist-credentials: false
 
       - name: Install decryption tool
@@ -38,6 +38,8 @@ jobs:
           RECOVERY_ARCHIVE_NAME: store-backup.tar.gz.age
           RECOVERY_AGE_IDENTITY: ${{ secrets.STORE_BACKUP_AGE_IDENTITY }}
           RECOVERY_MAX_AGE_HOURS: '4'
+          RECOVERY_REQUIRE_CAPTURED_DATA: 'true'
+          RECOVERY_REQUIRE_R2: 'true'
           RECOVERY_EVIDENCE_OUTPUT: ${{ runner.temp }}/recovery-archive-verification.json
           AWS_ACCESS_KEY_ID: ${{ secrets.STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.STORE_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY }}
