@@ -2939,12 +2939,8 @@ textarea.admin-settings__input--readonly {
   padding-inline: 10px;
 }
 
-.admin-store-products__event-address-status {
-  min-height: 1rem;
-
-  &:empty {
-    display: none;
-  }
+.admin-store-products__event-address-status:empty {
+  display: none;
 }
 
 .admin-store-products__image-field {
