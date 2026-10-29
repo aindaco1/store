@@ -67,7 +67,7 @@ event_details:
     require_contact_name: false
     require_attendee_names: true
     questions: []
-daily_report_emails: ["mcl.j76@gmail.com"]
+daily_report_emails: []
 pricing_mode: "fixed"
 suggested_amounts: []
 ---
