@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoreInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
+import { EMAIL_DELIVERY_PREFIX, EMAIL_OUTBOX_PREFIX, processEmailOutbox } from '../../worker/src/email-outbox.js';
 import catalog from '../../worker/src/generated/catalog-snapshot.js';
 
 // Serial transactions with rollback/cloning: concurrent calls cannot share a
@@ -41,7 +42,10 @@ beforeEach(() => {
     APP_MODE: 'test', STRIPE_SECRET_KEY_TEST: 'sk_test_fixture', STORE_STATE: {
       put: async (key: string, value: string) => { orders.set(key, value); },
       delete: async (key: string) => { orders.delete(key); },
-      list: async () => ({ keys: [], list_complete: true }),
+      list: async ({ prefix = '', limit = 1000 } = {}) => {
+        const names = [...orders.keys()].filter((name) => name.startsWith(prefix)).sort();
+        return { keys: names.slice(0, limit).map((name) => ({ name })), list_complete: names.length <= limit };
+      },
       get: async (key: string, options?: any) => { const value = orders.get(key); return options?.type === 'json' ? (value ? JSON.parse(value) : null) : value; }
     }
   } as never);
@@ -377,7 +381,7 @@ describe('public checkout gateway', () => {
       expect(JSON.parse(orders.get(eventKey)!)).toMatchObject({ eventId, status: 'processed' });
     }
     return {
-      kv: env.STORE_STATE, inventoryStub, orderKey, eventKey, storedOrder, claimed, expectSettled,
+      env, kv: env.STORE_STATE, inventoryStub, orderKey, eventKey, storedOrder, claimed, expectSettled,
       deliver: () => postWebhook(payload)
     };
   }
@@ -417,8 +421,7 @@ describe('public checkout gateway', () => {
     await expectSettled();
   });
 
-  it('settles one ticket when simultaneous deliveries both read a missing event marker', async () => {
-    const { kv, eventKey, deliver, expectSettled } = await pendingTicketWebhook('evt_ticket_simultaneous');
+  async function deliverSimultaneously({ kv, eventKey, deliver }: Awaited<ReturnType<typeof pendingTicketWebhook>>) {
     const bothRead = Promise.withResolvers<void>();
     const release = Promise.withResolvers<void>();
     const observedMarkers: (string | null)[] = [];
@@ -443,11 +446,76 @@ describe('public checkout gateway', () => {
       const statuses = (await Promise.all(deliveries)).map((response) => response.status);
       expect(statuses).toContain(200);
       for (const status of statuses) expect([200, 409]).toContain(status);
-      await expectSettled();
     } finally {
       release.resolve();
       await Promise.allSettled(deliveries);
       reads.mockRestore();
     }
+  }
+
+  it('settles one ticket when simultaneous deliveries both read a missing event marker', async () => {
+    const event = await pendingTicketWebhook('evt_ticket_simultaneous');
+    await deliverSimultaneously(event);
+    await event.expectSettled();
+  });
+
+  it('retries one buyer receipt after simultaneous Stripe deliveries and a lost provider response', async () => {
+    const event = await pendingTicketWebhook('evt_ticket_receipt');
+    const { env, kv, storedOrder } = event;
+    Object.assign(env, {
+      EMAIL_OUTBOX_ENABLED: 'true', STORE_EMAIL_DRY_RUN: 'false', RESEND_API_KEY: 're_test_fixture',
+      ORDERS_EMAIL_FROM: 'Store <orders@shop.test>'
+    });
+
+    // Accept one message per idempotency key. Lose the first response after recording acceptance.
+    const accepted = new Map<string | null, string>();
+    const sendReceipt = vi.fn(async (init: RequestInit) => {
+      const key = new Headers(init.headers).get('Idempotency-Key');
+      const loseResponse = accepted.size === 0;
+      const id = accepted.get(key) ?? `email_${accepted.size + 1}`;
+      accepted.set(key, id);
+      if (loseResponse) throw new TypeError('Response lost after acceptance');
+      return Response.json({ id });
+    });
+    const stripeStub = globalThis.fetch;
+    vi.stubGlobal('fetch', (url: string, init: RequestInit) =>
+      url === 'https://api.resend.com/emails' ? sendReceipt(init) : stripeStub(url, init));
+
+    await deliverSimultaneously(event);
+    await event.expectSettled();
+    expect(sendReceipt).not.toHaveBeenCalled();
+    const { orderToken, emailOutboxJobId: jobId } = storedOrder();
+    expect(storedOrder()).toMatchObject({ emailQueued: true, emailSent: false, emailOutboxJobId: expect.any(String) });
+    const receiptJobs = [...orders.entries()]
+      .filter(([key]) => key.startsWith(EMAIL_OUTBOX_PREFIX))
+      .map(([, value]) => JSON.parse(value))
+      .filter((job) => job.kind === 'store_order');
+    expect(receiptJobs).toHaveLength(1);
+    expect(receiptJobs[0]).toMatchObject({ jobId, orderToken, status: 'pending', payload: { email: 'fixture@example.com' } });
+
+    const jobKey = EMAIL_OUTBOX_PREFIX + jobId;
+    const deliveryKey = EMAIL_DELIVERY_PREFIX + jobId;
+    const providerKey = `store/${jobId}`;
+    expect(await processEmailOutbox(env)).toMatchObject({ sent: 0, retried: 1 });
+    const retry = await kv.get(jobKey, { type: 'json' });
+    expect(retry).toMatchObject({ jobId, status: 'retry', attempts: 1 });
+    expect(sendReceipt).toHaveBeenCalledTimes(1);
+    expect(accepted.get(providerKey)).toBe('email_1');
+    expect(storedOrder().emailSent).toBe(false);
+    expect(orders.has(deliveryKey)).toBe(false);
+
+    vi.setSystemTime(new Date(retry.nextAttemptAt));
+    expect(await processEmailOutbox(env)).toMatchObject({ sent: 1, retried: 0 });
+    expect(sendReceipt).toHaveBeenCalledTimes(2);
+    const [firstAttempt, secondAttempt] = sendReceipt.mock.calls.map(([init]) => init);
+    for (const attempt of [firstAttempt, secondAttempt]) {
+      expect(new Headers(attempt.headers).get('Idempotency-Key')).toBe(providerKey);
+    }
+    expect(JSON.parse(String(firstAttempt.body))).toMatchObject({ to: 'fixture@example.com' });
+    expect(secondAttempt.body).toBe(firstAttempt.body);
+    expect(accepted.size).toBe(1);
+    expect(orders.has(jobKey)).toBe(false);
+    expect(await kv.get(deliveryKey, { type: 'json' })).toMatchObject({ status: 'accepted', providerId: 'email_1', orderToken });
+    expect(storedOrder()).toMatchObject({ status: 'confirmed', emailSent: true, emailOutboxJobId: jobId });
   });
 });
