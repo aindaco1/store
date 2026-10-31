@@ -259,8 +259,9 @@ describe('checkout inventory lifecycle', () => {
 });
 
 describe('public checkout gateway', () => {
-  it.each(['ticket', 'contribution'])('checks origin, settles and reuses a paid %s attempt', async (kind) => {
+  async function checkoutGateway() {
     const { default: worker } = await import('../../worker/src/index.js');
+    const inventoryStub = { fetch: (url: string, options: RequestInit) => coordinator.fetch(new Request(url, options)) };
     const env: any = { ...(coordinator as any).env,
       // Keep this lifecycle fixture purchasable when the real event is archived.
       STORE_CATALOG_JSON: JSON.stringify({ ...catalog, products: catalog.products.map((product) =>
@@ -271,12 +272,33 @@ describe('public checkout gateway', () => {
       STRIPE_PUBLISHABLE_KEY_TEST: 'pk_test_fixture', TAX_PROVIDER: 'flat', SALES_TAX_RATE: '0',
       OBSERVABILITY_SAMPLE_RATE: '0', STORE_EMAIL_DRY_RUN: 'true', ADMIN_SESSION_SECRET: 'fixture_admin_secret',
       RATELIMIT: { get: async () => null, put: async () => {} },
-      STORE_INVENTORY_COORDINATOR: { idFromName: () => 'store', get: () => ({ fetch: (url: string, options: any) => coordinator.fetch(new Request(url, options)) }) }
+      STORE_INVENTORY_COORDINATOR: { idFromName: () => 'store', get: () => inventoryStub }
     };
     const background: Promise<unknown>[] = [];
     const request = (action: string, body: any, origin = 'http://127.0.0.1:4002') => worker.fetch(new Request(`http://127.0.0.1:8989/api/checkout/${action}`, {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     }), env, { waitUntil: (task: Promise<unknown>) => background.push(task) } as any);
+    async function postWebhook(payload: string) {
+      const timestamp = Math.floor(Date.now() / 1000);
+      const encoder = new TextEncoder();
+      const secret = await crypto.subtle.importKey('raw', encoder.encode(env.STRIPE_WEBHOOK_SECRET_TEST),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const digest = await crypto.subtle.sign('HMAC', secret, encoder.encode(`${timestamp}.${payload}`));
+      const signature = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+      const tasks: Promise<unknown>[] = [];
+      try {
+        return await worker.fetch(new Request('http://127.0.0.1:8989/webhooks/stripe', {
+          method: 'POST', headers: { 'stripe-signature': `t=${timestamp},v1=${signature}`, 'Content-Type': 'application/json' }, body: payload
+        }), env, { waitUntil: (task: Promise<unknown>) => tasks.push(task) } as any);
+      } finally {
+        await Promise.allSettled(tasks);
+      }
+    }
+    return { env, inventoryStub, background, request, postWebhook };
+  }
+
+  it.each(['ticket', 'contribution'])('checks origin, settles and reuses a paid %s attempt', async (kind) => {
+    const { background, request, postWebhook } = await checkoutGateway();
     const contribution = kind === 'contribution';
     const cart = { attemptId: first, items: [contribution ? { id: 'support-paradiso', price: 25.37, customAmountCents: 2537, quantity: 1 } : { id: 'a-night-in-paradiso', price: 20, quantity: 1 }], customer: { email: 'fixture@example.com' }, ...(contribution ? { abandonedCartConsent: true } : { tipPercent: 5 }) };
     for (const action of ['hold', 'status', 'extend', 'release']) {
@@ -310,16 +332,7 @@ describe('public checkout gateway', () => {
     const stored = JSON.parse(orders.get(`orders:store-order-${first}`)!);
     const intent = { id: 'pi_fixture', amount: stored.payment.amountCents, currency: 'usd', status: 'requires_payment_method',
       metadata: { checkoutProvider: 'first_party', orderToken: stored.orderToken, orderHash: stored.orderHash } };
-    const webhook = async (type: string, id: string) => {
-      const payload = JSON.stringify({ id, type, livemode: false, data: { object: intent } });
-      const timestamp = Math.floor(Date.now() / 1000);
-      const secret = await crypto.subtle.importKey('raw', new TextEncoder().encode('whsec_fixture'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-      const signature = Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', secret, new TextEncoder().encode(`${timestamp}.${payload}`))), (b) => b.toString(16).padStart(2, '0')).join('');
-      const tasks: Promise<any>[] = [];
-      const response = await worker.fetch(new Request('http://127.0.0.1:8989/webhooks/stripe', { method: 'POST', headers: { 'stripe-signature': `t=${timestamp},v1=${signature}`, 'Content-Type': 'application/json' }, body: payload }), env, { waitUntil: (task: Promise<any>) => tasks.push(task) } as any);
-      await Promise.allSettled(tasks);
-      return response;
-    };
+    const webhook = (type: string, id: string) => postWebhook(JSON.stringify({ id, type, livemode: false, data: { object: intent } }));
     expect((await webhook('payment_intent.payment_failed', 'evt_decline')).status).toBe(200);
     expect((await call('checkout-status')).phase).toBe('payment');
     status = intent.status = 'succeeded';
@@ -328,5 +341,69 @@ describe('public checkout gateway', () => {
     expect(JSON.parse(orders.get(`orders:store-order-${first}`)!).status).toBe('confirmed');
     if (!contribution) expect((await call('snapshot')).inventory['a-night-in-paradiso'].claimed).toBe(1);
     else expect(JSON.parse(orders.get(`orders:store-order-${first}`)!).orderDraft.items[0]).toMatchObject({ unitPriceCents: 2537, fulfillmentType: 'service' });
+  });
+
+  it.each(['inventory claim', 'confirmed order write'] as const)('recovers the same Stripe event after a crash following the %s', async (checkpoint) => {
+    const { env, inventoryStub, background, request, postWebhook } = await checkoutGateway();
+    const ticket = 'a-night-in-paradiso';
+    const cart = { attemptId: first, items: [{ id: ticket, quantity: 1 }], customer: { email: 'fixture@example.com' } };
+    const holdResponse = await request('hold', cart);
+    expect(await holdResponse.json()).toMatchObject({ success: true, heldQuantity: 1 });
+    const payment = await (await request('intent', cart)).json();
+    expect(payment).toMatchObject({ success: true, orderToken: `store-order-${first}`, paymentIntentId: 'pi_fixture' });
+    await Promise.all(background);
+
+    const orderKey = `orders:${payment.orderToken}`;
+    const storedOrder = () => JSON.parse(orders.get(orderKey)!);
+    const pending = storedOrder();
+    expect(pending.status).toBe('payment_pending');
+    const claimed = async () => (await call('snapshot')).inventory[ticket].claimed;
+    expect(await claimed()).toBe(0);
+    status = 'succeeded';
+    const eventId = 'evt_ticket_retry';
+    const eventKey = `stripe-event:${eventId}`;
+    const intent = {
+      id: payment.paymentIntentId, status, amount: pending.payment.amountCents, currency: 'usd',
+      metadata: { checkoutProvider: 'first_party', orderToken: payment.orderToken, orderHash: pending.orderHash }
+    };
+    const payload = JSON.stringify({ id: eventId, type: 'payment_intent.succeeded', livemode: false, data: { object: intent } });
+
+    const kv = env.STORE_STATE;
+    const put = kv.put.bind(kv);
+    const inventoryFetch = inventoryStub.fetch.bind(inventoryStub);
+    const crash = new Error('simulated worker termination');
+    const fault = checkpoint === 'inventory claim'
+      ? vi.spyOn(inventoryStub, 'fetch').mockImplementation(async (url, options) => {
+        const response = await inventoryFetch(url, options);
+        if (new URL(url).pathname === '/checkout-confirm' && response.ok) throw crash;
+        return response;
+      })
+      : vi.spyOn(kv, 'put').mockImplementation(async (key, value, ...options) => {
+        await put(key, value, ...options);
+        if (key === orderKey && JSON.parse(value as string).status === 'confirmed') throw crash;
+      });
+    try {
+      await expect(postWebhook(payload)).rejects.toThrow(crash);
+    } finally {
+      fault.mockRestore();
+    }
+    expect(await claimed()).toBe(1);
+    expect(storedOrder().status).toBe(checkpoint === 'inventory claim' ? 'payment_pending' : 'confirmed');
+    expect(JSON.parse(orders.get(eventKey)!)).toMatchObject({ eventId, status: 'processing' });
+
+    // Recreate the coordinator over the same persisted state before redelivery.
+    coordinator = new StoreInventoryCoordinator({ storage } as never, coordinator.env);
+    expect((await postWebhook(payload)).status).toBe(409);
+    vi.setSystemTime(Date.now() + 11 * 60_000);
+    const replay = await postWebhook(payload);
+    expect(replay.status).toBe(200);
+    expect(await replay.json()).toEqual({ received: true, storeOrder: 'confirmed' });
+    expect([...orders.keys()].filter((key) => key.startsWith('orders:'))).toEqual([orderKey]);
+    expect(storedOrder()).toMatchObject({
+      orderToken: payment.orderToken, status: 'confirmed',
+      payment: { status: 'succeeded', paymentIntentId: payment.paymentIntentId }
+    });
+    expect(await claimed()).toBe(1);
+    expect(JSON.parse(orders.get(eventKey)!)).toMatchObject({ eventId, status: 'processed' });
   });
 });
