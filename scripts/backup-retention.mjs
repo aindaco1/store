@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { planSnapshotRetention } from '../shared/dust-wave-platform/packages/release-core/src/backup-planning.js';
-import { readRetentionReceipt } from '../shared/dust-wave-platform/packages/release-core/src/backup-receipts.js';
+import { planSnapshotRetention, validatedPruneTargets } from '../shared/dust-wave-platform/packages/release-core/src/backup-planning.js';
+import { readRetentionReceipt, retentionRootId } from '../shared/dust-wave-platform/packages/release-core/src/backup-receipts.js';
 import { loadStoreDataInventory } from './lib/store-data-inventory.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,6 +39,7 @@ function resolveRetentionRoot(value) {
 export function planBackupRetention(options = {}) {
   if (!String(options.root || '').trim()) throw new Error('Backup retention root is required.');
   const root = resolveRetentionRoot(options.root);
+  const rootId = retentionRootId(root);
   const configured = options.retention || loadStoreDataInventory().retention;
   const snapshots = [];
   const untouched = [];
@@ -55,13 +56,13 @@ export function planBackupRetention(options = {}) {
     }
     snapshots.push({
       name: entry.name,
-      directory,
       createdAt: read.createdAt,
       releaseSnapshot: read.receipt.releaseSnapshot === true,
-      archiveBytes: Number(read.receipt.archiveBytes || fs.statSync(path.join(directory, read.receipt.archive)).size)
+      archiveBytes: read.archiveBytes,
+      archiveSha256: read.archiveSha256
     });
   }
-  return planSnapshotRetention({ snapshots, retention: configured, untouched, rootName: path.basename(root) });
+  return planSnapshotRetention({ snapshots, retention: configured, untouched, rootId, rootName: path.basename(root) });
 }
 
 export function executeBackupRetention(plan, options = {}) {
@@ -71,23 +72,32 @@ export function executeBackupRetention(plan, options = {}) {
   }
   const root = resolveRetentionRoot(options.root);
   if (pathIsWithin(REAL_ROOT, root)) throw new Error('Backup pruning cannot execute inside the repository.');
-  const currentPlan = planBackupRetention({ root, retention: plan.retention });
-  const currentlyEligible = new Set(currentPlan.prune.map((snapshot) => snapshot.name));
+  const currentPlan = planBackupRetention({ root, retention: options.retention });
+  const targets = validatedPruneTargets(plan, currentPlan);
   const deleted = [];
-  for (const snapshot of plan.prune || []) {
-    if (!currentlyEligible.has(snapshot.name)) {
-      throw new Error(`Backup prune target is no longer eligible: ${snapshot.name}.`);
-    }
+  for (const snapshot of targets) {
+    if (retentionRootId(root) !== currentPlan.rootId) throw new Error('Backup retention root changed.');
     const directory = path.join(root, snapshot.name);
     if (!pathIsWithin(root, directory)) throw new Error('Backup prune target escapes the retention root.');
     const stat = fs.lstatSync(directory);
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error(`Backup prune target is unsafe: ${snapshot.name}.`);
     const receipt = readRetentionReceipt(directory);
     if (!receipt.ok) throw new Error(`Backup prune target failed revalidation: ${snapshot.name}:${receipt.reason}.`);
+    if (receipt.archiveSha256 !== snapshot.archiveSha256 || receipt.createdAt.toISOString() !== snapshot.createdAt ||
+        (currentPlan.retention.releaseSnapshots && receipt.receipt.releaseSnapshot === true)) {
+      throw new Error(`Backup prune target changed: ${snapshot.name}.`);
+    }
     fs.rmSync(directory, { recursive: true, force: false });
     deleted.push(snapshot.name);
   }
-  return { ok: deleted.length === (plan.prune || []).length, deleted };
+  return { ok: true, deleted };
+}
+
+function loadReviewedPlan(file) {
+  if (!file) throw new Error('Backup pruning requires --plan=FILE from a saved preview.');
+  const preview = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (preview?.execution !== null || !preview.plan) throw new Error('A saved backup retention preview is required.');
+  return preview.plan;
 }
 
 function writeOutput(output, value) {
@@ -100,13 +110,15 @@ function writeOutput(output, value) {
 function main() {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
-    console.log(`Usage: node scripts/backup-retention.mjs --root=DIR [--execute --acknowledge=${PRUNE_ACKNOWLEDGEMENT}] [--output=FILE]`);
+    console.log(`Usage: node scripts/backup-retention.mjs --root=DIR [--execute --plan=FILE --acknowledge=${PRUNE_ACKNOWLEDGEMENT}] [--output=FILE]`);
     console.log('Planning is the default. Invalid, unencrypted, checksum-mismatched, newest, and release snapshots are never selected for deletion.');
     return;
   }
   const root = valueArg(args, '--root', '');
-  const plan = planBackupRetention({ root });
-  const result = args.includes('--execute')
+  const execute = args.includes('--execute');
+  if (execute && args.includes('--dry-run')) throw new Error('Choose either --dry-run or --execute.');
+  const plan = execute ? loadReviewedPlan(valueArg(args, '--plan')) : planBackupRetention({ root });
+  const result = execute
     ? { plan, execution: executeBackupRetention(plan, { root, acknowledge: valueArg(args, '--acknowledge', '') }) }
     : { plan, execution: null };
   writeOutput(valueArg(args, '--output', ''), result);

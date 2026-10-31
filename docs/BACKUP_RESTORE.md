@@ -237,10 +237,19 @@ It checks the canonical inventory, metadata-only snapshot plan, credential names
 Retention is plan-only by default:
 
 ```bash
-npm run backup:retention -- --root="$HOME/store-backups"
+npm run backup:retention -- --root="$HOME/store-backups" --output=store-retention.json
 ```
 
-The planner revalidates encrypted receipt/archive checksums and never selects the newest, release, daily, weekly, monthly, invalid, unencrypted, symlinked, or checksum-mismatched entry. Deletion additionally requires a real, non-symlinked root outside the repository, recomputes retention eligibility immediately before deletion, revalidates each receipt/archive, and requires both `--execute` and `--acknowledge=STORE_BACKUP_RETENTION_PRUNE`. Review the plan and verify the off-device copy before executing it.
+Review the keep and prune lists in `store-retention.json` and verify the off-device copy. Apply the reviewed preview with the following command.
+
+```bash
+npm run backup:retention -- --root="$HOME/store-backups" \
+  --execute --plan=store-retention.json --acknowledge=STORE_BACKUP_RETENTION_PRUNE
+```
+
+The planner keeps the newest snapshot, release snapshots, and the configured daily, weekly, and monthly representatives. It skips invalid receipts and symlinked entries. The preview binds the directory and each verified archive's SHA-256. Before the first deletion, the command rechecks every reviewed archive and each prune target's eligibility under the active policy. A different root, changed archive, or newly protected target rejects the entire batch. Newly discovered snapshots stay in place. Generate a fresh preview after a rejection or when upgrading from version 1.
+
+Use a real, non-symlinked root outside the repository. Run pruning while other processes that change these backups are idle. The command rechecks each target before removal, but a later filesystem error can interrupt a batch after a deletion.
 
 ## Scheduled Evidence And Drills
 
