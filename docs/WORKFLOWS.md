@@ -405,9 +405,9 @@ Use `npm run backup:snapshot` for an operator-owned snapshot outside the reposit
 5. The workflow audits deployed `robots.txt`, `sitemap.xml`, `sitemap.txt`, ordinary/Google Inspection responses, and every submitted public URL with bounded propagation retries.
 6. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
 
-Local Stripe test delivery uses the CLI listener. Optional hosted delivery uses
-the separately deployed `store-worker-staging` named environment. It is reachable only on its
-`workers.dev` URL, owns isolated KV/R2 state, has no scheduler, and disables
+Local Stripe test delivery uses the CLI listener. The separately deployed
+`store-worker-staging` retains its isolated storage with its public `workers.dev`
+address and preview URLs disabled. It has no custom route or scheduler and disables
 production email, shipping, reconciliation, analytics, and repository-write
 side effects. Staging deployment is independent of the production deployment
 workflow and must always use `npx wrangler deploy --env staging`.

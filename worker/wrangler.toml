@@ -331,12 +331,11 @@ binding = "RATELIMIT"
 id = "c55b47f5699244c5ac723018019e61e1"
 preview_id = "68f522d8316c49b6b2922767d67c9d8a"
 
-# Persistent non-production boundary for provider-originated Stripe test events.
-# This environment owns isolated storage, has no production route or cron, and
-# keeps every external side effect disabled or in dry-run mode.
+# Staging retains its isolated storage with public access disabled.
 [env.staging]
 name = "store-worker-staging"
-workers_dev = true
+workers_dev = false
+preview_urls = false
 routes = []
 
 [env.staging.triggers]
