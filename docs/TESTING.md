@@ -355,8 +355,9 @@ Use an existing recording instead with `--screen-reader-audio-file <recording>`.
 
 Scheduled **Production Posture** runs provider verification without local development variables and without strict skip enforcement. Required production secret names, bindings, origins, and runtime settings remain the configuration gate. Credential-dependent provider checks that cannot run in that workflow are retained in the sanitized artifact as `manual` / not run and do not turn configured production posture into a failure; an explicit provider `FAIL` or provider-command failure still fails the workflow. This is configuration evidence, not a claim that every provider API was contacted.
 
-Store uses the local Stripe CLI listener for test webhooks. The hosted staging destination
-is disabled. If you enable it for a hosted test, run
+Store uses the local Stripe CLI listener for test webhooks. The staging Worker's
+public address and the Stripe test destination are both disabled. If both are
+re-enabled for a hosted test, run
 `STRIPE_TEST_WEBHOOK_BASE=https://store-worker-staging.jogo.workers.dev npm run release:providers`
 to check it alongside production. Its Wrangler
 environment has isolated KV/R2 state, no route or cron, no production provider

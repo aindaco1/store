@@ -9,11 +9,12 @@ const production = config;
 const staging = config.env?.staging;
 
 describe('Store staging Worker posture', () => {
-  it('uses a test-only workers.dev boundary with no production route or cron', () => {
+  it('keeps the staging Worker in test mode with public routes, preview URLs and cron disabled', () => {
     expect(staging?.name).toBe('store-worker-staging');
-    expect(staging?.workers_dev).toBe(true);
-    expect(staging?.routes || []).toEqual([]);
-    expect(staging?.triggers?.crons || []).toEqual([]);
+    expect(staging?.workers_dev).toBe(false);
+    expect(staging?.preview_urls).toBe(false);
+    expect(staging?.routes).toEqual([]);
+    expect(staging?.triggers?.crons).toEqual([]);
     expect(staging?.vars?.APP_MODE).toBe('test');
     expect(staging?.vars?.WORKER_BASE).toBe('https://store-worker-staging.jogo.workers.dev');
     expect(staging?.vars?.WORKER_BASE).not.toBe(production.vars?.WORKER_BASE);
