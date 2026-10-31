@@ -217,6 +217,10 @@ npm run restore:plan -- \
   --json
 ```
 
+Before the first delete, cleanup lists the preview KV namespace, compares each listed snapshot key's current value and metadata, and hashes each listed R2 object against the snapshot. It skips confirmed absent targets. A mismatch, incomplete read, or provider error aborts the batch with zero deletes. If all listed R2 objects are absent, the command also confirms the preview bucket is accessible with Wrangler's `r2 bucket info`. A second successful cleanup issues zero deletes.
+
+Keep preview writers idle from preflight through deletion. The checked-in Store `STORE_STATE` and Pool `PLEDGES` bindings use the same preview namespace ID. Coordinate drills across both projects because the reads and deletes are separate provider operations.
+
 Verification and cleanup evidence contains counts only. Cleanup cannot target production, is idempotent, checks KV/R2 absence, runs explicitly after a successful protected drill, and is attempted again by the failure trap after a partial preview restore.
 
 ## Readiness And Retention

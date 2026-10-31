@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import { stripVTControlCharacters } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { matchingPreviewKvKeys } from './lib/preview-kv-cleanup.mjs';
 import { runCommand } from './lib/command-runner.mjs';
 import { sha256File, verifyChecksumManifest } from './lib/file-integrity.mjs';
 import { transformKvBackupValuesToPutRecords } from './lib/kv-backup-records.mjs';
@@ -265,8 +267,10 @@ function restoredValueMap(values = {}) {
   return new Map(transformKvValuesToRestoreRecords(values).map((record) => [record.key, record.value]));
 }
 
-function r2ObjectMissing(result = {}) {
-  return result.status !== 0 && /not found|404|does not exist/i.test(String(result.stderr || result.error || ''));
+function r2ObjectMissing(result) {
+  // Generic 404s, configuration errors and failed commands are not evidence of a missing object.
+  return result.status === 1 && !result.error && !result.timedOut &&
+    /(?:^|\[ERROR\]\s*)The specified key does not exist\.\s*$/m.test(stripVTControlCharacters(result.stderr || ''));
 }
 
 export function verifyStoreRestorePlan(plan, options = {}) {
@@ -398,29 +402,48 @@ export function cleanupStorePreviewRestore(plan, options = {}) {
     residualR2Objects: 0,
     ok: false
   };
+  function run(args) {
+    evidence.commands += 1;
+    return runner('npx', args, { cwd: WORKER_DIR, timeoutMs: 120_000 });
+  }
   try {
-    for (const [index, chunk] of chunks(records, 1000).entries()) {
+    let matchedKeys;
+    const matchedObjects = [];
+    try {
+      matchedKeys = matchingPreviewKvKeys(records, 'STORE_STATE', path.join(tempDir, 'read.json'), run);
+      for (const [index, action] of r2Actions.entries()) {
+        const file = path.join(tempDir, `read-${index}.bin`);
+        const result = run(['wrangler', 'r2', 'object', 'get', `${previewR2Bucket}/${action.key}`, '--file', file, '--remote']);
+        if (r2ObjectMissing(result)) continue;
+        if (result.status !== 0 || sha256File(file) !== sha256File(action.objectPath)) {
+          throw new Error('Preview R2 object changed or could not be read.');
+        }
+        matchedObjects.push(action);
+      }
+      // Wrangler reports an object GET 404 as a missing key, even if the bucket itself is missing.
+      if (r2Actions.length && !matchedObjects.length) {
+        const info = run(['wrangler', 'r2', 'bucket', 'info', previewR2Bucket, '--json']);
+        if (info.status !== 0 || JSON.parse(info.stdout)?.name !== previewR2Bucket) throw new Error('Preview bucket unavailable.');
+      }
+    } catch {
+      evidence.failures += 1;
+      return evidence;
+    }
+
+    for (const [index, keys] of chunks(matchedKeys, 1000).entries()) {
       const keysFile = path.join(tempDir, `preview.${index + 1}.delete.json`);
-      fs.writeFileSync(keysFile, `${JSON.stringify(chunk.map((record) => record.key))}\n`, { mode: 0o600 });
-      const result = runner('npx', [
-        'wrangler', 'kv', 'bulk', 'delete', keysFile,
-        '--binding', 'STORE_STATE', '--remote', '--preview'
-      ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
-      evidence.commands += 1;
+      fs.writeFileSync(keysFile, JSON.stringify(keys), { mode: 0o600 });
+      const result = run(['wrangler', 'kv', 'bulk', 'delete', keysFile, '--binding', 'STORE_STATE', '--remote', '--preview']);
       if (result.status !== 0) evidence.failures += 1;
     }
-    for (const action of r2Actions) {
-      const result = runner('npx', [
-        'wrangler', 'r2', 'object', 'delete', `${previewR2Bucket}/${action.key}`, '--remote'
-      ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
-      evidence.commands += 1;
+    for (const action of matchedObjects) {
+      const result = run(['wrangler', 'r2', 'object', 'delete', `${previewR2Bucket}/${action.key}`, '--remote']);
       if (result.status !== 0 && !r2ObjectMissing(result)) evidence.failures += 1;
     }
 
-    const keyList = runner('npx', [
+    const keyList = run([
       'wrangler', 'kv', 'key', 'list', '--binding', 'STORE_STATE', '--remote', '--preview'
-    ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
-    evidence.commands += 1;
+    ]);
     if (keyList.status !== 0) {
       evidence.failures += 1;
     } else {
@@ -435,11 +458,10 @@ export function cleanupStorePreviewRestore(plan, options = {}) {
     }
     for (const [index, action] of r2Actions.entries()) {
       const outputFile = path.join(tempDir, `r2-residual-${index + 1}.bin`);
-      const result = runner('npx', [
+      const result = run([
         'wrangler', 'r2', 'object', 'get', `${previewR2Bucket}/${action.key}`,
         '--file', outputFile, '--remote'
-      ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
-      evidence.commands += 1;
+      ]);
       if (result.status === 0) {
         evidence.residualR2Objects += 1;
       } else if (!r2ObjectMissing(result)) {
