@@ -9,7 +9,6 @@ export const EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const EMAIL_DELIVERY_TTL_SECONDS = 400 * 24 * 60 * 60;
 export const RESEND_WEBHOOK_MARKER_TTL_SECONDS = 35 * 24 * 60 * 60;
 const EMAIL_PROCESSING_LEASE_MS = 10 * 60 * 1000;
-const RESEND_IDEMPOTENCY_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 const MAX_FROZEN_PROVIDER_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
 const MARKETING_KINDS = new Set(['store_event_reminder', 'store_abandoned_cart', 'store_event_followup', 'store_product_report']);
@@ -77,6 +76,9 @@ export async function enqueueEmailOutbox(env, { kind, payload, dedupeKey = '', o
   if (['accepted', 'delivered'].includes(delivery?.status) || existing?.status === 'sent') {
     return { sent: true, queued: false, deduped: true, jobId, providerId: delivery?.providerId || '' };
   }
+  if (delivery?.status === 'ambiguous' || delivery?.retryWindowClosedAt) {
+    return { sent: false, queued: false, deduped: true, jobId, reason: 'Delivery requires reconciliation' };
+  }
   if (existing && ['pending', 'processing', 'retry'].includes(existing.status)) {
     return { sent: true, queued: true, deduped: true, jobId };
   }
@@ -85,7 +87,7 @@ export async function enqueueEmailOutbox(env, { kind, payload, dedupeKey = '', o
     kind,
     payload,
     metadata: { orderToken: String(orderToken || payload?.orderToken || '') },
-    existing,
+    existing: existing || delivery,
     expiresAt,
     maxRecordBytes: MAX_FROZEN_PROVIDER_PAYLOAD_BYTES
   });
@@ -142,7 +144,9 @@ async function markAcceptedStoreOrder(env, job, acceptedAt) {
   await env.STORE_STATE.put(`store-order-email-sent:${job.orderToken}`, 'sent', { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
 }
 
-export async function processEmailOutbox(env, { now = new Date(), limit = 10 } = {}) {
+export async function processEmailOutbox(env, { now: fixedNow, limit = 10 } = {}) {
+  const clock = () => fixedNow ?? new Date();
+  const now = clock();
   const empty = { attempted: false, checked: 0, sent: 0, retried: 0, failed: 0, suppressed: 0 };
   if (!env?.STORE_STATE?.list) return empty;
   const queueState = await env.STORE_STATE.get(EMAIL_OUTBOX_QUEUE_STATE_KEY, { type: 'json' });
@@ -166,37 +170,43 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       if (!nextDueAt || Date.parse(disposition.nextDueAt) < Date.parse(nextDueAt)) nextDueAt = disposition.nextDueAt;
       continue;
     }
-    if (disposition.state === 'expired') {
-      await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'expired', kind: job.kind, orderToken: job.orderToken, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
-      await env.STORE_STATE.delete(key);
-      results.failed += 1;
-      continue;
-    }
     if (disposition.state === 'leased') {
       hasPending = true;
       continue;
     }
-    if (await recipientSuppressed(env, job)) {
-      await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'suppressed', kind: job.kind, orderToken: job.orderToken, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
-      await env.STORE_STATE.delete(key);
-      results.suppressed += 1;
-      continue;
-    }
-
-    let deliveryStage = job.providerPayload ? 'provider' : 'render';
+    const previous = { ...job };
+    let deliveryStage = 'preflight';
     try {
+      outboxProviderAttemptStart(previous, clock());
+      const priorStart = previous.firstProviderAttemptAt ?? (previous.providerPayload ? previous.firstAttemptAt : '');
+      if (disposition.state === 'expired') {
+        await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'expired', kind: job.kind, firstProviderAttemptAt: priorStart, orderToken: job.orderToken, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
+        await env.STORE_STATE.delete(key);
+        results.failed += 1;
+        continue;
+      }
+      if (await recipientSuppressed(env, job)) {
+        await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({ version: 1, status: 'suppressed', kind: job.kind, firstProviderAttemptAt: priorStart, orderToken: job.orderToken, updatedAt: now.toISOString() }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
+        await env.STORE_STATE.delete(key);
+        results.suppressed += 1;
+        continue;
+      }
+      deliveryStage = 'render';
       if (!job.providerPayload) {
         job.providerPayload = await renderProviderPayload(env, job);
         job.contentHash = await sha256Hex(stableStringify(job.providerPayload));
       }
+      job.firstProviderAttemptAt = outboxProviderAttemptStart(previous, clock());
       job.status = 'processing';
       job.attempts = Number(job.attempts || 0) + 1;
       job.firstAttemptAt = job.firstAttemptAt || now.toISOString();
       job.lastAttemptAt = now.toISOString();
       deliveryStage = 'persist';
       await env.STORE_STATE.put(key, JSON.stringify(job), { expirationTtl: EMAIL_OUTBOX_PAYLOAD_TTL_SECONDS });
-      deliveryStage = 'provider';
       const { sendPreparedResendEmail } = await import('./email.js');
+      // Rendering and the durable checkpoint may have crossed the cutoff.
+      outboxProviderAttemptStart(job, clock());
+      deliveryStage = 'provider';
       const response = await sendPreparedResendEmail(env, job.providerPayload, {
         idempotencyKey: `store/${job.jobId}`,
         errorLabel: `Resend outbox error (${job.kind})`,
@@ -213,6 +223,28 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
       await env.STORE_STATE.delete(key);
       results.sent += 1;
     } catch (error) {
+      if (error instanceof OutboxRetryWindowClosed) {
+        const evidenceKey = deliveryKey(job.jobId);
+        const evidence = await env.STORE_STATE.get(evidenceKey, { type: 'json' });
+        const closedAt = clock().toISOString();
+        if (['accepted', 'delivered'].includes(evidence?.status)) {
+          await markAcceptedStoreOrder(env, job, evidence.acceptedAt || closedAt);
+          results.sent++;
+        } else {
+          await env.STORE_STATE.put(evidenceKey, JSON.stringify({
+            version: 1, kind: job.kind, orderToken: job.orderToken, contentHash: job.contentHash,
+            attempts: previous.attempts, lastError: previous.lastError, ...evidence,
+            status: evidence?.providerId && evidence.status ? evidence.status : 'ambiguous',
+            firstProviderAttemptAt: previous.firstProviderAttemptAt || previous.firstAttemptAt,
+            retryWindowClosedAt: closedAt, updatedAt: closedAt
+          }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
+          results.failed++;
+        }
+        await env.STORE_STATE.delete(key);
+        continue;
+      }
+      if (deliveryStage === 'preflight') throw error;
+      if (deliveryStage === 'persist') job.firstProviderAttemptAt = previous.firstProviderAttemptAt;
       const failedBeforeProvider = deliveryStage !== 'provider';
       if (deliveryStage === 'render') {
         job.attempts = Number(job.attempts || 0) + 1;
@@ -220,15 +252,12 @@ export async function processEmailOutbox(env, { now = new Date(), limit = 10 } =
         job.lastAttemptAt = now.toISOString();
         if (!job.contentHash) job.providerPayload = null;
       }
-      const firstAttemptMs = Date.parse(job.firstAttemptAt || '');
       const providerOutcomeUnknown = deliveryStage === 'provider' && !(Number(error?.statusCode || 0) > 0);
-      const ambiguityExpired = (error?.ambiguous || providerOutcomeUnknown) &&
-        Number.isFinite(firstAttemptMs) &&
-        now.getTime() - firstAttemptMs > RESEND_IDEMPOTENCY_RETRY_WINDOW_MS;
       const retryable = error?.retryable === true || failedBeforeProvider || providerOutcomeUnknown;
-      if (!retryable || ambiguityExpired) {
+      if (!retryable) {
         await env.STORE_STATE.put(deliveryKey(job.jobId), JSON.stringify({
-          version: 1, status: ambiguityExpired ? 'ambiguous' : 'failed', kind: job.kind, orderToken: job.orderToken,
+          version: 1, status: 'failed', kind: job.kind, orderToken: job.orderToken,
+          firstProviderAttemptAt: job.firstProviderAttemptAt,
           contentHash: job.contentHash, attempts: job.attempts,
           lastError: outboxDeliveryErrorEvidence(error, { stage: deliveryStage }), updatedAt: now.toISOString()
         }), { expirationTtl: EMAIL_DELIVERY_TTL_SECONDS });
@@ -300,6 +329,8 @@ import {
 import { sha256Hex } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import {
   classifyOutboxJob,
+  outboxProviderAttemptStart,
+  OutboxRetryWindowClosed,
   createOutboxJobId,
   createOutboxJobRecord,
   createOutboxQueueState,

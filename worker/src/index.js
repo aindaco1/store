@@ -3667,7 +3667,7 @@ export default {
 
     if (emailOutboxEnabled(env)) {
       try {
-        const outboxResults = await processEmailOutbox(env, { now });
+        const outboxResults = await processEmailOutbox(env);
         console.log('Store email outbox cron complete:', outboxResults);
       } catch (err) {
         console.error('Store email outbox cron failed:', err);
