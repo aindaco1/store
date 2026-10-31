@@ -61,6 +61,10 @@ function orderPayload() {
   };
 }
 
+function retryWindowReceipt() {
+  return { kind: 'store_order', dedupeKey: 'window', orderToken: 'store-order-one', payload: orderPayload() };
+}
+
 describe('Store durable Resend email outbox', () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -86,6 +90,92 @@ describe('Store durable Resend email outbox', () => {
     expect(await kv.get(`${EMAIL_OUTBOX_PREFIX}${first.jobId}`)).toBeNull();
     expect(await kv.get(`${EMAIL_DELIVERY_PREFIX}${first.jobId}`, { type: 'json' })).toMatchObject({ status: 'accepted', providerId: 'email_one' });
     expect(await kv.get('orders:store-order-one', { type: 'json' })).toMatchObject({ emailSent: true, emailOutboxJobId: first.jobId });
+  });
+
+  it.each([
+    { label: 'one millisecond inside', elapsed: 23 * 3_600_000 - 1, allowed: true },
+    { label: 'at the cutoff', elapsed: 23 * 3_600_000, allowed: false },
+    { label: 'after a 25-hour outage', elapsed: 25 * 3_600_000, allowed: false }
+  ])('protects an unacknowledged provider send $label', async ({ elapsed, allowed }) => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    const request = retryWindowReceipt();
+    const { jobId } = await enqueueEmailOutbox(env, request);
+    const start = new Date();
+    const send = vi.fn(async (_url: string, _init: RequestInit) => Response.json({ id: 'accepted_once' }))
+      .mockRejectedValueOnce(new TypeError('Connection lost after provider acceptance'));
+    vi.stubGlobal('fetch', send);
+    expect(await processEmailOutbox(env, { now: start })).toMatchObject({ retried: 1, sent: 0 });
+    const key = EMAIL_OUTBOX_PREFIX + jobId;
+    const receiptKey = EMAIL_DELIVERY_PREFIX + jobId;
+    expect(await kv.get(key, { type: 'json' })).toMatchObject({ status: 'retry', attempts: 1 });
+    const result = await processEmailOutbox(env, { now: new Date(start.getTime() + elapsed) });
+    const headers = send.mock.calls.map(([, init]) => new Headers(init.headers).get('Idempotency-Key'));
+    const expectedKey = `store/${jobId}`;
+    if (allowed) {
+      expect(headers).toEqual([expectedKey, expectedKey]);
+      expect(send.mock.calls[1][1].body).toBe(send.mock.calls[0][1].body);
+      expect(result).toMatchObject({ sent: 1, failed: 0 });
+      expect(await kv.get(receiptKey, { type: 'json' })).toMatchObject({ status: 'accepted', providerId: 'accepted_once' });
+    } else {
+      expect(headers).toEqual([expectedKey]);
+      expect(result).toMatchObject({ sent: 0, failed: 1 });
+      expect(await kv.get(receiptKey, { type: 'json' })).toMatchObject({ status: 'ambiguous', attempts: 1 });
+      expect(await enqueueEmailOutbox(env, request)).toMatchObject({ sent: false, queued: false, jobId });
+      await processEmailOutbox(env, { now: new Date(start.getTime() + elapsed + 60_000) });
+      expect(send).toHaveBeenCalledTimes(1);
+    }
+    expect(await kv.get(key)).toBeNull();
+  });
+
+  it('rechecks the live clock after checkpointing an old processing lease', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const kv = new MemoryKV();
+      const env = baseEnv(kv);
+      const { jobId } = await enqueueEmailOutbox(env, retryWindowReceipt());
+      const send = vi.fn().mockRejectedValue(new TypeError('Provider response lost'));
+      vi.stubGlobal('fetch', send);
+      expect(await processEmailOutbox(env)).toMatchObject({ retried: 1 });
+      const key = EMAIL_OUTBOX_PREFIX + jobId;
+      const job = await kv.get(key, { type: 'json' });
+      // Simulate a pre-upgrade worker that stopped after persisting its send intent.
+      delete job.firstProviderAttemptAt;
+      delete job.lastError;
+      await kv.put(key, JSON.stringify({ ...job, status: 'processing' }));
+      const cutoff = Date.parse(job.firstAttemptAt) + 23 * 3_600_000;
+      vi.setSystemTime(cutoff - 1);
+      const put = kv.put.bind(kv);
+      vi.spyOn(kv, 'put').mockImplementation(async (keyToWrite, value) => {
+        await put(keyToWrite, value);
+        if (keyToWrite === key && JSON.parse(value).status === 'processing') vi.setSystemTime(cutoff);
+      });
+      expect(await processEmailOutbox(env)).toMatchObject({ sent: 0, failed: 1 });
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(await kv.get(EMAIL_DELIVERY_PREFIX + jobId, { type: 'json' })).toMatchObject({
+        status: 'ambiguous', firstProviderAttemptAt: job.firstAttemptAt, attempts: 1
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('honors provider delivery evidence when recovering an overdue job', async () => {
+    const kv = new MemoryKV();
+    const env = baseEnv(kv);
+    const { jobId } = await enqueueEmailOutbox(env, retryWindowReceipt());
+    const start = new Date();
+    const send = vi.fn().mockRejectedValue(new TypeError('Response lost'));
+    vi.stubGlobal('fetch', send);
+    expect(await processEmailOutbox(env, { now: start })).toMatchObject({ retried: 1 });
+    const evidence = { status: 'delivered', providerId: 'receipt_from_webhook' };
+    const key = EMAIL_DELIVERY_PREFIX + jobId;
+    await kv.put(key, JSON.stringify(evidence));
+    await processEmailOutbox(env, { now: new Date(start.getTime() + 25 * 3_600_000) });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await kv.get(key, { type: 'json' })).toEqual(evidence);
+    expect(await kv.get(EMAIL_OUTBOX_PREFIX + jobId)).toBeNull();
+    expect(await enqueueEmailOutbox(env, retryWindowReceipt())).toMatchObject({ deduped: true, queued: false, providerId: evidence.providerId });
   });
 
   it('retries a rate-limited frozen payload after Retry-After', async () => {
@@ -164,7 +254,8 @@ describe('Store durable Resend email outbox', () => {
     }));
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ id: 'email_after_retry' }), { status: 200 })));
 
-    const second = await processEmailOutbox(env, { now: new Date('2027-07-13T12:02:00Z') });
+    // A rendering failure made no provider call and must not consume the send window.
+    const second = await processEmailOutbox(env, { now: new Date('2027-07-14T13:00:00Z') });
 
     expect(second).toMatchObject({ sent: 1, retried: 0, failed: 0 });
     expect(await kv.get(key)).toBeNull();
