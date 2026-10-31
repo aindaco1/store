@@ -343,7 +343,7 @@ describe('public checkout gateway', () => {
     else expect(JSON.parse(orders.get(`orders:store-order-${first}`)!).orderDraft.items[0]).toMatchObject({ unitPriceCents: 2537, fulfillmentType: 'service' });
   });
 
-  it.each(['inventory claim', 'confirmed order write'] as const)('recovers the same Stripe event after a crash following the %s', async (checkpoint) => {
+  async function pendingTicketWebhook(eventId: string) {
     const { env, inventoryStub, background, request, postWebhook } = await checkoutGateway();
     const ticket = 'a-night-in-paradiso';
     const cart = { attemptId: first, items: [{ id: ticket, quantity: 1 }], customer: { email: 'fixture@example.com' } };
@@ -360,7 +360,6 @@ describe('public checkout gateway', () => {
     const claimed = async () => (await call('snapshot')).inventory[ticket].claimed;
     expect(await claimed()).toBe(0);
     status = 'succeeded';
-    const eventId = 'evt_ticket_retry';
     const eventKey = `stripe-event:${eventId}`;
     const intent = {
       id: payment.paymentIntentId, status, amount: pending.payment.amountCents, currency: 'usd',
@@ -368,7 +367,24 @@ describe('public checkout gateway', () => {
     };
     const payload = JSON.stringify({ id: eventId, type: 'payment_intent.succeeded', livemode: false, data: { object: intent } });
 
-    const kv = env.STORE_STATE;
+    async function expectSettled() {
+      expect([...orders.keys()].filter((key) => key.startsWith('orders:'))).toEqual([orderKey]);
+      expect(storedOrder()).toMatchObject({
+        orderToken: payment.orderToken, status: 'confirmed',
+        payment: { status: 'succeeded', paymentIntentId: payment.paymentIntentId }
+      });
+      expect(await claimed()).toBe(1);
+      expect(JSON.parse(orders.get(eventKey)!)).toMatchObject({ eventId, status: 'processed' });
+    }
+    return {
+      kv: env.STORE_STATE, inventoryStub, orderKey, eventKey, storedOrder, claimed, expectSettled,
+      deliver: () => postWebhook(payload)
+    };
+  }
+
+  it.each(['inventory claim', 'confirmed order write'] as const)('recovers the same Stripe event after a crash following the %s', async (checkpoint) => {
+    const eventId = 'evt_ticket_retry';
+    const { kv, inventoryStub, orderKey, eventKey, storedOrder, claimed, deliver, expectSettled } = await pendingTicketWebhook(eventId);
     const put = kv.put.bind(kv);
     const inventoryFetch = inventoryStub.fetch.bind(inventoryStub);
     const crash = new Error('simulated worker termination');
@@ -383,7 +399,7 @@ describe('public checkout gateway', () => {
         if (key === orderKey && JSON.parse(value as string).status === 'confirmed') throw crash;
       });
     try {
-      await expect(postWebhook(payload)).rejects.toThrow(crash);
+      await expect(deliver()).rejects.toThrow(crash);
     } finally {
       fault.mockRestore();
     }
@@ -393,17 +409,45 @@ describe('public checkout gateway', () => {
 
     // Recreate the coordinator over the same persisted state before redelivery.
     coordinator = new StoreInventoryCoordinator({ storage } as never, coordinator.env);
-    expect((await postWebhook(payload)).status).toBe(409);
+    expect((await deliver()).status).toBe(409);
     vi.setSystemTime(Date.now() + 11 * 60_000);
-    const replay = await postWebhook(payload);
+    const replay = await deliver();
     expect(replay.status).toBe(200);
     expect(await replay.json()).toEqual({ received: true, storeOrder: 'confirmed' });
-    expect([...orders.keys()].filter((key) => key.startsWith('orders:'))).toEqual([orderKey]);
-    expect(storedOrder()).toMatchObject({
-      orderToken: payment.orderToken, status: 'confirmed',
-      payment: { status: 'succeeded', paymentIntentId: payment.paymentIntentId }
+    await expectSettled();
+  });
+
+  it('settles one ticket when simultaneous deliveries both read a missing event marker', async () => {
+    const { kv, eventKey, deliver, expectSettled } = await pendingTicketWebhook('evt_ticket_simultaneous');
+    const bothRead = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const observedMarkers: (string | null)[] = [];
+    const get = kv.get.bind(kv);
+    const reads = vi.spyOn(kv, 'get').mockImplementation(async (key, ...args) => {
+      const value = await get(key, ...args);
+      if (key === eventKey && observedMarkers.length < 2) {
+        observedMarkers.push(value ?? null);
+        if (observedMarkers.length === 2) bothRead.resolve();
+        await release.promise;
+      }
+      return value;
     });
-    expect(await claimed()).toBe(1);
-    expect(JSON.parse(orders.get(eventKey)!)).toMatchObject({ eventId, status: 'processed' });
+
+    const deliveries = [deliver(), deliver()];
+    try {
+      // An early response must fail the barrier check instead of leaving its peer waiting.
+      await Promise.race([bothRead.promise, ...deliveries]);
+      expect(observedMarkers).toEqual([null, null]);
+      expect(orders.has(eventKey)).toBe(false);
+      release.resolve();
+      const statuses = (await Promise.all(deliveries)).map((response) => response.status);
+      expect(statuses).toContain(200);
+      for (const status of statuses) expect([200, 409]).toContain(status);
+      await expectSettled();
+    } finally {
+      release.resolve();
+      await Promise.allSettled(deliveries);
+      reads.mockRestore();
+    }
   });
 });
