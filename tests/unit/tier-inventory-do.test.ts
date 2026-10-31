@@ -6,11 +6,11 @@ class MockStorage {
   store = new Map<string, unknown>();
 
   async get(key: string) {
-    return this.store.get(key);
+    return structuredClone(this.store.get(key));
   }
 
   async put(key: string, value: unknown) {
-    this.store.set(key, value);
+    this.store.set(key, structuredClone(value));
   }
 
   async transaction<T>(callback: (storage: MockStorage) => Promise<T>) {
@@ -288,6 +288,46 @@ describe('StoreInventoryCoordinator', () => {
         'vip-pass': 1
       }
     });
+  });
+
+  it('drops only the expiring hold from reserved counts at its exact deadline', async () => {
+    const deadline = Date.parse('2026-04-09T06:00:00Z');
+    const liveHold = { counts: { 'vip-pass': 3 }, expiresAt: new Date(deadline + 60_000).toISOString() };
+    const state = new MockDurableObjectState();
+    await state.storage.put('state', {
+      inventory: { 'vip-pass': { limit: 5, claimed: 0 } },
+      reservations: {
+        expiring: { counts: { 'vip-pass': 2 }, expiresAt: new Date(deadline).toISOString() },
+        live: liveHold
+      }
+    });
+
+    const env = { STORE_STATE: new MockKVNamespace() };
+    const coordinator = new StoreInventoryCoordinator(state as never, env as never);
+    async function expectReservedCount(count: number) {
+      const response = await coordinator.fetch(new Request('https://store-inventory/reserved-counts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: 'catalog' })
+      }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ success: true, reservedCounts: { 'vip-pass': count } });
+    }
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(deadline - 1);
+      await expectReservedCount(5);
+
+      vi.setSystemTime(deadline);
+      await expectReservedCount(3);
+      expect(await state.storage.get('state')).toHaveProperty('reservations', { live: liveHold });
+
+      await expectReservedCount(3);
+      expect(await state.storage.get('state')).toHaveProperty('reservations', { live: liveHold });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('drops expired reservations from availability snapshots', async () => {
