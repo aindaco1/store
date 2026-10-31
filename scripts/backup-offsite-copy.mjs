@@ -5,7 +5,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { commandAvailable, runCommand } from './lib/command-runner.mjs';
-import { inspectEncryptedSnapshot, requireBackupDirectory } from '../shared/dust-wave-platform/packages/release-core/src/backup-receipts.js';
+import { assertCopiedArchiveDigest, inspectEncryptedSnapshot, requireBackupDirectory } from '../shared/dust-wave-platform/packages/release-core/src/backup-receipts.js';
 export { inspectEncryptedSnapshot };
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -96,6 +96,7 @@ export function executeOffsiteCopy(options = {}) {
       fs.chmodSync(path.join(plan.target, filename), 0o600);
     }
     const verification = verifyOffsiteCopy({ snapshot: plan.target });
+    assertCopiedArchiveDigest(plan.archiveSha256, verification.archiveSha256);
     const receipt = {
       ...verification,
       copiedAt: verification.verifiedAt,
