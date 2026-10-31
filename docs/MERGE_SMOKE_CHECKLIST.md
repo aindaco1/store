@@ -142,8 +142,8 @@ Provider and runtime checks:
 - [ ] `STORE_STATE`, `RATELIMIT`, `STORE_DOWNLOADS`, and `STORE_INVENTORY_COORDINATOR` point at production Cloudflare resources.
 - [ ] Worker secrets are set in Cloudflare, not in Git, including Stripe, Resend, admin session/login, checkout intent, magic link, download/order lookup, Turnstile, and USPS secrets as applicable.
 - [ ] Production runtime config uses `SITE_BASE=https://shop.dustwave.xyz`, `WORKER_BASE=https://checkout.dustwave.xyz`, `CORS_ALLOWED_ORIGIN=https://shop.dustwave.xyz`, `TAX_PROVIDER=nm_grt`, `SHIPPING_ORIGIN_ZIP=87120`, `SHIPPING_ORIGIN_COUNTRY=US`, and `USPS_ENABLED=true` unless intentionally changed.
-- [ ] Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes at least to `payment_intent.succeeded` and `payment_intent.payment_failed`.
-- [ ] Stripe test webhook endpoint targets `https://store-worker-staging.jogo.workers.dev/webhooks/stripe`, subscribes to the same two events, and uses `STRIPE_WEBHOOK_SECRET_TEST` only in the isolated staging Worker.
+- [ ] Stripe production webhook endpoint targets `https://checkout.dustwave.xyz/webhooks/stripe` and subscribes to `payment_intent.succeeded`, `payment_intent.payment_failed`, and `payment_intent.canceled`.
+- [ ] For a hosted staging test only, run the provider check with `STRIPE_TEST_WEBHOOK_BASE=https://store-worker-staging.jogo.workers.dev` to verify its test-mode subscription.
 - [ ] Resend sender domains and `ORDERS_EMAIL_FROM` / `UPDATES_EMAIL_FROM` are verified.
 - [ ] Resend delivery webhook targets `https://checkout.dustwave.xyz/webhooks/resend`, subscribes to delivered/bounced/complained/failed/suppressed events, and its signing secret is stored as `RESEND_WEBHOOK_SECRET`.
 - [ ] `EMAIL_OUTBOX_ENABLED=true` and `PAYMENT_RECONCILIATION_ENABLED=true` are present in the deployed production binding summary; the admin readiness checks report their dependencies as ready.

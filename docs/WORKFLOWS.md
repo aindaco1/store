@@ -405,8 +405,8 @@ Use `npm run backup:snapshot` for an operator-owned snapshot outside the reposit
 5. The workflow audits deployed `robots.txt`, `sitemap.xml`, `sitemap.txt`, ordinary/Google Inspection responses, and every submitted public URL with bounded propagation retries.
 6. Verify Stripe webhooks, Resend senders, USPS/tax config, `STORE_DOWNLOADS`, admin magic links, cron heartbeat, and readiness checks.
 
-Provider-originated Stripe test delivery uses the separately deployed
-`store-worker-staging` named environment. It is reachable only on its
+Local Stripe test delivery uses the CLI listener. Optional hosted delivery uses
+the separately deployed `store-worker-staging` named environment. It is reachable only on its
 `workers.dev` URL, owns isolated KV/R2 state, has no scheduler, and disables
 production email, shipping, reconciliation, analytics, and repository-write
 side effects. Staging deployment is independent of the production deployment
@@ -460,8 +460,8 @@ Keep these checks current in production and rerun them after checkout, fulfillme
 External provider checks:
 
 - Stripe production publishable/secret keys are configured and the production webhook endpoint is `https://checkout.dustwave.xyz/webhooks/stripe`.
-- Stripe test credentials are scoped to `store-worker-staging`, whose test webhook endpoint is `https://store-worker-staging.jogo.workers.dev/webhooks/stripe`; staging must never share Store production storage or signing secrets.
-- Stripe webhook events include at least `payment_intent.succeeded` and `payment_intent.payment_failed`.
+- For hosted Stripe tests, scope the test webhook signing secret to `store-worker-staging` and set `STRIPE_TEST_WEBHOOK_BASE=https://store-worker-staging.jogo.workers.dev` for the provider check.
+- Stripe webhook events include `payment_intent.succeeded`, `payment_intent.payment_failed`, and `payment_intent.canceled`.
 - Resend sender domains and sender identities are verified for `ORDERS_EMAIL_FROM` and `UPDATES_EMAIL_FROM`.
 - USPS live credentials are configured and the flat-rate fallback remains available if USPS is unavailable.
 - New Mexico GRT behavior is verified for the production origin and destination cases.

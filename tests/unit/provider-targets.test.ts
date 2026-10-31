@@ -11,20 +11,18 @@ describe('release provider targets', () => {
       vars: {
         SITE_BASE: 'http://127.0.0.1:4002',
         WORKER_BASE: 'http://127.0.0.1:8989'
-      },
-      stagingVars: { WORKER_BASE: 'https://store-worker-staging.jogo.workers.dev' }
+      }
     })).toEqual({
       siteBase: 'https://shop.dustwave.xyz',
       workerBase: 'https://checkout.dustwave.xyz',
-      testWorkerBase: 'https://store-worker-staging.jogo.workers.dev'
+      testWorkerBase: ''
     });
   });
 
   it('keeps an explicit Stripe test target isolated from production', () => {
     expect(resolveProviderTargets({
       stripeTestWebhookBase: 'https://stripe-test.example.workers.dev',
-      vars: { WORKER_BASE: 'https://checkout.dustwave.xyz' },
-      stagingVars: { WORKER_BASE: 'https://staging.example.workers.dev' }
+      vars: { WORKER_BASE: 'https://checkout.dustwave.xyz' }
     }).testWorkerBase).toBe('https://stripe-test.example.workers.dev');
   });
 
@@ -39,15 +37,15 @@ describe('release provider targets', () => {
     })).toEqual({
       siteBase: 'https://shop.dustwave.xyz',
       workerBase: 'https://checkout.dustwave.xyz',
-      testWorkerBase: 'https://checkout.dustwave.xyz'
+      testWorkerBase: ''
     });
   });
 
-  it('uses safe production defaults when no configuration is available', () => {
+  it('checks only production by default', () => {
     expect(resolveProviderTargets()).toEqual({
       siteBase: 'https://shop.dustwave.xyz',
       workerBase: 'https://checkout.dustwave.xyz',
-      testWorkerBase: 'https://checkout.dustwave.xyz'
+      testWorkerBase: ''
     });
   });
 

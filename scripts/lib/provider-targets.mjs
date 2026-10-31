@@ -9,8 +9,7 @@ export function resolveProviderTargets({
   siteBaseOverride = '',
   workerBaseOverride = '',
   stripeTestWebhookBase = '',
-  vars = {},
-  stagingVars = {}
+  vars = {}
 } = {}) {
   const siteBase = normalizedValue(siteBaseOverride) ||
     normalizedValue(vars.CANONICAL_SITE_BASE) ||
@@ -20,10 +19,7 @@ export function resolveProviderTargets({
     normalizedValue(vars.CANONICAL_WORKER_BASE) ||
     normalizedValue(vars.WORKER_BASE) ||
     DEFAULT_WORKER_BASE;
-  const testWorkerBase = normalizedValue(stripeTestWebhookBase) ||
-    normalizedValue(stagingVars.WORKER_BASE) ||
-    normalizedValue(stagingVars.CANONICAL_WORKER_BASE) ||
-    workerBase;
+  const testWorkerBase = normalizedValue(stripeTestWebhookBase);
 
   return { siteBase, workerBase, testWorkerBase };
 }
