@@ -54,6 +54,7 @@ The provider probe is read-only. It checks public DNS and, when credentials are
 exported in the shell or present in worker/.dev.vars, Cloudflare, Stripe webhook
 endpoint, Resend sender domain, KV, and R2 readiness. DNS evidence can use a
 dedicated CLOUDFLARE_DNS_API_TOKEN with Zone:DNS:Read for the production zone.
+Set STRIPE_TEST_WEBHOOK_BASE to also check a hosted test destination.
 USPS quote smoke may also use worker/.dev.vars. It never prints secret values.`);
   process.exit(0);
 }
@@ -263,6 +264,25 @@ function listStripeWebhooksWithCli({ live = false, authState } = {}) {
   return { ok: true, data: parsed.data || [] };
 }
 
+async function checkStripeTestWebhook(testWorkerBase, authState) {
+  const label = 'Stripe test webhook endpoint';
+  let webhooks = listStripeWebhooksWithCli({ live: false, authState });
+  if (!webhooks.ok) {
+    const { key, mode } = stripeKeyForReadiness();
+    if (mode !== 'test' || !key) {
+      return add('SKIP', label, 'set STRIPE_SECRET_KEY_TEST or authenticate stripe CLI for test endpoint verification');
+    }
+    webhooks = await listStripeWebhooksWithApi(key);
+    if (!webhooks.ok) return add('WARN', label, `test endpoint API returned ${webhooks.status || 'unavailable'}`);
+  }
+
+  if (findRequiredStripeWebhook(webhooks.data, testWorkerBase, { livemode: false })) {
+    add('PASS', label, `test endpoint targets ${testWorkerBase}/webhooks/stripe with required events`);
+  } else {
+    add('WARN', label, 'test endpoint not found with required payment_intent events; direct local webhook smoke can still cover settlement');
+  }
+}
+
 function listCloudflareKvWithWrangler() {
   const result = run('npx', ['wrangler', 'kv', 'namespace', 'list'], { cwd: WORKER_DIR });
   if (result.status !== 0) {
@@ -410,15 +430,13 @@ function firstTokenChoice(choices) {
 async function main() {
   const wranglerContent = fs.existsSync(WRANGLER_PATH) ? fs.readFileSync(WRANGLER_PATH, 'utf8') : '';
   const vars = wranglerContent ? parseTomlVars(wranglerContent) : {};
-  const stagingVars = wranglerContent ? parseTomlVars(wranglerContent, '[env.staging.vars]') : {};
   const kvNamespaces = wranglerContent ? parseTomlBlocks(wranglerContent, 'kv_namespaces') : [];
   const r2Buckets = wranglerContent ? parseTomlBlocks(wranglerContent, 'r2_buckets') : [];
   const { siteBase, workerBase, testWorkerBase } = resolveProviderTargets({
     siteBaseOverride: envValue('SITE_BASE'),
     workerBaseOverride: envValue('WORKER_BASE'),
     stripeTestWebhookBase: envValue('STRIPE_TEST_WEBHOOK_BASE'),
-    vars,
-    stagingVars
+    vars
   });
   const siteHost = hostFromUrl(siteBase);
   const workerHost = hostFromUrl(workerBase);
@@ -565,22 +583,7 @@ async function main() {
     }
   }
 
-  const stripeTestCli = listStripeWebhooksWithCli({ live: false, authState: stripeCliAuth });
-  if (stripeTestCli.ok) {
-    const testEndpoint = findRequiredStripeWebhook(stripeTestCli.data, testWorkerBase, { livemode: false });
-    if (testEndpoint) {
-      add('PASS', 'Stripe test webhook endpoint', `test endpoint targets ${testWorkerBase}/webhooks/stripe with required events`);
-    } else {
-      add('WARN', 'Stripe test webhook endpoint', 'test endpoint not found with required payment_intent events; direct local webhook smoke can still cover settlement');
-    }
-  } else if (stripeKeyForReadiness().key) {
-    const webhooks = await listStripeWebhooksWithApi(stripeKeyForReadiness().key);
-    if (!webhooks.ok) add('WARN', 'Stripe test webhook endpoint', `test endpoint API returned ${webhooks.status || 'unavailable'}`);
-    else if (findRequiredStripeWebhook(webhooks.data, testWorkerBase, { livemode: false })) add('PASS', 'Stripe test webhook endpoint', `test endpoint targets ${testWorkerBase}/webhooks/stripe with required events`);
-    else add('WARN', 'Stripe test webhook endpoint', 'test endpoint not found with required payment_intent events; direct local webhook smoke can still cover settlement');
-  } else {
-    add('SKIP', 'Stripe test webhook endpoint', 'set STRIPE_SECRET_KEY_TEST or authenticate stripe CLI for test endpoint verification');
-  }
+  if (testWorkerBase) await checkStripeTestWebhook(testWorkerBase, stripeCliAuth);
 
   const resendKey = envValue('RESEND_API_KEY');
   const emailDomains = expectedEmailDomains(vars);
