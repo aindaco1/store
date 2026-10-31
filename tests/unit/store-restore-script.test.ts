@@ -285,45 +285,106 @@ describe('Store restore automation', () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it('deletes only snapshot-owned preview data and verifies it is absent', () => {
+  it.each([
+    ['mixed', 'unchanged'],
+    ['kv', 'changed'], ['kv', 'unreadable'], ['kv', 'incomplete'], ['kv', 'metadata'],
+    ['mixed', 'changed'], ['mixed', 'unreadable'], ['mixed', 'missing file'],
+    ['mixed', 'unreadable bucket'],
+  ])('preflights %s cleanup when the last target is %s', (scope, change) => {
     const root = fixtureSnapshot();
-    const objectPath = path.join(root, 'r2', 'objects', 'downloads', 'fixture.txt');
-    fs.mkdirSync(path.dirname(objectPath), { recursive: true });
-    fs.writeFileSync(objectPath, 'private fixture', { mode: 0o600 });
-    const artifacts = buildChecksumManifest(root, { exclude: ['checksums.json'] });
-    writeJson(path.join(root, 'checksums.json'), { schemaVersion: 1, artifacts });
+    const orderFile = path.join(root, 'kv/orders.values.json');
+    const orders = JSON.parse(fs.readFileSync(orderFile, 'utf8'));
+    const first = 'orders:store-order-test', last = 'orders:second';
+    orders[last] = { value: orders[first].value.replaceAll('store-order-test', 'second') };
+    writeJson(orderFile, orders);
+    if (scope === 'mixed') {
+      fs.mkdirSync(path.join(root, 'r2/objects'), { recursive: true });
+      for (const name of ['a', 'z']) fs.writeFileSync(path.join(root, 'r2/objects', name), 'snapshot');
+    }
+    writeJson(path.join(root, 'checksums.json'), {
+      schemaVersion: 1, artifacts: buildChecksumManifest(root, { exclude: ['checksums.json'] })
+    });
     const plan = buildStoreRestorePlan(readAndVerifySnapshot(root), { target: 'preview' });
-    const calls: string[][] = [];
-    const evidence = cleanupStorePreviewRestore(plan, {
-      target: 'preview',
-      previewR2Bucket: 'store-recovery-drill-preview',
-      acknowledgePreviewCleanup: 'STORE_PREVIEW_RESTORE_CLEANUP',
-      runner: (_command: string, args: string[]) => {
-        calls.push(args);
-        if (args.includes('key') && args.includes('list')) {
-          return { status: 0, stdout: '[]', stderr: '', error: '' };
-        }
-        if (args.includes('r2') && args.includes('get')) {
-          return { status: 1, stdout: '', stderr: 'not found', error: '' };
-        }
-        return { status: 0, stdout: '', stderr: '', error: '' };
+    const kv = new Map([[first, orders[first].value], [last, orders[last].value], ['unlisted', 'keep']]);
+    const objects = new Map([['a', 'snapshot'], ['z', 'snapshot'], ['unlisted', 'keep']]);
+    if (change === 'unchanged') kv.delete(last); // Absent alongside existing matches.
+    if (change === 'changed' && scope === 'kv') kv.set(last, orders[last].value + ' ');
+    if (change === 'changed' && scope === 'mixed') objects.set('z', 'replaced'); // Same byte length.
+    if (change === 'unreadable bucket') objects.clear();
+    const beforeKv = [...kv], beforeObjects = [...objects];
+    const deletes: string[] = [];
+    let deleteCalls = 0;
+    const run = (_cmd: string, args: string[]) => {
+      const op = args.slice(1, 4).join(' ');
+      const success = (stdout = '') => ({ status: 0, stdout, stderr: '' });
+      if (args[1] === 'kv') {
+        expect(args).toContain('--remote');
+        expect(args).toContain('--preview');
+        expect(args[args.indexOf('--binding') + 1]).toBe('STORE_STATE');
       }
+      if (op === 'kv key list') {
+        return success(JSON.stringify([...kv.keys()].map(name =>
+          name === last && change === 'metadata' ? { name, metadata: { edited: true } } : { name })));
+      }
+      if (op === 'kv bulk get') {
+        const names: string[] = JSON.parse(fs.readFileSync(args[4], 'utf8'));
+        if (scope === 'kv' && change === 'unreadable' && names.includes(last)) return { status: 1 };
+        return success(JSON.stringify(Object.fromEntries(names
+          .filter(key => !(change === 'incomplete' && key === last)).map(key => [key, kv.get(key)]))));
+      }
+      if (op === 'kv bulk delete') {
+        deleteCalls += 1;
+        const keys: string[] = JSON.parse(fs.readFileSync(args[4], 'utf8'));
+        for (const key of keys) { deletes.push(key); kv.delete(key); }
+        return success();
+      }
+      if (op === 'r2 bucket info') {
+        expect(args[4]).toBe('test-preview');
+        return change === 'unreadable bucket' ? { status: 1 } : success('{"name":"test-preview"}');
+      }
+      if (args[1] === 'r2') {
+        expect(args).toContain('--remote');
+        expect(args[4]).toMatch(/^test-preview\//);
+        const key = args[4].slice('test-preview/'.length);
+        if (op === 'r2 object delete') {
+          deleteCalls += 1;
+          deletes.push(key);
+          objects.delete(key);
+          return success();
+        }
+        if (op === 'r2 object get') {
+          if (change === 'unreadable' && key === 'z') return { status: 1, stderr: 'endpoint not found: 404' };
+          if (!objects.has(key)) return { status: 1, stderr: '✘ \x1b[31m[ERROR]\x1b[0m \x1b[1mThe specified key does not exist.\x1b[0m' };
+          if (change !== 'missing file' || key !== 'z') fs.writeFileSync(args[args.indexOf('--file') + 1], objects.get(key)!);
+          return success();
+        }
+      }
+      throw new Error('Unexpected command: ' + op);
+    };
+    const cleanup = () => cleanupStorePreviewRestore(plan, {
+      target: 'preview', previewR2Bucket: 'test-preview',
+      acknowledgePreviewCleanup: 'STORE_PREVIEW_RESTORE_CLEANUP', runner: run
     });
-    expect(evidence).toMatchObject({
-      ok: true,
-      productionDeletesExecuted: false,
-      kvRecordsTargeted: 1,
-      r2ObjectsTargeted: 1,
-      residualKvRecords: 0,
-      residualR2Objects: 0
-    });
-    expect(calls.some((args) => args.includes('bulk') && args.includes('delete') && args.includes('--preview'))).toBe(true);
-    expect(calls.some((args) => args.includes('r2') && args.includes('delete') && args.includes('--remote'))).toBe(true);
-    expect(() => cleanupStorePreviewRestore(plan, {
-      target: 'production',
-      acknowledgePreviewCleanup: 'STORE_PREVIEW_RESTORE_CLEANUP'
-    })).toThrow(/only.*preview/i);
-    expect(JSON.stringify(evidence)).not.toContain('store-order-test');
-    fs.rmSync(root, { recursive: true, force: true });
+    try {
+      const evidence = cleanup();
+      if (change === 'unchanged') {
+        expect(evidence).toMatchObject({ ok: true, productionDeletesExecuted: false, residualKvRecords: 0, residualR2Objects: 0 });
+        expect(deletes).toEqual([first, 'a', 'z']);
+        expect([...kv]).toEqual([['unlisted', 'keep']]);
+        expect([...objects]).toEqual([['unlisted', 'keep']]);
+        expect(deleteCalls).toBe(3);
+        deleteCalls = 0;
+        deletes.length = 0;
+        expect(cleanup().ok).toBe(true);
+      } else {
+        expect(evidence.ok).toBe(false);
+        expect([...kv]).toEqual(beforeKv);
+        expect([...objects]).toEqual(beforeObjects);
+      }
+      expect(deleteCalls).toBe(0);
+      expect(deletes).toEqual([]);
+      expect(JSON.stringify(evidence)).not.toContain(first);
+      expect(() => cleanupStorePreviewRestore(plan, { target: 'production' })).toThrow(/preview/i);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 });
