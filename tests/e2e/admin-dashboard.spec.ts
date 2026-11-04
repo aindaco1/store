@@ -2705,8 +2705,8 @@ test.describe('Admin Dashboard', () => {
     const demoRow = page.locator('#admin-store-orders-results tbody tr').filter({ hasText: DEMO_ORDER_TOKEN });
     await expect(demoRow).not.toContainText('3 item actions');
     await expect(demoRow).toContainText('Demo Digital Download');
-    await expect(demoRow.getByRole('button', { name: 'Refresh download access for Demo Digital Download' })).toBeVisible();
-    await expect(demoRow.getByRole('button', { name: 'Revoke download access for Demo Digital Download' })).toBeVisible();
+    await expect(demoRow.getByRole('button', { name: 'Refresh access: Demo Digital Download' })).toBeVisible();
+    await expect(demoRow.getByRole('button', { name: 'Revoke access: Demo Digital Download' })).toBeVisible();
     await expect(demoRow.getByRole('button', { name: /Check in/ })).toHaveCount(3);
     await expect.poll(() => demoRow.locator('.admin-store-orders__actions .btn').evaluateAll((buttons: HTMLElement[]) => {
       return buttons.every((button) => {
@@ -2740,14 +2740,14 @@ test.describe('Admin Dashboard', () => {
     await expect(digitalRow).toContainText('Active entitlement');
 	    await expect(digitalRow).toContainText('Access history (1)');
     await expect(digitalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
-    await expect(digitalRow.getByRole('button', { name: 'Refresh download access for Fronteras Download' })).toBeVisible();
-    await expect(digitalRow.getByRole('button', { name: 'Revoke download access for Fronteras Download' })).toBeVisible();
+    await expect(digitalRow.getByRole('button', { name: 'Refresh access: Fronteras Download' })).toBeVisible();
+    await expect(digitalRow.getByRole('button', { name: 'Revoke access: Fronteras Download' })).toBeVisible();
 	    await digitalRow.getByRole('button', { name: 'Abuse diagnostics' }).click();
 	    await expect.poll(() => calls.storeDownloadAbuse.length).toBe(1);
 	    expect(calls.storeDownloadAbuse[0]).toMatchObject({ orderToken: DIGITAL_ORDER_TOKEN });
 	    await expect(digitalRow).toContainText('3 failed attempts');
 	    await expect(digitalRow).toContainText('1 soft locks');
-    await digitalRow.getByRole('button', { name: 'Refresh download access for Fronteras Download' }).click();
+    await digitalRow.getByRole('button', { name: 'Refresh access: Fronteras Download' }).click();
     await expect.poll(() => calls.storeOrderDownloadAccesses.length).toBe(1);
     expect(calls.storeOrderDownloadAccesses[0]).toMatchObject({
       orderToken: DIGITAL_ORDER_TOKEN,
@@ -2756,7 +2756,7 @@ test.describe('Admin Dashboard', () => {
     });
     expect(calls.storeOrderDownloadAccesses[0]).not.toHaveProperty('expiresHours');
     await expect(page.locator('#admin-store-orders-status')).toContainText('Download access refreshed.');
-    await digitalRow.getByRole('button', { name: 'Revoke download access for Fronteras Download' }).click();
+    await digitalRow.getByRole('button', { name: 'Revoke access: Fronteras Download' }).click();
     await expect.poll(() => calls.storeOrderDownloadAccesses.length).toBe(2);
     expect(calls.storeOrderDownloadAccesses[1]).toMatchObject({
       orderToken: DIGITAL_ORDER_TOKEN,

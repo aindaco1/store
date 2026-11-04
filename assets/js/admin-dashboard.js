@@ -4189,7 +4189,7 @@
     refresh.dataset.storeOrderDownloadAction = 'reissue';
     refresh.dataset.orderToken = row.orderToken || '';
     refresh.dataset.itemId = row.itemId || '';
-    refresh.setAttribute('aria-label', (isRevoked ? 'Restore download access for ' : 'Refresh download access for ') + itemLabel);
+    refresh.setAttribute('aria-label', refresh.textContent + ': ' + itemLabel);
     control.appendChild(refresh);
     if (!isRevoked) {
       var revoke = createElement('button', 'btn btn--secondary', 'Revoke access');
@@ -4198,7 +4198,7 @@
       revoke.dataset.storeOrderDownloadAction = 'revoke';
       revoke.dataset.orderToken = row.orderToken || '';
       revoke.dataset.itemId = row.itemId || '';
-      revoke.setAttribute('aria-label', 'Revoke download access for ' + itemLabel);
+      revoke.setAttribute('aria-label', revoke.textContent + ': ' + itemLabel);
       control.appendChild(revoke);
     }
     var diagnostics = createElement('button', 'btn btn--secondary', 'Abuse diagnostics');
