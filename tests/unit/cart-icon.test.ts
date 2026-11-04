@@ -23,6 +23,20 @@ describe('cart icon provider integration', () => {
     document.body.innerHTML = '';
   });
 
+  it('includes the visible empty-cart total in its accessible name', async () => {
+    document.body.innerHTML = `
+      <button id="header-cart-btn" data-cart-label-empty="Abrir carrito. El carrito está vacío.">
+        <span class="site-header__cart-count" aria-hidden="true"></span>
+        <span class="site-header__cart-price" aria-hidden="true">$0</span>
+      </button>`;
+    await import('../../shared/dust-wave-platform/packages/site-shell/src/cart-icon-browser.js');
+    const button = document.getElementById('header-cart-btn')!;
+    const visibleTotal = button.querySelector('.site-header__cart-price')!.textContent!;
+    expect(visibleTotal).toBe('$0.00');
+    expect(button.getAttribute('aria-label')).toContain(visibleTotal);
+    expect(button.getAttribute('aria-label')).toContain('Abrir carrito. El carrito está vacío.');
+  });
+
   it('renders from first-party cart state and opens the provider cart on click', async () => {
     const addEventListenerSpy = vi.spyOn(document, 'addEventListener');
     document.body.innerHTML = `

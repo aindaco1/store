@@ -247,8 +247,8 @@ admin:
   rsvp_move_down: Move down
   rsvp_remove_question: Remove
   rsvp_remove_choice: Remove
-  rsvp_move_question_up: "Move question %{number} up"
-  rsvp_move_question_down: "Move question %{number} down"
+  rsvp_move_question_up: "Move up: question %{number}"
+  rsvp_move_question_down: "Move down: question %{number}"
   rsvp_remove_question_number: "Remove question %{number}"
   rsvp_remove_choice_number: "Remove choice %{number}"
   load_more: Load more
