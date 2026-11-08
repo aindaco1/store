@@ -82,7 +82,8 @@
     "media:optimize:check": "node ./scripts/optimize-media.mjs --check",
     "media:manifest": "node ./scripts/optimize-media.mjs --write --manifest-only",
     "media:optimize:podman": "./scripts/podman-media-optimize.sh --write",
-    "media:optimize:check:podman": "./scripts/podman-media-optimize.sh --check"
+    "media:optimize:check:podman": "./scripts/podman-media-optimize.sh --check",
+    "test:licensing:acceptance": "node experiments/software-licensing/provider-acceptance.mjs --test-mode"
   },
   "keywords": [],
   "author": "",

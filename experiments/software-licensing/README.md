@@ -1,5 +1,9 @@
 # Combined checkout feasibility
 
+Current provider/browser/Resend procedure: [ACCEPTANCE.md](ACCEPTANCE.md).
+The November 4 findings below are a historical feasibility checkpoint; current
+implementation and remaining gates live in [Software licensing](../../docs/SOFTWARE_LICENSING.md).
+
 Isolated payment experiment; the public checkout does not select it. The existing
 inventory coordinator accepts an injected provider for characterization, while
 its normal PaymentIntent path is preserved. A separate test-only complimentary
@@ -63,7 +67,7 @@ provider IDs and cleanup results. All final probes cleaned up without errors.
 Fixture discounts/tax/shipping demonstrate integer-cent invoice compatibility;
 they do **not** establish a production coupon recurrence or tax policy.
 
-Still open before combined checkout may ship: actual Elements challenge
+At the November 4 feasibility checkpoint, these were still open: actual Elements challenge
 completion in the Store UI; catalog-to-snapshot recurring prices and full
 canonical tax/coupon/shipping integration; production durable invoice intent
 storage/dispatch and signed webhook routing; refund/dispute reconciliation and

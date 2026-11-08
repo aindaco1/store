@@ -181,7 +181,7 @@ Tax failure leaves the invoice in draft. A paid renewal without a verified
 snapshot requires review. Address/price changes remain operator-assisted. The private order page supports
 payment-method and existing-invoice recovery. Failed payment does not extend or
 remove coverage; monitor draft invoices and failed attempts. An approved dunning
-schedule and hosted-browser SCA acceptance remain launch gates.
+schedule remains a launch gate. Hosted-browser sandbox acceptance is recorded below.
 
 ### Durable fulfillment and money records
 
@@ -274,10 +274,11 @@ decline/SCA-required cancellation, and provider cleanup. It does not prove an
 actual browser SCA challenge or public webhook delivery. The report is
 `experiments/software-licensing/paid-runtime-result.json`.
 
-Live prices/seat/support policy, real-recipient mail acceptance, browser SCA
-completion, hosted card-setup recipient acceptance, pagination/retention for long-lived operator
-history, key replacement/device administration/release withdrawal, dispute policy, distributed backup/restore and app distribution gates
-remain required before launch. No public price, provider webhook configuration,
+Live prices/seat/support policy, pagination/retention for long-lived operator
+history, key replacement/device administration/release withdrawal, dispute policy,
+production backup/restore acceptance and app distribution gates remain required
+before launch. Sandbox browser/webhook and approved-recipient Resend evidence is
+recorded in the acceptance section below. No public price, production webhook configuration,
 production deployment or app release is performed by these changes.
 
 ## Customer and operator management UI
@@ -335,11 +336,26 @@ existing role/scope/session/CSRF/rate checks and redacted audits. Keys are absen
 from lists and browser storage. No card numbers enter Store.
 
 Validation: `tests/unit/software-management.test.ts`, complimentary and paid
-billing tests, `tests/e2e/software-management.spec.ts`, the extended actual-Worker
-provider probe, and the complete pre-merge gate. Browser provider redirects use
-fixtures; the provider probe creates/retrieves/expires a real test-mode setup
-session. Neither proves a completed human hosted card form or bank SCA challenge.
-Those remain acceptance tasks before enabling paid sales.
+billing tests, `tests/e2e/software-management.spec.ts`, the actual-Worker provider
+probe and complete pre-merge gate remain the deterministic regression checks.
+The E2E redirect fixtures do not substitute for provider acceptance.
+
+### Provider acceptance without a paid launch
+
+`npm run test:licensing:acceptance` runs a manual private Cloudflare fixture using
+the actual Store owners and customer-management renderer. It requires an approved
+inbox, checks test credentials/account, accepts only one synthetic order, and uses
+Store's Resend plan/templates/outbox. Read the [operator procedure](../experiments/software-licensing/ACCEPTANCE.md)
+before running; it sends real test emails and cleans up its temporary resources.
+There is no new workflow or scheduler.
+
+The [November 7 evidence](release-evidence/2026-11-07-licensing-provider-acceptance.md)
+records browser decline and authenticated 3DS, a $60 mixed settlement through a
+public signed webhook, hosted card replacement, a failed $11 tax-verified renewal,
+payment of the original invoice, coverage extension and three delivered Resend
+messages to the approved inbox only. It distinguishes provider delivery from
+inbox rendering and records the replay/receipt limitations. Production sales,
+licensing and scheduled licensing capture remain disabled.
 
 The pre-launch backup integration now uses the existing encrypted Store pipeline.
 See [BACKUP_RESTORE.md](BACKUP_RESTORE.md#software-licensing-checkpoint-integration-pre-launch)
