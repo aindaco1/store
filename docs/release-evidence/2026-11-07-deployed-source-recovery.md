@@ -26,7 +26,7 @@ No new scheduler, backup destination, encryption implementation or shared Platfo
 package is introduced. Source admission state remains local to each source;
 restored targets still omit alarms, transient sessions and pending mail payloads.
 
-## Observed validation
+## Pre-merge preview acceptance
 
 The Cloudflare preview-only candidate passed with both source and destination
 cleanup, independently confirmed by provider reads. It restored two owners,
@@ -42,12 +42,15 @@ seat/coverage/refund/revocation, signature and lost-upload-reply checks.
 Measured source drain was 3.1 seconds, target restore/readback 39.9 seconds, and
 the full synthetic exercise 287.6 seconds. These are fixture measurements, not
 production RPO/RTO. This local-run receipt has `remoteArchive:false`; the existing
-protected archive leg was not re-exercised by that command. Protected acceptance
-of the final published sources remains the next check through the existing manual
-main-only workflow. Its outcome will also be retained on the reviewed PR.
+protected archive leg was not re-exercised by that command. At this pre-merge checkpoint, protected acceptance of the final published sources
+was pending. The latest protected result and exact source revisions are retained
+on [Store PR #125](https://github.com/aindaco1/store/pull/125); the workflow keeps
+its existing manual, main-only approval boundary.
 
 Licensing's 11 tests and dry-run build passed; focused Store source/recovery tests
-and the local encrypted rehearsal passed. The full Store gate is running.
+and the local encrypted rehearsal passed. The complete local Store gate passed:
+855 unit tests, seven payment contracts, 22 security tests, 109 browser tests,
+audits/build/resource checks and Worker smoke.
 Platform changes are execution documentation only; its test/recipe gate passed.
 
 ## Limits and rollback
