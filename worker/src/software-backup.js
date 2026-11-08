@@ -1,4 +1,13 @@
 // Consumer-owned logical recovery. No inventory holds, alarms or sessions are imported.
+import { timingSafeEqual } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
+
+export function softwareCaptureCredential(env,credential,now=Date.now()) {
+  const current=env.SOFTWARE_BACKUP_READ_SECRET;
+  if(!current) return false;
+  const previous=env.SOFTWARE_BACKUP_READ_SECRET_PREVIOUS,until=env.SOFTWARE_BACKUP_READ_SECRET_PREVIOUS_UNTIL;
+  if(!!previous!==!!until || previous && (!/^\d{1,12}$/.test(String(until)) || Number(until)<=0)) throw new Error('Invalid capture credential rotation');
+  return timingSafeEqual(credential,current) || !!previous && now<Number(until)*1000 && timingSafeEqual(credential,previous);
+}
 export const OWNER_PREFIX = 'billing-owner:v1:';
 export const RECOVERY_KEY = 'software-recovery:v1';
 export const JOURNAL_PREFIXES = ['billing-order', 'billing-payment:', 'billing-ledger:', 'billing-tax:',

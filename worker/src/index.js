@@ -1,5 +1,5 @@
 import { sourceCommand, sourceCheckpointEnv, withStoreSource } from './software-source.js';
-import { recoveryMode } from './software-backup.js';
+import { recoveryMode, softwareCaptureCredential } from './software-backup.js';
 import { callSoftwareBilling, softwareBillingWatchdog } from './software-billing.js';
 import { authorityAdministration } from './software-administration.js';
 import { licensingRequest } from './software-service.js';
@@ -3008,7 +3008,7 @@ export const storeWorker = {
         catch { return privateJsonResponse({error:'Source checkpoint is not drained'},503,env); }
         const reply = (data,status) => privateJsonResponse(data,status,env,{'X-Robots-Tag':'noindex, nofollow, noarchive'});
         if (!recoveryMode(env)) return reply({ error: 'Recovery unavailable' }, 503);
-        const readOnly = !!env.SOFTWARE_BACKUP_READ_SECRET && timingSafeEqual(bearerTokenFromRequest(request),env.SOFTWARE_BACKUP_READ_SECRET);
+        const readOnly = softwareCaptureCredential(env,bearerTokenFromRequest(request));
         if (!readOnly && !requireAdmin(request, env, 'maintenance').ok) return reply({ error: 'Unauthorized' }, 401);
         const parsed = await parseJsonRequestBody(request, env, { maxBytes: 2 * 1024 * 1024, privateResponse: true });
         if (!parsed.ok) return parsed.response;

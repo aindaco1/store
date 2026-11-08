@@ -426,3 +426,10 @@ rollback. After any replacement, Store must also retain the current-key recovery
 reader; the old Store recovery implementation would reveal the obsolete key. Do not point old code at a migrated database or reopen an old snapshot
 without reconciling later replacement, deactivation, reset, withdrawal and refunds.
 No public offer, paid-sales flag or scheduled licensing capture is enabled here.
+
+## Server-secret operations
+
+See [server-secret recovery and rotation](SOFTWARE_SERVER_SECRETS.md) for the stable
+derivation root, bounded signing/service/capture rotation, checkpoint key proofs
+and the authenticated local admin preview. These are test-only capabilities;
+production paid sales and scheduled licensing capture remain disabled.

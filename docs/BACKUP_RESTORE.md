@@ -724,3 +724,11 @@ replacement, individual deactivation, reset and withdrawal. After restart it
 checks current-key recovery, old-key/token denial, retained withdrawal/history,
 coverage/refund denial, unchanged seat limits and no replayed email/payment.
 The rehearsal does not enable production recovery or a capture schedule.
+
+### Licensing key recovery and rotation
+
+Follow [the licensing server-secret procedure](SOFTWARE_SERVER_SECRETS.md).
+Checkpoints now include non-secret HMAC proofs for the complete bounded token
+verification set and its original retirement policy. Restore checks them, the
+stable Store derivation root and updater public key before importing data.
+Normal captures continue to exclude raw secrets. No licensing schedule is enabled.

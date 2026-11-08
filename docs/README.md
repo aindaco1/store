@@ -68,5 +68,7 @@ When moving a guide, update incoming links and check relative paths and section 
 
 - [Software licensing](SOFTWARE_LICENSING.md): test-only complimentary and paid
   licenses, combined checkout, renewal tax, refunds, Resend handoff and recovery.
+- [Licensing server secrets](SOFTWARE_SERVER_SECRETS.md): stable-root recovery,
+  bounded credential/signing-key rotation and the local authenticated admin preview.
 
 - [License management and gate evidence](release-evidence/2026-11-04-license-management.md): test-only customer/admin controls, payment recovery and verification boundaries.

@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 
 // One resource lifecycle for both the guarded source and empty restore target.
 export async function withSoftwarePreview(context, {root,licensing,cli,report,emit,evidenceFile,source=false,includeObjects=true,configure}, use) {
-  const {snapshot,secret,readSecret,checkpoint,publicKey,temp}=context;
+  const {snapshot,secret,readSecret,keySecret,tokenSecrets,checkpoint,publicKey,temp}=context;
   const previewId = randomBytes(8).toString('hex'), prefix = `dw-recovery-${previewId}`;
   const directory = path.join(temp, source ? 'source-preview' : 'preview'); fs.mkdirSync(directory, { mode: 0o700 });
   const configPaths = Object.fromEntries(['store', 'licensing'].map(role => [role, path.join(directory, `${role}.json`)]));
@@ -68,17 +68,23 @@ export async function withSoftwarePreview(context, {root,licensing,cli,report,em
     // Wrangler keeps bulk secrets in its encrypted provider store. Files are
     // private/temporary and never enter an archive, receipt or repository.
     const secrets = {
-      licensing: { ADMIN_SECRET: secret, TOKEN_SECRET: secret, SOFTWARE_BACKUP_READ_SECRET: readSecret, UPDATER_PUBLIC_KEY: publicKey },
-      store: { ADMIN_SECRET: secret, SOFTWARE_BACKUP_READ_SECRET: readSecret, LICENSING_ADMIN_SECRET: secret, LICENSING_KEY_SECRET: secret, RESEND_API_KEY: 'dry-run' }
+      licensing: { ADMIN_SECRET: secret, ...tokenSecrets, SOFTWARE_BACKUP_READ_SECRET: readSecret, UPDATER_PUBLIC_KEY: publicKey },
+      store: { ADMIN_SECRET: secret, SOFTWARE_BACKUP_READ_SECRET: readSecret, LICENSING_ADMIN_SECRET: secret, LICENSING_KEY_SECRET: keySecret, RESEND_API_KEY: 'dry-run' }
     };
     await configure?.({configs,secrets,directory,previewId,prefix});
+    const installSecrets = role => {
+      const file=path.join(directory,`${role}-secrets.json`);
+      try {
+        fs.writeFileSync(file,JSON.stringify(secrets[role]),{mode:0o600});
+        run(['secret','bulk',file,'--config',configPaths[role]]);
+      } finally {fs.rmSync(file,{force:true});}
+    };
     for (const role of ['licensing', 'store']) {
       write(role, configs[role]); deploy(role);
-      const file = path.join(directory, `${role}-secrets.json`); fs.writeFileSync(file, JSON.stringify(secrets[role]), { mode: 0o600 });
-      run(['secret', 'bulk', file, '--config', configPaths[role]]); fs.rmSync(file);
+      installSecrets(role);
     }
     const bases = { storeBase: deploy('store'), licensingBase: deploy('licensing') };
-    return await use({previewId,prefix,resources,configs,configPaths,bases,run,write,deploy,directory});
+    return await use({previewId,prefix,resources,configs,configPaths,bases,run,write,deploy,directory,secrets,installSecrets});
   } finally {
     const failures = [];
     for (const name of resources.workers) { try { run(['delete', '--name', name, '--force'], {absentOK:true});
