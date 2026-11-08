@@ -178,6 +178,7 @@ async function routeAdminWorker(page: any, options: { role?: AdminRole; productS
       body: JSON.stringify(payload)
     });
 
+    if (url.pathname === '/admin/store/licenses/config') return fulfillJson({ enabled: false, paidActions: role === 'super_admin' });
     if (url.pathname === '/admin/session') {
       return fulfillJson({ error: 'Unauthorized' }, 401);
     }

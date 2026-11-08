@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -59,10 +59,32 @@ describe('Playwright test server config', () => {
   it('keeps Podman site builds local when _config.local.yml is absent', () => {
     const podmanSiteEntrypoint = readFileSync(join(repoRoot, 'scripts/podman-site-entrypoint.sh'), 'utf8');
 
-    expect(podmanSiteEntrypoint).toContain('if [[ -f /workspace/_config.local.yml ]]; then');
+    expect(podmanSiteEntrypoint).toContain('if [[ -f /workspace/_config.local.yml && "${STORE_ISOLATED_TEST_CONFIG:-false}" != "true" ]]; then');
     expect(podmanSiteEntrypoint).toContain('/workspace/scripts/jekyll-config-files.sh /workspace');
     expect(podmanSiteEntrypoint).toContain('/workspace/scripts/jekyll-test-config-files.sh "${TEMP_JEKYLL_CONFIG}"');
     expect(podmanSiteEntrypoint).toContain('SITE_BASE="${SITE_BASE:-http://127.0.0.1:4002}"');
     expect(podmanSiteEntrypoint).toContain('WORKER_BASE="${WORKER_BASE:-http://127.0.0.1:8989}"');
+  });
+});
+
+
+describe('Jekyll local override precedence', () => {
+  it.each([false,true])('preserves explicit overlays while retaining default local development (explicit=%s)', explicit => {
+    const root = mkdtempSync(join(tmpdir(),'store-local-precedence-'));
+    try {
+      writeFileSync(join(root,'_config.yml'),'platform:\n  worker_url: https://canonical.example.test\n  name: Store\n');
+      writeFileSync(join(root,'_config.local.yml'),'platform:\n  worker_url: https://private-local.example.test\n');
+      const script = `require 'yaml'; require 'json'; require 'date'; require 'ostruct'
+        module Jekyll; module Hooks
+          def self.register(*args, &block); @hook=block; end
+          def self.run(site); @hook.call(site); end
+        end; end
+        load ARGV[0]
+        site=OpenStruct.new(source: ARGV[1],config: JSON.parse(ARGV[2]))
+        Jekyll::Hooks.run(site)
+        puts JSON.generate(site.config)`;
+      const output=execFileSync('ruby',['-e',script,join(repoRoot,'_plugins/local_config.rb'),root,JSON.stringify({config:explicit ? ['_config.yml','/tmp/test-config.yml'] : ['_config.yml'],platform:{worker_url:'http://isolated.test',name:'Store'}})],{encoding:'utf8',env:{...process.env,JEKYLL_ENV:'development'}});
+      expect(JSON.parse(output.trim().split('\n').at(-1)!).platform).toEqual({worker_url:explicit ? 'http://isolated.test' : 'https://private-local.example.test',name:'Store'});
+    } finally { rmSync(root,{recursive:true,force:true}); }
   });
 });

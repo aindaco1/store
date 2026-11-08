@@ -215,6 +215,7 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
       'price' => variant_price,
       'price_cents' => cents(variant_price),
       'price_override' => variant_price_override,
+      'software_license' => variant['software_license'].is_a?(Hash) ? variant['software_license'] : nil,
       'inventory' => integer(variant.fetch('inventory', product['inventory']), 0),
       'status' => present_string(variant['status']) || status
     )
@@ -254,6 +255,7 @@ products = Dir.glob(File.join(PRODUCTS_DIR, '*.md')).sort.filter_map do |path|
     'daily_report_emails' => product['daily_report_emails'].is_a?(Array) ? product['daily_report_emails'] : [],
     'event_details' => product['event_details'].is_a?(Hash) ? product['event_details'] : nil,
     'download' => product['download'].is_a?(Hash) ? product['download'] : nil,
+    'software_license' => product['software_license'].is_a?(Hash) ? product['software_license'] : nil,
     'turnstile_required' => product.fetch('turnstile_required', false) == true
   )
 end.sort_by do |product|

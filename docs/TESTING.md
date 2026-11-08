@@ -514,3 +514,28 @@ Create and Edit at 320, 390, and 1280 pixel widths, including long addresses,
 keyboard entry and accessibility.
 All fixtures are synthetic and rendering uses capture/dry-run mode; these tests
 send no real email. Run `npm run test:premerge` before release.
+
+
+Software management adds localized private-order/admin browser contracts in
+`software-management.spec.ts` and route/provider recovery contracts in
+`software-management.test.ts`. Refund retry tests preserve the request ID after
+an interrupted response; setup tests cover ownership, serialized duplicate
+completion, superseded sessions, partial provider failures and safe redirect
+origins. The provider probe uses only test-mode objects and dry-run email.
+
+Isolated Podman test state now also requires an isolated site configuration.
+The test stack sets `STORE_ISOLATED_TEST_CONFIG=true` and uses internal pod URLs
+(4000/8787), ignoring the machine-local Jekyll override. Default manual development
+retains `_config.local.yml`. The local-config hook respects explicitly supplied
+config overlays. Never edit local preview URLs merely to make the gate pass;
+`playwright-test-config.test.ts` exercises both precedence paths and the stack
+readiness tests reject a test Worker paired with a non-isolated site.
+
+For the pre-launch software recovery slice, run
+`npm run restore:rehearse:software -- --evidence=/private/tmp/software-restore.json`.
+It uses actual isolated Store/licensing Workers and synthetic provider records,
+then the existing age archive and verification tools. It requires the sibling
+licensing checkout/dependencies (or `LICENSING_REPO`) and `age`/`age-keygen`, uses
+no production credentials, and keeps paid checkout disabled. See
+`docs/BACKUP_RESTORE.md` for the distinction between this local proof and live
+quiescence, archive-copy and recovery acceptance.

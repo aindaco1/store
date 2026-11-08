@@ -51,6 +51,17 @@ function fixtureSnapshot() {
 }
 
 describe('Store restore automation', () => {
+  it('refuses to omit logical software recovery from execution, verification or cleanup', () => {
+    const root = fixtureSnapshot();
+    const plan = buildStoreRestorePlan(readAndVerifySnapshot(root));
+    plan.actions.push({ type: 'software-restore', owners: 1, artifacts: 0 });
+    expect(() => executeStoreRestorePlan(plan, { target: 'local', conflict: 'overwrite' })).toThrow(/logical adapter/);
+    expect(() => executeStoreRestorePlan(plan, { target: 'production', conflict: 'overwrite', softwareAdapterReady: true })).toThrow(/logical adapter/);
+    expect(() => verifyStoreRestorePlan(plan, { target: 'local' })).toThrow(/logical restore readback/);
+    expect(() => cleanupStorePreviewRestore(plan, { target: 'preview' })).toThrow(/isolated recovery target/);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
   it('verifies checksums and plans authoritative restore plus derived rebuilds', () => {
     const root = fixtureSnapshot();
     const snapshot = readAndVerifySnapshot(root);

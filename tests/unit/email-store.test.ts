@@ -8,7 +8,8 @@ import {
   sendStoreEventReminderEmail,
   sendStoreOrderAdminNotificationEmail,
   sendStoreOrderEmail,
-  sendStoreOrderLookupEmail
+  sendStoreOrderLookupEmail,
+  sendSoftwareBillingEmail
 } from '../../worker/src/email.js';
 
 const env = {
@@ -43,6 +44,16 @@ describe('Store email integration', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  it('links software recovery to the localized private order without provider capabilities', async () => {
+    const fetchMock = mockResend();
+    await sendSoftwareBillingEmail(env, {email:'customer@example.test',orderToken:'store-order-fixture',event:'payment_failed',preferredLang:'es'});
+    const payload = getEmailPayload(fetchMock);
+    expect(payload.html).toContain('https://shop.test/es/order-success/?orderToken=store-order-fixture');
+    expect(payload.text).toContain('/es/order-success/?orderToken=store-order-fixture');
+    expect(payload.html).not.toContain('checkout.stripe.com');
+    expect(payload.reply_to).toBe('orders@shop.test');
   });
 
   it('sends escaped Store order confirmations with themed payload metadata', async () => {

@@ -422,3 +422,12 @@ Run a local build after dashboard markup or style changes:
 ```bash
 bundle exec jekyll build --config _config.yml,_config.local.yml
 ```
+
+### Software licensing pilot
+
+The Orders tab exposes a test-only **Software licenses** disclosure when the
+licensing service is configured. It reuses fulfillment permissions for
+complimentary issuance/list/recovery; paid-order reconciliation, refunds and
+renewal cancellation require super-admin access. No published paid offer or
+production enablement is implied. See [the operator guide](SOFTWARE_LICENSING.md#customer-and-operator-management-ui)
+for confirmations, refund retry identity and remaining launch acceptance.

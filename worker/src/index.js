@@ -1,3 +1,9 @@
+import { recoveryMode } from './software-backup.js';
+import { callSoftwareBilling, softwareBillingWatchdog } from './software-billing.js';
+import { licensingRequest } from './software-service.js';
+import { hasSoftware, softwareOrderSnapshot } from './software-offers.js';
+import { softwareStripe, objectId as softwareStripeId } from './software-stripe.js';
+import { callComplimentaryLicenses, softwareLicensingEnabled } from './software-licenses.js';
 import { normalizeProductReportEmails, productReportRecipients, processProductReports } from './product-reports.js';
 import { PAY_WHAT_YOU_WANT, normalizeProductPricing } from './product-pricing.js';
 /**
@@ -2986,6 +2992,37 @@ export default {
     }
 
     try {
+      if (path === '/admin/store/recovery/software' && method === 'POST') {
+        const reply = (data,status) => privateJsonResponse(data,status,env,{'X-Robots-Tag':'noindex, nofollow, noarchive'});
+        if (!recoveryMode(env)) return reply({ error: 'Recovery unavailable' }, 503);
+        const readOnly = !!env.SOFTWARE_BACKUP_READ_SECRET && timingSafeEqual(bearerTokenFromRequest(request),env.SOFTWARE_BACKUP_READ_SECRET);
+        if (!readOnly && !requireAdmin(request, env, 'maintenance').ok) return reply({ error: 'Unauthorized' }, 401);
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: 2 * 1024 * 1024, privateResponse: true });
+        if (!parsed.ok) return parsed.response;
+        const p = parsed.body;
+        if (readOnly && !['info','orders','export'].includes(p.action)) return reply({error:'Read-only backup credential'},403);
+        if (p.checkpoint !== env.SOFTWARE_RECOVERY_CHECKPOINT) return reply({error:'Checkpoint mismatch'},409);
+        if (p.action === 'info') {
+          const { complimentaryKey } = await import('./software-licenses.js');
+          const proof = await complimentaryKey(env,p.checkpoint,'recovery');
+          return reply({version:1,checkpoint:p.checkpoint,keyProof:proof,previewId:env.SOFTWARE_RECOVERY_PREVIEW_ID || null,target:env.SOFTWARE_RECOVERY_TARGET || null,paidCheckoutEnabled:env.SOFTWARE_CHECKOUT_ENABLED==='true'},200);
+        }
+        if (p.action === 'orders') {
+          const page = await env.STORE_STATE.list({prefix:'orders:',limit:25,...(p.cursor ? {cursor:p.cursor} : {})});
+          const records = [];
+          for (const {name} of page.keys) {
+            const order = await env.STORE_STATE.get(name,{type:'json'});
+            if (order?.payment?.billing?.snapshot) records.push([name,order]);
+          }
+          return reply({version:1,checkpoint:p.checkpoint,records,cursor:page.list_complete ? null : page.cursor},200);
+        }
+        if (p.owner !== 'software-licenses' && !/^software-billing:store-order-[a-f0-9]{64}$/.test(p.owner || '')) return reply({ error: 'Invalid owner' }, 400);
+        const ns = env.STORE_INVENTORY_COORDINATOR;
+        const response = await ns.get(ns.idFromName(p.owner)).fetch(new Request('https://inventory/software-recovery', { method: 'POST', body: JSON.stringify(p) }));
+        return reply(await response.json(),response.status);
+      }
+      if (recoveryMode(env)) return privateJsonResponse({ error: 'Recovery maintenance' }, 503, env);
+
       // SEC-003: Block test endpoints in production mode (unless admin-authenticated)
       if (path.startsWith('/test/') && getAppMode(env) !== 'test') {
         const auth = requireAdmin(request, env);
@@ -3051,6 +3088,60 @@ export default {
 
       if (path === '/admin/audit' && method === 'GET') {
         return handleAdminAudit(request, env);
+      }
+
+      if (['/admin/store/licenses/complimentary', '/admin/store/licenses/recover'].includes(path) && method === 'POST') {
+        const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE, requireCsrf: true });
+        if (!auth.ok) return auth.response;
+        if (!softwareLicensingEnabled(env)) return privateJsonResponse({ error: 'Licensing is not configured' }, 503, env);
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: 16384, privateResponse: true, emptyValue: {} });
+        if (!parsed.ok) return parsed.response;
+        const rl = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rl.allowed) return rl.response;
+        const result = await callComplimentaryLicenses(env, path.endsWith('/recover') ? 'recover' : 'issue', parsed.body);
+        if (!result.error) await recordAdminAuditEvent(env, {
+          action: path.endsWith('/recover') ? 'software_license:recover' : 'software_license:issue',
+          adminEmail: auth.user.email, adminRole: auth.user.role,
+          grantId: result.id, state: result.state, replayed: !!result.replayed
+        });
+        return privateJsonResponse(result, result.status || (path.endsWith('/recover') || result.replayed ? 200 : 202), env);
+      }
+
+      if (path === '/admin/store/licenses/config' && method === 'GET') {
+        const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
+        if (!auth.ok) return auth.response;
+        return privateJsonResponse({ enabled: softwareLicensingEnabled(env), paidActions: auth.user.role === 'super_admin' }, 200, env);
+      }
+      if (path === '/admin/store/licenses/list' && method === 'POST') {
+        const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE, requireCsrf: true });
+        if (!auth.ok) return auth.response;
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: 2048, privateResponse: true });
+        if (!parsed.ok) return parsed.response;
+        const rate = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rate.allowed) return rate.response;
+        const result = await callComplimentaryLicenses(env, 'list', parsed.body);
+        return privateJsonResponse(result, result.status || 200, env);
+      }
+
+      if (['/admin/store/licenses/billing', '/admin/store/licenses/refunds', '/admin/store/licenses/cancel-renewals', '/admin/store/licenses/paid-recover', '/admin/store/licenses/reconcile'].includes(path) && method === 'POST') {
+        const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE, requireCsrf: true });
+        if (!auth.ok) return auth.response;
+        if (auth.user.role !== 'super_admin') return privateJsonResponse({ error: 'Super-admin access required' }, 403, env);
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: 16384, privateResponse: true, emptyValue: {} });
+        if (!parsed.ok) return parsed.response;
+        const rate = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rate.allowed) return rate.response;
+        const action = { billing: 'status', refunds: 'refund', 'cancel-renewals': 'cancel', 'paid-recover': 'recover', reconcile: 'reconcile' }[path.split('/').at(-1)];
+        try {
+          const result = await callSoftwareBilling(env, parsed.body.orderToken, action, { ...parsed.body, actor: auth.user.email, settleInitial: action === 'reconcile' });
+          if (result.paymentIntent) {
+            const settled = await confirmStorePaymentIntentOrder(result.paymentIntent, env, ctx);
+            if (!settled.ok) return privateJsonResponse({ error: settled.error }, settled.status || 503, env);
+            delete result.paymentIntent;
+          }
+          await recordAdminAuditEvent(env, { action: `software_billing:${action}`, adminEmail: auth.user.email, adminRole: auth.user.role, orderToken: parsed.body.orderToken, requestId: parsed.body.id });
+          return privateJsonResponse(result, action === 'refund' ? 202 : 200, env);
+        } catch (error) { return privateJsonResponse({ error: error.message }, error.status || 503, env); }
       }
 
       if (path === '/admin/store/health' && method === 'GET') {
@@ -3488,6 +3579,11 @@ export default {
         return withObservedOperation(env, ctx, 'store_order_lookup_consume', () => handleStoreOrderLookupConsume(request, env));
       }
 
+      const softwareRoute = path.match(/^\/api\/orders\/(store-order-[a-f0-9]{64})\/software\/(status|recover|cancel|card-setup|card-complete|invoice-page|download)$/);
+      if (softwareRoute && ((softwareRoute[2] === 'download' && method === 'GET') || (softwareRoute[2] !== 'download' && method === 'POST'))) {
+        return handleStoreSoftwareManagement(request, env, softwareRoute[1], softwareRoute[2]);
+      }
+
       const storeOrderRoute = matchStoreOrderRoute(path);
       if (storeOrderRoute && method === 'GET') {
         const rl = await checkRateLimit(request, env, {
@@ -3579,7 +3675,18 @@ export default {
   // Cron trigger:
   // - `* * * * *`: Store background maintenance.
   async scheduled(event, env) {
+    if (recoveryMode(env)) return;
     configureWorkerLogging(env);
+    // The scheduled watchdog recovers grant handoffs after alarm retries exhaust.
+    if (softwareLicensingEnabled(env)) {
+      try { await callComplimentaryLicenses(env, 'drain'); }
+      catch { console.error('Software license handoff requires retry'); }
+      try { await softwareBillingWatchdog(env, async intent => {
+        const result = await confirmStorePaymentIntentOrder(intent, env, ctx);
+        if (!result.ok) throw new Error('Software order settlement pending');
+      }); }
+      catch { console.error('Software billing watchdog requires retry'); }
+    }
     const now = new Date();
     const cronExpression = String(event?.cron || '');
     console.log('Scheduled Store task triggered:', now.toISOString());
@@ -6685,7 +6792,7 @@ async function buildStoreSummaryItem(request, env, storedOrder, item = {}, index
 
   if (!fulfillmentReady) return summary;
 
-  if (isStoreDownloadItem(item)) {
+  if (isStoreDownloadItem(item) && !item.softwareLicense) {
     const access = getStoreDownloadAccessState(storedOrder, itemId, item);
     const fileReady = hasStoreDownloadHandler(env, item);
     if (!access.available || !fileReady) {
@@ -6819,6 +6926,10 @@ async function buildStoreOrderSummary(request, env, storedOrder = {}) {
       : { required: false }
   };
 
+  if (softwareLicensingEnabled(env) && hasSoftware(orderDraft) && fulfillmentReady) {
+    summary.software = { token: await signStoreFulfillmentToken(env, { orderToken: summary.orderToken, itemId: 'software', action: 'manage' }, 900) };
+  }
+
   if (storeEmailDryRunEnabled(env)) {
     summary.emailDelivery = {
       customer: {
@@ -6842,6 +6953,51 @@ async function buildStoreOrderSummary(request, env, storedOrder = {}) {
   }
 
   return summary;
+}
+
+async function handleStoreSoftwareManagement(request, env, orderToken, action) {
+  if (!softwareLicensingEnabled(env)) return privateJsonResponse({ error: 'Licensing unavailable' }, 404, env);
+  const origin = requireTrustedSiteOrigin(request, env);
+  if (!origin.ok) return origin.response;
+  const rate = await checkRateLimit(request, env, { ...RATE_LIMITS.orderRead, privateResponse: true });
+  if (!rate.allowed) return rate.response;
+  let payload;
+  if (action === 'download') payload = Object.fromEntries(new URL(request.url).searchParams);
+  else {
+    const parsed = await parseJsonRequestBody(request, env, { maxBytes: 4096, privateResponse: true });
+    if (!parsed.ok) return parsed.response;
+    payload = parsed.body || {};
+  }
+  const expected = { orderToken, itemId: action === 'download' ? `${payload.lineId}:${payload.releaseId}` : 'software', action: action === 'download' ? 'software-download' : 'manage' };
+  const verified = await verifyStoreFulfillmentToken(env, payload.token, expected);
+  if (!verified.ok) return privateJsonResponse({ error: verified.error }, verified.status, env);
+  const loaded = await loadStoreOrderForRead(env, orderToken);
+  if (!loaded.ok) return privateJsonResponse({ error: loaded.error }, loaded.status, env);
+  if (!isStoreOrderFulfillmentReady(loaded.storedOrder) || !hasSoftware(loaded.storedOrder.orderDraft)) return privateJsonResponse({ error: 'Software order unavailable' }, 409, env);
+  try {
+    if (action === 'download') {
+      const grant = await callSoftwareBilling(env, orderToken, 'recover', { lineId: payload.lineId });
+      const response = await licensingRequest(env, 'customer-download', { id: grant.id, product: grant.product, release: payload.releaseId }, request.headers.has('Range') ? { Range: request.headers.get('Range') } : {});
+      const headers = new Headers(response.headers);
+      headers.set('Cache-Control', 'private, no-store'); headers.set('X-Robots-Tag', 'noindex, nofollow'); headers.set('Referrer-Policy', 'no-referrer');
+      return new Response(response.body, { status: response.status, headers });
+    }
+    const returnUrl = new URL(getLocalizedPath('/order-success/', loaded.storedOrder.orderDraft.preferredLang), getSiteBase(env));
+    returnUrl.searchParams.set('orderToken', orderToken);
+    const result = await callSoftwareBilling(env, orderToken, action === 'status' ? 'customer' : action, {
+      lineId: payload.lineId, invoiceId: payload.invoiceId, id: payload.id, sessionId: payload.sessionId, returnUrl: returnUrl.href
+    });
+    if (action === 'status') {
+      for (const license of result.licenses) for (const release of license.releases) {
+        const token = await signStoreFulfillmentToken(env, { orderToken, itemId: `${license.lineId}:${release.id}`, action: 'software-download' }, 900);
+        const url = new URL(`/api/orders/${orderToken}/software/download`, request.url);
+        url.search = new URLSearchParams({ token, lineId: license.lineId, releaseId: release.id }).toString();
+        release.url = url.href;
+      }
+    }
+    // Only explicit key reveal returns a key; never expose internal grant IDs/hashes.
+    return privateJsonResponse(action === 'recover' ? { key: result.key } : result, 200, env);
+  } catch (error) { return privateJsonResponse({ error: error.message || 'Software management unavailable' }, error.status || 503, env); }
 }
 
 async function handleStoreOrderRoute(request, env, route) {
@@ -9598,6 +9754,10 @@ function normalizeAdminStoreProductPublishBody(body = {}, env = {}, options = {}
       inventory: 0,
       variants: []
     };
+  }
+
+  if (product?.variants?.some(variant => variant.software_license) && body?.fields?.variants !== undefined) {
+    errors.push('Software offer variants must be edited in repository source during the test pilot.');
   }
 
   const sourcePath = createProduct && normalizedProductId.ok
@@ -14904,7 +15064,18 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     }
     validation = couponResult.validation;
   }
-  const submittedShippingCents = Math.max(0, Number(body.shippingCents) || 0);
+  const softwareCheckout = hasSoftware(validation);
+  if (softwareCheckout && (!attemptId || !email || !softwareLicensingEnabled(env) || !env.LICENSING_SERVICE || !env.LICENSING_ADMIN_SECRET || String(env.LICENSING_KEY_SECRET || '').length < 32)) return privateJsonResponse({ error: 'Software checkout is unavailable or requires an email and checkout attempt.' }, 422, env);
+  let submittedShippingCents = Math.max(0, Number(body.shippingCents) || 0);
+  if (softwareCheckout) {
+    submittedShippingCents = 0;
+    if (validation.totals.requiresShipping) {
+      if (!normalizedShippingAddress.valid) return privateJsonResponse({ error: 'Shipping address required.' }, 422, env);
+      const shipping = await quoteStoreShipment(env, buildStoreShippingTierSelection(validation), normalizedShippingAddress.destination, [], body.shippingOption || 'standard', []);
+      if (!shipping.valid) return privateJsonResponse({ error: shipping.error }, 422, env);
+      submittedShippingCents = shipping.quote.shippingCents;
+    }
+  }
   const validatedTaxableSubtotalCents = getValidationTaxableSubtotalCents(validation);
   const normalizedShippingTaxAddress = body.shippingAddress
     ? normalizeTaxDestination(body.shippingAddress)
@@ -14912,9 +15083,9 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
   const taxDestination = normalizedBillingAddress.valid
     ? normalizedBillingAddress.destination
     : (normalizedShippingTaxAddress.valid ? normalizedShippingTaxAddress.destination : null);
-  let computedTaxCents = Math.max(0, Number(body.taxCents) || 0);
+  let computedTaxCents = softwareCheckout ? 0 : Math.max(0, Number(body.taxCents) || 0);
   let computedTaxDetails = null;
-  if (taxDestination && validatedTaxableSubtotalCents > 0) {
+  if ((taxDestination || softwareCheckout) && validatedTaxableSubtotalCents > 0) {
     try {
       const taxQuote = await quoteTax(env, {
         subtotalCents: validatedTaxableSubtotalCents,
@@ -14959,6 +15130,10 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
     taxDetails: computedTaxDetails,
     orderHash
   };
+  if (softwareCheckout) {
+    try { softwareOrderSnapshot(orderDraft); }
+    catch (error) { return privateJsonResponse({ error: error.message }, 422, env); }
+  }
   const challenge = orderDraft.totals.requiresTurnstile
     ? await verifyTurnstile(request, env, body.turnstileToken || body['cf-turnstile-response'], {
         action: 'store_order',
@@ -15429,6 +15604,14 @@ async function confirmStorePaymentIntentOrder(paymentIntent, env, ctx = null) {
     return storeOrderSettlementError('Store PaymentIntent has not succeeded', 409, 'store_order_rejected', metadata.orderToken);
   }
 
+  if (hasSoftware(loaded.storedOrder.orderDraft)) {
+    try {
+      const verified = await callSoftwareBilling(env, metadata.orderToken, 'payment');
+      if (!verified.paymentIntent) return storeOrderSettlementError('Software payment is not settled', 409, 'software_payment_pending', metadata.orderToken);
+      paymentIntent = verified.paymentIntent;
+    } catch (error) { return storeOrderSettlementError(error.message, error.status || 503, 'software_fulfillment_pending', metadata.orderToken); }
+  }
+
   const alreadyConfirmed = loaded.storedOrder.status === STORE_ORDER_STATUS_CONFIRMED;
   const confirmedAt = loaded.storedOrder.confirmedAt || new Date().toISOString();
   const inventoryCommit = alreadyConfirmed
@@ -15881,6 +16064,50 @@ async function handleStripeWebhook(request, env, ctx) {
       leaseId: eventLeaseId,
       startedAt: new Date().toISOString()
     }), { expirationTtl: STRIPE_EVENT_MARKER_TTL_SECONDS });
+  }
+
+  if (softwareLicensingEnabled(env) && (event.type.startsWith('invoice.') || ['checkout.session.completed', 'refund.created', 'refund.updated', 'refund.failed', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type))) {
+    try {
+      const stripe = softwareStripe(env);
+      let orderToken, result;
+      const reconcile = async (action, payload) => {
+        if (!orderToken) return;
+        const loaded = await loadStoreOrderForRead(env, orderToken);
+        if (!loaded.ok) throw new Error('Billing order not yet available');
+        if (!loaded.storedOrder.payment?.billing?.snapshot) return;
+        return callSoftwareBilling(env, orderToken, action, payload);
+      };
+      if (event.type === 'checkout.session.completed') {
+        const session = await stripe.checkout.sessions.retrieve(event.data.object.id);
+        if (session.mode === 'setup') {
+          orderToken = session.metadata?.orderToken;
+          result = await reconcile('card-complete-event', { sessionId: session.id });
+        }
+      } else if (event.type.startsWith('invoice.')) {
+        const invoice = await stripe.invoices.retrieve(event.data.object.id);
+        const subscriptionId = softwareStripeId(invoice.parent?.subscription_details?.subscription);
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          orderToken = subscription.metadata?.orderToken;
+          result = await reconcile('invoice', { invoiceId: invoice.id, eventId: event.id });
+        }
+      } else if (event.type.startsWith('customer.subscription.')) {
+        const subscription = await stripe.subscriptions.retrieve(event.data.object.id);
+        orderToken = subscription.metadata?.orderToken;
+        result = await reconcile('subscription', { subscriptionId: subscription.id });
+      } else {
+        const refund = await stripe.refunds.retrieve(event.data.object.id);
+        const intent = await stripe.paymentIntents.retrieve(softwareStripeId(refund.payment_intent));
+        orderToken = refund.metadata?.orderToken || intent.metadata?.orderToken;
+        result = await reconcile('refund-event', { refundId: refund.id });
+      }
+      if (result?.paymentIntent) {
+        const settled = await confirmStorePaymentIntentOrder(result.paymentIntent, env, ctx);
+        if (!settled.ok) return finishWebhook(jsonResponse({ error: settled.error }, settled.status || 503), 'software_order_pending');
+      }
+      await markStripeEventProcessed();
+      return finishWebhook(jsonResponse({ received: true, reconciled: !!result }), 'software_billing_reconciled', { orderId: orderToken });
+    } catch (error) { return finishWebhook(jsonResponse({ error: 'Software billing reconciliation pending' }, error.status || 503), 'software_billing_pending'); }
   }
 
   if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {

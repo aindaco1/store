@@ -410,3 +410,240 @@ repository bundles; provider reads retain their shorter bounds. The shared runne
 reports capture/upload/verification phases and fixed failure categories without
 logging provider stderr or captured values. A failed run does not enable scheduling
 or count as a verified recovery point.
+
+### Test-only complimentary licenses
+
+The `software-licenses` instance of `STORE_INVENTORY_COORDINATOR` owns
+`complimentary:v1:` grant checkpoints and `complimentary-due:v1:` retry indexes.
+These must be reconciled with the licensing authority and the existing Resend
+receipt ledger before recovering pending work. Retain the original
+`LICENSING_KEY_SECRET`; rotating it without versioned migration prevents key
+recovery by design. A rendered `software_license` outbox payload contains a
+key: quarantine it with other pending mail, never blindly replay it after
+restore. Independent grant export/restore and final retention/erasure policy
+remain production gates; this synthetic-only slice does not claim those gates.
+
+### Paid software billing pilot
+
+Pause new intake with `SOFTWARE_CHECKOUT_ENABLED=false`; leave existing billing
+processing enabled. Each `software-billing:<orderToken>` DO retains its frozen
+order, append-only payment receipts/balanced postings, tax snapshots, refund
+reservations/provider mappings, license key hashes, coverage commands and retry
+indexes. These `billing-*` records are authoritative and cannot be reconstructed
+from a current expiry date or the KV order summary. The
+`software-billing-watchdog:v1` KV cursor is disposable; reset it to rescan canonical
+orders after restoring the authority. The per-order `billing-invoice-cursor` is
+also disposable; it discovers existing invoices without creating purchases.
+
+Reconcile Stripe payments/refunds first; reapply coverage refund tombstones before
+reopening licensing downloads; then reconcile Resend receipts before resuming
+notification work. Restore the original derivation secret. Unknown refunds older
+than 23 hours require review, not a fresh request ID. Paused renewal invoices need
+their saved tax snapshot verified before collection resumes. Retain Stripe's
+`pause_collection.behavior=keep_as_draft` guard: Store finalizes and pays each
+verified invoice individually. Do not unset it during a restore. Do not revert to a
+Store build that cannot process active subscriptions. Independent encrypted DO
+exports, retention approval and a complete paid-state restore drill remain launch
+gates. See [software billing](SOFTWARE_LICENSING.md) for commands and key families.
+
+Payment recovery adds one bounded `billing-card-setup` checkpoint per order: opaque
+request/session IDs, creation time and completion state, never card details. Do
+not import or blindly replay a stale checkpoint after restore. Reconcile the
+current Checkout Session/SetupIntent/customer/subscription with Stripe or discard
+it and have the customer start a new setup. Normal retries use the original
+SetupIntent-derived provider keys. This operation updates payment defaults only;
+it cannot collect or unpause an invoice. The admin browser's session-only refund
+hint contains an opaque request ID and payload hash, no customer/license/card
+data; it is disposable and never authoritative for money recovery.
+
+## Software licensing checkpoint integration (pre-launch)
+
+`--software-licensing` extends the existing v2 snapshot. It adds Store's logical
+billing/complimentary journals and the licensing consumer's schema-3 authority
+and complete artifact inventory under `software/`. All files enter the same
+checksum inventory, age/GPG archive, decryptability check, private archive copy,
+readback verification and retention policy. No new scheduler, destination,
+encryption format or credential store is introduced. macOS tar metadata is
+excluded so it cannot create files outside the checksum inventory.
+
+This is an **isolated, test-mode maintenance checkpoint**, not an online database
+snapshot. Production licensing and paid checkout remain disabled. Stop intake,
+webhooks, scheduled work and artifact publishers, drain in-flight requests and
+alarms, then restart both Workers with the same unique
+`SOFTWARE_RECOVERY_CHECKPOINT` (16–100 letters/digits/underscores/hyphens).
+Store blocks ordinary requests and scheduled/alarm work; licensing blocks grants,
+activations, downloads and releases. The rehearsal proves this boundary by
+stopping both source runtimes before reopening their persisted state in checkpoint
+mode. Do not assume a rolling deployment alone has drained old requests. Do not
+write directly to KV/R2 during capture. A future live rollout needs a reviewed
+quiescence procedure or online snapshot protocol before claiming a four-hour
+licensing RPO; the existing ordinary Store backup schedule remains unchanged.
+
+Scheduled capture is wired only to purpose-limited read credentials:
+`SOFTWARE_BACKUP_READ_SECRET` for Store and `LICENSING_BACKUP_READ_SECRET` for
+licensing (bound there as `SOFTWARE_BACKUP_READ_SECRET`). They permit checkpoint
+info/exports/object reads, never import/upload, issuance or other mutations. Store's
+workflow security gate continues to forbid admin or Stripe payment credentials.
+These read credentials must be provisioned in the existing protected secret stores
+before enabling the opt-in; none were provisioned during this local implementation.
+Manual local capture can reuse the existing maintenance/admin credentials, while
+restore requires `ADMIN_MAINTENANCE_SECRET` (or local `ADMIN_SECRET`) and
+`LICENSING_ADMIN_SECRET`. Only names/presence and checkpoint-bound key proofs are
+captured; raw secrets, license keys and bearer tokens are not. Recover original
+Store key-derivation and licensing token secrets through the existing secure
+provider recovery process. The signing public key must also match.
+
+For a reviewed paused test source, set `WORKER_BASE`, `LICENSING_WORKER_BASE`,
+`STORE_BACKUP_SOFTWARE_CHECKPOINT` and the existing authentication/encryption
+variables, then add `--software-licensing` to the usual capture invocation:
+
+```bash
+node scripts/store-backup.mjs --remote --kv-values --r2-objects \
+  --require-complete-r2 --software-licensing --skip-build \
+  --acknowledge-sensitive=STORE_SENSITIVE_BACKUP
+```
+
+The existing capture workflow has optional environment wiring for
+`STORE_BACKUP_SOFTWARE_ENABLED` (default `false`) and the checkpoint/client
+settings. No GitHub variables, environment secrets, schedules, Cloudflare
+bindings or live deployments were changed during implementation. Keep the
+workflow opt-in off for the current production Store: these adapters deliberately
+require `APP_MODE=test`. An enabled capture fails if either authenticated endpoint
+is unavailable, a page/schema/checkpoint mismatches, a billing journal is missing,
+a completed grant/refund is absent from licensing, or an artifact is missing or
+changed. It never silently downgrades to a partial licensing backup.
+
+`billing-owner:v1:<orderToken>` is a recovery membership record in the existing
+`software-licenses` Durable Object, written before the first billing operation.
+It includes failed and KV-lagged attempts; canonical orders remain authoritative
+for commerce. Every indexed journal is exported. A canonical software order
+without membership or its matching immutable journal fails capture. Older test
+states created before this index must be reconciled/reseeded explicitly; do not
+claim an old orphan journal can be rediscovered from KV. This adapter has not
+been deployed against production licensing data.
+
+Recovery preserves grants/key hashes, installation seats/token generations,
+coverage intervals/refund tombstones, releases, frozen billing orders, receipts,
+integer balanced postings, tax snapshots, refund allocation/deduplication and
+command evidence. It excludes temporary inventory holds, alarms, due indexes,
+card-setup sessions and invoice discovery cursors. Existing KV policy continues
+to quarantine sessions and pending notification jobs while retaining delivery
+receipts. Pending command evidence is retained without scheduling it: reconcile
+money and Resend receipts separately before any explicit retry.
+
+### Isolated restore and acceptance
+
+The standard restore planner validates the software bundle and exposes a logical
+restore action. It refuses to silently skip it. Software execution supports local targets and uniquely named, synthetic Cloudflare
+preview targets. Production execution remains refused; existing production restore
+approvals do not enable this adapter.
+The two destination Workers must use empty, dedicated persistence/buckets,
+`APP_MODE=test`, the snapshot's checkpoint and `SOFTWARE_RECOVERY_TARGET=empty`.
+Keep `SOFTWARE_CHECKOUT_ENABLED=false`. Restore original secrets separately.
+
+After decrypting and verifying into a private directory, configure loopback
+`WORKER_BASE` / `LICENSING_WORKER_BASE` and the existing bearer variables. For a
+captured Stripe test account, `STRIPE_SECRET_KEY_TEST` permits only GET payment,
+invoice and refund comparisons. Use the same isolated local persistence directory
+as the Store Worker for the ordinary KV/R2 restore actions:
+
+```bash
+node scripts/store-restore.mjs --snapshot=/private/verified-snapshot \
+  --target=local --persist-to=/private/isolated-worker-state \
+  --conflict=overwrite --software-licensing --execute --verify
+```
+
+The planner's ordinary inventory reconciliation and order/index checks still
+apply. Provider drift (including a new paid invoice or post-backup/unallocated
+refund), pending refunds or billing reviews stops automatic acceptance. Resolve
+that state with reviewed provider truth and a new checkpoint/explicit reconciliation;
+do not invoke the billing watchdog as a read-only money comparison, since it can
+collect prepared invoices. Seller revocations made after the snapshot also need
+operator reconciliation before acceptance. This tool does not invent them.
+
+Import uses empty-target checks, atomic bounded pages and conflict detection.
+Retries after a lost upload reply reuse the matching import checkpoint and verify
+the existing bytes. Full logical readback, R2 readback hashes and the existing
+Minisign verifier run before completion. New R2 versions are rebound only after
+verification. Restore markers keep the authority/journals closed across restarts,
+even if checkpoint mode is removed. After all provider/revocation/mail/inventory
+checks pass, an operator may set `SOFTWARE_RECOVERY_ACCEPTED` to that checkpoint;
+that is an explicit acceptance step, not a command the restore tool runs.
+Never set it on a partial import. Paid checkout stays independently disabled.
+
+Run the synthetic acceptance rehearsal without any production credentials:
+
+```bash
+npm run restore:rehearse:software -- --evidence=/private/tmp/software-restore.json
+```
+
+It expects the licensing checkout/dependencies at `../dust-wave-licensing` (or
+`LICENSING_REPO`) and `age`/`age-keygen`. It uses actual local Workers, temporary
+private persistence, ephemeral encryption/signing keys and a synthetic Stripe
+provider. It runs the existing archive encryption and Platform archive verifier,
+then restores to fresh Workers. It tests mixed purchase/renewal/refund history,
+more than one export page, missing-page rejection, post-backup refund detection,
+lost-reply/repeated-restore safety, original key/activation retention, seats,
+coverage gaps, revocation, signed artifact rebinding and duplicate-event mail
+suppression. It cleans temporary plaintext, ciphertext, keys and runtimes.
+This does not claim a new remote archive upload, deployed restore or live-provider
+acceptance; those existing protected workflows remain separate release evidence.
+
+
+### Manual Cloudflare software rehearsal
+
+`npm run restore:rehearse:software:preview -- --evidence=/private/software-recovery.json`
+uses the same fixture, drained local source, encrypted snapshot, archive verifier,
+logical restore and ordinary KV/R2 restore planner as the local rehearsal. It
+creates fresh `dw-recovery-<random-id>-*` Workers, one isolated KV namespace (shared
+by test Store state/rate-limit bindings) and two private artifact/download buckets.
+No production Worker configuration, payment credential, mail credential or schedule
+is deployed. Ephemeral read-only capture and mutation secrets are installed as
+Worker secrets and removed with the test resources.
+
+The standard `--target=preview --software-licensing --execute --verify` path now
+requires `--software-preview-id=<16-hex-id>` and `--worker-config=<private-json>`.
+It checks the dedicated HTTPS origins, test/disabled-checkout configuration,
+matching preview bindings, provider namespace ownership and both authenticated
+recovery identities before ordinary KV/R2 writes. Production targets and generic
+preview bindings fail closed. Whole-resource cleanup belongs to the rehearsal;
+partial snapshot cleanup is not sufficient for licensing Durable Objects.
+
+**Rehearse Software Recovery** is manual, main-only and uses the existing
+`production-recovery` environment and reviewer protection. Its licensing input
+must be a reviewed full commit of `aindaco1/dust-wave-licensing`; that consumer
+must first be published and accessible to the checkout job. A private consumer
+requires a repository-scoped read-only SSH deploy-key `LICENSING_SOURCE_READ_KEY` approved for checkout. No source
+publication, workflow merge, permission expansion or environment change is implied
+by the local implementation.
+
+The job uses the existing protected age identity, separate-account R2 bucket and
+S3 credentials. Ciphertext is uploaded before its receipt, downloaded into a fresh
+private directory, compared byte-for-byte/by digest and verified by the pinned
+Platform archive verifier before extraction and restore. Synthetic archives use
+`software-rehearsal/<unique-run>/` beside the existing `store/` prefix so production
+latest-backup selection cannot choose a synthetic receipt. They remain under the
+existing bucket retention/lock policy; the rehearsal never deletes them. No new
+scheduler, encryption format, destination bucket or credential store is created.
+
+`--preview-only` explicitly skips the protected remote archive step and uses a
+locally verified encrypted round trip. Its evidence records `remoteArchive:false`;
+that result cannot close remote-archive acceptance. Both modes retain the restore
+lock across redeploys, explicitly accept only the completed synthetic target,
+check original activation/seats, coverage gaps/refunds/revocation, signed bytes
+and duplicate-event mail suppression, then remove and verify test resources.
+Failed-run receipts list any resources still requiring cleanup. Private command
+logs are kept beside local evidence and are never uploaded by the workflow.
+
+This rehearsal's source is stopped local workerd, with synthetic Stripe records.
+It does not establish a deployed production drain procedure, live Stripe/Resend
+acceptance, independent secret escrow or a licensing RPO/RTO. Paid checkout and
+production licensing capture remain off. Review actual timing and remaining
+operational gates before any separately authorized production rollout.
+
+Cloudflare now defaults Durable Object code updates to a deferred window of up to
+300 seconds. The synthetic rehearsal uses the supported
+`--durable-objects-code-update-mode immediate` override after every awaited phase;
+otherwise a restored object can retain its old acceptance configuration during
+verification. This is not a production drain technique: immediate updates can
+interrupt requests. See [Durable Objects code updates](https://developers.cloudflare.com/durable-objects/deployments/durable-objects-code-updates/).

@@ -1,0 +1,7 @@
+.store-software {
+  overflow-wrap: anywhere;
+  label { display: grid; margin-block: 1rem; }
+  input, select { max-width: 100%; }
+  .btn { margin: .5rem; }
+  &__card { margin-block: 1rem; }
+}

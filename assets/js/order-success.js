@@ -2,6 +2,7 @@
   'use strict';
 
   var root = document.querySelector('[data-store-order-success]');
+  var softwareModuleUrl = '/assets/js/software-management.js' + (document.currentScript ? new URL(document.currentScript.src).search : '');
   if (!root) return;
 
   var statusNode = root.querySelector('[data-store-order-status]');
@@ -290,6 +291,12 @@
 
     bodyNode.append(list);
     renderShipping(bodyNode, data.shipping || {});
+    if (data.software?.token) {
+      var management = appendText(bodyNode, 'section', 'store-software', '');
+      import(softwareModuleUrl).then(function(module) {
+        if (management.isConnected) module.mountCustomer(management, { orderToken: data.orderToken, token: data.software.token, workerBase: getWorkerBase() });
+      }).catch(function() { management.textContent = message('unable_load_order', 'Unable to load order.'); });
+    }
   }
 
   async function fetchOrder(orderToken) {

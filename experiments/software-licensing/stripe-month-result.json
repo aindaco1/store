@@ -1,0 +1,27 @@
+{
+  "run": "licensing_083bddb962854c94b6f8c739ab23bad9",
+  "apiVersion": "2026-06-24.dahlia",
+  "interval": "month",
+  "testMode": true,
+  "startedAt": "2026-11-04T19:57:10.037Z",
+  "checks": [
+    "One idempotently created subscription, one initial invoice, one successful PaymentIntent and charge for all three lines; recurring lines map through persisted subscription-item IDs",
+    "Test-clock renewal charges only the recurring software line",
+    "Partial ticket-sized refund is idempotent; local item allocation remains Store work"
+  ],
+  "initial": {
+    "invoice": "in_1UYAJ1K9nUOzi4tvoLLkFoC5",
+    "paymentIntent": "pi_3UYAJ2K9nUOzi4tv1yZFbOwr",
+    "charge": "ch_3UYAJ2K9nUOzi4tv1f3NV0t0",
+    "amount": 5000
+  },
+  "renewal": {
+    "invoice": "in_1UYAJAK9nUOzi4tv5ddGwdxx",
+    "paymentIntent": "pi_3UYAJIK9nUOzi4tv1jM01LSV",
+    "charge": "ch_3UYAJIK9nUOzi4tv1QXolHOR",
+    "amount": 1000
+  },
+  "status": "passed",
+  "cleanupErrors": [],
+  "finishedAt": "2026-11-04T19:57:38.789Z"
+}

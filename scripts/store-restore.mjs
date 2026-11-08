@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { validateSoftwarePreview } from './lib/software-preview.mjs';
+import { validateSoftwareBackup, restoreSoftwareBackup, verifySoftwareRestoreDestination, softwareRecoveryClients, reconcileSoftwareMoney } from './lib/software-backup.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -28,7 +30,10 @@ export function parseRestoreArgs(args = []) {
     help: args.includes('--help') || args.includes('-h'),
     snapshot: valueArg(args, '--snapshot', ''),
     target: valueArg(args, '--target', 'plan'),
+    workerConfig: valueArg(args, '--worker-config', ''),
+    previewId: valueArg(args, '--software-preview-id', ''),
     execute: args.includes('--execute'),
+    softwareLicensing: args.includes('--software-licensing'),
     verify: args.includes('--verify'),
     cleanupPreview: args.includes('--cleanup-preview'),
     conflict: valueArg(args, '--conflict', 'abort'),
@@ -51,6 +56,9 @@ Default behavior is verification and planning only. No provider writes occur.
 
 Options:
   --target=plan|local|preview|production
+  --software-licensing         Enable the isolated local/preview licensing restore adapter.
+  --software-preview-id=ID     Unique 16-hex rehearsal resource ID.
+  --worker-config=FILE         Dedicated preview Wrangler JSON config.
   --execute                     Execute the generated local/preview/production plan.
   --verify                      Read back restored KV values and R2 objects and compare them to the snapshot.
   --cleanup-preview             Delete only snapshot-owned KV/R2 data from the isolated preview target.
@@ -202,6 +210,12 @@ export function buildStoreRestorePlan(snapshot, options = {}) {
     }
   }
 
+  if (snapshot.manifest.includesSoftwareLicensing || fs.existsSync(path.join(snapshot.root,'software'))) {
+    try {
+      const software = validateSoftwareBackup(snapshot.root);
+      actions.push({type:'software-restore',owners:software.manifest.owners.length,artifacts:software.manifest.objects.length});
+    } catch (error) { actions.push({type:'invalid',familyId:'software-licensing',error:error.message}); }
+  }
   actions.push({
     type: 'verify',
     checks: [
@@ -248,11 +262,13 @@ export function productionRestoreGate(options = {}) {
   return { ok: missing.length === 0, missing };
 }
 
+function configFlags(options) { return options.workerConfig ? ['--config', options.workerConfig] : []; }
+
 function targetFlags(options = {}) {
   if (options.target === 'local') {
     return ['--local', '--persist-to', options.persistTo || path.join(os.tmpdir(), 'store-restore-wrangler')];
   }
-  if (options.target === 'preview') return ['--remote', '--preview'];
+  if (options.target === 'preview') return ['--remote', '--preview', ...configFlags(options)];
   if (options.target === 'production') return ['--remote'];
   return [];
 }
@@ -274,6 +290,7 @@ function r2ObjectMissing(result) {
 }
 
 export function verifyStoreRestorePlan(plan, options = {}) {
+  if (plan.actions.some(action=>action.type==='software-restore') && !options.softwareAdapterReady) throw new Error('Software verification requires the logical restore readback');
   if (!['local', 'preview', 'production'].includes(options.target)) throw new Error('Verification target must be local, preview, or production.');
   if (plan.invalidActions.length || plan.missingValueFamilies?.length) {
     throw new Error('Restore verification requires a complete valid restore plan.');
@@ -348,7 +365,7 @@ export function verifyStoreRestorePlan(plan, options = {}) {
         const result = runner('npx', [
           'wrangler', 'r2', 'object', 'get', `${targetBucket}/${action.key}`,
           '--file', outputFile,
-          ...(options.target === 'preview' ? ['--remote'] : targetFlags(options))
+          ...(options.target === 'preview' ? ['--remote', ...configFlags(options)] : targetFlags(options))
         ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
         evidence.commands += 1;
         evidence.r2Objects += 1;
@@ -367,6 +384,7 @@ export function verifyStoreRestorePlan(plan, options = {}) {
 }
 
 export function cleanupStorePreviewRestore(plan, options = {}) {
+  if (plan.actions.some(action=>action.type==='software-restore')) throw new Error('Software cleanup requires disposal of the isolated recovery target');
   if (options.target !== 'preview') throw new Error('Captured-data cleanup is available only for the preview target.');
   if (options.acknowledgePreviewCleanup !== 'STORE_PREVIEW_RESTORE_CLEANUP') {
     throw new Error('Preview cleanup requires exact acknowledgement.');
@@ -476,6 +494,7 @@ export function cleanupStorePreviewRestore(plan, options = {}) {
 }
 
 export function executeStoreRestorePlan(plan, options = {}) {
+  if (plan.actions.some(action=>action.type==='software-restore') && (options.target==='production' || !options.softwareAdapterReady)) throw new Error('Software recovery requires the isolated logical adapter and fresh money comparison');
   if (!['local', 'preview', 'production'].includes(options.target)) throw new Error('Execution target must be local, preview, or production.');
   if (options.conflict !== 'overwrite') throw new Error('Execution requires --conflict=overwrite.');
   if (plan.invalidActions.length) throw new Error('Restore plan contains invalid KV records.');
@@ -523,7 +542,7 @@ export function executeStoreRestorePlan(plan, options = {}) {
           'wrangler', 'r2', 'object', 'put', `${targetBucket}/${action.key}`,
           '--file', action.objectPath,
           '--force',
-          ...(options.target === 'preview' ? ['--remote'] : targetFlags(options))
+          ...(options.target === 'preview' ? ['--remote', ...configFlags(options)] : targetFlags(options))
         ], { cwd: WORKER_DIR, timeoutMs: 120_000 });
         results.push(result);
         if (result.status !== 0) break actionLoop;
@@ -549,9 +568,32 @@ export async function runStoreRestore(rawOptions = {}) {
   const options = { ...rawOptions, target: rawOptions.target || 'plan' };
   const snapshot = readAndVerifySnapshot(options.snapshot);
   const plan = buildStoreRestorePlan(snapshot, options);
-  const execution = options.execute ? executeStoreRestorePlan(plan, options) : null;
+  const hasSoftware = plan.actions.some(action=>action.type==='software-restore');
+  if (options.execute && hasSoftware) {
+    if (!options.softwareLicensing || !['local','preview'].includes(options.target)) throw new Error('Software execution requires the isolated logical adapter');
+    if (options.target === 'preview') {
+      validateSoftwarePreview({...options,storeBase:process.env.WORKER_BASE,licensingBase:process.env.LICENSING_WORKER_BASE});
+      if (!options.verify || options.cleanupPreview) throw new Error('Software preview requires readback and whole-resource cleanup by its rehearsal owner');
+    }
+    options.softwareRecovery ||= softwareRecoveryClients({target:options.target,previewId:options.previewId});
+    if (!options.softwareRecovery.request || !options.softwareRecovery.stripeRead) throw new Error('Software execution requires an isolated adapter and read-only Stripe client');
+    if (options.target === 'preview') {
+      options.softwareRecovery.previewId = options.previewId;
+      const runner = options.runner || runCommand;
+      const result = runner('npx',['wrangler','kv','namespace','list',...configFlags(options)],{cwd:WORKER_DIR,timeoutMs:120000});
+      const config = readJson(options.workerConfig);
+      if (result.status !== 0 || !JSON.parse(result.stdout).some(entry=>entry.id===config.kv_namespaces[0].id && entry.title===`dw-recovery-${options.previewId}-store-STORE_STATE`)) throw new Error('Software preview KV namespace is not owned by this rehearsal');
+    }
+  }
+  if (options.execute && hasSoftware) {
+    const comparison=await reconcileSoftwareMoney(snapshot.root,options.softwareRecovery.stripeRead);
+    if (!comparison.ok) throw new Error('Software money reconciliation requires review before restore');
+    await verifySoftwareRestoreDestination(snapshot.root,options.softwareRecovery);
+  }
+  const execution = options.execute ? executeStoreRestorePlan(plan, {...options,softwareAdapterReady:hasSoftware}) : null;
+  if (hasSoftware && execution?.ok) execution.software = await restoreSoftwareBackup(snapshot.root,options.softwareRecovery);
   const verification = options.verify && (!execution || execution.ok)
-    ? verifyStoreRestorePlan(plan, options)
+    ? verifyStoreRestorePlan(plan, {...options,softwareAdapterReady:execution?.software?.ok===true})
     : null;
   const cleanup = options.cleanupPreview ? cleanupStorePreviewRestore(plan, options) : null;
   return { plan, execution, verification, cleanup };
@@ -564,6 +606,7 @@ async function main() {
   const result = await runStoreRestore(options);
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
+    if (result.execution && !result.execution.ok) process.exitCode = 1;
     if (result.verification && !result.verification.ok) process.exitCode = 1;
     if (result.cleanup && !result.cleanup.ok) process.exitCode = 1;
     return;
@@ -575,6 +618,7 @@ async function main() {
   if (result.execution) console.log(`Restore execution ${result.execution.ok ? 'completed' : 'failed'}.`);
   if (result.verification) console.log(`Restore verification ${result.verification.ok ? 'completed' : 'failed'}.`);
   if (result.cleanup) console.log(`Preview cleanup ${result.cleanup.ok ? 'completed' : 'failed'}.`);
+  if (result.execution && !result.execution.ok) process.exitCode = 1;
   if (result.verification && !result.verification.ok) process.exitCode = 1;
   if (result.cleanup && !result.cleanup.ok) process.exitCode = 1;
 }

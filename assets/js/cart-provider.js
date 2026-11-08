@@ -4402,6 +4402,7 @@
             <div class="store-first-party-cart__stripe-shell">
               <div class="store-first-party-cart__stripe-region store-first-party-cart__stripe-region--payment" data-cart-custom-checkout-region="payment" tabindex="-1" role="group" aria-label="${escapeAttribute(getRuntimeMessage('cart.paymentMethod', 'Payment method'))}"></div>
             </div>
+            ${(customCheckout.softwareRenewals || []).length ? `<p class="store-first-party-cart__section-label">${escapeHtml(getRuntimeMessage('cart.softwareRenewalHeading', 'Future renewals'))}</p>${customCheckout.softwareRenewals.map(item => `<p class="store-first-party-cart__note" data-software-renewal>${escapeHtml(item.name)}: ${escapeHtml(getRuntimeMessage('cart.softwareRenewalPrice', '{amount} per {interval}, plus tax.').replace('{amount}', formatCents(item.subtotalCents)).replace('{interval}', getRuntimeMessage(item.softwareLicense.billing === 'month' ? 'cart.softwareMonth' : 'cart.softwareYear', item.softwareLicense.billing === 'month' ? 'month' : 'year')))}</p>`).join('')}<p class="store-first-party-cart__note" data-software-renewal-terms>${escapeHtml(getRuntimeMessage('cart.softwareRenewal', 'Renews automatically. Store coupons apply to the first payment only. Cancel future renewal through support. Installed software keeps working after coverage ends.'))}</p>` : ''}
             <p class="store-first-party-cart__note store-first-party-cart__note--payment-consent">${escapeHtml(getRuntimeMessage('cart.storePaymentConsent', 'Your payment is processed securely by Stripe.'))}</p>
           </div>
         `;
@@ -6394,6 +6395,7 @@
         sessionId: '',
         totalCents: Number(data?.totals?.totalCents),
         canonicalTotals: data?.totals,
+        softwareRenewals: (data?.orderDraft?.items || []).filter(item => ['month', 'year'].includes(item.softwareLicense?.billing)),
         taxDetails: data?.orderDraft?.taxDetails,
         paymentIntentId: String(data?.paymentIntentId || ''),
         clientSecret: String(data?.clientSecret || ''),

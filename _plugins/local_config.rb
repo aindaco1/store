@@ -15,6 +15,10 @@ end
 
 Jekyll::Hooks.register :site, :after_reset do |site|
   next if ENV['JEKYLL_ENV'] == 'production'
+  # Explicit config overlays already express the caller's precedence. In
+  # particular, test servers must not inherit a private local Worker URL.
+  configs = Array(site.config['config'])
+  next if configs.any? { |path| File.basename(path) != '_config.yml' }
   
   base_config = File.join(site.source, '_config.yml')
   local_config = File.join(site.source, '_config.local.yml')

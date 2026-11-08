@@ -1,0 +1,33 @@
+{
+  "run": "failure_45892947e3e84ec193ea89d51bf8beed",
+  "testMode": true,
+  "apiVersion": "2026-06-24.dahlia",
+  "startedAt": "2026-11-04T20:39:36.724Z",
+  "cases": [
+    {
+      "name": "decline",
+      "subscription": "sub_1UYAy5K9nUOzi4tvfqzfG7PA",
+      "invoice": "in_1UYAy5K9nUOzi4tvR8wPtWsK",
+      "paymentIntent": "pi_3UYAy6K9nUOzi4tv1tHsMgCa",
+      "amount": 5000,
+      "observedStatus": "requires_payment_method",
+      "afterSubscriptionCancel": "canceled",
+      "afterVoid": "canceled",
+      "hasElementsConfirmationSecret": true
+    },
+    {
+      "name": "sca",
+      "subscription": "sub_1UYAyDK9nUOzi4tvE319OYLl",
+      "invoice": "in_1UYAyDK9nUOzi4tvDwYod6NI",
+      "paymentIntent": "pi_3UYAyDK9nUOzi4tv0mQgTYgg",
+      "amount": 5000,
+      "observedStatus": "requires_action",
+      "afterSubscriptionCancel": "canceled",
+      "afterVoid": "canceled",
+      "hasElementsConfirmationSecret": true
+    }
+  ],
+  "cleanupErrors": [],
+  "status": "passed",
+  "finishedAt": "2026-11-04T20:39:53.045Z"
+}

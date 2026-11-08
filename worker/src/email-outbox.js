@@ -14,6 +14,8 @@ const MAX_FROZEN_PROVIDER_PAYLOAD_BYTES = 8 * 1024 * 1024;
 const MARKETING_KINDS = new Set(['store_event_reminder', 'store_abandoned_cart', 'store_event_followup', 'store_product_report']);
 const OPTIONAL_PROMOTIONAL_KINDS = new Set(['store_event_followup']);
 const TEMPLATE_SENDERS = Object.freeze({
+  software_license: 'sendSoftwareLicenseEmail',
+  software_billing: 'sendSoftwareBillingEmail',
   store_product_report: 'sendStoreProductReportEmail',
   store_order: 'sendStoreOrderEmail',
   store_event_reminder: 'sendStoreEventReminderEmail',

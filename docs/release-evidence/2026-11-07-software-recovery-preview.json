@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "synthetic": true,
+  "remoteArchive": false,
+  "productionWrites": false,
+  "paidCheckoutEnabled": false,
+  "livePayments": 0,
+  "realEmails": 0,
+  "timingsMs": {
+    "previewRestore": 50790,
+    "total": 218332
+  },
+  "cleanup": {
+    "ok": true,
+    "failures": []
+  },
+  "checks": [
+    "remote credential boundaries",
+    "lost upload reply retry",
+    "complete logical and KV/R2 readback",
+    "restart acceptance lock",
+    "original activation and seats",
+    "coverage gaps, refunds and revocations",
+    "signature-verified downloads",
+    "duplicate payment produces no email"
+  ],
+  "local": {
+    "ok": true,
+    "captured": {
+      "version": 1,
+      "owners": 2,
+      "records": 50,
+      "authorityRows": 36,
+      "objects": 2
+    },
+    "checks": [
+      "read-only capture credential cannot import",
+      "paused mutation rejected",
+      "more than one export page",
+      "missing page rejected",
+      "mismatched KV checkpoint rejected",
+      "age round trip and full checksums",
+      "fresh refund drift blocks acceptance",
+      "restored authority stays closed",
+      "artifact readback and signature rebinding",
+      "old activation retained and seat limit enforced",
+      "coverage gap and refunded renewal denied",
+      "seller revocation retained",
+      "lost upload reply and complete restore replay safe",
+      "original Store key retained",
+      "approved KV and mail receipts restored without sessions or pending mail",
+      "duplicate payment event produces no new mail"
+    ]
+  }
+}

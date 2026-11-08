@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { captureSoftwareBackup } from './lib/software-backup.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,6 +29,11 @@ export const KV_VALUE_BACKUP_PREFIXES = storeKvValueBackupFamilies({ inventory: 
 export const KV_QUARANTINE_PREFIXES = storeQuarantinedKvFamilies({ inventory: STORE_DATA_INVENTORY }).map((family) => family.prefix);
 
 export const SECRET_INVENTORY_NAMES = [
+  'SOFTWARE_BACKUP_READ_SECRET',
+  'LICENSING_BACKUP_READ_SECRET',
+  'LICENSING_ADMIN_SECRET',
+  'LICENSING_KEY_SECRET',
+  'ADMIN_MAINTENANCE_SECRET',
   'STRIPE_SECRET_KEY',
   'STRIPE_SECRET_KEY_LIVE',
   'STRIPE_SECRET_KEY_TEST',
@@ -91,6 +97,8 @@ Options:
   --kv-values           With --remote, also export KV values with wrangler kv bulk get.
   --r2-objects          With --remote, download referenced STORE_DOWNLOADS R2 objects.
   --require-complete-r2 Require provider object enumeration before an R2 object snapshot.
+  --software-licensing  Capture paused licensing/billing journals and artifacts (encrypted).
+  --software-checkpoint=ID  Matching maintenance checkpoint on both Workers.
   --admin-exports       With --remote, capture protected admin CSV/readiness/download inventory.
   --worker-base=URL     Worker base for --admin-exports. Defaults to WORKER_BASE.
   --acknowledge-sensitive=STORE_SENSITIVE_BACKUP
@@ -129,6 +137,8 @@ export function parseBackupArgs(args = []) {
     kvValues: args.includes('--kv-values'),
     r2Objects: args.includes('--r2-objects'),
     requireCompleteR2Inventory: args.includes('--require-complete-r2'),
+    softwareLicensing: args.includes('--software-licensing') || process.env.STORE_BACKUP_SOFTWARE_ENABLED === 'true',
+    softwareCheckpoint: valueArg(args, '--software-checkpoint', process.env.STORE_BACKUP_SOFTWARE_CHECKPOINT || ''),
     adminExports: args.includes('--admin-exports'),
     workerBase: valueArg(args, '--worker-base', process.env.WORKER_BASE || ''),
     acknowledgeSensitive: valueArg(args, '--acknowledge-sensitive', ''),
@@ -726,7 +736,7 @@ jq 'to_entries | map({ key: .key, value: (.value.value // "") } + (if .value.met
 }
 
 export function validateBackupSafety(options = {}, outputDir = '') {
-  const sensitive = options.remote === true && (
+  const sensitive = options.softwareLicensing === true || options.remote === true && (
     options.kvValues === true || options.r2Objects === true || options.adminExports === true
   );
   const errors = [];
@@ -760,7 +770,7 @@ function selectedEncryptionBackend(options = {}) {
   return '';
 }
 
-function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
+export function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
   const backend = selectedEncryptionBackend(options);
   if (!backend) throw new Error('No supported encryption backend is available. Install age or GPG.');
   ensureDir(outputDir, options);
@@ -768,7 +778,7 @@ function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
   const archiveName = backend === 'age' ? 'store-backup.tar.gz.age' : 'store-backup.tar.gz.gpg';
   const encryptedPath = path.join(outputDir, archiveName);
   try {
-    let result = run('tar', ['-czf', archiveBase, '-C', stagingDir, '.'], { cwd: path.dirname(stagingDir) });
+    let result = run('tar', ['-czf', archiveBase, '-C', stagingDir, '.'], { cwd: path.dirname(stagingDir), env: { ...process.env, COPYFILE_DISABLE: '1' } });
     if (result.status !== 0) throw new Error(`Unable to archive sensitive snapshot: ${result.stderr || result.error}`);
     fs.chmodSync(archiveBase, 0o600);
     if (backend === 'age') {
@@ -823,6 +833,7 @@ function archiveSensitiveSnapshot(stagingDir, outputDir, options, manifest) {
       r2Objects: Number(manifest.r2?.objectsDownloadedCount || 0),
       r2InventoryComplete: manifest.r2?.completeInventory === true,
       r2InventorySource: String(manifest.r2?.inventorySource || 'not_captured'),
+      softwareLicensing: manifest.softwareLicensing || null,
       adminExports: Array.isArray(manifest.adminExports) ? manifest.adminExports.length : 0
     }
   };
@@ -850,6 +861,8 @@ export async function createBackupSnapshot(rawOptions = {}) {
     kvValues: rawOptions.kvValues === true,
     r2Objects: rawOptions.r2Objects === true,
     requireCompleteR2Inventory: rawOptions.requireCompleteR2Inventory === true,
+    softwareLicensing: rawOptions.softwareLicensing === true,
+    softwareCheckpoint: rawOptions.softwareCheckpoint || '',
     adminExports: rawOptions.adminExports === true,
     workerBase: rawOptions.workerBase || process.env.WORKER_BASE || '',
     acknowledgeSensitive: rawOptions.acknowledgeSensitive || '',
@@ -886,12 +899,14 @@ export async function createBackupSnapshot(rawOptions = {}) {
     remote: options.remote,
     includesKvValues: options.remote && options.kvValues,
     includesR2Objects: options.remote && options.r2Objects,
+    includesSoftwareLicensing: options.softwareLicensing,
     includesAdminExports: options.remote && options.adminExports,
     encrypted: safety.sensitive,
     releaseSnapshot: options.releaseSnapshot,
     includedDataClasses: [
       'git-config-build',
       'provider-metadata',
+      ...(options.softwareLicensing ? ['software-licensing-journals-and-artifacts'] : []),
       'kv-key-inventory',
       ...(options.remote && options.kvValues ? ['authoritative-and-control-kv-values'] : []),
       ...(options.remote && options.r2Objects ? ['r2-objects'] : []),
@@ -952,6 +967,7 @@ export async function createBackupSnapshot(rawOptions = {}) {
     captureKv(manifest, captureDir, options);
     await captureAdminExports(manifest, captureDir, options);
     await captureR2(manifest, captureDir, options, wranglerInventory);
+    if (options.softwareLicensing && !options.dryRun) manifest.softwareLicensing = await captureSoftwareBackup(captureDir,{checkpoint:options.softwareCheckpoint});
     writeRestorePlan(captureDir, options);
     manifest.completedAt = new Date().toISOString();
     manifest.durationMs = Math.max(0, Date.parse(manifest.completedAt) - Date.parse(manifest.createdAt));

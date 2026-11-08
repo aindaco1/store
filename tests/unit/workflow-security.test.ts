@@ -18,6 +18,24 @@ function workflowFiles() {
 
 describe('workflow security posture', () => {
 
+  it('keeps the software rehearsal manual, reviewed and separate from paid sales', () => {
+    const text = readWorkflow('software-recovery-rehearsal.yml');
+    const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',
+      'puts JSON.generate(YAML.load_file(ARGV.fetch(0)))', path.join(repoRoot, '.github/workflows/software-recovery-rehearsal.yml')
+    ], { encoding: 'utf8' }));
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.jobs.rehearse.environment).toBe('production-recovery');
+    expect(workflow.jobs.rehearse.if).toBe("github.ref == 'refs/heads/main'");
+    expect(workflow.concurrency['cancel-in-progress']).toBe(false);
+    expect(text).not.toMatch(/\n  (push|schedule|pull_request):|STRIPE_SECRET|RESEND_API_KEY|--target=production|--preview-only/);
+    const steps = workflow.jobs.rehearse.steps;
+    expect(steps[0].run).toContain('^[a-f0-9]{40}$');
+    expect(steps.find((step: any) => step.with?.repository)?.with.repository).toBe('aindaco1/dust-wave-licensing');
+    expect(steps.find((step: any) => step.with?.repository)?.with['ssh-key']).toBe('${{ secrets.LICENSING_SOURCE_READ_KEY }}');
+    expect(steps.find((step: any) => step.with?.repository)?.with['persist-credentials']).toBe(false);
+    expect(steps.at(-1).with.path).toBe('${{ runner.temp }}/software-recovery.json');
+  });
+
   it('captures every four hours without admitting restore or payment authority', () => {
     const text = readWorkflow('capture-production-backup.yml');
     const workflow = JSON.parse(execFileSync('ruby', ['-ryaml', '-rjson', '-e',

@@ -207,6 +207,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       ],
       "price": 0.0,
       "price_cents": 0,
+      "pricing_mode": "fixed",
       "currency": "USD",
       "image": "/assets/images/products/product-phantom-of-the-paradise-the-ultimate-uncut-edition-20261006-031955.webp",
       "url": "https://shop.dustwave.xyz/products/phantom-of-the-paradise-the-ultimate-uncut-edition/",
@@ -330,6 +331,9 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
         "stack_height_in": 1
       },
       "tax_category": "admission",
+      "daily_report_emails": [
+        "mcl.j76@gmail.com"
+      ],
       "event_details": {
         "starts_at": "2026-11-07T19:00:00-07:00",
         "ends_at": "2026-11-07T22:00:00-07:00",
@@ -3299,7 +3303,7 @@ export const STORE_CATALOG_SNAPSHOT = Object.freeze({
       "turnstile_required": false
     }
   ],
-  "source_hash": "ad110bca5299222a00f9a56048bfae0b6502274a79859343b1d8e8e1cdeae10b"
+  "source_hash": "1db9262d3c5b6ae4ee33c933640be4ceaf576ecd02635937a3821616a3b06a25"
 });
 
 export default STORE_CATALOG_SNAPSHOT;

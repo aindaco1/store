@@ -65,3 +65,8 @@ Keep README, LICENSE, AGENTS, and CHANGELOG at the repository root. Root `admin.
 When moving a guide, update incoming links and check relative paths and section anchors from its new location. Keep this index current as guides are added or consolidated.
 
 - [Platform reuse batch 2](platform-reuse-batch2-2026-09-14.md): shared primitives, characterization and independent rollback.
+
+- [Software licensing](SOFTWARE_LICENSING.md): test-only complimentary and paid
+  licenses, combined checkout, renewal tax, refunds, Resend handoff and recovery.
+
+- [License management and gate evidence](release-evidence/2026-11-04-license-management.md): test-only customer/admin controls, payment recovery and verification boundaries.
