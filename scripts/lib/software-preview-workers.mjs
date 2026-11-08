@@ -5,7 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 // One resource lifecycle for both the guarded source and empty restore target.
-export async function withSoftwarePreview(context, {root,licensing,cli,report,emit,evidenceFile,source=false}, use) {
+export async function withSoftwarePreview(context, {root,licensing,cli,report,emit,evidenceFile,source=false,includeObjects=true,configure}, use) {
   const {snapshot,secret,readSecret,checkpoint,publicKey,temp}=context;
   const previewId = randomBytes(8).toString('hex'), prefix = `dw-recovery-${previewId}`;
   const directory = path.join(temp, source ? 'source-preview' : 'preview'); fs.mkdirSync(directory, { mode: 0o700 });
@@ -32,6 +32,7 @@ export async function withSoftwarePreview(context, {root,licensing,cli,report,em
   let configs;
   const deploy = role => {
     const name = `${prefix}-${role}`;
+    validateSoftwarePreviewConfig(JSON.parse(fs.readFileSync(configPaths[role], 'utf8')), name);
     if (!resources.workers.includes(name)) {
       assert.equal(run(['deployments','list','--name',name],{absentOK:true}),'absent','Rehearsal Worker name already exists');
       resources.workers.push(name);
@@ -49,18 +50,18 @@ export async function withSoftwarePreview(context, {root,licensing,cli,report,em
     const output = run(['kv', 'namespace', 'create', `${prefix}-store-STORE_STATE`, '--config', configPaths.store]);
     resources.namespace = output.match(/"id"\s*:\s*"([a-f0-9]{32})"/)?.[1];
     assert.ok(resources.namespace, 'Namespace create did not return its ID'); emit();
-    for (const suffix of ['artifacts', 'downloads']) {
+    for (const suffix of includeObjects ? ['artifacts', 'downloads'] : []) {
       const name = `${prefix}-${suffix}`;
       assert.equal(run(['r2','bucket','list']).includes(name),false,'Rehearsal bucket already exists');
       resources.buckets.push(name); emit(); run(['r2', 'bucket', 'create', name]);
     }
     configs = {
       licensing: { ...common, name: `${prefix}-licensing`, main: path.join(licensing, 'src/worker.js'), vars,
-        durable_objects: { bindings: [{ name: 'PUBLISHER', class_name: 'Publisher' }] }, migrations: [{ tag: 'v1', new_sqlite_classes: ['Publisher'] }], r2_buckets: [{ binding: 'ARTIFACTS', bucket_name: `${prefix}-artifacts` }] },
+        durable_objects: { bindings: [{ name: 'PUBLISHER', class_name: 'Publisher' }] }, migrations: [{ tag: 'v1', new_sqlite_classes: ['Publisher'] }], r2_buckets: includeObjects ? [{ binding: 'ARTIFACTS', bucket_name: `${prefix}-artifacts` }] : [] },
       store: { ...common, name: `${prefix}-store`, main: path.join(root, 'experiments/software-licensing/recovery-worker.js'), compatibility_flags: ['nodejs_compat'],
         vars: { ...vars, SOFTWARE_LICENSING_ENABLED: 'true', TAX_PROVIDER: 'flat', SALES_TAX_RATE: '0.10', STORE_EMAIL_DRY_RUN: 'true', OBSERVABILITY_SAMPLE_RATE: '0' },
         kv_namespaces: ['STORE_STATE','RATELIMIT'].map(binding=>({binding,id:resources.namespace,preview_id:resources.namespace})),
-        r2_buckets: [{ binding: 'STORE_DOWNLOADS', bucket_name: `${prefix}-downloads` }],
+        r2_buckets: includeObjects ? [{ binding: 'STORE_DOWNLOADS', bucket_name: `${prefix}-downloads` }] : [],
         durable_objects: { bindings: [{ name: 'STORE_INVENTORY_COORDINATOR', class_name: 'StoreInventoryCoordinator' }] }, migrations: [{ tag: 'v1', new_sqlite_classes: ['StoreInventoryCoordinator'] }],
         services: [{ binding: 'LICENSING_SERVICE', service: `${prefix}-licensing` }] }
     };
@@ -70,6 +71,7 @@ export async function withSoftwarePreview(context, {root,licensing,cli,report,em
       licensing: { ADMIN_SECRET: secret, TOKEN_SECRET: secret, SOFTWARE_BACKUP_READ_SECRET: readSecret, UPDATER_PUBLIC_KEY: publicKey },
       store: { ADMIN_SECRET: secret, SOFTWARE_BACKUP_READ_SECRET: readSecret, LICENSING_ADMIN_SECRET: secret, LICENSING_KEY_SECRET: secret, RESEND_API_KEY: 'dry-run' }
     };
+    await configure?.({configs,secrets,directory,previewId,prefix});
     for (const role of ['licensing', 'store']) {
       write(role, configs[role]); deploy(role);
       const file = path.join(directory, `${role}-secrets.json`); fs.writeFileSync(file, JSON.stringify(secrets[role]), { mode: 0o600 });
@@ -87,14 +89,24 @@ export async function withSoftwarePreview(context, {root,licensing,cli,report,em
       else if(found.length>1) failures.push('ambiguous namespace allocation');
     }
     if (resources.namespace) { try { run(['kv', 'namespace', 'delete', '--namespace-id', resources.namespace], {absentOK:true}); } catch { failures.push('kv:' + resources.namespace); } }
-    const metadata = source ? {objects:[{key:'app.tar.gz'},{key:'unattached.txt'}]} : JSON.parse(fs.readFileSync(path.join(snapshot, 'software/manifest.json'), 'utf8'));
+    const metadata = !includeObjects ? {objects:[]} : source ? {objects:[{key:'app.tar.gz'},{key:'unattached.txt'}]} : JSON.parse(fs.readFileSync(path.join(snapshot, 'software/manifest.json'), 'utf8'));
     for (const name of resources.buckets) {
       const keys = name.endsWith('-artifacts') ? metadata.objects.map(o => o.key) : ['downloads/restore-drill.txt'];
       try { for (const key of keys) run(['r2', 'object', 'delete', `${name}/${key}`, '--remote']); run(['r2', 'bucket', 'delete', name]); } catch { if(run(['r2','bucket','list']).includes(name)) failures.push('bucket:' + name); }
     }
-    const buckets = run(['r2', 'bucket', 'list']); const namespaces = run(['kv', 'namespace', 'list']);
+    const buckets = includeObjects ? run(['r2', 'bucket', 'list']) : ''; const namespaces = run(['kv', 'namespace', 'list']);
     if (resources.buckets.some(name => buckets.includes(name)) || (resources.namespace && namespaces.includes(resources.namespace))) failures.push('residual resources');
     report[source ? 'sourceCleanup' : 'cleanup'] = { ok: failures.length === 0, failures }; emit();
     assert.equal(failures.length, 0, 'Preview resource cleanup incomplete; see evidence');
   }
+}
+
+export function validateSoftwarePreviewConfig(config, expectedName) {
+  assert.match(expectedName, /^dw-recovery-[a-f0-9]{16}-(store|licensing)$/);
+  assert.equal(config.name, expectedName, 'Preview name changed');
+  assert.equal(config.vars?.APP_MODE, 'test');
+  assert.equal(config.vars?.SOFTWARE_CHECKOUT_ENABLED, 'false');
+  assert.ok(!config.route, 'Preview cannot attach a production route');
+  assert.equal((config.routes || []).length, 0, 'Preview cannot attach production routes');
+  assert.equal((config.triggers?.crons || []).length, 0, 'Preview cannot add schedules');
 }
