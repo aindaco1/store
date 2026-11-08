@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createSyntheticSnapshot } from './rehearse-store-restore.mjs';
 import { archiveSensitiveSnapshot, validateBackupSafety } from './store-backup.mjs';
@@ -22,6 +22,8 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
   const {Miniflare,convertV4MiniflareOptions}=require('miniflare'), {buildSync}=require('esbuild');
   const {signingFixture}=await import(pathToFileURL(path.join(licensingRoot,'test/signature-fixture.mjs')));
   const signer=signingFixture(), secret=randomBytes(32).toString('hex'), readSecret=randomBytes(32).toString('hex'), checkpoint='rehearsal-'+randomBytes(16).toString('hex');
+  const keySecret=randomBytes(32).toString('hex');
+  const tokenSecrets={TOKEN_SECRET:randomBytes(32).toString('hex'),TOKEN_KEY_ID:'current',TOKEN_PREVIOUS_SECRET:randomBytes(32).toString('hex'),TOKEN_PREVIOUS_KEY_ID:'legacy',TOKEN_PREVIOUS_UNTIL:String(Math.floor(Date.now()/1000)+86400)};
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'software-restore-')); fs.chmodSync(temp,0o700);
   const previousIdentity=process.env.STORE_BACKUP_AGE_IDENTITY;
   const write=(name,value)=>fs.writeFileSync(name,JSON.stringify(value)+'\n',{mode:0o600});
@@ -30,8 +32,8 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
   const licensingScript=buildSync({entryPoints:[path.join(licensingRoot,'src/worker.js')],bundle:true,write:false,format:'esm',platform:'browser'}).outputFiles[0].text;
   function runtime(name,extra={}) {
     const mf=new Miniflare(convertV4MiniflareOptions({resourcePersistencePath:path.join(temp,name),workers:[
-      {name:'store',modules:true,script,compatibilityDate:'2026-10-30',compatibilityFlags:['nodejs_compat'],bindings:{APP_MODE:'test',SOFTWARE_LICENSING_ENABLED:'true',SOFTWARE_CHECKOUT_ENABLED:'false',ADMIN_SECRET:secret,SOFTWARE_BACKUP_READ_SECRET:readSecret,LICENSING_ADMIN_SECRET:secret,LICENSING_KEY_SECRET:secret,TAX_PROVIDER:'flat',SALES_TAX_RATE:'0.10',RESEND_API_KEY:'dry-run',STORE_EMAIL_DRY_RUN:'true',OBSERVABILITY_SAMPLE_RATE:'0',...extra},kvNamespaces:['STORE_STATE','RATELIMIT'],durableObjects:{STORE_INVENTORY_COORDINATOR:{className:'StoreInventoryCoordinator',useSQLite:true}},serviceBindings:{LICENSING_SERVICE:'licensing'},outboundService:()=>{externalCalls++;throw new Error('External request prohibited');}},
-      {name:'licensing',modules:true,script:licensingScript,compatibilityDate:'2026-10-30',bindings:{APP_MODE:'test',ADMIN_SECRET:secret,SOFTWARE_BACKUP_READ_SECRET:readSecret,TOKEN_SECRET:secret,UPDATER_PUBLIC_KEY:signer.publicKey,...extra},durableObjects:{PUBLISHER:{className:'Publisher',useSQLite:true}},r2Buckets:['ARTIFACTS'],outboundService:()=>{externalCalls++;throw new Error('External request prohibited');}}
+      {name:'store',modules:true,script,compatibilityDate:'2026-10-30',compatibilityFlags:['nodejs_compat'],bindings:{APP_MODE:'test',SOFTWARE_LICENSING_ENABLED:'true',SOFTWARE_CHECKOUT_ENABLED:'false',ADMIN_SECRET:secret,SOFTWARE_BACKUP_READ_SECRET:readSecret,LICENSING_ADMIN_SECRET:secret,LICENSING_KEY_SECRET:keySecret,TAX_PROVIDER:'flat',SALES_TAX_RATE:'0.10',RESEND_API_KEY:'dry-run',STORE_EMAIL_DRY_RUN:'true',OBSERVABILITY_SAMPLE_RATE:'0',...extra},kvNamespaces:['STORE_STATE','RATELIMIT'],durableObjects:{STORE_INVENTORY_COORDINATOR:{className:'StoreInventoryCoordinator',useSQLite:true}},serviceBindings:{LICENSING_SERVICE:'licensing'},outboundService:()=>{externalCalls++;throw new Error('External request prohibited');}},
+      {name:'licensing',modules:true,script:licensingScript,compatibilityDate:'2026-10-30',bindings:{APP_MODE:'test',ADMIN_SECRET:secret,SOFTWARE_BACKUP_READ_SECRET:readSecret,...tokenSecrets,UPDATER_PUBLIC_KEY:signer.publicKey,...extra},durableObjects:{PUBLISHER:{className:'Publisher',useSQLite:true}},r2Buckets:['ARTIFACTS'],outboundService:()=>{externalCalls++;throw new Error('External request prohibited');}}
     ]})); runtimes.add(mf);return mf;
   }
   const stop=async mf=>{await mf.dispose();runtimes.delete(mf);};
@@ -57,7 +59,7 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
     const activate=async()=>{const r=await request('licensing','/v1/activate',{key:license.key,installation:'mac'});return (await r.json()).token;};
     staleTokens.push(await activate());
     const mutation=async p=>{const response=await request('licensing','/internal/administration',{target:license.id,product:license.product,actor:'admin',...p});assert.equal(response.status,200);return response.json();};
-    license.key=await complimentaryKey({LICENSING_KEY_SECRET:secret},license.id,'paid:replacement:restore-rotation');
+    license.key=await complimentaryKey({LICENSING_KEY_SECRET:keySecret},license.id,'paid:replacement:restore-rotation');
     await mutation({action:'replace',operation:'restore-rotation',generation:1,key:license.key});
     staleTokens.push(await activate());
     await mutation({action:'deactivate',operation:'restore-deactivation',generation:2,installation:'mac',revision:0});
@@ -69,7 +71,9 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
     await request('licensing','/internal/grant',{id:'revoked',key:compKey,product:'ascii-vj-remix',seats:1,policy:{kind:'lifetime'}});
     const revokedToken=(await (await request('licensing','/v1/activate',{key:compKey,installation:'mac'})).json()).token;
     await request('licensing','/internal/revoke',{id:'revoked'});
-    return {license,token,revokedToken,oldKey,staleTokens};
+    const legacyBody=token.split('.').slice(0,4).join('.');
+    const legacyToken=legacyBody+'.'+createHmac('sha256',tokenSecrets.TOKEN_PREVIOUS_SECRET).update(legacyBody).digest('hex');
+    return {license,token,legacyToken,revokedToken,oldKey,staleTokens};
     };
     const capture = async (request,sourceId) => {
     const captured=await captureSoftwareBackup(snapshot,{checkpoint,request,sourceId});
@@ -84,7 +88,7 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
       return captured;
     };
     let seeded;
-    if (sourceCapture) seeded=await sourceCapture({snapshot,temp,secret,readSecret,checkpoint,publicKey:signer.publicKey,bytes,seed,capture});
+    if (sourceCapture) seeded=await sourceCapture({snapshot,temp,secret,readSecret,keySecret,tokenSecrets,checkpoint,publicKey:signer.publicKey,bytes,seed,capture});
     else {
       let source=runtime('source');
       const bucket=await source.getR2Bucket('ARTIFACTS','licensing');
@@ -97,7 +101,11 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
         assert.equal((await raw(source,service,route,{checkpoint,action:'begin',owner:'software-licenses',count:0},undefined,readSecret)).status,403);
       seeded.captured=await capture(client(source,readSecret));
     }
-    const {license,token,revokedToken,captured,oldKey,staleTokens}=seeded;
+    const {license,token,legacyToken,revokedToken,captured,oldKey,staleTokens}=seeded;
+    for(const filename of fs.readdirSync(path.join(snapshot,'software'))) {
+      const bytes=fs.readFileSync(path.join(snapshot,'software',filename));
+      for(const value of [secret,readSecret,keySecret,tokenSecrets.TOKEN_SECRET,tokenSecrets.TOKEN_PREVIOUS_SECRET])assert.equal(bytes.includes(Buffer.from(value)),false,'Raw server secret excluded from data snapshot');
+    }
     const manifest=JSON.parse(fs.readFileSync(path.join(snapshot,'manifest.json'),'utf8'));
     Object.assign(manifest,{includesSoftwareLicensing:true,softwareLicensing:captured,completedAt:new Date().toISOString(),warnings:[],includedDataClasses:['software-licensing-journals-and-artifacts']});
     write(path.join(snapshot,'manifest.json'),manifest);write(path.join(snapshot,'checksums.json'),{schemaVersion:1,artifacts:buildChecksumManifest(snapshot,{exclude:['checksums.json']})});
@@ -119,7 +127,7 @@ assert result['status']=='PASS',result
 `,verifier,archiveForRestore],{stdio:'pipe'});
     const decrypted=path.join(temp,'decrypted');fs.mkdirSync(decrypted,{mode:0o700});const tar=path.join(temp,'restore.tar.gz');
     execFileSync('age',['--decrypt','--identity',identity,'--output',tar,path.join(archiveForRestore,receipt.archive)]);execFileSync('tar',['-xzf',tar,'-C',decrypted]);readAndVerifySnapshot(decrypted);
-    const preview=previewRestore ? await previewRestore({snapshot:decrypted,secret,readSecret,checkpoint,publicKey:signer.publicKey,token,revokedToken,license,bytes,temp}) : null;
+    const preview=previewRestore ? await previewRestore({snapshot:decrypted,secret,readSecret,keySecret,tokenSecrets,checkpoint,publicKey:signer.publicKey,token,legacyToken,revokedToken,license,bytes,temp}) : null;
     const drift=await reconcileSoftwareMoney(decrypted,async route=>{
       const result=await stripeRead(route);if(route.startsWith('/refunds?')&&route.includes('pi_first'))return {has_more:false,data:[{...refund,id:'re_after_backup',payment_intent:'pi_first'}]};return result;
     });assert.equal(drift.ok,false);assert.ok(drift.issues.includes('unreconciled_refund'));
@@ -127,6 +135,16 @@ assert result['status']=='PASS',result
     await assert.rejects(restoreSoftwareBackup(decrypted,{previewId:'0123456789abcdef',request:client(target),stripeRead}),/Preview destination identity/);
     const untouched=await (await raw(target,'licensing','/internal/backup',{checkpoint,action:'info'})).json();
     assert.equal(untouched.recovery,null);assert.equal(untouched.counts.grants,0);
+    // Required roots are supplied separately from the data archive. Reject a
+    // lost/mistaken key before any import, then recover it and retry safely.
+    await stop(target);
+    for(const wrong of [{LICENSING_KEY_SECRET:randomBytes(32).toString('hex')},{TOKEN_SECRET:randomBytes(32).toString('hex')},{TOKEN_PREVIOUS_UNTIL:String(Number(tokenSecrets.TOKEN_PREVIOUS_UNTIL)+1)},{TOKEN_PREVIOUS_SECRET:randomBytes(32).toString('hex')},{TOKEN_PREVIOUS_SECRET:'',TOKEN_PREVIOUS_KEY_ID:'',TOKEN_PREVIOUS_UNTIL:''}]) {
+      target=runtime('target',{SOFTWARE_RECOVERY_CHECKPOINT:checkpoint,SOFTWARE_RECOVERY_TARGET:'empty',...wrong});
+      await assert.rejects(restoreSoftwareBackup(decrypted,{request:client(target),stripeRead}),/Original licensing|Original token/);
+      const empty=await(await raw(target,'licensing','/internal/backup',{checkpoint,action:'info'})).json();
+      assert.equal(empty.counts.grants,0);assert.equal(empty.recovery,null);await stop(target);
+    }
+    target=runtime('target',{SOFTWARE_RECOVERY_CHECKPOINT:checkpoint,SOFTWARE_RECOVERY_TARGET:'empty'});
     let loseUpload=true;
     await assert.rejects(restoreSoftwareBackup(decrypted,{stripeRead,request:async(...args)=>{
       const response=await client(target)(...args);
@@ -162,8 +180,19 @@ assert result['status']=='PASS',result
     const recovered=await (await billing('recover',{lineId:'software'})).json();assert.equal(recovered.key,license.key);
     await billing('invoice',{invoiceId:'in_first',eventId:'evt_replayed'});await billing('drain');
     const kv=await target.getKVNamespace('STORE_STATE');assert.equal((await kv.list({prefix:'email-outbox:v1:'})).keys.length,0);
+    assert.equal((await download(target,legacyToken,'old')).status,200,'old signer recovered during overlap');
+    await stop(target);
+    const rotatedAdmin=randomBytes(32).toString('hex');
+    target=runtime('target',{SOFTWARE_RECOVERY_ACCEPTED:checkpoint,TOKEN_PREVIOUS_UNTIL:'1',ADMIN_SECRET:rotatedAdmin,ADMIN_SECRET_PREVIOUS:secret,ADMIN_SECRET_PREVIOUS_UNTIL:'1',LICENSING_ADMIN_SECRET:rotatedAdmin});
+    assert.equal((await post(target,'/internal/administration',{action:'status',target:license.id,product:license.product})).status,403);
+    assert.equal((await raw(target,'licensing','/internal/administration',{action:'status',target:license.id,product:license.product},undefined,rotatedAdmin)).status,200);
+    assert.equal((await download(target,legacyToken,'old')).status,403);
+    assert.equal((await download(target,token,'old')).status,200);
+    const nsRotated=await target.getDurableObjectNamespace('STORE_INVENTORY_COORDINATOR','store');
+    const afterRotation=await nsRotated.get(nsRotated.idFromName('software-billing:'+orderToken)).fetch('https://journal/billing-recover',{method:'POST',body:JSON.stringify({lineId:'software'})});
+    assert.equal((await afterRotation.json()).key,license.key,'server rotation preserves deterministic license recovery');
     assert.equal(externalCalls,0);
-    return {ok:true,preview,encrypted:true,archiveVerification:'PASS',captured,restored,checks:['read-only capture credential cannot import','paused mutation rejected','more than one export page','missing page rejected','mismatched KV checkpoint rejected','age round trip and full checksums','fresh refund drift blocks acceptance','restored authority stays closed','artifact readback and signature rebinding','old activation retained and seat limit enforced','coverage gap and refunded renewal denied','seller revocation retained','lost upload reply and complete restore replay safe','replacement Store key recovered with original secret','old keys and device tokens remain denied','withdrawal and administration receipts survive restore','approved KV and mail receipts restored without sessions or pending mail','duplicate payment event produces no new mail'],externalRequests:externalCalls,livePayments:0,realEmails:0,paidCheckoutEnabled:false};
+    return {ok:true,preview,encrypted:true,archiveVerification:'PASS',captured,restored,checks:['wrong root and missing verification keys rejected before import','previous signing key recovered and retired','service credential retirement preserves license recovery','read-only capture credential cannot import','paused mutation rejected','more than one export page','missing page rejected','mismatched KV checkpoint rejected','age round trip and full checksums','fresh refund drift blocks acceptance','restored authority stays closed','artifact readback and signature rebinding','old activation retained and seat limit enforced','coverage gap and refunded renewal denied','seller revocation retained','lost upload reply and complete restore replay safe','replacement Store key recovered with original secret','old keys and device tokens remain denied','withdrawal and administration receipts survive restore','approved KV and mail receipts restored without sessions or pending mail','duplicate payment event produces no new mail'],externalRequests:externalCalls,livePayments:0,realEmails:0,paidCheckoutEnabled:false};
   } finally {
     await Promise.allSettled([...runtimes].map(mf=>mf.dispose()));fs.rmSync(temp,{recursive:true,force:true});
     if(previousIdentity===undefined)delete process.env.STORE_BACKUP_AGE_IDENTITY;else process.env.STORE_BACKUP_AGE_IDENTITY=previousIdentity;

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { rehearseSoftwareRestore } from './rehearse-software-restore.mjs';
 import { softwareBackupClient, restoreSoftwareBackup } from './lib/software-backup.mjs';
 import { softwareArchiveConfiguration, softwareArchiveRoundTrip } from './lib/software-recovery-archive.mjs';
@@ -36,8 +37,8 @@ export async function rehearseSoftwarePreview({ previewOnly = false, evidenceFil
         return downloaded;
       },
       previewRestore: async context => {
-        const { snapshot, secret, readSecret, checkpoint, publicKey, token, revokedToken, license, bytes, temp } = context;
-        return withSoftwarePreview(context,{root,licensing,cli,report,emit,evidenceFile},async ({previewId,prefix,resources,configs,configPaths,bases,run,write,deploy}) => {
+        const { snapshot, secret, readSecret, checkpoint, publicKey, token, legacyToken, revokedToken, license, bytes, temp } = context;
+        return withSoftwarePreview(context,{root,licensing,cli,report,emit,evidenceFile},async ({previewId,prefix,resources,configs,configPaths,bases,run,write,deploy,secrets,installSecrets}) => {
           const request = softwareBackupClient({ ...bases, storeSecret: secret, licensingSecret: secret, restore: true });
           const readOnly = softwareBackupClient({ ...bases, storeSecret: readSecret, licensingSecret: readSecret });
           for (const [service, route] of [['store', '/admin/store/recovery/software'], ['licensing', '/internal/backup']]) {
@@ -66,12 +67,26 @@ export async function rehearseSoftwarePreview({ previewOnly = false, evidenceFil
           // Explicit acceptance is only for this completed, synthetic target.
           for (const role of ['store', 'licensing']) { configs[role].vars.SOFTWARE_RECOVERY_ACCEPTED = checkpoint; write(role, configs[role]); deploy(role); }
           assert.equal(await (await fetchLicense('/v1/releases/old')).text(), bytes.toString());
+          assert.equal((await fetchLicense('/v1/releases/old',legacyToken)).status,200,'previous signing key recovered');
           for (const id of ['gap','new']) assert.equal((await fetchLicense(`/v1/releases/${id}`)).status, 403);
           assert.equal((await fetchLicense('/v1/releases/old', revokedToken)).status, 403);
           assert.equal((await fetchLicense('/v1/activate', secret, { key: license.key, installation: 'second-mac' })).status, 409);
           const replay = await fetch(bases.storeBase + '/fixture/replay', { method: 'POST', headers: { Authorization: `Bearer ${secret}`, 'Content-Type':'application/json' }, body:JSON.stringify({key:license.key}), redirect: 'error', signal: AbortSignal.timeout(30000) });
           assert.equal(replay.status, 200); assert.deepEqual(await replay.json(), { sameKey: true, queuedMail: 0 });
-          report.checks = ['remote credential boundaries', 'lost upload reply retry', 'complete logical and KV/R2 readback', 'restart acceptance lock', 'original activation and seats', 'coverage gaps, refunds and revocations', 'signature-verified downloads', 'duplicate payment produces no email'];
+          const nextAdmin=randomBytes(32).toString('hex');
+          Object.assign(secrets.licensing,{ADMIN_SECRET:nextAdmin,ADMIN_SECRET_PREVIOUS:secret,ADMIN_SECRET_PREVIOUS_UNTIL:String(Math.floor(Date.now()/1000)+3600)});
+          installSecrets('licensing');
+          const status={action:'status',target:license.id,product:license.product};
+          for(const credential of [secret,nextAdmin])assert.equal((await fetchLicense('/internal/administration',credential,status)).status,200);
+          secrets.store.LICENSING_ADMIN_SECRET=nextAdmin;installSecrets('store');
+          Object.assign(secrets.licensing,{ADMIN_SECRET_PREVIOUS_UNTIL:'1',TOKEN_PREVIOUS_UNTIL:'1'});installSecrets('licensing');
+          assert.equal((await fetchLicense('/internal/administration',secret,status)).status,403);
+          assert.equal((await fetchLicense('/internal/administration',nextAdmin,status)).status,200);
+          assert.equal((await fetchLicense('/v1/releases/old',legacyToken)).status,403);
+          assert.equal((await fetchLicense('/v1/releases/old')).status,200);
+          const recovered=await request('store','/fixture/replay',{key:license.key});
+          assert.deepEqual(await recovered.json(),{sameKey:true,queuedMail:0});
+          report.checks = ['remote credential boundaries', 'lost upload reply retry', 'complete logical and KV/R2 readback', 'restart acceptance lock', 'original activation and seats', 'coverage gaps, refunds and revocations', 'signature-verified downloads', 'duplicate payment produces no email','previous signing key recovered','service overlap and retirement','retired signer denied; current signer and Store key recovery retained'];
           return { ok: true, paidCheckoutEnabled: false };
         });
       }

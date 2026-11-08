@@ -233,6 +233,10 @@ export async function verifySoftwareRestoreDestination(snapshotRoot,{request,pre
   const info=await json(request,'licensing',authorityRoute,{checkpoint,action:'info'}), store=await json(request,'store',storeRoute,{checkpoint,action:'info'});
   if (previewId) check([info,store].every(value=>value.previewId===previewId && value.target==='empty' && value.paidCheckoutEnabled===false),'Preview destination identity or disabled-sales guard mismatch');
   check(info.keyProof===manifest.authority.keyProof && info.publicKey===manifest.authority.publicKey && store.keyProof===manifest.store.keyProof,'Original licensing secrets/signing key required');
+  // Legacy archives describe a single unversioned signing key. New archives
+  // require the exact bounded verification set, including its retirement time.
+  const legacy=authority=>[{id:'legacy',until:null,proof:authority.keyProof}];
+  check(JSON.stringify(info.tokenKeys || legacy(info))===JSON.stringify(manifest.authority.tokenKeys || legacy(manifest.authority)),'Original token verification keys and retirement policy required');
   return {info,store};
 }
 export async function restoreSoftwareBackup(snapshotRoot,{request=softwareBackupClient({restore:true}),stripeRead,previewId}={}) {

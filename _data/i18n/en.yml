@@ -720,6 +720,20 @@ email:
     footer: Someone requested access to the admin dashboard with this email address.
 
 software:
+  admin_tab: "Licenses"
+  unavailable: "License management is not enabled for this store."
+  paid_title_help: "Load an existing purchase to review license delivery, payments, refunds and renewal cancellation."
+  paid_status_help: "Review pending work before retrying delivery. Items marked for review need an operator decision."
+  releases_help: "Review published private builds and withdraw a build from downloads and update feeds. Installed copies keep working."
+  complimentary_help: "Grant update access without a purchase. Choose the device allowance and coverage before issuing."
+  order_help: "Use the Store order token for the purchase you want to manage."
+  refund_amount_help: "Refund this item only. A full software refund removes this payment’s coverage; partial refunds need a coverage review."
+  existing_refund_help: "Enter a Stripe refund ID only when money was already returned, so Store can record it without another refund."
+  email_help: "The recipient receives the license email after issuance succeeds."
+  seat_count_help: "Maximum active installations at once. Deactivating a device frees a seat."
+  policy_help: "Coverage controls private downloads and updates. It never disables installed software."
+  major_help: "Allow releases within this major version."
+  end_help: "The selected date is exclusive, at midnight UTC. Earlier covered builds remain available."
   manage_devices: "Manage devices and key"
   device_count: "Active installations: %{count} of %{seats}."
   deactivate: "Deactivate this installation"

@@ -58,6 +58,11 @@ describe('software logical recovery',()=>{
     expect((await worker.fetch(request('Bearer synthetic-read-secret'),readConfig,{})).status).toBe(200);
     const mutation=new Request('https://store/admin/store/recovery/software',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer synthetic-read-secret'},body:JSON.stringify({checkpoint,action:'begin',owner:'software-licenses',count:0})});
     expect((await worker.fetch(mutation,readConfig,{})).status).toBe(403);
+    const rotating={...readConfig,SOFTWARE_BACKUP_READ_SECRET:'new-read-secret',SOFTWARE_BACKUP_READ_SECRET_PREVIOUS:'synthetic-read-secret',SOFTWARE_BACKUP_READ_SECRET_PREVIOUS_UNTIL:String(Math.floor(Date.now()/1000)+3600)};
+    expect((await worker.fetch(request('Bearer synthetic-read-secret'),rotating,{})).status).toBe(200);
+    const oldWrite=new Request('https://store/admin/store/recovery/software',{method:'POST',headers:{Authorization:'Bearer synthetic-read-secret','Content-Type':'application/json'},body:JSON.stringify({checkpoint,action:'begin',owner:'software-licenses',count:0})});
+    expect((await worker.fetch(oldWrite,rotating,{})).status).toBe(403);
+    expect((await worker.fetch(request('Bearer synthetic-read-secret'),{...rotating,SOFTWARE_BACKUP_READ_SECRET_PREVIOUS_UNTIL:'1'},{})).status).toBe(401);
     const exportRequest=new Request('https://store/admin/store/recovery/software',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer synthetic-read-secret'},body:JSON.stringify({checkpoint,action:'export',owner:'software-licenses'})});
     const namespace={idFromName:(name:string)=>name,get:()=>({fetch:async()=>Response.json({version:1,records:[],cursor:null})})};
     const response=await worker.fetch(exportRequest,{...readConfig,STORE_INVENTORY_COORDINATOR:namespace},{});

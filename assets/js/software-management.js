@@ -13,20 +13,33 @@ function button(parent, label, action) {
   const element = node(parent, 'button', label, 'btn btn--secondary'); element.type = 'button';
   element.addEventListener('click', action); return element;
 }
+let controlId = 0;
+function control(parent, label, name, tag) {
+  const admin = !!parent.closest('.admin-licenses');
+  const wrapper = node(parent, 'div', '', admin ? 'admin-settings__field-stack' : 'store-software__field');
+  const header = node(wrapper, 'div', '', admin ? 'admin-settings__row-header' : '');
+  const caption = node(header, 'label', label);
+  const input = node(wrapper, tag, '', 'admin-settings__input');
+  input.id = `software-control-${++controlId}`; input.name = name; caption.htmlFor = input.id;
+  return input;
+}
 function field(parent, label, name, type = 'text', value = '') {
-  const wrapper = node(parent, 'label', label, 'store-software__field');
-  const input = node(wrapper, 'input', '', type === 'checkbox' ? '' : 'admin-settings__input'); input.type = type; input.name = name; input.value = value; input.required = true;
+  let input;
+  if (type === 'checkbox') {
+    const wrapper = node(parent, 'label', '', parent.closest('.admin-licenses') ? 'admin-settings__checkbox-option' : 'store-software__field');
+    input = node(wrapper, 'input'); input.name = name; node(wrapper, 'span', label);
+  } else input = control(parent, label, name, 'input');
+  input.type = type; input.value = value; input.required = true;
   return input;
 }
 function select(parent, label, name, options) {
-  const wrapper = node(parent, 'label', label, 'store-software__field');
-  const element = node(wrapper, 'select', '', 'admin-settings__input'); element.name = name;
+  const element = control(parent, label, name, 'select');
   for (const [value, text] of options) { const option = node(element, 'option', text); option.value = value; }
   return element;
 }
-function view(root) {
-  root.classList.add('store-software');
-  const status = node(root, 'p', '', 'store-software__status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
+function view(root, admin = false) {
+  root.classList.add(admin ? 'admin-licenses' : 'store-software');
+  const status = node(root, 'p', '', admin ? 'admin-dashboard__status' : 'store-software__status'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   let busy = false;
   return async action => {
     if (busy) return;
@@ -166,25 +179,34 @@ async function refundRequestId(payload) {
   return hint.id;
 }
 
-export async function mountAdmin(root, { request }) {
+export async function mountAdmin(root, { request, createHelp, createHeadingWithHelp }) {
   const config = await request('/admin/store/licenses/config');
-  if (!config.enabled) { root.hidden = true; return; }
   root.hidden = false; root.replaceChildren();
-  node(node(root, 'summary'), 'h2', t('admin_title'));
-  const run = view(root);
+  node(root, 'h2', t('admin_title'), 'admin-report-heading');
+  if (!config.enabled) { node(root, 'p', t('unavailable'), 'admin-app__muted'); return; }
+  const run = view(root, true);
+  function heading(parent, key) {
+    if (createHeadingWithHelp) parent.append(createHeadingWithHelp('h3', 'admin-report-heading', t(key), {path:'software-'+key,help:t(key+'_help')}));
+    else node(parent, 'h3', t(key), 'admin-report-heading');
+  }
+  function explain(input, key) {
+    const header = input.parentElement.querySelector('.admin-settings__row-header');
+    if (createHelp && header) header.append(createHelp({label:t(key),path:input.id,help:t(key+'_help')},input));
+    return input;
+  }
   const api = (action, body = {}) => request(`/admin/store/licenses/${action}`, { method: 'POST', body });
-  node(root, 'p', t('pilot'));
+  node(root, 'p', t('pilot'), 'admin-app__muted');
   if (config.paidActions) {
-    const form = node(root, 'form', '', 'store-software__card store-order__panel'); node(form, 'h3', t('paid_title'));
-    const order = field(form, t('order'), 'orderToken'); order.pattern = 'store-order-[a-f0-9]{64}';
+    const form = node(root, 'form', '', 'admin-section-panel'); heading(form, 'paid_title');
+    const order = explain(field(form, t('order'), 'orderToken'), 'order'); order.pattern = 'store-order-[a-f0-9]{64}';
     node(form, 'button', t('load'), 'btn').type = 'submit';
-    const body = node(root, 'div');
+    const body = node(root, 'div', '', 'admin-section-stack');
     form.addEventListener('submit', event => { event.preventDefault(); const orderToken = order.value.trim(); run(() => loadPaid(orderToken)); });
     async function loadPaid(orderToken,data) {
       data ||= await api('billing', { orderToken }); body.replaceChildren();
       const hint = JSON.parse(sessionStorage.getItem(REFUND_HINT) || 'null');
       if (hint && data.refunds.some(refund => refund.request.id === hint.id)) sessionStorage.removeItem(REFUND_HINT);
-      const card = node(body, 'section', '', 'store-software__card store-order__panel'); node(card, 'h3', t('paid_status'));
+      const card = node(body, 'section', '', 'admin-section-panel'); heading(card, 'paid_status');
       node(card, 'p', t('work', { pending: data.work.filter(job => !job.done && !job.review).length, review: data.work.filter(job => job.review).length + data.reviews.length }));
       button(card, t('reconcile'), () => run(async () => { await api('reconcile', { orderToken }); await loadPaid(orderToken); }));
       if (data.lines.some(line => line.interval) && !data.cancellation) confirmAction(card, t('cancel'), t('cancel_help'), run, async () => { await api('cancel-renewals', { orderToken }); await loadPaid(orderToken); });
@@ -200,14 +222,14 @@ export async function mountAdmin(root, { request }) {
       node(card,'p',t('history_hint'));
       for(const [kind,cursor] of Object.entries(data.cursors || {})) if(cursor)button(card,t('more_'+kind),()=>run(async()=>{const page=await api('history',{orderToken,kind,cursor});data[kind].push(...page.entries);data.cursors[kind]=page.cursor;await loadPaid(orderToken,data);}));
       for (const payment of data.payments) {
-        const details = node(body, 'details', '', 'store-software__card store-order__panel'); node(details, 'summary', `${date(payment.receipt.paidAt)} · ${money(payment.receipt.amountCents)} · ${payment.receipt.id}`);
+        const details = node(body, 'details', '', 'admin-section-panel'); node(details, 'summary', `${date(payment.receipt.paidAt)} · ${money(payment.receipt.amountCents)} · ${payment.receipt.id}`);
         for (const item of payment.items) {
           const source = data.lines.find(line => line.id === item.orderLineId);
           node(details, 'p', `${source?.name || item.orderLineId}: ${money(item.amountCents)}`);
           if (!item.amountCents) continue;
           const refundForm = node(details, 'form');
-          const amount = field(refundForm, t('refund_amount'), 'amount', 'number'); amount.min = '0.01'; amount.max = String(item.amountCents / 100); amount.step = '0.01';
-          const existing = field(refundForm, t('existing_refund'), 'refundId'); existing.required = false; existing.pattern = 're_[A-Za-z0-9_]+';
+          const amount = explain(field(refundForm, t('refund_amount'), 'amount', 'number'), 'refund_amount'); amount.min = '0.01'; amount.max = String(item.amountCents / 100); amount.step = '0.01';
+          const existing = explain(field(refundForm, t('existing_refund'), 'refundId'), 'existing_refund'); existing.required = false; existing.pattern = 're_[A-Za-z0-9_]+';
           field(refundForm, t('refund_confirm'), 'confirmed', 'checkbox');
           const submit = node(refundForm, 'button', t('refund'), 'btn'); submit.type = 'submit';
           refundForm.addEventListener('submit', event => {
@@ -223,7 +245,7 @@ export async function mountAdmin(root, { request }) {
     }
   }
   if(config.paidActions) {
-    const releases=node(root,'section','','store-software__card store-order__panel');node(releases,'h3',t('releases'));
+    const releases=node(root,'section','','admin-section-panel');heading(releases, 'releases');
     const list=node(releases,'div');
     button(releases,t('load_releases'),()=>run(()=>load()));
     async function load(cursor='',append=false) {
@@ -236,12 +258,12 @@ export async function mountAdmin(root, { request }) {
       if(page.cursor){const more=button(list,t('more'),()=>run(async()=>{await load(page.cursor,true);more.remove();}));}
     }
   }
-  const grantForm = node(root, 'form', '', 'store-software__card store-order__panel'); node(grantForm, 'h3', t('complimentary'));
-  const email = field(grantForm, t('email'), 'email', 'email');
-  const seats = field(grantForm, t('seat_count'), 'seats', 'number', '1'); seats.min = '1'; seats.max = '100';
-  const policy = select(grantForm, t('policy'), 'policy', [['lifetime',t('lifetime')],['major',t('major')],['term',t('term')]]);
-  const major = field(grantForm, t('major'), 'major', 'number', '1'); major.min = '1';
-  const end = field(grantForm, t('end'), 'end', 'date');
+  const grantForm = node(root, 'form', '', 'admin-section-panel'); heading(grantForm, 'complimentary');
+  const email = explain(field(grantForm, t('email'), 'email', 'email'), 'email');
+  const seats = explain(field(grantForm, t('seat_count'), 'seats', 'number', '1'), 'seat_count'); seats.min = '1'; seats.max = '100';
+  const policy = explain(select(grantForm, t('policy'), 'policy', [['lifetime',t('lifetime')],['major',t('major')],['term',t('term')]]), 'policy');
+  const major = explain(field(grantForm, t('major'), 'major', 'number', '1'), 'major'); major.min = '1';
+  const end = explain(field(grantForm, t('end'), 'end', 'date'), 'end');
   function policyFields() { major.parentElement.hidden = policy.value !== 'major'; major.required = policy.value === 'major'; end.parentElement.hidden = policy.value !== 'term'; end.required = policy.value === 'term'; }
   policy.addEventListener('change', policyFields); policyFields();
   field(grantForm, t('grant_confirm'), 'confirmed', 'checkbox');
@@ -255,11 +277,11 @@ export async function mountAdmin(root, { request }) {
     if (!grantRequest || JSON.stringify(grantRequest.meaning) !== JSON.stringify(meaning)) grantRequest = { id: crypto.randomUUID(), meaning };
     run(async () => { const result = await api('complimentary', { id: grantRequest.id, ...meaning }); node(grantResults, 'p', t('grant_saved', { id: result.id })); await loadGrants(); });
   });
-  const grants = node(root, 'div');
+  const grants = node(root, 'div', '', 'admin-section-stack');
   async function loadGrants(cursor = '', append = false) {
     const data = await api('list', { cursor }); if (!append) grants.replaceChildren();
     for (const grant of data.grants) {
-      const card = node(grants, 'section', '', 'store-software__card store-order__panel'); node(card, 'h4', grant.email);
+      const card = node(grants, 'section', '', 'admin-section-panel'); node(card, 'h4', grant.email);
       node(card, 'p', `${grant.id} · ${coverageText(grant.policy)} · ${t(`grant_${grant.state}`)}`);
       if (grant.grantedAt) {
         reveal(card, run, () => api('recover', { id: grant.id }));
