@@ -86,3 +86,19 @@ Keep paid Entitle sales, production licensing and scheduled licensing capture
 **disabled**. This test establishes a sandbox path, not a paid app launch,
 production tax policy, actual inbox rendering, dispute policy or app distribution
 acceptance.
+
+
+For a focused checkout/webhook regression run, add `--checkout-only`. It still
+requires the real browser decline, 3DS challenge, one mixed-cart settlement and a
+fresh signed redelivery receipt, then cleans up without advancing a renewal or
+sending email. The full mode retains all three messages and renewal recovery.
+Both modes now require the initial declined PaymentIntent webhook to return 200.
+A non-success receipt records only a bounded error label, never the event payload.
+
+Store resolves a missing PaymentIntent identity from its existing checkout DO
+when KV still serves the pre-provider checkpoint. Normal payment identity, amount,
+currency and order-hash validation still runs; conflicting identities are denied.
+The fallback is read-only and does not expose a client secret or retry creation.
+This addresses [KV eventual consistency](https://developers.cloudflare.com/kv/concepts/how-kv-works/).
+A fresh receipt after [Stripe redelivery](https://docs.stripe.com/webhooks) is
+required; CLI acceptance alone is not delivery evidence.

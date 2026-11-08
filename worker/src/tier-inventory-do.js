@@ -75,12 +75,13 @@ class InventoryCoordinator {
       if (!await this.ctx.storage.get(key)) await this.ctx.storage.put(key, { orderToken: body.orderToken });
       return jsonResponse({ registered: true });
     }
-    if (this.checkout && ['/checkout-hold', '/checkout-extend', '/checkout-pay', '/checkout-free', '/checkout-status', '/checkout-release', '/checkout-confirm'].includes(url.pathname)) {
+    if (this.checkout && ['/checkout-hold', '/checkout-extend', '/checkout-pay', '/checkout-free', '/checkout-status', '/checkout-release', '/checkout-confirm', '/checkout-payment'].includes(url.pathname)) {
       return jsonResponse(await this.checkout.handle(url.pathname, body));
     }
     if (this.licenses && url.pathname === '/license-issue') return jsonResponse(await this.licenses.issue(body));
     if (this.licenses && url.pathname === '/license-recover') return jsonResponse(await this.licenses.recover(body.id));
     if (this.licenses && url.pathname === '/license-list') return jsonResponse(await this.licenses.list(body));
+    if (this.licenses && url.pathname === '/license-administration') return jsonResponse(await this.licenses.administer(body));
     if (this.licenses && url.pathname === '/license-drain') { await this.licenses.drain(); return jsonResponse({ ok: true }); }
 
     if (this.billing && url.pathname.startsWith('/billing-')) return jsonResponse(await this.billing.handle(url.pathname.slice('/billing-'.length), body));

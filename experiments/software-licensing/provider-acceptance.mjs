@@ -20,6 +20,7 @@ const licensing=path.resolve(process.env.LICENSING_REPO||path.join(root,'../dust
 const stateFile=path.resolve(arg('state')||'');
 assert.ok(arg('state')&&!stateFile.startsWith(root+path.sep),'Private --state path must be outside the checkout');
 assert.ok(!fs.existsSync(stateFile),'Use a new state path for each run');
+const checkoutOnly=process.argv.includes('--checkout-only');
 const recipient=arg('recipient');assert.match(recipient||'',/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
 assert.match(process.env.CLOUDFLARE_ACCOUNT_ID||'',/^[a-f0-9]{32}$/);
 const credentials=parseEnv(fs.readFileSync(arg('credentials'),'utf8'));
@@ -32,7 +33,7 @@ const nonce=()=>randomBytes(32).toString('hex');
 const secret=nonce(),orderToken='store-order-'+nonce();
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'software-provider-acceptance-'));
 const evidenceFile=stateFile+'.evidence.json';
-const report={ok:false,testMode:true,productionWrites:false,paidCheckoutEnabled:false,scheduledCaptureEnabled:false,checks:[],mail:[],cleanup:{},providerCleanup:{ok:false}};
+const report={ok:false,testMode:true,productionWrites:false,paidCheckoutEnabled:false,scheduledCaptureEnabled:false,scope:checkoutOnly?'checkout-webhook-followup':'full-provider-acceptance',checks:[],mail:[],cleanup:{},providerCleanup:{ok:false}};
 const emit=()=>fs.writeFileSync(evidenceFile,JSON.stringify(report,null,2)+'\n',{mode:0o600});
 let stopped=false,clock,endpoint,order,base,setupState;
 process.on('SIGINT',()=>{stopped=true;});process.on('SIGTERM',()=>{stopped=true;});
@@ -64,6 +65,11 @@ async function sendMail() {
   for(const m of state.mail)if(!report.mail.some(x=>x.id===m.providerId))report.mail.push({id:m.providerId,kind:m.kind});
   assert.ok(report.mail.length<=4,'Bounded test mail count');emit();
 }
+async function replay(event) {
+  execFileSync('stripe',['events','resend',event.id,'--webhook-endpoint',endpoint.id],{env:{...process.env,STRIPE_API_KEY:secretKey},stdio:'pipe',timeout:30000});
+  const receipt=await waitFor(async()=>{const s=await call('/acceptance/state');return s.events.find(e=>e.id===event.id&&e.status===200&&e.receivedAt>event.receivedAt);},'redelivered public webhook receipt');
+  report.replay={eventId:event.id,before:event.receivedAt,after:receipt.receivedAt,status:receipt.status};emit();
+}
 const account=await api('GET','/account');assert.equal(account.id,arg('account'),'Unexpected Stripe account');
 try {
   clock=await api('POST','/test_helpers/test_clocks',{frozen_time:Math.floor(Date.now()/1000),name:'licensing-browser-'+orderToken.slice(-16)});
@@ -92,13 +98,20 @@ try {
       setupState={base,secret,orderToken,recipient};phase('decline-and-sca');await signal('payment');
       const confirmed=await waitFor(async()=>{const s=await call('/acceptance/state');return s.order?.status==='confirmed'&&s.billing?.payments?.length===1?s:false;},'public webhook fulfillment');order=confirmed.order;
       assert.ok(confirmed.events.some(e=>e.type==='payment_intent.succeeded'&&e.status===200));
-      assert.ok(confirmed.events.some(e=>e.type==='payment_intent.payment_failed'),'Browser decline evidence missing');
+      const decline=confirmed.events.find(e=>e.type==='payment_intent.payment_failed');
+      assert.equal(decline?.status,200,'Initial decline must reach the authority despite KV propagation');
+      report.initialDecline={status:decline.status,receivedAt:decline.receivedAt};
       assert.equal(confirmed.billing.payments.length,1);assert.equal(order.totalCents??order.totals?.totalCents??confirmed.billing.payments[0].receipt.amountCents,6000);
       const intent=await api('GET','/payment_intents/'+confirmed.billing.payments[0].receipt.paymentIntentId+'?expand[]=latest_charge');
       const sca=intent.latest_charge.payment_method_details?.card?.three_d_secure;
       assert.equal(sca?.result,'authenticated');assert.equal(sca?.authentication_flow,'challenge');
       report.sca={result:sca.result,flow:sca.authentication_flow,version:sca.version};
-      report.checks.push('browser initial payment and signed public webhook','one mixed-cart initial settlement');emit();await sendMail();
+      report.checks.push('browser initial payment and signed public webhook','one mixed-cart initial settlement','early declined-payment webhook accepted');emit();
+      if(checkoutOnly) {
+        await replay(decline);assert.equal((await call('/acceptance/state')).billing.payments.length,1);
+        report.checks.push('fresh failed-payment replay receipt; no extra fulfillment');report.ok=true;phase('complete');emit();return;
+      }
+      await sendMail();
       phase('declining-card-setup');await signal('setup');
       const sub=await api('GET','/subscriptions/'+order.payment.billing.subscriptionId);
       const pm=await api('GET','/payment_methods/'+sub.default_payment_method);assert.equal(pm.card.last4,'0341');
@@ -121,8 +134,7 @@ try {
       await sendMail();
       assert.equal(report.mail.length,3,'Expected license, failure and renewal messages');
       const event=await waitFor(async()=>{const s=await call('/acceptance/state');return s.events.find(e=>e.type==='invoice.paid'&&e.objectId===renewal.id&&e.status===200);},'paid renewal webhook receipt');
-      execFileSync('stripe',['events','resend',event.id,'--webhook-endpoint',endpoint.id],{env:{...process.env,STRIPE_API_KEY:secretKey},stdio:'pipe',timeout:30000});
-      await waitFor(async()=>{const s=await call('/acceptance/state');return s.events.some(e=>e.id===event.id&&e.status===200&&e.receivedAt>event.receivedAt);},'redelivered public webhook receipt');
+      await replay(event);
       assert.equal((await call('/acceptance/state')).billing.payments.length,2);assert.equal((await call('/acceptance/mail',{})).sent,0);
       report.checks.push('provider redelivery preserved payment and mail deduplication');
       for(const mail of report.mail){

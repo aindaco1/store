@@ -319,7 +319,13 @@ describe('public checkout gateway', () => {
     const intent = { id: 'pi_fixture', amount: stored.payment.amountCents, currency: 'usd', status: 'requires_payment_method',
       metadata: { checkoutProvider: 'first_party', orderToken: stored.orderToken, orderHash: stored.orderHash } };
     const webhook = (type: string, id: string) => postWebhook(JSON.stringify({ id, type, livemode: false, data: { object: intent } }));
+    // A regional KV read can still see the pre-provider checkpoint after the DO committed its PaymentIntent.
+    const stale=structuredClone(stored);delete stale.payment.paymentIntentId;
+    orders.set(`orders:${stored.orderToken}`,JSON.stringify(stale));
     expect((await webhook('payment_intent.payment_failed', 'evt_decline')).status).toBe(200);
+    intent.id='pi_foreign';
+    expect((await webhook('payment_intent.payment_failed','evt_foreign')).status).toBe(409);
+    intent.id='pi_fixture';
     expect((await call('checkout-status')).phase).toBe('payment');
     status = intent.status = 'succeeded';
     expect((await webhook('payment_intent.succeeded', 'evt_success')).status).toBe(200);

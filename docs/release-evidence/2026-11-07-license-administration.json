@@ -1,0 +1,154 @@
+{
+  "date": "2026-11-07",
+  "paidEntitleSalesEnabled": false,
+  "productionLicensingEnabled": false,
+  "scheduledLicensingCaptureEnabled": false,
+  "productionWrites": false,
+  "fullProvider": {
+    "ok": true,
+    "checks": [
+      "browser initial payment and signed public webhook",
+      "one mixed-cart initial settlement",
+      "hosted setup completed and applied to the original subscription",
+      "renewal recalculated tax and excluded one-time items",
+      "failed renewal arrived through public webhook",
+      "hosted recovery paid original invoice without a second charge",
+      "paid renewal webhook fulfilled once",
+      "provider redelivery preserved payment and mail deduplication",
+      "existing Resend templates delivered with text, reply-to and private management links"
+    ],
+    "sca": {
+      "result": "authenticated",
+      "flow": "challenge",
+      "version": "2.1.0"
+    },
+    "cleanup": {
+      "ok": true,
+      "failures": []
+    },
+    "providerCleanup": {
+      "ok": true,
+      "failures": []
+    },
+    "mail": [
+      {
+        "kind": "software_license",
+        "delivered": true
+      },
+      {
+        "kind": "software_billing",
+        "delivered": true
+      },
+      {
+        "kind": "software_billing",
+        "delivered": true
+      }
+    ]
+  },
+  "checkoutFollowup": {
+    "ok": true,
+    "checks": [
+      "browser initial payment and signed public webhook",
+      "one mixed-cart initial settlement",
+      "early declined-payment webhook accepted",
+      "fresh failed-payment replay receipt; no extra fulfillment"
+    ],
+    "initialDecline": {
+      "status": 200,
+      "receivedAt": 1794106904951
+    },
+    "sca": {
+      "result": "authenticated",
+      "flow": "challenge",
+      "version": "2.1.0"
+    },
+    "cleanup": {
+      "ok": true,
+      "failures": []
+    },
+    "providerCleanup": {
+      "ok": true,
+      "failures": []
+    },
+    "replay": {
+      "before": 1794106904951,
+      "after": 1794107310989,
+      "status": 200
+    },
+    "emailsSent": 0
+  },
+  "restore": {
+    "ok": true,
+    "preview": null,
+    "encrypted": true,
+    "archiveVerification": "PASS",
+    "captured": {
+      "version": 1,
+      "owners": 2,
+      "records": 50,
+      "authorityRows": 41,
+      "objects": 2
+    },
+    "restored": {
+      "ok": true,
+      "money": {
+        "ok": true,
+        "payments": 2,
+        "refunds": 1,
+        "issues": [],
+        "providerWrites": 0
+      },
+      "owners": 2,
+      "artifacts": 2,
+      "quarantined": true,
+      "automaticPayments": 0,
+      "automaticEmails": 0
+    },
+    "checks": [
+      "read-only capture credential cannot import",
+      "paused mutation rejected",
+      "more than one export page",
+      "missing page rejected",
+      "mismatched KV checkpoint rejected",
+      "age round trip and full checksums",
+      "fresh refund drift blocks acceptance",
+      "restored authority stays closed",
+      "artifact readback and signature rebinding",
+      "old activation retained and seat limit enforced",
+      "coverage gap and refunded renewal denied",
+      "seller revocation retained",
+      "lost upload reply and complete restore replay safe",
+      "replacement Store key recovered with original secret",
+      "old keys and device tokens remain denied",
+      "withdrawal and administration receipts survive restore",
+      "approved KV and mail receipts restored without sessions or pending mail",
+      "duplicate payment event produces no new mail"
+    ],
+    "externalRequests": 0,
+    "livePayments": 0,
+    "realEmails": 0,
+    "paidCheckoutEnabled": false
+  },
+  "preservedStoreFiles": 105,
+  "failedAllocation": {
+    "createdResources": 0,
+    "cleanupVerified": true,
+    "reason": "Wrangler authentication failed before namespace allocation"
+  },
+  "verification": {
+    "storePremerge": true,
+    "storeUnitTests": 872,
+    "contracts": 7,
+    "security": 22,
+    "browserTests": 111,
+    "finalFocusedTests": 74,
+    "authorityTests": 14,
+    "authorityBuild": true,
+    "productionMetadataUnchanged": true,
+    "temporaryWorkersRemaining": 0,
+    "licensingCaptureOptInsUnset": true,
+    "finalManagementBrowserTests": 9,
+    "platformTests": 397,
+    "platformCleanCheckoutRecipes": 2
+  }
+}

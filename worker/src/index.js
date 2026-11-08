@@ -1,6 +1,7 @@
 import { sourceCommand, sourceCheckpointEnv, withStoreSource } from './software-source.js';
 import { recoveryMode } from './software-backup.js';
 import { callSoftwareBilling, softwareBillingWatchdog } from './software-billing.js';
+import { authorityAdministration } from './software-administration.js';
 import { licensingRequest } from './software-service.js';
 import { hasSoftware, softwareOrderSnapshot } from './software-offers.js';
 import { softwareStripe, objectId as softwareStripeId } from './software-stripe.js';
@@ -3119,6 +3120,29 @@ export const storeWorker = {
         return privateJsonResponse(result, result.status || (path.endsWith('/recover') || result.replayed ? 200 : 202), env);
       }
 
+      if (['/admin/store/licenses/administration','/admin/store/licenses/releases'].includes(path) && method === 'POST') {
+        const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE, requireCsrf: true });
+        if (!auth.ok) return auth.response;
+        if (!softwareLicensingEnabled(env)) return privateJsonResponse({error:'Licensing unavailable'},503,env);
+        const parsed = await parseJsonRequestBody(request, env, {maxBytes:4096,privateResponse:true});
+        if (!parsed.ok) return parsed.response;
+        const rate = await checkRateLimit(request,env,ADMIN_RATE_LIMIT_OPTIONS);
+        if (!rate.allowed) return rate.response;
+        const p={...parsed.body,actorRef:await sha256HexString(auth.user.email)}, releases=path.endsWith('/releases');
+        if ((releases || p.orderToken) && auth.user.role!=='super_admin') return privateJsonResponse({error:'Super-admin access required'},403,env);
+        try {
+          let result;
+          if(releases) {
+            if(!['releases','withdraw'].includes(p.action)) return privateJsonResponse({error:'Invalid release action'},400,env);
+            result=await authorityAdministration(env,{action:p.action,product:'ascii-vj-remix',target:p.releaseId,operation:p.id,cursor:p.cursor,actor:'admin',actorRef:p.actorRef});
+          } else result=p.orderToken
+            ? await callSoftwareBilling(env,p.orderToken,'administration',{...p,actor:'admin'})
+            : await callComplimentaryLicenses(env,'administration',p);
+          if(!result.error && !['status','history','releases'].includes(p.action)) await recordAdminAuditEvent(env,{action:`software_license:${p.action}`,adminEmail:auth.user.email,adminRole:auth.user.role,orderToken:p.orderToken,grantId:p.grantId,lineId:p.lineId,releaseId:p.releaseId,requestId:p.id});
+          return privateJsonResponse(result,result.status||200,env);
+        } catch(error) {return privateJsonResponse({error:error.message},error.status||503,env);}
+      }
+
       if (path === '/admin/store/licenses/config' && method === 'GET') {
         const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE });
         if (!auth.ok) return auth.response;
@@ -3135,7 +3159,7 @@ export const storeWorker = {
         return privateJsonResponse(result, result.status || 200, env);
       }
 
-      if (['/admin/store/licenses/billing', '/admin/store/licenses/refunds', '/admin/store/licenses/cancel-renewals', '/admin/store/licenses/paid-recover', '/admin/store/licenses/reconcile'].includes(path) && method === 'POST') {
+      if (['/admin/store/licenses/billing', '/admin/store/licenses/refunds', '/admin/store/licenses/cancel-renewals', '/admin/store/licenses/paid-recover', '/admin/store/licenses/reconcile', '/admin/store/licenses/history'].includes(path) && method === 'POST') {
         const auth = await requireAdminSession(request, env, 'fulfillment:manage', { accessScope: STORE_ADMIN_SCOPE, requireCsrf: true });
         if (!auth.ok) return auth.response;
         if (auth.user.role !== 'super_admin') return privateJsonResponse({ error: 'Super-admin access required' }, 403, env);
@@ -3143,7 +3167,7 @@ export const storeWorker = {
         if (!parsed.ok) return parsed.response;
         const rate = await checkRateLimit(request, env, ADMIN_RATE_LIMIT_OPTIONS);
         if (!rate.allowed) return rate.response;
-        const action = { billing: 'status', refunds: 'refund', 'cancel-renewals': 'cancel', 'paid-recover': 'recover', reconcile: 'reconcile' }[path.split('/').at(-1)];
+        const action = { billing: 'status', refunds: 'refund', 'cancel-renewals': 'cancel', 'paid-recover': 'recover', reconcile: 'reconcile', history: 'history' }[path.split('/').at(-1)];
         try {
           const result = await callSoftwareBilling(env, parsed.body.orderToken, action, { ...parsed.body, actor: auth.user.email, settleInitial: action === 'reconcile' });
           if (result.paymentIntent) {
@@ -3591,7 +3615,7 @@ export const storeWorker = {
         return withObservedOperation(env, ctx, 'store_order_lookup_consume', () => handleStoreOrderLookupConsume(request, env));
       }
 
-      const softwareRoute = path.match(/^\/api\/orders\/(store-order-[a-f0-9]{64})\/software\/(status|recover|cancel|card-setup|card-complete|invoice-page|download)$/);
+      const softwareRoute = path.match(/^\/api\/orders\/(store-order-[a-f0-9]{64})\/software\/(status|recover|cancel|card-setup|card-complete|invoice-page|download|administration|invoices)$/);
       if (softwareRoute && ((softwareRoute[2] === 'download' && method === 'GET') || (softwareRoute[2] !== 'download' && method === 'POST'))) {
         return handleStoreSoftwareManagement(request, env, softwareRoute[1], softwareRoute[2]);
       }
@@ -6997,7 +7021,8 @@ async function handleStoreSoftwareManagement(request, env, orderToken, action) {
     const returnUrl = new URL(getLocalizedPath('/order-success/', loaded.storedOrder.orderDraft.preferredLang), getSiteBase(env));
     returnUrl.searchParams.set('orderToken', orderToken);
     const result = await callSoftwareBilling(env, orderToken, action === 'status' ? 'customer' : action, {
-      lineId: payload.lineId, invoiceId: payload.invoiceId, id: payload.id, sessionId: payload.sessionId, returnUrl: returnUrl.href
+      lineId: payload.lineId, invoiceId: payload.invoiceId, id: payload.id, sessionId: payload.sessionId, returnUrl: returnUrl.href,
+      action:payload.action,generation:payload.generation,installation:payload.installation,revision:payload.revision,cursor:payload.cursor,actor:'customer',actorRef:await sha256HexString(orderToken)
     });
     if (action === 'status') {
       for (const license of result.licenses) for (const release of license.releases) {
@@ -15497,11 +15522,22 @@ async function loadStorePaymentOrder(env, orderToken) {
     return storeOrderSettlementError('Missing Store order token', 400, 'store_order_rejected', orderToken);
   }
 
-  const storedOrder = await env.STORE_STATE.get(storageKey, { type: 'json' });
+  let storedOrder = await env.STORE_STATE.get(storageKey, { type: 'json' });
   if (!storedOrder) {
     return storeOrderSettlementError('Store order not found', 404, 'store_order_not_found', orderToken);
   }
 
+  // KV can serve the pre-provider checkpoint for up to its cache TTL. Resolve
+  // only a missing identity from the existing checkout authority, then apply
+  // the same strict webhook checks. A conflicting nonempty identity still fails.
+  if (!storedOrder.payment?.paymentIntentId && storedOrder.status !== STORE_ORDER_STATUS_CONFIRMED &&
+      storedOrder.checkoutAttemptId && orderToken === `store-order-${storedOrder.checkoutAttemptId}`) {
+    const current = await callStoreInventoryCoordinator(env,'/checkout-payment',{attemptId:storedOrder.checkoutAttemptId});
+    if (!current.success || !current.order || current.order.orderToken !== orderToken || current.order.orderHash !== storedOrder.orderHash) {
+      return storeOrderSettlementError('Store payment checkpoint unavailable',503,'store_order_pending_resolution',orderToken);
+    }
+    storedOrder=current.order;
+  }
   return {
     ok: true,
     storageKey,

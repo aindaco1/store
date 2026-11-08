@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { softwareBilling, softwareBillingWatchdog } from '../../worker/src/software-billing.js';
 import { softwareStripe } from '../../worker/src/software-stripe.js';
@@ -34,7 +35,7 @@ beforeEach(async () => {
   invoices = new Map([['in_first', invoice('in_first', true)], ['in_next', invoice('in_next')]]);
   env = { APP_MODE: 'test', SOFTWARE_LICENSING_ENABLED: 'true', SOFTWARE_CHECKOUT_ENABLED: 'true', LICENSING_KEY_SECRET: 'synthetic-key-secret-at-least-32-bytes', LICENSING_ADMIN_SECRET: 'synthetic',
     STORE_STATE: kv, RESEND_API_KEY: 're_test', SALES_TAX_RATE: '0.10', TAX_PROVIDER: 'flat',
-    LICENSING_SERVICE: { fetch: async (request: Request) => { const p: any = await request.json(); receipts.push(p); return Response.json({ id: p.id, coverageId: p.coverageId, revision: p.revision }); } } };
+    LICENSING_SERVICE: { fetch: async (request: Request) => { const p: any = await request.json(); if(new URL(request.url).pathname.endsWith('/administration')) {const g=receipts.find(r=>r.id===p.target);return Response.json({keyVersion:'',keyHash:createHash('sha256').update(g.key).digest('hex')});} receipts.push(p); return Response.json({ id: p.id, coverageId: p.coverageId, revision: p.revision }); } } };
   stripe = {
     invoices: { retrieve: async (id: string) => structuredClone(invoices.get(id)), list: vi.fn(async () => ({ has_more: false, data: [...invoices.values()].map(value => structuredClone(value)) })), pay: vi.fn(async () => ({})) },
     invoicePayments: { list: async ({ invoice: id }: any) => ({ has_more: false, data: [{ payment: { type: 'payment_intent', payment_intent: id === 'in_first' ? 'pi_first' : 'pi_next' } }] }) },
