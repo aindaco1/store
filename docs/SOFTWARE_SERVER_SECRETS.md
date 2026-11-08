@@ -65,13 +65,19 @@ fields must be set together; incomplete configuration fails closed.
 1. Generate a new independent credential in the protected credential environment.
    Record its owner, revision and deadline without recording its value in evidence.
 2. Deploy the new current credential plus old previous credential/deadline to the
-   receiving Worker first. Verify both credentials only have their intended scope.
+   receiving Worker first. Apply an explicit immediate Durable Object deployment
+   after a bulk secret update, before testing or changing callers. The pinned
+   `wrangler secret bulk` command does not expose the code-update strategy; the
+   rehearsal reuses its guarded `deploy --durable-objects-code-update-mode immediate`
+   path so existing instances adopt the new environment. See [Cloudflare code
+   update behavior](https://developers.cloudflare.com/changelog/post/2026-10-30-durable-objects-deferred-code-updates/).
+   Verify both credentials only have their intended scope.
 3. Change Store `LICENSING_ADMIN_SECRET`, or the protected capture caller's read
    credential, to the new value. Check a harmless authorized read and rejection of
    an unrelated credential. Capture credentials must still fail grant, import,
    upload, pause/resume and other mutations. Keep scheduled licensing capture off.
 4. Confirm callers use the new value. At the deadline the old credential is denied
-   even after restart. Remove both previous fields in one deployment and verify
+   even after restart. Use the same immediate deployment when retiring secrets. Remove both previous fields in one deployment and verify
    denial again. Preserve recovery custody of durable signing/derivation material;
    disposable service credentials do not need to match a data checkpoint.
 

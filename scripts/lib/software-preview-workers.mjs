@@ -78,12 +78,15 @@ export async function withSoftwarePreview(context, {root,licensing,cli,report,em
         fs.writeFileSync(file,JSON.stringify(secrets[role]),{mode:0o600});
         run(['secret','bulk',file,'--config',configPaths[role]]);
       } finally {fs.rmSync(file,{force:true});}
+      // Bulk updates can leave active Durable Objects on their previous env.
+      // Reuse the guarded immediate deployment before exercising new secrets.
+      return deploy(role);
     };
+    const bases = {};
     for (const role of ['licensing', 'store']) {
       write(role, configs[role]); deploy(role);
-      installSecrets(role);
+      bases[`${role}Base`] = installSecrets(role);
     }
-    const bases = { storeBase: deploy('store'), licensingBase: deploy('licensing') };
     return await use({previewId,prefix,resources,configs,configPaths,bases,run,write,deploy,directory,secrets,installSecrets});
   } finally {
     const failures = [];

@@ -634,7 +634,9 @@ that result cannot close remote-archive acceptance. Both modes retain the restor
 lock across redeploys, explicitly accept only the completed synthetic target,
 check original activation/seats, coverage gaps/refunds/revocation, signed bytes
 and duplicate-event mail suppression, then remove and verify test resources.
-Failed-run receipts list any resources still requiring cleanup. Private command
+Failed-run receipts identify the acceptance phase and list any resources still
+requiring cleanup. Bulk-secret changes reuse the guarded immediate deployment so
+active Durable Objects adopt rotated credentials before the next assertion. Private command
 logs are kept beside local evidence and are never uploaded by the workflow.
 
 The preview rehearsal uses deployed test-source Workers and synthetic Stripe
