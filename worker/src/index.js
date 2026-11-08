@@ -1,3 +1,4 @@
+import { sourceCommand, sourceCheckpointEnv, withStoreSource } from './software-source.js';
 import { recoveryMode } from './software-backup.js';
 import { callSoftwareBilling, softwareBillingWatchdog } from './software-billing.js';
 import { licensingRequest } from './software-service.js';
@@ -2972,7 +2973,7 @@ export const CachedAdminStoreReads = {
 
 export const CachedAdminStoreOrders = CachedAdminStoreReads;
 
-export default {
+export const storeWorker = {
   async fetch(request, env, ctx) {
     configureWorkerLogging(env);
     const url = new URL(request.url);
@@ -2992,7 +2993,18 @@ export default {
     }
 
     try {
+      if (path === '/admin/store/recovery/source' && method === 'POST') {
+        if (!requireAdmin(request, env, 'maintenance').ok) return privateJsonResponse({ error: 'Unauthorized' }, 401, env);
+        const parsed = await parseJsonRequestBody(request, env, { maxBytes: 4096, privateResponse: true });
+        if (!parsed.ok) return parsed.response;
+        const p = parsed.body;
+        if (!['status', 'pause', 'resume'].includes(p.action) || p.sourceId !== env.SOFTWARE_RECOVERY_SOURCE_ID) return privateJsonResponse({error:'Invalid source control'},400,env);
+        try { return privateJsonResponse(await sourceCommand(env,p),200,env); }
+        catch { return privateJsonResponse({error:'Source maintenance rejected'},409,env); }
+      }
       if (path === '/admin/store/recovery/software' && method === 'POST') {
+        try { env = await sourceCheckpointEnv(env); }
+        catch { return privateJsonResponse({error:'Source checkpoint is not drained'},503,env); }
         const reply = (data,status) => privateJsonResponse(data,status,env,{'X-Robots-Tag':'noindex, nofollow, noarchive'});
         if (!recoveryMode(env)) return reply({ error: 'Recovery unavailable' }, 503);
         const readOnly = !!env.SOFTWARE_BACKUP_READ_SECRET && timingSafeEqual(bearerTokenFromRequest(request),env.SOFTWARE_BACKUP_READ_SECRET);
@@ -3005,7 +3017,7 @@ export default {
         if (p.action === 'info') {
           const { complimentaryKey } = await import('./software-licenses.js');
           const proof = await complimentaryKey(env,p.checkpoint,'recovery');
-          return reply({version:1,checkpoint:p.checkpoint,keyProof:proof,previewId:env.SOFTWARE_RECOVERY_PREVIEW_ID || null,target:env.SOFTWARE_RECOVERY_TARGET || null,paidCheckoutEnabled:env.SOFTWARE_CHECKOUT_ENABLED==='true'},200);
+          return reply({version:1,checkpoint:p.checkpoint,keyProof:proof,previewId:env.SOFTWARE_RECOVERY_PREVIEW_ID || null,target:env.SOFTWARE_RECOVERY_TARGET || null,paidCheckoutEnabled:env.SOFTWARE_CHECKOUT_ENABLED==='true',...(env.SOFTWARE_RECOVERY_SOURCE_STATE ? {source:env.SOFTWARE_RECOVERY_SOURCE_STATE} : {})},200);
         }
         if (p.action === 'orders') {
           const page = await env.STORE_STATE.list({prefix:'orders:',limit:25,...(p.cursor ? {cursor:p.cursor} : {})});
@@ -3674,7 +3686,7 @@ export default {
 
   // Cron trigger:
   // - `* * * * *`: Store background maintenance.
-  async scheduled(event, env) {
+  async scheduled(event, env, ctx) {
     if (recoveryMode(env)) return;
     configureWorkerLogging(env);
     // The scheduled watchdog recovers grant handoffs after alarm retries exhaust.
@@ -19787,3 +19799,5 @@ export {
   queueStoreEventReminders,
   signStoreFulfillmentToken
 };
+
+export default withStoreSource(storeWorker);

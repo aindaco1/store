@@ -343,6 +343,12 @@ Those remain acceptance tasks before enabling paid sales.
 
 The pre-launch backup integration now uses the existing encrypted Store pipeline.
 See [BACKUP_RESTORE.md](BACKUP_RESTORE.md#software-licensing-checkpoint-integration-pre-launch)
-for maintenance checkpoint capture, local-only restore, provider comparison and
+for maintenance checkpoint capture, isolated local/deployed restore, provider comparison and
 explicit acceptance. `npm run restore:rehearse:software` exercises actual local
 Workers and synthetic provider records without enabling paid checkout.
+
+The protected synthetic archive/restore passed in
+[run 42430004952](https://github.com/aindaco1/store/actions/runs/42430004952).
+The deployed-source extension adds a persistent admission barrier for dedicated
+test Workers; see the backup guide and current deployed-source release evidence.
+Production licensing, paid offers and scheduled licensing capture remain disabled.
