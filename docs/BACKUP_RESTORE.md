@@ -593,8 +593,10 @@ acceptance; those existing protected workflows remain separate release evidence.
 ### Manual Cloudflare software rehearsal
 
 `npm run restore:rehearse:software:preview -- --evidence=/private/software-recovery.json`
-uses the same fixture, drained local source, encrypted snapshot, archive verifier,
-logical restore and ordinary KV/R2 restore planner as the local rehearsal. It
+uses the same fixture, encrypted snapshot, archive verifier, logical restore and
+ordinary KV/R2 restore planner as the local rehearsal. It seeds and captures a
+guarded deployed source, verifies explicit resumption, removes that source, then
+restores the downloaded snapshot into a separate empty deployed target. Each pair
 creates fresh `dw-recovery-<random-id>-*` Workers, one isolated KV namespace (shared
 by test Store state/rate-limit bindings) and two private artifact/download buckets.
 No production Worker configuration, payment credential, mail credential or schedule
@@ -612,8 +614,8 @@ partial snapshot cleanup is not sufficient for licensing Durable Objects.
 **Rehearse Software Recovery** is manual, main-only and uses the existing
 `production-recovery` environment and reviewer protection. Its licensing input
 must be a reviewed full commit of `aindaco1/dust-wave-licensing`; that consumer
-must first be published and accessible to the checkout job. A private consumer
-requires a repository-scoped read-only SSH deploy-key `LICENSING_SOURCE_READ_KEY` approved for checkout. No source
+is already published privately. The private consumer
+uses a repository-scoped read-only SSH deploy-key `LICENSING_SOURCE_READ_KEY` approved for checkout. No source
 publication, workflow merge, permission expansion or environment change is implied
 by the local implementation.
 
@@ -635,9 +637,10 @@ and duplicate-event mail suppression, then remove and verify test resources.
 Failed-run receipts list any resources still requiring cleanup. Private command
 logs are kept beside local evidence and are never uploaded by the workflow.
 
-This rehearsal's source is stopped local workerd, with synthetic Stripe records.
-It does not establish a deployed production drain procedure, live Stripe/Resend
-acceptance, independent secret escrow or a licensing RPO/RTO. Paid checkout and
+The preview rehearsal uses deployed test-source Workers and synthetic Stripe
+records. The local-only command retains its stopped-workerd source path. Neither
+establishes a production drain procedure, live Stripe/Resend acceptance,
+independent secret escrow or a licensing RPO/RTO. Paid checkout and
 production licensing capture remain off. Review actual timing and remaining
 operational gates before any separately authorized production rollout.
 
@@ -647,3 +650,53 @@ Cloudflare now defaults Durable Object code updates to a deferred window of up t
 otherwise a restored object can retain its old acceptance configuration during
 verification. This is not a production drain technique: immediate updates can
 interrupt requests. See [Durable Objects code updates](https://developers.cloudflare.com/durable-objects/deployments/durable-objects-code-updates/).
+
+### Guarded deployed-source checkpoints
+
+Provision dedicated test Workers with `SOFTWARE_RECOVERY_SOURCE_ID` equal to their
+16-hex `SOFTWARE_RECOVERY_PREVIEW_ID`, `APP_MODE=test`, explicit
+`SOFTWARE_CHECKOUT_ENABLED=false`, and no restore target/checkpoint variable.
+The guard must be installed before source traffic is admitted and remain present
+through every source deployment. This is opt-in staging infrastructure; it does
+not retrofit an unguarded live source or make rolling deployments a drain method.
+
+Store's existing coordinator class owns a dedicated `software-source-control`
+object and a bounded `software-source:v1` control record. Licensing's existing
+Publisher owns `licensing-source:v1`. They track opaque admission IDs, checkpoint,
+generation and open/draining/frozen state, with at most 128 active operations.
+They contain no customer payload. Control records stay with their source and
+are excluded from logical exports/imports. An interrupted or abandoned admission
+never expires automatically. A timeout, lost completion or uncertain write keeps
+capture/resume blocked; investigate the source rather than clearing its tickets.
+
+Authenticated maintenance POSTs use `/admin/store/recovery/source` for Store and
+`/internal/source` for licensing, with `{action, sourceId, checkpoint}`. Supported
+public actions are `status`, `pause`, `resume`; capture-only credentials cannot
+control the barrier. Pause is idempotent at the same checkpoint. Drain Store
+first so its admitted handoffs can finish against licensing, then pause licensing.
+Require both to report `phase:frozen`, `active:0`, matching identity/checkpoint and
+sales disabled. Capture rejects a changed generation/state at either endpoint.
+Use a fresh checkpoint for each cycle; resume retries are idempotent.
+
+The Store guard covers requests/webhooks, scheduled handlers and coordinator
+alarms. Source request completion includes registered `waitUntil` tasks. A paused
+alarm retains a delayed retry; restored targets still omit alarms/due indexes.
+Licensing covers admission through authorization/publication, including artifact
+verification. Already-authorized read-only response streams may finish after
+admission completion; they do not mutate the snapshot. Direct provider KV/R2
+writes and deployments that remove/bypass the guard are prohibited during capture.
+
+After capture succeeds, explicitly resume licensing first, then Store. Do not
+resume after an incomplete/failed capture merely because a timer elapsed. The
+synthetic rehearsal also proves a rejected early resume, a webhook rejected during
+drain, an admitted alarm and deferred write completing before freeze, a blocked
+scheduled handler, freeze retained across identical-code redeploys, original-key
+access after resume, and duplicate-event mail suppression. Ordinary fixture KV
+and download bytes are seeded and read back from the deployed source. The fixture
+waits for readback before accepting KV capture; this is not a general online,
+transactional KV snapshot protocol or proof of production inventory recovery.
+
+Durable admission records are separate from installation seats and business
+journals. Consumer-specific ingress and storage adapters stay in Store/licensing;
+resource provisioning and capture orchestration are shared within the existing
+Store rehearsal. See [Cloudflare's concurrency rules](https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/).

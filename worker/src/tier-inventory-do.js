@@ -1,3 +1,4 @@
+import { sourceControl, sourceCheckpointEnv, sourceWork } from './software-source.js';
 import { OWNER_PREFIX, recoveryBlocked, softwareJournalRecovery } from './software-backup.js';
 import { softwareBilling } from './software-billing.js';
 import { checkoutCoordinator } from './checkout-coordinator.js';
@@ -59,8 +60,12 @@ class InventoryCoordinator {
       return jsonResponse({ error: 'Invalid JSON body' }, 400);
     }
 
+    if (this.billing && url.pathname === '/software-source') {
+      try { return jsonResponse(await sourceControl(this.ctx.storage, this.env, body)); }
+      catch (error) { return jsonResponse({ error: error.message }, 409); }
+    }
     if (this.billing && url.pathname === '/software-recovery') {
-      try { return jsonResponse(await softwareJournalRecovery(this.ctx.storage, this.env, body)); }
+      try { return jsonResponse(await softwareJournalRecovery(this.ctx.storage, await sourceCheckpointEnv(this.env), body)); }
       catch (error) { return jsonResponse({ error: error.message }, 409); }
     }
     if (this.billing && await recoveryBlocked(this.ctx.storage, this.env)) return jsonResponse({ error: 'Recovery maintenance' }, 503);
@@ -349,7 +354,14 @@ export class StoreInventoryCoordinator extends InventoryCoordinator {
     this.billing = softwareBilling(ctx, env, billingStripe);
   }
 
-  async alarm() { if (await recoveryBlocked(this.ctx.storage, this.env)) return; await this.checkout.alarm(); await this.licenses.drain(); await this.billing.drain(); }
+  async alarm() {
+    if (await recoveryBlocked(this.ctx.storage, this.env)) return;
+    const ran = await sourceWork(this.env, this.ctx, async () => {
+      await this.checkout.alarm(); await this.licenses.drain(); await this.billing.drain(); return true;
+    });
+    // Keep the source's deferred alarm; imported targets still discard alarms.
+    if (ran === null) await this.ctx.storage.setAlarm(Date.now() + 30000);
+  }
 }
 
 function validatePayload(body, options = {}) {

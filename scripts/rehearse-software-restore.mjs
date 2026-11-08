@@ -15,7 +15,7 @@ import { captureSoftwareBackup, restoreSoftwareBackup, reconcileSoftwareMoney, v
 import { buildChecksumManifest } from './lib/file-integrity.mjs';
 import { order, orderToken, stripeRead, refund } from '../experiments/software-licensing/recovery-fixture.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url));
-export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore, archiveIdentity } = {}) {
+export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore, archiveIdentity, sourceCapture } = {}) {
   const licensingRoot=path.resolve(process.env.LICENSING_REPO || path.join(root,'../dust-wave-licensing'));
   const require=createRequire(path.join(licensingRoot,'package.json'));
   const {Miniflare,convertV4MiniflareOptions}=require('miniflare'), {buildSync}=require('esbuild');
@@ -43,36 +43,49 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
   const post=async(mf,route,payload)=>raw(mf,'licensing',route,payload);
   const download=async(mf,token,id)=> (await mf.getWorker('licensing')).fetch('https://local/v1/releases/'+id,{headers:{Authorization:'Bearer '+token}});
   try {
-    let source=runtime('source');
-    const seeded=await raw(source,'store','/fixture/seed',{});assert.equal(seeded.status,200,await seeded.clone().text());const license=await seeded.json();
-    const bucket=await source.getR2Bucket('ARTIFACTS','licensing'), bytes=Buffer.from('signed synthetic application');
-    await bucket.put('app.tar.gz',bytes);await bucket.put('unattached.txt','unattached synthetic artifact');
-    for(const [id,releasedAt,version] of [['old',150000,'1.0.0'],['gap',250000,'1.1.0'],['new',350000,'1.2.0']]) {
-      assert.equal((await post(source,'/internal/publish',{id,product:'ascii-vj-remix',key:'app.tar.gz',major:1,releasedAt,update:{version,platform:'darwin-aarch64',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),signature:signer.sign(bytes)}})).status,201);
-    }
-    const token=(await (await post(source,'/v1/activate',{key:license.key,installation:'mac'})).json()).token;assert.ok(token);
-    const compKey='synthetic-revoked-'+secret;
-    await post(source,'/internal/grant',{id:'revoked',key:compKey,product:'ascii-vj-remix',seats:1,policy:{kind:'lifetime'}});
-    const revokedToken=(await (await post(source,'/v1/activate',{key:compKey,installation:'mac'})).json()).token;
-    await post(source,'/internal/revoke',{id:'revoked'});
-    assert.equal((await download(source,token,'old')).status,200);assert.equal((await download(source,token,'new')).status,403);
-    await stop(source); // No in-flight request or alarm can straddle the checkpoint.
-    source=runtime('source',{SOFTWARE_RECOVERY_CHECKPOINT:checkpoint});
-    assert.equal((await post(source,'/v1/activate',{key:license.key,installation:'other'})).status,503);
-    for(const [service,route] of [['store','/admin/store/recovery/software'],['licensing','/internal/backup']]) {
-      assert.equal((await raw(source,service,route,{checkpoint,action:'begin',owner:'software-licenses',count:0},undefined,readSecret)).status,403);
-    }
+    const bytes=Buffer.from('signed synthetic application');
     const snapshot=path.join(temp,'snapshot');createSyntheticSnapshot(snapshot);
     const ordersPath=path.join(snapshot,'kv','orders.values.json');const orders=JSON.parse(fs.readFileSync(ordersPath,'utf8'));orders['orders:'+orderToken]={value:JSON.stringify(order)};write(ordersPath,orders);
-    const captured=await captureSoftwareBackup(snapshot,{checkpoint,request:client(source,readSecret)});
+    const seed = async (request,putObject) => {
+    const seeded=await request('store','/fixture/seed',{});assert.equal(seeded.status,200,await seeded.clone().text());const license=await seeded.json();
+    await putObject('app.tar.gz',bytes);await putObject('unattached.txt',Buffer.from('unattached synthetic artifact'));
+    for(const [id,releasedAt,version] of [['old',150000,'1.0.0'],['gap',250000,'1.1.0'],['new',350000,'1.2.0']]) {
+      assert.equal((await request('licensing','/internal/publish',{id,product:'ascii-vj-remix',key:'app.tar.gz',major:1,releasedAt,update:{version,platform:'darwin-aarch64',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),signature:signer.sign(bytes)}})).status,201);
+    }
+    const token=(await (await request('licensing','/v1/activate',{key:license.key,installation:'mac'})).json()).token;assert.ok(token);
+    const compKey='synthetic-revoked-'+secret;
+    await request('licensing','/internal/grant',{id:'revoked',key:compKey,product:'ascii-vj-remix',seats:1,policy:{kind:'lifetime'}});
+    const revokedToken=(await (await request('licensing','/v1/activate',{key:compKey,installation:'mac'})).json()).token;
+    await request('licensing','/internal/revoke',{id:'revoked'});
+    return {license,token,revokedToken};
+    };
+    const capture = async (request,sourceId) => {
+    const captured=await captureSoftwareBackup(snapshot,{checkpoint,request,sourceId});
     const originalOrders=fs.readFileSync(ordersPath,'utf8');
     write(ordersPath,{});assert.throws(()=>validateSoftwareBackup(snapshot),/KV and software checkpoint differ/);fs.writeFileSync(ordersPath,originalOrders,{mode:0o600});
     // Negative capture cases cannot produce a complete software manifest.
     const broken=path.join(temp,'broken');fs.mkdirSync(broken);
     await assert.rejects(captureSoftwareBackup(broken,{checkpoint,request:async(service,route,p,upload)=>{
-      const response=await client(source,readSecret)(service,route,p,upload);
+      const response=await request(service,route,p,upload);
       if(service==='licensing' && p?.action==='export' && p.table==='grants') { const page=await response.json();page.rows.pop();return Response.json(page); } return response;
     }}),/Incomplete authority page/);
+      return captured;
+    };
+    let seeded;
+    if (sourceCapture) seeded=await sourceCapture({snapshot,temp,secret,readSecret,checkpoint,publicKey:signer.publicKey,bytes,seed,capture});
+    else {
+      let source=runtime('source');
+      const bucket=await source.getR2Bucket('ARTIFACTS','licensing');
+      seeded=await seed(client(source),(key,bytes)=>bucket.put(key,bytes));
+      assert.equal((await download(source,seeded.token,'old')).status,200);
+      await stop(source); // Local mode proves a stopped-source checkpoint.
+      source=runtime('source',{SOFTWARE_RECOVERY_CHECKPOINT:checkpoint});
+      assert.equal((await post(source,'/v1/activate',{key:seeded.license.key,installation:'other'})).status,503);
+      for(const [service,route] of [['store','/admin/store/recovery/software'],['licensing','/internal/backup']])
+        assert.equal((await raw(source,service,route,{checkpoint,action:'begin',owner:'software-licenses',count:0},undefined,readSecret)).status,403);
+      seeded.captured=await capture(client(source,readSecret));
+    }
+    const {license,token,revokedToken,captured}=seeded;
     const manifest=JSON.parse(fs.readFileSync(path.join(snapshot,'manifest.json'),'utf8'));
     Object.assign(manifest,{includesSoftwareLicensing:true,softwareLicensing:captured,completedAt:new Date().toISOString(),warnings:[],includedDataClasses:['software-licensing-journals-and-artifacts']});
     write(path.join(snapshot,'manifest.json'),manifest);write(path.join(snapshot,'checksums.json'),{schemaVersion:1,artifacts:buildChecksumManifest(snapshot,{exclude:['checksums.json']})});

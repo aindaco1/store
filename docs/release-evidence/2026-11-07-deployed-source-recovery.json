@@ -1,0 +1,95 @@
+{
+  "ok": true,
+  "synthetic": true,
+  "remoteArchive": false,
+  "productionWrites": false,
+  "paidCheckoutEnabled": false,
+  "livePayments": 0,
+  "realEmails": 0,
+  "timingsMs": {
+    "sourceDrain": 3149,
+    "previewRestore": 39938,
+    "total": 287615
+  },
+  "cleanup": {
+    "ok": true,
+    "failures": []
+  },
+  "sourceResources": {
+    "workers": [
+      "dw-recovery-0a5491e29a678129-licensing",
+      "dw-recovery-0a5491e29a678129-store"
+    ],
+    "buckets": [
+      "dw-recovery-0a5491e29a678129-artifacts",
+      "dw-recovery-0a5491e29a678129-downloads"
+    ],
+    "namespace": "248e51c1c8a3475db0335fecffc21f30"
+  },
+  "source": {
+    "deployed": true,
+    "checkpointMatched": true,
+    "inflightDrained": true,
+    "deferredWritesDrained": true,
+    "alarmDrained": true,
+    "scheduledBlocked": true,
+    "webhookBlocked": true,
+    "restartFreeze": true,
+    "ordinaryKvReadback": true,
+    "downloadReadback": true,
+    "resumed": true
+  },
+  "sourceCleanup": {
+    "ok": true,
+    "failures": []
+  },
+  "resources": {
+    "workers": [
+      "dw-recovery-84988e75313542be-licensing",
+      "dw-recovery-84988e75313542be-store"
+    ],
+    "buckets": [
+      "dw-recovery-84988e75313542be-artifacts",
+      "dw-recovery-84988e75313542be-downloads"
+    ],
+    "namespace": "b783699276884ed4b26312be50bfab6e"
+  },
+  "checks": [
+    "remote credential boundaries",
+    "lost upload reply retry",
+    "complete logical and KV/R2 readback",
+    "restart acceptance lock",
+    "original activation and seats",
+    "coverage gaps, refunds and revocations",
+    "signature-verified downloads",
+    "duplicate payment produces no email"
+  ],
+  "local": {
+    "ok": true,
+    "captured": {
+      "version": 1,
+      "owners": 2,
+      "records": 50,
+      "authorityRows": 36,
+      "objects": 2
+    },
+    "checks": [
+      "read-only capture credential cannot import",
+      "paused mutation rejected",
+      "more than one export page",
+      "missing page rejected",
+      "mismatched KV checkpoint rejected",
+      "age round trip and full checksums",
+      "fresh refund drift blocks acceptance",
+      "restored authority stays closed",
+      "artifact readback and signature rebinding",
+      "old activation retained and seat limit enforced",
+      "coverage gap and refunded renewal denied",
+      "seller revocation retained",
+      "lost upload reply and complete restore replay safe",
+      "original Store key retained",
+      "approved KV and mail receipts restored without sessions or pending mail",
+      "duplicate payment event produces no new mail"
+    ]
+  }
+}

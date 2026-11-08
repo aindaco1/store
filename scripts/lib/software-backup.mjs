@@ -53,7 +53,7 @@ async function objects(request,checkpoint) {
   check(new Set(rows.map(row=>row.key)).size===rows.length,'Duplicate artifact');
   return rows.sort((a,b)=>a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 }
-export async function captureSoftwareBackup(snapshotRoot,{checkpoint,request=softwareBackupClient()}={}) {
+export async function captureSoftwareBackup(snapshotRoot,{checkpoint,request=softwareBackupClient(),sourceId}={}) {
   check(/^[a-zA-Z0-9_-]{16,100}$/.test(checkpoint || ''),'A shared software maintenance checkpoint is required');
   const root=path.join(snapshotRoot,'software');
   fs.mkdirSync(root,{mode:0o700});
@@ -62,6 +62,8 @@ export async function captureSoftwareBackup(snapshotRoot,{checkpoint,request=sof
   manifest.store=await json(request,'store',storeRoute,{checkpoint,action:'info'}); validatePage(manifest.store);
   manifest.authority=await json(request,'licensing',authorityRoute,{checkpoint,action:'info'}); validatePage(manifest.authority);
   check(manifest.authority.schema===3,'Unsupported licensing schema');
+  const expectedSource=sourceId || manifest.store.source?.sourceId;
+  if(expectedSource || manifest.authority.source) check(/^[a-f0-9]{16}$/.test(expectedSource || '') && [manifest.store,manifest.authority].every(info=>info.source?.sourceId===expectedSource && info.source.phase==='frozen' && info.source.active===0 && info.source.checkpoint===checkpoint && info.paidCheckoutEnabled===false),'Source is not frozen at a matching checkpoint');
   const registry=[];
   async function owner(name) {
     const entry={name,count:0,pages:[]}, seen=new Set();
@@ -110,6 +112,7 @@ export async function captureSoftwareBackup(snapshotRoot,{checkpoint,request=sof
   check(JSON.stringify(inventory)===JSON.stringify(await objects(request,checkpoint)),'Artifacts changed during checkpoint capture');
   const authority=await json(request,'licensing',authorityRoute,{checkpoint,action:'info'});
   check(JSON.stringify(authority)===JSON.stringify(manifest.authority),'Authority changed during checkpoint capture');
+  check(JSON.stringify(await json(request,'store',storeRoute,{checkpoint,action:'info'}))===JSON.stringify(manifest.store),'Store changed during checkpoint capture');
   write(root,'manifest.json',manifest);
   validateSoftwareBackup(snapshotRoot);
   return {version:1,owners:manifest.owners.length,records:manifest.owners.reduce((sum,owner)=>sum+owner.count,0),authorityRows:Object.values(manifest.tables).reduce((sum,t)=>sum+t.count,0),objects:manifest.objects.length};
