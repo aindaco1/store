@@ -287,3 +287,31 @@ For production smoke, also complete a real Stripe test checkout for each fulfill
 ## Anonymous checkout attempts
 
 The local checkout candidate adds trusted-origin, rate-limited, private/no-store POST hold/status/extend/release routes with 256-bit opaque capabilities. Canonical counts, catalog prices, expiry, and payment parameters are server-owned. Treat capabilities and frozen checkout records as restricted data; no raw form/payment logging. Existing site/XSS boundaries apply to browser capability storage. Uncertain money keeps inventory reserved until processor truth is established. See [lifecycle and retention](CHECKOUT_HOLDS.md).
+
+### Store software pilot
+
+Private order licensing reuses the existing signed fulfillment capability with
+an order/action binding and a 15-minute expiry. Lists never include license keys;
+explicit recovery is private/no-store. Download capabilities also bind the line
+and release and recheck live entitlement. Card setup is Stripe-hosted; Store
+accepts only verified test-mode Session/SetupIntent ownership and exact hosted
+Stripe origins. The provider draft-tax guard remains set during all recovery.
+See [software management](SOFTWARE_LICENSING.md#customer-and-operator-management-ui).
+
+The Store secret-audit wrapper exempts only values assigned to the three exact
+`STRIPE_PUBLISHABLE_KEY`, `_TEST`, `_LIVE` settings whose full value matches
+`pk_test_…` or `pk_live_…`. These are [public browser identifiers](https://docs.stripe.com/keys).
+Secret, restricted and webhook keys are never exempted by that setting name;
+tracked-file/history checks remain enabled and the regression test covers
+misassigned credentials. This does not authorize committing local environment
+files or removing duplicate configuration files.
+
+Software recovery remains test-mode-only. During a drained checkpoint,
+`/admin/store/recovery/software` accepts the existing maintenance authentication
+for isolated import and a separate `SOFTWARE_BACKUP_READ_SECRET` for bounded
+info/order/journal reads. Licensing's matching read credential permits only
+checkpoint info/table/object reads. Neither read credential can grant, revoke,
+import or upload. The scheduled backup workflow contains only these read
+credentials, never admin or Stripe payment credentials. Imports require empty
+isolated targets, preserve a durable acceptance lock and do not restore job
+schedules or sessions. See `BACKUP_RESTORE.md` for acceptance and key recovery.

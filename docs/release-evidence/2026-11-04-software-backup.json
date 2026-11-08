@@ -1,0 +1,49 @@
+{
+  "ok": true,
+  "encrypted": true,
+  "archiveVerification": "PASS",
+  "captured": {
+    "version": 1,
+    "owners": 2,
+    "records": 50,
+    "authorityRows": 36,
+    "objects": 2
+  },
+  "restored": {
+    "ok": true,
+    "money": {
+      "ok": true,
+      "payments": 2,
+      "refunds": 1,
+      "issues": [],
+      "providerWrites": 0
+    },
+    "owners": 2,
+    "artifacts": 2,
+    "quarantined": true,
+    "automaticPayments": 0,
+    "automaticEmails": 0
+  },
+  "checks": [
+    "read-only capture credential cannot import",
+    "paused mutation rejected",
+    "more than one export page",
+    "missing page rejected",
+    "mismatched KV checkpoint rejected",
+    "age round trip and full checksums",
+    "fresh refund drift blocks acceptance",
+    "restored authority stays closed",
+    "artifact readback and signature rebinding",
+    "old activation retained and seat limit enforced",
+    "coverage gap and refunded renewal denied",
+    "seller revocation retained",
+    "lost upload reply and complete restore replay safe",
+    "original Store key retained",
+    "approved KV and mail receipts restored without sessions or pending mail",
+    "duplicate payment event produces no new mail"
+  ],
+  "externalRequests": 0,
+  "livePayments": 0,
+  "realEmails": 0,
+  "paidCheckoutEnabled": false
+}

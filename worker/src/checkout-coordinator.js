@@ -1,3 +1,6 @@
+import { hasSoftware } from './software-offers.js';
+import { softwarePayments } from './software-checkout.js';
+import { callSoftwareBilling } from './software-billing.js';
 import { createStoreStripeClient, storeReconciliationBreak, recordStripeProcessorEvent } from './payment-integrity.js';
 import { cancelStorePaymentIntent } from './stripe.js';
 import { CHECKOUT_ATTEMPT_PATTERN, CHECKOUT_RETENTION_SECONDS, checkoutPolicy, checkoutStripeKey } from './checkout-policy.js';
@@ -16,6 +19,22 @@ export function checkoutCoordinator(owner, mechanics) {
   const { getWorkingState, putWorkingState, reserveCounts, syncInventoryToKv } = mechanics;
   const policy = checkoutPolicy(env);
   const paymentCreations = new Map();
+  const ordinaryPayments = {
+    create: record => createStoreStripeClient(env, checkoutStripeKey(env), { operation: 'checkout_payment_intent', orderToken: orderToken(record.id), intent: 'create' })
+      .paymentIntents.create(record.params, { idempotencyKey: `store-order:${orderToken(record.id)}` }),
+    retrieve: record => createStoreStripeClient(env, checkoutStripeKey(env), { operation: 'checkout_payment_status', orderToken: orderToken(record.id), intent: 'read' })
+      .paymentIntents.retrieve(record.paymentIntentId),
+    cancel: (record, intent) => cancelStorePaymentIntent(checkoutStripeKey(env), intent.id, { idempotencyKey: `store-checkout-cancel:${record.id}`, stripeVersion: env.STRIPE_API_VERSION,
+      onRequest: event => recordStripeProcessorEvent(env, event, { operation: 'checkout_expiry', intent: 'cancel', orderToken: orderToken(record.id) }) })
+  };
+
+  const software = softwarePayments(env);
+  const payments = mechanics.payments || {
+    create: record => hasSoftware(record.order?.orderDraft) ? software.create(record) : ordinaryPayments.create(record),
+    retrieve: record => ordinaryPayments.retrieve(record),
+    cancel: (record, intent) => record.order?.payment?.billing?.subscriptionId ? software.cancel(record) : ordinaryPayments.cancel(record, intent)
+  };
+
   const view = (record) => ({
     success: true, attemptId: record.id, phase: record.phase,
     expiresAt: new Date(record.expiresAt).toISOString(), serverTime: new Date().toISOString(),
@@ -120,8 +139,7 @@ export function checkoutCoordinator(owner, mechanics) {
 
   async function paymentUnavailable(record, freshlyCreated = false) {
     try {
-      const stripe = createStoreStripeClient(env, checkoutStripeKey(env), { operation: 'checkout_payment_status', orderToken: orderToken(record.id), intent: 'read' });
-      const status = freshlyCreated ? record.order.payment.status : (await stripe.paymentIntents.retrieve(record.paymentIntentId)).status;
+      const status = freshlyCreated ? record.order.payment.status : (await payments.retrieve(record)).status;
       // Cancellation must use the existing checkpoint/release path. A paid or
       // processing intent keeps its stock until the signed webhook settles it.
       if (status === 'canceled') return release(record.id);
@@ -160,17 +178,17 @@ export function checkoutCoordinator(owner, mechanics) {
       return current;
     });
     if (!lease) return await ctx.storage.get(key(record.id));
-    const stripe = createStoreStripeClient(env, checkoutStripeKey(env), { operation: 'checkout_payment_intent', orderToken: orderToken(record.id), intent: 'create' });
     try {
       // Retain unresolved payment evidence independently of the short hold.
       await env.STORE_STATE.put(`orders:${orderToken(record.id)}`, JSON.stringify(lease.order));
-      const intent = await stripe.paymentIntents.create(lease.params, { idempotencyKey: `store-order:${orderToken(record.id)}` });
+      const intent = await payments.create(lease);
       if (!intent?.id || !intent?.client_secret) throw new Error('Incomplete payment response');
       const pending = { ...lease.order, status: 'payment_pending', orderDraft: { ...lease.order.orderDraft, status: 'payment_pending' },
-        payment: { ...lease.order.payment, paymentIntentId: intent.id, status: intent.status } };
+        payment: { ...lease.order.payment, paymentIntentId: intent.id, status: intent.status, ...(intent.billing ? { billing: intent.billing } : {}) } };
       // Webhooks cannot commit a creating attempt. They retry until this write
       // and the following durable transition have completed.
       await env.STORE_STATE.put(`orders:${orderToken(record.id)}`, JSON.stringify(pending));
+      if (pending.payment.billing?.snapshot) await callSoftwareBilling(env, pending.orderToken, 'register', { order: pending });
       return await mutate(record.id, async (current, _state, storage) => {
         if (current.phase !== 'creating') return current;
         current.phase = 'payment'; current.order = pending;
@@ -205,11 +223,9 @@ export function checkoutCoordinator(owner, mechanics) {
     record = await createPayment(record);
     if (record.phase !== 'payment') return error('payment_resolving', 'We are checking this payment. Do not pay again.');
     try {
-      const stripe = createStoreStripeClient(env, checkoutStripeKey(env), { operation: 'checkout_expiry', orderToken: orderToken(id), intent: 'read' });
-      let intent = await stripe.paymentIntents.retrieve(record.paymentIntentId);
+      let intent = await payments.retrieve(record);
       if (['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(intent.status)) {
-        intent = await cancelStorePaymentIntent(checkoutStripeKey(env), intent.id, { idempotencyKey: `store-checkout-cancel:${id}`, stripeVersion: env.STRIPE_API_VERSION,
-          onRequest: (event) => recordStripeProcessorEvent(env, event, { operation: 'checkout_expiry', intent: 'cancel', orderToken: orderToken(id) }) });
+        intent = await payments.cancel(record, intent);
       }
       if (intent.status !== 'canceled') {
         await storeReconciliationBreak(env, { orderToken: orderToken(id), paymentIntentId: record.paymentIntentId, reasons: ['checkout_awaiting_payment_resolution'], source: 'checkout_alarm' });

@@ -5,7 +5,10 @@ PODMAN_STACK_READY_TIMEOUT="${PODMAN_STACK_READY_TIMEOUT:-600}"
 store_podman_test_state_isolated() {
   local volume
   volume="$(podman inspect --format '{{range .Mounts}}{{if eq .Destination "/workspace/worker/.wrangler"}}{{.Name}}{{end}}{{end}}' store-dev-worker 2>/dev/null)" || return 1
-  [ "$volume" = "store-test-worker-wrangler" ]
+  [ "$volume" = "store-test-worker-wrangler" ] || return 1
+  local isolated_site
+  isolated_site="$(podman inspect --format '{{range .Config.Env}}{{if eq . "STORE_ISOLATED_TEST_CONFIG=true"}}true{{end}}{{end}}' store-dev-site 2>/dev/null)" || return 1
+  [ "$isolated_site" = "true" ]
 }
 
 store_print_podman_logs() {

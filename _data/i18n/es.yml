@@ -328,6 +328,11 @@ storefront:
   only_left: Solo quedan %{count}
 runtime:
   cart:
+    software_renewal_heading: "Renovaciones futuras"
+    software_renewal_price: "{amount} cada {interval}, más impuestos."
+    software_renewal: "Se renueva automáticamente. Los cupones de Store solo se aplican al primer pago. Cancela la renovación futura a través de soporte. El software instalado sigue funcionando al terminar la cobertura."
+    software_month: "mes"
+    software_year: "año"
     cart_button_empty: Abrir carrito. El carrito está vacío.
     cart_button_summary_one: Abrir carrito. %{count} artículo, %{total} en total.
     cart_button_summary_other: Abrir carrito. %{count} artículos, %{total} en total.
@@ -567,6 +572,17 @@ fulfillment:
     pending_error: Este pedido todavía no está listo para verificar el boleto.
     return_to_store: Volver a la tienda
 email:
+  software_billing:
+    heading: Tu suscripción de software
+    renewed: Tu pago renovó la cobertura de actualizaciones y soporte. Tu clave de licencia sigue funcionando.
+    payment_failed: Un intento de pago de renovación falló. Abre tu página privada del pedido para actualizar tu método de pago o completar un pago pendiente. Si ya pagaste, no necesitas hacer nada. Solo los pagos completados añaden cobertura.
+    refunded: Tu reembolso está confirmado. Una línea de software reembolsada por completo ya no cubre descargas ni actualizaciones. Los demás períodos pagados siguen disponibles. Este reembolso no cancela las renovaciones futuras.
+    cancelled: Se ha cancelado la renovación futura. La cobertura pagada sigue disponible hasta el final de su período.
+  software_license:
+    manage: Administrar licencias y pagos
+    heading: Tu licencia de ASCII VJ Remix
+    body: Abre Software license en ASCII VJ Remix e introduce esta clave para acceder a las actualizaciones incluidas.
+    offline: La aplicación instalada seguirá funcionando cuando termine la cobertura de actualizaciones. Guarda este correo para recuperar tu clave.
   subjects:
     admin_login: Tu enlace de administración
     admin_user_created: Acceso de administración agregado
@@ -702,3 +718,75 @@ email:
     body: Este enlace funciona por 15 minutos. Si no lo solicitaste, puedes ignorar este correo.
     cta: Abrir administración
     footer: Alguien solicitó acceso al panel de administración con este correo.
+
+software:
+  title: "Tus licencias de software"
+  working: "Procesando…"
+  done: "Actualizado."
+  failed: "No se pudo completar esta acción."
+  confirm: "Confirmar"
+  reveal: "Mostrar clave de licencia"
+  hide_key: "Ocultar clave de licencia"
+  key: "Clave de licencia"
+  lifetime: "Actualizaciones de por vida"
+  major_coverage: "Actualizaciones de la versión principal %{major}"
+  through: "Versiones publicadas antes del %{end}"
+  between: "Versiones publicadas desde el %{start} hasta antes del %{end}"
+  invalid_link: "No se pudo verificar el enlace de pago."
+  installed: "El software instalado sigue funcionando cuando termina la cobertura. Protege tu clave de licencia y este enlace privado del pedido."
+  seats: "Dispositivos permitidos: %{count}"
+  pending: "El pago está registrado. La entrega de la licencia está pendiente. Actualiza en un momento o contacta a soporte."
+  no_coverage: "Esta licencia no tiene cobertura de descargas disponible."
+  downloads: "Descargas disponibles"
+  no_downloads: "Aún no se han publicado versiones cubiertas."
+  recent_only: "Se muestran registros recientes. Contacta a soporte para consultar los anteriores."
+  billing: "Renovaciones y pago"
+  cancelled: "La renovación futura está cancelada. La cobertura ya pagada sigue disponible."
+  automatic: "Tu suscripción se renueva automáticamente."
+  card_help: "Guardar un método de pago no paga una factura pendiente. Usa el botón de esa factura para revisar y completar el pago de forma segura."
+  update_card: "Actualizar método de pago"
+  cancel: "Cancelar renovaciones futuras"
+  cancel_help: "Cancela todo el software recurrente de este pedido al finalizar su período de facturación. La cobertura pagada y el software instalado siguen disponibles."
+  invoice_draft: "Pendiente de verificar impuestos"
+  invoice_open: "Pago pendiente"
+  invoice_paid: "Pagada"
+  invoice_void: "Anulada"
+  invoice_uncollectible: "Contacta a soporte"
+  pay_invoice: "Revisar y pagar de forma segura"
+  refresh: "Actualizar licencias y facturación"
+  refund_uncertain: "Es posible que un reembolso siga procesándose. Consulta su estado o vuelve a intentar la misma factura, artículo e importe antes de iniciar otro."
+  admin_title: "Licencias de software"
+  pilot: "Modo de prueba. Las ofertas de software de pago siguen sin publicarse."
+  paid_title: "Gestionar un pedido pagado"
+  order: "Token del pedido"
+  load: "Cargar pedido"
+  paid_status: "Entrega de licencias"
+  work: "Acciones pendientes: %{pending}. Acciones que requieren revisión: %{review}."
+  reconcile: "Actualizar y reintentar acciones pendientes"
+  refund: "Reembolsar"
+  refund_pending: "Pendiente"
+  refund_succeeded: "Completado"
+  refund_failed: "Fallido"
+  refund_review: "Requiere revisión"
+  review_partial_software_refund: "El reembolso parcial requiere decidir la cobertura"
+  review_unallocated_refund: "El reembolso externo requiere asignarse a un artículo"
+  refund_amount: "Importe del reembolso (USD)"
+  existing_refund: "ID de reembolso existente de Stripe (opcional; se importa sin volver a enviar dinero)"
+  refund_confirm: "Revisé el artículo y el importe. Un reembolso completo elimina solo la cobertura de este pago. La cancelación de renovaciones es independiente."
+  complimentary: "Emitir una licencia de cortesía"
+  email: "Correo del destinatario"
+  seat_count: "Dispositivos permitidos"
+  policy: "Cobertura de actualizaciones"
+  major: "Versión principal"
+  term: "Hasta una fecha"
+  end: "La cobertura termina al comenzar esta fecha (UTC)"
+  grant_confirm: "Emitir esta licencia y poner su correo en la cola de envío al destinatario."
+  issue: "Emitir licencia"
+  grant_saved: "Solicitud guardada: %{id}. La emisión y el envío del correo pueden estar pendientes."
+  refresh_grants: "Actualizar licencias de cortesía"
+  more: "Cargar más"
+  grant_pending: "Emisión pendiente"
+  grant_granted: "Emitida; correo pendiente"
+  grant_queued: "Emitida; correo en cola"
+  grant_failed: "Emisión fallida"
+  grant_reconcile: "El envío del correo requiere revisión"

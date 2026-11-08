@@ -172,7 +172,9 @@ for (const lang of ['en', 'es']) {
   });
 }
 
-for (const { physical, failFirstMount, failPreparation, editDuringPreparation, editAfterPreparation, failCancellation, editBillingZip, estimateFallback, delayedFields, slowEstimates, width } of [
+for (const { softwareRenewal, physical, failFirstMount, failPreparation, editDuringPreparation, editAfterPreparation, failCancellation, editBillingZip, estimateFallback, delayedFields, slowEstimates, width } of [
+  { softwareRenewal: true, physical: false, width: 390 },
+  { softwareRenewal: true, physical: true, width: 1280 },
   { physical: false, failFirstMount: false, width: 320 },
   { physical: true, failFirstMount: false, width: 390 },
   { physical: false, failFirstMount: false, width: 768 },
@@ -188,7 +190,7 @@ for (const { physical, failFirstMount, failPreparation, editDuringPreparation, e
   { physical: false, slowEstimates: 'initial', width: 390 },
   { physical: false, editBillingZip: 'NM', slowEstimates: 'edit', width: 390 }
 ]) {
-test(`${physical ? 'Physical' : 'Ticket'} ${width}px${slowEstimates ? ` with slow ${slowEstimates} estimates` : delayedFields ? ' with delayed fields' : editBillingZip ? ' with ZIP correction' : failFirstMount ? ' with terminal mount recovery' : failPreparation ? ' with network recovery' : failCancellation ? ' with uncertain cancellation' : editDuringPreparation ? ' with edited details' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
+test(`${softwareRenewal ? 'Software renewal ' : ''}${physical ? 'Physical' : 'Ticket'} ${width}px${slowEstimates ? ` with slow ${slowEstimates} estimates` : delayedFields ? ' with delayed fields' : editBillingZip ? ' with ZIP correction' : failFirstMount ? ' with terminal mount recovery' : failPreparation ? ' with network recovery' : failCancellation ? ' with uncertain cancellation' : editDuringPreparation ? ' with edited details' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
   let creations = 0; let confirms = 0;
   let succeed = false;
   let finishPreparation!: () => void;
@@ -295,7 +297,7 @@ test(`${physical ? 'Physical' : 'Ticket'} ${width}px${slowEstimates ? ` with slo
     const canonicalTax = zipEdited ? editedTax : updatedPayment ? 253 : 153;
     await route.fulfill({ json: action === 'intent' ? { ...base, checkoutUiMode: 'payment_intent', requiresPayment: true,
       paymentIntentId: `pi_browser_fixture_${creations}`, clientSecret: `pi_browser_fixture_${creations}_secret`, publishableKey: 'pk_test_fixture', orderToken: 'store-order-browser-fixture', totals: { taxCents: canonicalTax, shippingCents: physical ? 300 : 0, totalCents: (physical ? 3450 : 2100) + canonicalTax },
-      orderDraft: { taxDetails: { effectiveRate: zipEdited ? (estimateFallback ? 0.029 : 0.08875) : 0.0765,
+      orderDraft: { items: softwareRenewal ? [{ name: 'ASCII VJ Remix', subtotalCents: 1000, softwareLicense: { billing: 'month' } }, { name: 'ASCII annual', subtotalCents: 10000, softwareLicense: { billing: 'year' } }] : [], taxDetails: { effectiveRate: zipEdited ? (estimateFallback ? 0.029 : 0.08875) : 0.0765,
         estimated: Boolean(zipEdited), coverage: zipEdited ? (estimateFallback ? 'state_only' : 'zip_local') : null } } } : base });
   });
   await gotoCheckoutProduct(page, physical ? '/products/fronteras-t-shirt/' : '/products/a-night-in-paradiso/');
@@ -389,6 +391,14 @@ test(`${physical ? 'Physical' : 'Ticket'} ${width}px${slowEstimates ? ` with slo
   await expect(cart.locator('[data-cart-custom-checkout-email]')).toBeEnabled();
   await expect(cart.locator('[data-cart-custom-checkout-region="payment"]')).toContainText('Fixture payment element');
   const pay = cart.locator('[data-cart-confirm-custom-checkout]');
+  if (softwareRenewal) {
+    const disclosure = cart.locator('[data-software-renewal]');
+    await expect(disclosure).toHaveCount(2);
+    await expect(disclosure.first()).toContainText('$10.00 per month, plus tax');
+    await expect(disclosure.last()).toContainText('$100.00 per year, plus tax');
+    await expect(cart.locator('[data-software-renewal-terms]')).toContainText('first payment only');
+    await expect(cart.locator('[data-software-renewal-terms]')).toContainText('Installed software keeps working');
+  }
   await expect(pay).toHaveText(physical ? 'Pay $36.03' : 'Pay $22.53');
   await expect(cart.locator('[data-cart-checkout-summary-total]')).toHaveText(physical ? '$36.03' : '$22.53');
   await expect(pay).toBeEnabled();

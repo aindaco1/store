@@ -7,6 +7,7 @@ function runPlaywright({ volume = 'test-worker-dependencies', inspectStatus = 0,
     podman() {
       case "$1" in
         inspect)
+          if [[ "$3" == *'.Config.Env'* ]]; then printf 'true'; return 0; fi
           if [[ "$3" == *'/workspace/worker/.wrangler'* ]]; then
             printf '%s' 'store-test-worker-wrangler'
             return 0

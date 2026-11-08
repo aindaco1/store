@@ -328,6 +328,11 @@ storefront:
   only_left: Only %{count} left
 runtime:
   cart:
+    software_renewal_heading: "Future renewals"
+    software_renewal_price: "{amount} per {interval}, plus tax."
+    software_renewal: "Renews automatically. Store coupons apply to the first payment only. Cancel future renewal through support. Installed software keeps working after coverage ends."
+    software_month: "month"
+    software_year: "year"
     cart_button_empty: Open cart. Cart is empty.
     cart_button_summary_one: Open cart. %{count} item, %{total} total.
     cart_button_summary_other: Open cart. %{count} items, %{total} total.
@@ -567,6 +572,17 @@ fulfillment:
     pending_error: This order is not ready for ticket verification yet.
     return_to_store: Return to the store
 email:
+  software_billing:
+    heading: Your software subscription
+    renewed: Your payment renewed your update and support coverage. Your existing license key still works.
+    payment_failed: A renewal payment attempt failed. Open your private order page to update your payment method or complete an outstanding payment. If you have since paid, no action is needed. Only successful payments add coverage.
+    refunded: Your refund has been confirmed. A fully refunded software line no longer covers downloads or updates. Other paid periods remain available. This refund does not cancel future renewals.
+    cancelled: Future renewal has been cancelled. Your paid update coverage remains available through the end of its period.
+  software_license:
+    manage: Manage licenses and payment
+    heading: Your ASCII VJ Remix license
+    body: Open Software license in ASCII VJ Remix and enter this key to access covered updates.
+    offline: Your installed app keeps working when update coverage ends. Keep this email for recovery.
   subjects:
     admin_login: Admin sign-in link
     admin_user_created: Admin access added
@@ -702,3 +718,75 @@ email:
     body: This link works for 15 minutes. If you did not ask for it, you can ignore this email.
     cta: Open admin
     footer: Someone requested access to the admin dashboard with this email address.
+
+software:
+  title: "Your software licenses"
+  working: "Working…"
+  done: "Up to date."
+  failed: "Unable to complete this action."
+  confirm: "Confirm"
+  reveal: "Show license key"
+  hide_key: "Hide license key"
+  key: "License key"
+  lifetime: "Lifetime updates"
+  major_coverage: "Updates for major version %{major}"
+  through: "Releases published before %{end}"
+  between: "Releases published from %{start} to before %{end}"
+  invalid_link: "The payment link could not be verified."
+  installed: "Installed software keeps working when update coverage ends. Keep your license key and this private order link secure."
+  seats: "Devices allowed: %{count}"
+  pending: "Payment is recorded. License delivery is still pending. Refresh in a moment or contact support."
+  no_coverage: "No download coverage is currently available for this license."
+  downloads: "Eligible downloads"
+  no_downloads: "No eligible builds have been published yet."
+  recent_only: "Recent records are shown. Contact support for older records."
+  billing: "Renewals and payment"
+  cancelled: "Future renewal is cancelled. Previously paid coverage remains available."
+  automatic: "Your subscription renews automatically."
+  card_help: "Saving a payment method does not pay an outstanding invoice. Use its payment button to review and complete payment securely."
+  update_card: "Update payment method"
+  cancel: "Cancel future renewals"
+  cancel_help: "Cancel all recurring software in this order at the end of its billing period. Previously paid coverage and installed software remain available."
+  invoice_draft: "Awaiting tax verification"
+  invoice_open: "Payment needed"
+  invoice_paid: "Paid"
+  invoice_void: "Voided"
+  invoice_uncollectible: "Contact support"
+  pay_invoice: "Review and pay securely"
+  refresh: "Refresh licenses and billing"
+  refund_uncertain: "A refund request may still be processing. Check its status or retry the same invoice, item and amount before starting another."
+  admin_title: "Software licenses"
+  pilot: "Test mode. Paid software offers remain unpublished."
+  paid_title: "Manage a paid order"
+  order: "Order token"
+  load: "Load order"
+  paid_status: "License fulfillment"
+  work: "Pending actions: %{pending}. Actions needing review: %{review}."
+  reconcile: "Refresh and retry pending work"
+  refund: "Refund"
+  refund_pending: "Pending"
+  refund_succeeded: "Succeeded"
+  refund_failed: "Failed"
+  refund_review: "Needs review"
+  review_partial_software_refund: "Partial software refund needs a coverage decision"
+  review_unallocated_refund: "External refund needs an item allocation"
+  refund_amount: "Refund amount (USD)"
+  existing_refund: "Existing Stripe refund ID (optional; imports without sending money again)"
+  refund_confirm: "I reviewed this item and amount. A full software refund removes only this payment’s coverage. Renewal cancellation is separate."
+  complimentary: "Issue a complimentary license"
+  email: "Recipient email"
+  seat_count: "Allowed devices"
+  policy: "Update coverage"
+  major: "Major version"
+  term: "Through a date"
+  end: "Coverage ends at the start of this date (UTC)"
+  grant_confirm: "Issue this license and queue its email to the recipient."
+  issue: "Issue license"
+  grant_saved: "Request saved: %{id}. Issuance and email delivery may still be pending."
+  refresh_grants: "Refresh complimentary licenses"
+  more: "Load more"
+  grant_pending: "Issuance pending"
+  grant_granted: "Issued; email pending"
+  grant_queued: "Issued; email queued"
+  grant_failed: "Issuance failed"
+  grant_reconcile: "Email delivery needs review"

@@ -1,3 +1,4 @@
+import { callSoftwareBilling } from './software-billing.js';
 /**
  * Resend email integration for Store admin and order flows.
  */
@@ -26,6 +27,7 @@ import {
   normalizeStoreLang
 } from './i18n.js';
 import { getScopedConsole } from './logger.js';
+import { callComplimentaryLicenses } from './software-licenses.js';
 import { WORKER_USER_AGENT } from './version.js';
 import { productReportCsv } from './product-reports.js';
 import { Buffer } from 'node:buffer';
@@ -512,6 +514,43 @@ async function sendResendEmail(env, payload, { errorLabel = 'Resend error', fail
     errorLabel,
     failureLabel
   });
+}
+
+function softwareManagementLink(theme, t, orderToken, lang) {
+  if (!orderToken) return '';
+  const url = safeSiteUrl(`${getLocalizedPath('/order-success/', normalizeLang(lang))}?orderToken=${encodeURIComponent(orderToken)}`, theme.siteBase);
+  return `<p><a href="${escapeHtml(url)}" style="${getEmailPrimaryButtonStyle(theme)}">${escapeHtml(t('software_license.manage'))}</a></p>`;
+}
+
+export async function sendSoftwareLicenseEmail(env, { email, grantId, orderToken, lineId, preferredLang } = {}) {
+  configureEmailLogging(env);
+  const grant = orderToken ? await callSoftwareBilling(env, orderToken, 'recover', { lineId }) : await callComplimentaryLicenses(env, 'recover', { id: grantId });
+  if (!grant.key || grant.email !== email) throw new Error('Issued license unavailable');
+  const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
+  const heading = t('software_license.heading', 'Your ASCII VJ Remix license');
+  const html = `<body style="${getEmailBodyStyle(theme)}">
+    ${renderEmailHeader(theme, escapeHtml(heading))}
+    <div style="${getEmailCardStyle(theme)}">
+      <p>${escapeHtml(t('software_license.body', 'Open Software license in ASCII VJ Remix and enter this key to access covered updates.'))}</p>
+      <p><code>${escapeHtml(grant.key)}</code></p>
+      <p>${escapeHtml(t('software_license.offline', 'Your installed app keeps working when update coverage ends. Keep this email for recovery.'))}</p>
+      ${softwareManagementLink(theme, t, orderToken, preferredLang)}
+    </div></body>`;
+  await sendResendEmail(env, { from: safeEmailHeaderText(getOrdersEmailFrom(env)), to: email,
+    subject: safeEmailHeaderText(buildEmailSubject(heading, theme.platformName)), html }, { errorLabel: 'Resend error (software license)' });
+  return { sent: true };
+}
+
+export async function sendSoftwareBillingEmail(env, { email, orderToken, event, preferredLang } = {}) {
+  if (!['renewed', 'payment_failed', 'refunded', 'cancelled'].includes(event)) throw new Error('Invalid software notice');
+  const { t } = await getEmailTranslator(env, preferredLang);
+  const theme = getEmailTheme(env);
+  const heading = t('software_billing.heading', 'Your software subscription');
+  const copy = t(`software_billing.${event}`);
+  const html = `<body style="${getEmailBodyStyle(theme)}">${renderEmailHeader(theme, escapeHtml(heading))}<div style="${getEmailCardStyle(theme)}"><p>${escapeHtml(copy)}</p><p>${escapeHtml(t('software_license.offline'))}</p>${softwareManagementLink(theme, t, orderToken, preferredLang)}</div></body>`;
+  await sendResendEmail(env, { from: safeEmailHeaderText(getOrdersEmailFrom(env)), to: email, subject: safeEmailHeaderText(buildEmailSubject(heading, theme.platformName)), html }, { errorLabel: 'Resend error (software billing)' });
+  return { sent: true };
 }
 
 export async function sendAdminLoginEmail(env, { email, loginUrl, lang } = {}) {

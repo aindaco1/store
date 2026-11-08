@@ -1,3 +1,4 @@
+import { softwareOffer } from './software-offers.js';
 import STORE_CATALOG_SNAPSHOT from './generated/catalog-snapshot.js';
 import { validateEventRegistrationSubmission } from './event-registration.js';
 import { isValidAmount } from './validation.js';
@@ -199,6 +200,11 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
     ));
   }
 
+  let license = null;
+  try { license = softwareOffer(product, variant, options.env || {}); }
+  catch (error) { errors.push(buildValidationIssue('software_offer_invalid', error.message, { index, productId: product.id })); }
+  if (license && (rawItem.quantity !== 1 || unitPriceCents < 50)) errors.push(buildValidationIssue('software_quantity_invalid', 'Software offers require quantity one and a paid price.', { index, productId: product.id }));
+
   const fulfillmentType = normalizeString(product.fulfillment_type || product.type || 'physical');
   const shippable = !NON_SHIPPABLE_TYPES.has(fulfillmentType);
   const inventoryQuantity = normalizeInventory(variant?.inventory ?? product.inventory);
@@ -264,6 +270,7 @@ export function validateStoreOrderDraftItem(rawItem = {}, catalog, options = {})
       subtotalCents: unitPriceCents * quantity,
       currency: product.currency || catalog.defaults?.currency || 'USD',
       fulfillmentType,
+      ...(license ? { softwareLicense: license } : {}),
       event: product.event || product.collection || '',
       collection: product.collection || product.event || '',
       category: product.category || '',

@@ -1130,6 +1130,8 @@
   }
 
   function showAuth(message) {
+    var management = $('#admin-software-management');
+    if (management) { management.replaceChildren(); management.hidden = true; }
     var authPanel = $('#admin-auth-panel');
     var app = $('#admin-app');
     if (authPanel) authPanel.hidden = false;
@@ -1150,6 +1152,10 @@
     var email = currentUser.email || 'admin';
     $('#admin-session-summary').textContent = 'Signed in as ' + email;
     configureTabsForRole(currentUser);
+    var management = $('#admin-software-management');
+    if (management) import('/assets/js/software-management.js' + (script ? new URL(script.src).search : '')).then(function(module) {
+      return module.mountAdmin(management, { request: requestJson });
+    }).catch(function() { management.hidden = true; });
   }
 
   function exchangeLoginToken(token) {

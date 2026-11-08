@@ -1,0 +1,83 @@
+name: Rehearse Software Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      licensing_ref:
+        description: Reviewed full commit of aindaco1/dust-wave-licensing
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: software-recovery-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    if: github.ref == 'refs/heads/main'
+    environment: production-recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Validate immutable licensing revision
+        env:
+          LICENSING_REF: ${{ inputs.licensing_ref }}
+        run: |
+          [[ "$LICENSING_REF" =~ ^[a-f0-9]{40}$ ]] || exit 1
+
+      - name: Checkout reviewed Store
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: store
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Checkout reviewed licensing consumer
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: aindaco1/dust-wave-licensing
+          ssh-key: ${{ secrets.LICENSING_SOURCE_READ_KEY }}
+          ref: ${{ inputs.licensing_ref }}
+          path: dust-wave-licensing
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Setup patched Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '26.12.1'
+
+      - name: Install pinned dependencies and existing archive tools
+        run: |
+          npm ci --prefix store
+          npm ci --prefix dust-wave-licensing
+          sudo apt-get update
+          sudo apt-get install -y age
+          aws --version
+
+      - name: Rehearse synthetic encrypted archive and preview restore
+        working-directory: store
+        run: npm run restore:rehearse:software:preview -- --evidence="$RUNNER_TEMP/software-recovery.json"
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STORE_BACKUP_AGE_IDENTITY: ${{ secrets.STORE_BACKUP_AGE_IDENTITY }}
+          STORE_RECOVERY_ARCHIVE_ACCOUNT_ID: ${{ vars.STORE_RECOVERY_ARCHIVE_ACCOUNT_ID }}
+          STORE_RECOVERY_ARCHIVE_S3_URI: ${{ secrets.STORE_RECOVERY_ARCHIVE_S3_URI }}
+          STORE_RECOVERY_ARCHIVE_S3_ENDPOINT: ${{ vars.STORE_RECOVERY_ARCHIVE_S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.STORE_RECOVERY_ARCHIVE_ACCESS_KEY_ID || secrets.STORE_RECOVERY_ARCHIVE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.STORE_RECOVERY_ARCHIVE_SECRET_ACCESS_KEY || secrets.STORE_RECOVERY_ARCHIVE_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          WRANGLER_SEND_METRICS: 'false'
+
+      - name: Retain sanitized rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: software-recovery-${{ github.run_id }}
+          path: ${{ runner.temp }}/software-recovery.json
+          if-no-files-found: warn
+          retention-days: 90

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -f /workspace/_config.local.yml ]]; then
+if [[ "${STORE_ISOLATED_TEST_CONFIG:-false}" == "true" ]]; then
+  export SITE_BASE="${SITE_BASE:-http://127.0.0.1:4000}"
+  export WORKER_BASE="${WORKER_BASE:-http://127.0.0.1:8787}"
+fi
+
+if [[ -f /workspace/_config.local.yml && "${STORE_ISOLATED_TEST_CONFIG:-false}" != "true" ]]; then
   JEKYLL_CONFIG_FILES="$(/workspace/scripts/jekyll-config-files.sh /workspace)"
 else
   TEMP_JEKYLL_CONFIG="$(mktemp /tmp/store-podman-jekyll.XXXXXX.yml)"

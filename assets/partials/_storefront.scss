@@ -554,6 +554,7 @@
 }
 
 .store-order__body {
+  overflow-wrap: anywhere;
   display: grid;
   gap: 16px;
 }

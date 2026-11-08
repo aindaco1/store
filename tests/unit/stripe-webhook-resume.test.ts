@@ -55,6 +55,26 @@ function environment(storeState = new MemoryKV()) {
 }
 
 describe('Stripe webhook crash and replay controls', () => {
+  it('does not send ordinary Store refunds to software billing and retries missing canonical orders', async () => {
+    const orderToken = `store-order-${'b'.repeat(64)}`;
+    const coordinator = vi.fn();
+    const env = { ...environment(), SOFTWARE_LICENSING_ENABLED: 'true', STRIPE_SECRET_KEY_TEST: 'sk_test_fixture',
+      STORE_INVENTORY_COORDINATOR: { idFromName: coordinator } };
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(String(url).includes('/refunds/')
+      ? { id: 're_ordinary', payment_intent: 'pi_ordinary', amount: 100, currency: 'usd' }
+      : { id: 'pi_ordinary', livemode: false, metadata: { orderToken } })));
+    const event = { id: 'evt_ordinary_refund', type: 'refund.created', livemode: false, data: { object: { id: 're_ordinary' } } };
+    try {
+      expect((await postWebhook(env, event)).status).toBe(503);
+      expect(await env.STORE_STATE.get('stripe-event:evt_ordinary_refund')).toBeNull();
+      await env.STORE_STATE.put(`orders:${orderToken}`, JSON.stringify({ orderToken, payment: { paymentIntentId: 'pi_ordinary' } }));
+      const response = await postWebhook(env, event);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ received: true, reconciled: false });
+      expect(coordinator).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it('verifies signatures before acknowledging a cross-mode event', async () => {
     const env = {
       ...environment(),

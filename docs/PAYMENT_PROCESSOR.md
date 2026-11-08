@@ -650,3 +650,13 @@ the summary uses its returned totals and tax details; a late preview cannot
 replace the amount shown beside Pay. Pay remains disabled while estimates are
 loading or details are invalid. The existing release-before-replacement rule
 still applies to every prepared payment.
+
+## Software billing test pilot
+
+The opt-in [software billing path](SOFTWARE_LICENSING.md) now extends the same
+checkout coordinator, Payment Element, signed webhook and Resend outbox. It adds
+one combined initial subscription invoice when any software item recurs; ordinary
+one-time-only carts retain PaymentIntents. Paid software has a per-order durable
+receipt/refund subledger, independent coverage commands and item-scoped refunds.
+Renewals requote Store tax before collection. Production remains disabled. The
+software guide defines events, operator APIs, failure semantics and rollback.

@@ -254,3 +254,20 @@ npx playwright test tests/e2e/store-event-reminder-email.spec.ts tests/e2e/store
 ```
 
 For release payment evidence, run the target Worker with `STORE_EMAIL_DRY_RUN=true` or `RESEND_EMAIL_DRY_RUN=true`. The Worker records email delivery markers without calling Resend, and `npm run release:payment-smoke -- --direct-webhook` verifies customer/admin order emails would render for the local signed-webhook matrix.
+
+## Complimentary software licenses
+
+The test-only `software_license` transactional template uses this same Resend
+account, sender, localized copy, plain-text rendering, reply-to, durable outbox
+and receipts. The licensing consumer does not send mail. Store retains issuance
+before enqueueing delivery; mail failure cannot undo access. The frozen email
+payload contains an activation key and must follow the existing restricted
+outbox retention and restore quarantine. See [software licensing](SOFTWARE_LICENSING.md)
+for configuration, operator recovery and key-secret retention.
+
+Paid software uses the same Resend account/outbox as complimentary licensing.
+`software_license` renders a key from the order's billing authority;
+`software_billing` renders renewal, failed-payment-attempt, cancellation and refund
+notices. Commands carry identifiers, recipient and locale; license secrets enter
+only the restricted rendered provider payload. Delivery does not control coverage.
+See [software licensing](SOFTWARE_LICENSING.md) for idempotency and recovery.

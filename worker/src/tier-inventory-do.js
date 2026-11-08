@@ -1,4 +1,7 @@
+import { OWNER_PREFIX, recoveryBlocked, softwareJournalRecovery } from './software-backup.js';
+import { softwareBilling } from './software-billing.js';
 import { checkoutCoordinator } from './checkout-coordinator.js';
+import { complimentaryLicenses } from './software-licenses.js';
 import {
   cloneInventory,
   cloneReservations,
@@ -56,9 +59,26 @@ class InventoryCoordinator {
       return jsonResponse({ error: 'Invalid JSON body' }, 400);
     }
 
+    if (this.billing && url.pathname === '/software-recovery') {
+      try { return jsonResponse(await softwareJournalRecovery(this.ctx.storage, this.env, body)); }
+      catch (error) { return jsonResponse({ error: error.message }, 409); }
+    }
+    if (this.billing && await recoveryBlocked(this.ctx.storage, this.env)) return jsonResponse({ error: 'Recovery maintenance' }, 503);
+    if (this.billing && url.pathname === '/license-owner') {
+      if (!/^store-order-[a-f0-9]{64}$/.test(body.orderToken || '')) return jsonResponse({ error: 'Invalid billing owner' }, 400);
+      const key = OWNER_PREFIX + body.orderToken;
+      if (!await this.ctx.storage.get(key)) await this.ctx.storage.put(key, { orderToken: body.orderToken });
+      return jsonResponse({ registered: true });
+    }
     if (this.checkout && ['/checkout-hold', '/checkout-extend', '/checkout-pay', '/checkout-free', '/checkout-status', '/checkout-release', '/checkout-confirm'].includes(url.pathname)) {
       return jsonResponse(await this.checkout.handle(url.pathname, body));
     }
+    if (this.licenses && url.pathname === '/license-issue') return jsonResponse(await this.licenses.issue(body));
+    if (this.licenses && url.pathname === '/license-recover') return jsonResponse(await this.licenses.recover(body.id));
+    if (this.licenses && url.pathname === '/license-list') return jsonResponse(await this.licenses.list(body));
+    if (this.licenses && url.pathname === '/license-drain') { await this.licenses.drain(); return jsonResponse({ ok: true }); }
+
+    if (this.billing && url.pathname.startsWith('/billing-')) return jsonResponse(await this.billing.handle(url.pathname.slice('/billing-'.length), body));
 
     const payload = validatePayload(body, this.getPayloadOptions());
     if (!payload.ok) {
@@ -322,12 +342,14 @@ class InventoryCoordinator {
 }
 
 export class StoreInventoryCoordinator extends InventoryCoordinator {
-  constructor(ctx, env) {
+  constructor(ctx, env, { payments, billingStripe } = {}) {
     super(ctx, env);
-    this.checkout = checkoutCoordinator(this, { getWorkingState, putWorkingState, reserveCounts, syncInventoryToKv });
+    this.checkout = checkoutCoordinator(this, { getWorkingState, putWorkingState, reserveCounts, syncInventoryToKv, payments });
+    this.licenses = complimentaryLicenses(ctx, env);
+    this.billing = softwareBilling(ctx, env, billingStripe);
   }
 
-  async alarm() { await this.checkout.alarm(); }
+  async alarm() { if (await recoveryBlocked(this.ctx.storage, this.env)) return; await this.checkout.alarm(); await this.licenses.drain(); await this.billing.drain(); }
 }
 
 function validatePayload(body, options = {}) {

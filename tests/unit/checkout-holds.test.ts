@@ -3,25 +3,7 @@ import { StoreInventoryCoordinator } from '../../worker/src/tier-inventory-do.js
 import { EMAIL_DELIVERY_PREFIX, EMAIL_OUTBOX_PREFIX, processEmailOutbox } from '../../worker/src/email-outbox.js';
 import catalog from '../../worker/src/generated/catalog-snapshot.js';
 
-// Serial transactions with rollback/cloning: concurrent calls cannot share a
-// mutable object, as they could in a simplistic Map mock.
-class Storage {
-  data = new Map<string, any>(); alarmAt: number | null = null; queue = Promise.resolve();
-  async get(key: string) { return structuredClone(this.data.get(key)); }
-  async put(key: string, value: any) { this.data.set(key, structuredClone(value)); }
-  async delete(keys: string | string[]) { for (const key of [keys].flat()) this.data.delete(key); }
-  async getAlarm() { return this.alarmAt; }
-  async setAlarm(at: number) { this.alarmAt = at; }
-  async list({ prefix, limit }: any) { return new Map([...this.data].filter(([k]) => k.startsWith(prefix)).sort(([a], [b]) => a.localeCompare(b)).slice(0, limit)); }
-  async transaction<T>(callback: (storage: Storage) => Promise<T>) {
-    const run = this.queue.then(async () => {
-      const snapshot = structuredClone(this.data);
-      try { return await callback(this); } catch (error) { this.data = snapshot; throw error; }
-    });
-    this.queue = run.then(() => undefined, () => undefined);
-    return run;
-  }
-}
+import { Storage } from './helpers/storage';
 const first = 'a'.repeat(64), second = 'b'.repeat(64);
 const inventory = { ticket: { limit: 1, claimed: 0 }, mug: { limit: 2, claimed: 0 } };
 let storage: Storage, coordinator: StoreInventoryCoordinator, orders: Map<string, string>;

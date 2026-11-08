@@ -1,0 +1,95 @@
+{
+  "run": "paid-587dc8f1a0dd0517",
+  "testMode": true,
+  "apiVersion": "2026-02-25.clover",
+  "checks": [
+    {
+      "policies": [
+        "lifetime"
+      ],
+      "oneInitialPayment": true,
+      "amountCents": 6000,
+      "canonicalShippingTax": true,
+      "duplicateSettlement": true,
+      "licenseActivation": true
+    },
+    {
+      "policies": [
+        "major"
+      ],
+      "oneInitialPayment": true,
+      "amountCents": 6000,
+      "canonicalShippingTax": true,
+      "duplicateSettlement": true,
+      "licenseActivation": true
+    },
+    {
+      "policies": [
+        "term"
+      ],
+      "oneInitialPayment": true,
+      "amountCents": 6000,
+      "canonicalShippingTax": true,
+      "duplicateSettlement": true,
+      "licenseActivation": true
+    },
+    {
+      "policies": [
+        "monthly",
+        "annual"
+      ],
+      "oneInitialPayment": true,
+      "amountCents": 16780,
+      "canonicalShippingTax": true,
+      "duplicateSettlement": true,
+      "licenseActivation": true
+    },
+    {
+      "hostedSetupCreated": true,
+      "setupModeOnly": true,
+      "incompleteSetupRejected": true,
+      "setupOwnershipVerified": true,
+      "sessionExpired": true,
+      "hostedFormCompleted": false
+    },
+    {
+      "renewalAmountCents": 1100,
+      "oneTimeItemsNotRepeated": true,
+      "taxRecalculated": true,
+      "collectionHeldAtProvider": true,
+      "missedWebhookDiscovered": true,
+      "automaticallyCollectedAfterTax": true,
+      "staleFailurePreservedPaidCoverage": true
+    },
+    {
+      "customerLibraryAndDownload": true,
+      "staleCustomerDownloadRevoked": true
+    },
+    {
+      "realPrivateDownloadRevokedForRefund": true,
+      "priorPeriodRetained": true,
+      "otherLicenseRetained": true
+    },
+    {
+      "refundIdempotent": true,
+      "refundScope": "renewal-software-line-only",
+      "renewalCancellationSeparate": true,
+      "adminAndCsrf": true,
+      "resendDryRunSent": 8,
+      "resendReplaySent": 0
+    },
+    {
+      "paymentState": "requires_payment_method",
+      "cancelledBeforeInventoryRelease": true,
+      "scaChallengeCompleted": false
+    },
+    {
+      "paymentState": "requires_action",
+      "cancelledBeforeInventoryRelease": true,
+      "scaChallengeCompleted": false
+    }
+  ],
+  "cleanup": [],
+  "realEmailsSent": 0,
+  "passed": true
+}

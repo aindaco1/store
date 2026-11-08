@@ -313,6 +313,7 @@ start_pod_containers() {
     --restart=unless-stopped \
     -v "$ROOT_DIR:/workspace" \
     -v "$SITE_VOLUME:/usr/local/bundle" \
+    -e STORE_ISOLATED_TEST_CONFIG="$PODMAN_RESET_WRANGLER_STATE" \
     "$SITE_IMAGE" >/dev/null || return 1
 
   podman run -d \
