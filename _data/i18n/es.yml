@@ -720,6 +720,20 @@ email:
     footer: Alguien solicitó acceso al panel de administración con este correo.
 
 software:
+  admin_tab: "Licencias"
+  unavailable: "La gestión de licencias no está habilitada para esta tienda."
+  paid_title_help: "Carga una compra existente para revisar la entrega de licencias, los pagos, los reembolsos y la cancelación de renovaciones."
+  paid_status_help: "Revisa las acciones pendientes antes de reintentar la entrega. Las acciones marcadas para revisión requieren una decisión del operador."
+  releases_help: "Revisa las versiones privadas publicadas y retira una versión de las descargas y actualizaciones. Las copias instaladas siguen funcionando."
+  complimentary_help: "Otorga acceso a actualizaciones sin una compra. Elige los dispositivos permitidos y la cobertura antes de emitirla."
+  order_help: "Usa el token del pedido de Store correspondiente a la compra que quieres gestionar."
+  refund_amount_help: "Reembolsa solo este artículo. Un reembolso completo de software elimina la cobertura de este pago; los reembolsos parciales requieren revisar la cobertura."
+  existing_refund_help: "Introduce un ID de reembolso de Stripe solo si el dinero ya se devolvió, para que Store lo registre sin volver a reembolsar."
+  email_help: "El destinatario recibe el correo con la licencia una vez emitida correctamente."
+  seat_count_help: "Máximo de instalaciones activas a la vez. Desactivar un dispositivo libera una plaza."
+  policy_help: "La cobertura controla las descargas y actualizaciones privadas. Nunca desactiva el software instalado."
+  major_help: "Permite las versiones de esta versión principal."
+  end_help: "La fecha seleccionada es exclusiva, a medianoche UTC. Las versiones anteriores cubiertas siguen disponibles."
   manage_devices: "Administrar dispositivos y clave"
   device_count: "Instalaciones activas: %{count} de %{seats}."
   deactivate: "Desactivar esta instalación"

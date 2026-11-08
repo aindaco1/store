@@ -317,7 +317,7 @@ invoices await Store tax verification and deliberately have no payment button.
 Billing and paid-license Resend templates link to the localized private order
 page; no Stripe session URL is persisted in mail.
 
-In **Dashboard → Orders → Software licenses**, Store fulfillment admins can issue
+In **Dashboard → Licenses**, Store fulfillment admins can issue
 and paginate complimentary licenses and explicitly reveal an issued key.
 Super-admins additionally load a paid order, inspect fulfillment/review state,
 reconcile existing work, reveal keys, cancel renewals and submit item-scoped

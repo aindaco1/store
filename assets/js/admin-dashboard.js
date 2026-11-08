@@ -974,6 +974,7 @@
   }
 
   function getTabLabel(key) {
+    if (key === 'store-licenses') return config.i18n?.messages?.software?.admin_tab || key;
     var langLabels = labels[currentLang] || labels[currentLang.split('-')[0]] || labels.en;
     return langLabels[key] || key;
   }
@@ -1065,7 +1066,7 @@
   }
 
   function getRequestedAdminTab() {
-    var allowed = ['settings', 'store-products', 'store-coupons', 'store-downloads', 'store-orders', 'store-analytics', 'store-marketing'];
+    var allowed = ['settings', 'store-products', 'store-coupons', 'store-downloads', 'store-orders', 'store-licenses', 'store-analytics', 'store-marketing'];
     var requested = '';
     try {
       var params = new URLSearchParams(window.location.search);
@@ -1154,7 +1155,7 @@
     configureTabsForRole(currentUser);
     var management = $('#admin-software-management');
     if (management) import('/assets/js/software-management.js' + (script ? new URL(script.src).search : '')).then(function(module) {
-      return module.mountAdmin(management, { request: requestJson });
+      return module.mountAdmin(management, { request: requestJson, createHelp: createHelp, createHeadingWithHelp: createHeadingWithHelp });
     }).catch(function() { management.hidden = true; });
   }
 
@@ -1429,6 +1430,7 @@
     };
     var show = function() {
       active = true;
+      wrapper.classList.remove('is-dismissed');
       tooltip.classList.add('is-visible');
       positionHelpTooltip(wrapper, button, tooltip);
       window.addEventListener('resize', reposition);
@@ -1452,8 +1454,9 @@
     wrapper.addEventListener('focusout', scheduleHide);
     button.addEventListener('keydown', function(event) {
       if (event.key === 'Escape') {
+        event.preventDefault();
         hide();
-        button.blur();
+        wrapper.classList.add('is-dismissed');
       }
     });
   }

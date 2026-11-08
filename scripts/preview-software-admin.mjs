@@ -68,7 +68,7 @@ try {
       if(req.headers.host!==new URL(origin).host){res.writeHead(403);return res.end();}
       const url=new URL(req.url,origin);
       if(req.method==='GET' && ['/','/preview/start'].includes(url.pathname)) {
-        const login=await createAdminLoginUrl(bindings,{email,params:{tab:'store-orders'}});assert.ok(login);
+        const login=await createAdminLoginUrl(bindings,{email,params:{tab:'store-licenses'}});assert.ok(login);
         res.writeHead(302,{'Location':login,'Cache-Control':'no-store'});return res.end();
       }
       const response=(req.method==='GET' && await staticFile(url)) || await store.fetch(new Request(url,{method:req.method,headers:req.headers,...(!['GET','HEAD'].includes(req.method)?{body:Readable.toWeb(req),duplex:'half'}:{})}));

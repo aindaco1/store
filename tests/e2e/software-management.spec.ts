@@ -107,8 +107,8 @@ test('hosted setup returns through verified completion and existing invoice reco
 });
 test('operator refund retries preserve money request identity and complimentary issuance is explicit',async ({page}, testInfo)=>{
   const calls=await fixture(page,{lostRefund:true});
-  await page.goto('/admin/?tab=store-orders',{waitUntil:'domcontentloaded'});
-  const root=page.locator('#admin-software-management'); await expect(root).toBeVisible(); await root.locator(':scope > summary').click();
+  await page.goto('/admin/?tab=store-licenses',{waitUntil:'domcontentloaded'});
+  const root=page.locator('#admin-software-management'); await expect(root).toBeVisible();
   await root.getByLabel('Order token',{exact:true}).fill(orderToken); await root.getByRole('button',{name:'Load order',exact:true}).click();
   await expect(root.getByRole('heading',{name:'License fulfillment'})).toBeVisible();
   await root.locator('details').filter({hasText:'in_paid'}).locator('summary').click();
@@ -127,8 +127,8 @@ test('operator refund retries preserve money request identity and complimentary 
 });
 test('operator withdrawal retries preserve identity and history pages append',async ({page})=>{
   const calls=await fixture(page,{paginated:true,lostWithdrawal:true});
-  await page.goto('/admin/?tab=store-orders',{waitUntil:'domcontentloaded'});
-  const root=page.locator('#admin-software-management');await root.locator(':scope > summary').click();
+  await page.goto('/admin/?tab=store-licenses',{waitUntil:'domcontentloaded'});
+  const root=page.locator('#admin-software-management');
   await root.getByLabel('Order token',{exact:true}).fill(orderToken);await root.getByRole('button',{name:'Load order',exact:true}).click();
   await root.getByRole('button',{name:'Load more payments',exact:true}).click();
   await expect(root.locator('summary').filter({hasText:'in_older'})).toBeVisible();
@@ -154,11 +154,11 @@ test('customer invoice history appends without replacing current billing',async 
   expect(calls.find(c=>c.path.endsWith('/invoices'))?.body.cursor).toBe('in_due');
   await expect(root.getByRole('button',{name:'Review and pay securely'})).toBeVisible();
 });
-test('limited operator sees complimentary actions only and disabled pilot stays hidden',async ({page}, testInfo)=>{
-  await fixture(page,{paid:false});await page.goto('/admin/?tab=store-orders',{waitUntil:'domcontentloaded'});
-  const root=page.locator('#admin-software-management');await expect(root).toBeVisible();await root.locator('summary').click();
+test('limited operator sees complimentary actions only and disabled licensing has no controls',async ({page}, testInfo)=>{
+  await fixture(page,{paid:false});await page.goto('/admin/?tab=store-licenses',{waitUntil:'domcontentloaded'});
+  const root=page.locator('#admin-software-management');await expect(root).toBeVisible();
   await expect(root.getByRole('heading',{name:'Issue a complimentary license'})).toBeVisible();await expect(root.getByLabel('Order token',{exact:true})).toHaveCount(0);
-  await page.unroute(`${worker}/**`);await fixture(page,{enabled:false});await page.reload({waitUntil:'domcontentloaded'});await expect(root).toBeHidden();
+  await page.unroute(`${worker}/**`);await fixture(page,{enabled:false});await page.reload({waitUntil:'domcontentloaded'});await expect(root).toContainText('License management is not enabled');await expect(root.getByRole('button')).toHaveCount(0);
   await page.goto(`/order-success/?orderToken=${orderToken}`,{waitUntil:'domcontentloaded'});await expect(page.locator('[data-store-order-body]')).toBeVisible();await expect(page.locator('.store-software')).toHaveCount(0);
 });
 
@@ -187,4 +187,28 @@ for(const lang of ['en','es'])test(`key replacement retry and device administrat
   await expect(root.getByText(lang==='en'?/Key replaced/:/Clave reemplazada/)).toBeVisible();
   await expectNoHorizontalOverflow(page);await axe(page,'.store-software');
   await page.screenshot({path:testInfo.outputPath(`license-administration-${lang}.png`),fullPage:true});
+});
+
+for(const lang of ['en','es'])test(`licenses have a dedicated tab and dashboard help (${lang})`,async({page},testInfo)=>{
+  await fixture(page);
+  await page.goto(`${lang==='es'?'/es':''}/admin/?tab=store-licenses`,{waitUntil:'domcontentloaded'});
+  const root=page.locator('#admin-software-management');
+  await expect(page.locator('#admin-tab-store-licenses')).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#admin-panel-store-orders #admin-software-management')).toHaveCount(0);
+  await expect(root.getByRole('heading',{name:lang==='es'?'Licencias de software':'Software licenses',exact:true})).toBeVisible();
+  const help=root.getByRole('button',{name:lang==='es'?'Acerca de Cobertura de actualizaciones':'About Update coverage',exact:true});
+  await help.click();
+  const tooltipId=await help.getAttribute('aria-describedby');
+  await expect(page.locator('#'+tooltipId)).toBeVisible();
+  await expect(page.locator('#'+tooltipId)).toContainText(lang==='es'?'Nunca desactiva':'never disables');
+  await help.press('Escape');await expect(page.locator('#'+tooltipId)).toBeHidden();await expect(help).toBeFocused();
+  await root.getByLabel(lang==='es'?'Token del pedido':'Order token',{exact:true}).fill(orderToken);
+  await root.getByRole('button',{name:lang==='es'?'Cargar pedido':'Load order',exact:true}).click();
+  await axe(page,'#admin-panel-store-licenses');await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({width:390,height:844});
+  await expect(root).toBeVisible();await expectNoHorizontalOverflow(page);
+  const mobileTabs=page.locator('.admin-mobile-tab-select select').first();
+  await mobileTabs.selectOption('store-orders');await expect(root).toBeHidden();
+  await mobileTabs.selectOption('store-licenses');await expect(root).toBeVisible();
+  await page.screenshot({path:testInfo.outputPath(`licenses-${lang}.png`),fullPage:true});
 });

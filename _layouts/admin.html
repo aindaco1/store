@@ -56,6 +56,7 @@
             <button id="admin-tab-store-coupons" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-coupons" data-admin-tab="store-coupons" tabindex="-1">{% include t.html key="admin.store_coupons_short_title" lang=current_lang %}</button>
             <button id="admin-tab-store-downloads" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-downloads" data-admin-tab="store-downloads" tabindex="-1">{% include t.html key="admin.store_downloads_short_title" lang=current_lang %}</button>
             <button id="admin-tab-store-orders" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-orders" data-admin-tab="store-orders" tabindex="-1">{% include t.html key="admin.store_orders_short_title" lang=current_lang %}</button>
+            <button id="admin-tab-store-licenses" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-licenses" data-admin-tab="store-licenses" tabindex="-1">{% include t.html key="software.admin_tab" lang=current_lang %}</button>
             <button id="admin-tab-store-analytics" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-analytics" data-admin-tab="store-analytics" tabindex="-1">{% include t.html key="admin.store_analytics_short_title" lang=current_lang %}</button>
             <button id="admin-tab-store-marketing" class="admin-tabs__tab" type="button" role="tab" aria-selected="false" aria-controls="admin-panel-store-marketing" data-admin-tab="store-marketing" tabindex="-1">{% include t.html key="admin.store_marketing_short_title" lang=current_lang %}</button>
           </div>
@@ -252,9 +253,12 @@
           <div id="admin-store-orders-status" class="admin-dashboard__status" role="status" aria-live="polite"></div>
           <div id="admin-store-orders-summary" class="admin-store-orders__summary" aria-live="polite"></div>
           <div id="admin-store-orders-attendance" class="admin-store-orders__attendance" hidden></div>
-          <details id="admin-software-management" hidden></details>
           <div id="admin-store-orders-results" class="admin-store-orders__results"></div>
           <button id="admin-store-orders-next" class="btn btn--secondary" type="button" hidden>{% include t.html key="admin.load_more" lang=current_lang %}</button>
+        </section>
+
+        <section id="admin-panel-store-licenses" class="admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-licenses" data-admin-tab-panel="store-licenses" hidden>
+          <div id="admin-software-management" class="admin-licenses admin-section-stack"></div>
         </section>
 
         <section id="admin-panel-store-products" class="admin-store-products admin-tabs__panel" role="tabpanel" aria-labelledby="admin-tab-store-products" data-admin-tab-panel="store-products" hidden>

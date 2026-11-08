@@ -648,8 +648,8 @@ $admin-section-gap: clamp(16px, 2vw, 24px);
   z-index: 5;
 }
 
-.admin-settings__help:hover .admin-settings__help-tooltip,
-.admin-settings__help:focus-within .admin-settings__help-tooltip {
+.admin-settings__help:not(.is-dismissed):hover .admin-settings__help-tooltip,
+.admin-settings__help:not(.is-dismissed):focus-within .admin-settings__help-tooltip {
   display: block;
   opacity: 1;
 }
@@ -5535,4 +5535,11 @@ textarea.admin-settings__input--readonly {
     top: 0;
   }
 
+}
+
+.admin-licenses {
+  overflow-wrap: anywhere;
+  .btn { justify-self: start; }
+  .admin-settings__field-stack[hidden] { display: none; }
+  .admin-settings__checkbox-option input { width: auto; }
 }

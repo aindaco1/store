@@ -1,6 +1,8 @@
 # Licensing server-secret recovery and admin preview
 
-Store base: `53f2bd03b56dacc3cb57c704502cbe0812160f4e`.
+Store original base: `53f2bd03b56dacc3cb57c704502cbe0812160f4e`; refreshed against
+main `4dba770399f2fae7600d6bddf1a1f29d516e48ec` before the dashboard follow-up.
+[Store PR #128](https://github.com/aindaco1/store/pull/128) contains both changes.
 Compatible authority: `e84e61090de73c921096c0a86449e9265229d98b`,
 [private PR #3](https://github.com/aindaco1/dust-wave-licensing/pull/3).
 This is test-only implementation evidence, not a production deployment.
@@ -25,14 +27,27 @@ paid-order/refund history, active installation controls, private releases and
 complimentary licenses. No new admin renderer, auth bypass in the product, live
 provider calls or real email sends were introduced.
 
+License administration now has its own **Licenses** tab and mobile navigation
+entry. Cards, field stacks, checkboxes and info bugs reuse the existing dashboard
+components, with English/Spanish copy. Help explains coverage, devices, refunds
+and private releases; Escape dismisses it without losing keyboard focus. Disabled
+licensing shows an unavailable message with no controls. Authorization, CSRF,
+refund idempotency and confirmation requirements are unchanged. Small layout
+rules remain in the admin-only stylesheet; the aggregate/admin CSS ceilings grow
+by 1,000 bytes, while the public stylesheet ceiling stays unchanged.
+
 ## Validation
 
 - Authority: 15 Worker/SQLite tests and Wrangler dry-run build passed. Hosted
   [Feasibility checks 42455294576](https://github.com/aindaco1/dust-wave-licensing/actions/runs/42455294576)
   passed on the exact authority ref above.
 - Store: full `test:premerge` passed: 874 unit tests, seven payment contracts,
-  22 security tests, 113 browser tests, and all audit/build/resource/Worker checks.
+  22 security tests, 115 browser tests, and all audit/build/resource/Worker checks.
   Final focused recovery/credential/administration checks passed 14 tests.
+  The complete gate was rerun after the Licenses-tab follow-up; its browser checks
+  cover desktop/mobile navigation, both locales, role/disabled behavior, info-bug
+  dismissal/focus, overflow and accessibility assertions. Aggregate production
+  CSS is 200,179 bytes; the documented revised ceiling is 201,000 bytes.
 - Updated local encrypted restore passed: 50 Store records, 41 authority rows,
   two artifact objects; zero external requests, live payments and real emails.
   Wrong current/root/previous keys, missing previous keys and altered retirement
@@ -59,11 +74,13 @@ the main-only `production-recovery` workflow after review/merge; retain its norm
 reviewer gate and existing archive credentials/destination. Do not treat the prior
 run 42453190850 as evidence for this new code.
 
-Independent Cloudflare/GitHub reads found production `store-worker` unchanged:
-modified `2026-11-04T02:43:42.429179Z`, ETag
-`40a09ab32dc3a1e84d27fcfb3bd189508b7477e0a82749babb521f7948d11e05`.
-No licensing enablement binding or repository/environment licensing capture opt-in
-was present. The existing ordinary `BACKUP_SCHEDULE_ENABLED=true` was preserved.
+Final Cloudflare/GitHub reads found production `store-worker` in live mode with
+no licensing bindings. Its latest modified time was
+`2026-11-08T06:40:15.625451Z`, ETag
+`c6ae230cad6ded32cd24345c14eb7d41a5ca1513c9fe3252195ba76773a16d49`.
+That metadata advanced since the initial read during this task; this phase made
+no production writes. No repository/environment licensing capture opt-in was
+present. The existing ordinary `BACKUP_SCHEDULE_ENABLED=true` was preserved.
 Paid Entitle sales and scheduled licensing capture stay disabled. No production
 secret was generated, transferred or rotated by this phase.
 

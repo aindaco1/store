@@ -124,7 +124,7 @@ npm run preview:licensing-admin
 
 Open `http://127.0.0.1:8899/preview/start`. The disposable preview uses the real
 Store dashboard, signed one-time login, session/CSRF checks, SQLite authority and
-synthetic provider fixture. Expand **Software licenses** on **Orders**; load the
+synthetic provider fixture. Open **Licenses**; load the
 printed synthetic order token to inspect payments/refunds and device controls.
 **Load releases** and **Refresh complimentary licenses** show those records.
 No credentials from `.dev.vars` are loaded; outside provider requests are blocked,

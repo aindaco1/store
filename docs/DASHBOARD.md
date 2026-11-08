@@ -15,8 +15,9 @@ Top-level tabs appear in this order:
 3. Coupons
 4. Downloads
 5. Orders
-6. Analytics
-7. Marketing
+6. Licenses
+7. Analytics
+8. Marketing
 
 There are no standalone Add-ons, Inventory, or Health tabs. Add-on settings live in Settings -> Platform, inventory is managed in Products, and launch/usage checks live in Settings -> Store readiness and Settings -> Plan usage.
 
@@ -425,8 +426,10 @@ bundle exec jekyll build --config _config.yml,_config.local.yml
 
 ### Software licensing pilot
 
-The Orders tab exposes a test-only **Software licenses** disclosure when the
-licensing service is configured. It reuses fulfillment permissions for
+The **Licenses** tab owns software-license administration. Its cards, fields,
+checkboxes and localized info bugs reuse the dashboard components. When licensing
+is disabled, it shows an unavailable message with no controls. Configured test-mode
+licensing reuses fulfillment permissions for
 complimentary issuance/list/recovery; paid-order reconciliation, refunds and
 renewal cancellation require super-admin access. No published paid offer or
 production enablement is implied. See [the operator guide](SOFTWARE_LICENSING.md#customer-and-operator-management-ui)

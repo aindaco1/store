@@ -2248,6 +2248,7 @@ test.describe('Admin Dashboard', () => {
 	      'Coupons',
 	      'Downloads',
 	      'Orders',
+	      'Licenses',
 	      'Analytics',
 	      'Marketing'
 	    ]);
@@ -4303,6 +4304,7 @@ test.describe('Admin Dashboard', () => {
 	      ['#admin-tab-store-products', 'Productos'],
 	      ['#admin-tab-store-downloads', 'Descargas'],
 	      ['#admin-tab-store-orders', 'Pedidos'],
+	      ['#admin-tab-store-licenses', 'Licencias'],
 	      ['#admin-tab-store-analytics', 'Datos'],
 	      ['#admin-tab-store-marketing', 'Mktg']
 	    ];

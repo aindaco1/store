@@ -3,7 +3,7 @@
   "assets": {
     "siteDirectory": "_site",
     "javascriptTotalBytes": 750000,
-    "cssTotalBytes": 200000,
+    "cssTotalBytes": 201000,
     "files": {
       "assets/js/admin-dashboard.js": 320000,
       "assets/js/admin-settings-review.js": 30000,
@@ -14,7 +14,7 @@
       "shared/dust-wave-platform/packages/site-shell/src/shipping-option-utils-browser.js": 6000,
       "shared/dust-wave-platform/packages/site-shell/src/script-loader-browser.js": 4000,
       "assets/main.css": 100000,
-      "assets/admin.css": 117000
+      "assets/admin.css": 118000
     }
   },
   "lighthouse": {
