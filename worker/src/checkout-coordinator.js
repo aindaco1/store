@@ -319,6 +319,9 @@ export function checkoutCoordinator(owner, mechanics) {
       if (path === '/checkout-confirm') return confirm(body.attemptId);
       let record = await ctx.storage.get(key(body.attemptId));
       if (!record) return error('hold_missing', 'Checkout was not found.', 404);
+      // Internal webhook read: never creates, cancels or discloses a client secret.
+      if (path === '/checkout-payment') return record.phase === 'payment' && record.order
+        ? {success:true,order:record.order} : error('payment_resolving','Payment checkpoint unavailable.',503);
       if (record.phase === 'creating') record = await createPayment(record);
       if (!terminal(record) && (record.cancelRequested || record.expiresAt <= Date.now())) return release(record.id);
       if (record.phase === 'payment') {

@@ -4,6 +4,7 @@ import { softwarePaymentRecovery, stripeHostedUrl } from '../../worker/src/softw
 import { softwareBilling } from '../../worker/src/software-billing.js';
 import { MemoryKV } from './helpers/memory-kv';
 import { Storage } from './helpers/storage';
+import {createAdminLoginUrl,handleAdminAuthExchange} from '../../worker/src/admin-auth.js';
 
 const orderToken = `store-order-${'d'.repeat(64)}`;
 const other = `store-order-${'e'.repeat(64)}`;
@@ -38,6 +39,15 @@ const managementToken = () => signStoreFulfillmentToken(env, { orderToken, itemI
 const recovery = (action: string, payload: any = {}) => softwarePaymentRecovery(action, payload, { storage, stripe, order, returnUrl: `https://shop.test/order-success/?orderToken=${orderToken}` });
 
 describe('private order software access', () => {
+  it('authenticates administration and fixes the actor to the customer capability',async()=>{
+    const token=await managementToken();
+    expect((await request('administration',{token,action:'reset',lineId:'line-0',actor:'admin',id:'operation',generation:1})).status).toBe(200);
+    const invocation=call.mock.calls.find(([r]:any)=>new URL(r.url).pathname==='/billing-administration')[0];
+    expect(await invocation.json()).toMatchObject({actor:'customer',action:'reset',generation:1});
+    call.mockClear();
+    expect((await request('administration',{token,action:'reset'},other)).status).toBe(403);
+    expect(call).not.toHaveBeenCalled();
+  });
   it('rejects missing, expired, cross-order and cross-origin capabilities before reading billing', async () => {
     const token = await managementToken();
     expect((await request('recover', {})).status).toBe(403);
@@ -66,6 +76,26 @@ describe('private order software access', () => {
     expect((await request('cancel', { token })).status).toBe(404);
     env.APP_MODE = 'test'; await env.STORE_STATE.put(`orders:${orderToken}`, JSON.stringify({ status: 'pending' }));
     expect((await request('cancel', { token })).status).toBe(409); expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe('license administration roles',()=>{
+  it.each(['limited_admin','super_admin'])('requires CSRF and limits paid/release controls for %s',async role=>{
+    env.ADMIN_SESSION_SECRET='synthetic-admin-secret';
+    await env.STORE_STATE.put('store-admin-users:v1',JSON.stringify({users:[{email:'operator@example.test',role,accessScopes:['store']}]}));
+    const url=await createAdminLoginUrl(env,{email:'operator@example.test'});
+    const exchange=await handleAdminAuthExchange(new Request('https://shop.test/admin/auth/exchange',{method:'POST'}),env,{token:new URL(url).searchParams.get('admin_login')});
+    expect(exchange.status).toBe(200);
+    const cookie=exchange.headers.get('Set-Cookie')!.split(';')[0],session:any=await exchange.json();
+    const send=(path:string,body:any,csrf=session.csrfToken)=>worker.fetch(new Request('https://shop.test/admin/store/licenses/'+path,{method:'POST',headers:{Origin:'https://shop.test',Cookie:cookie,'x-store-admin-csrf':csrf,'Content-Type':'application/json'},body:JSON.stringify(body)}),env,{waitUntil(){}});
+    expect((await send('administration',{grantId:'gift',action:'reset'},'wrong')).status).toBe(403);
+    expect(call).not.toHaveBeenCalled();
+    expect((await send('administration',{grantId:'gift',action:'status'})).status).toBe(200);
+    expect((await send('administration',{orderToken,lineId:'line-0',action:'status'})).status).toBe(role==='super_admin'?200:403);
+    env.LICENSING_SERVICE.fetch.mockResolvedValue(Response.json({releases:[],cursor:null}));
+    expect((await send('releases',{action:'releases'})).status).toBe(role==='super_admin'?200:403);
+    env.APP_MODE='live';
+    expect((await send('administration',{grantId:'gift',action:'status'})).status).toBe(503);
   });
 });
 

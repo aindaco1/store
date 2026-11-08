@@ -459,7 +459,7 @@ data; it is disposable and never authoritative for money recovery.
 ## Software licensing checkpoint integration (pre-launch)
 
 `--software-licensing` extends the existing v2 snapshot. It adds Store's logical
-billing/complimentary journals and the licensing consumer's schema-3 authority
+billing/complimentary journals and the licensing consumer's schema-4 authority (schema-3 archives remain readable)
 and complete artifact inventory under `software/`. All files enter the same
 checksum inventory, age/GPG archive, decryptability check, private archive copy,
 readback verification and retention policy. No new scheduler, destination,
@@ -700,3 +700,27 @@ Durable admission records are separate from installation seats and business
 journals. Consumer-specific ingress and storage adapters stay in Store/licensing;
 resource provisioning and capture orchestration are shared within the existing
 Store rehearsal. See [Cloudflare's concurrency rules](https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/).
+
+
+### Administration records in licensing checkpoints
+
+The logical adapter now exports schema-4 `key_version`, installation `active` and
+`revision`, release `withdrawn`, and the authority's `administration` receipts.
+Store's grant/coverage journal keeps the original key identity; validation checks
+its immutable digest when a key has been replaced. Original derivation/token
+secrets remain separately required. No new credential or scheduled pipeline is
+introduced, and scheduled licensing capture remains disabled.
+
+Older schema-3 archives import with an empty key version, active revision-zero
+installations, no withdrawals and no administration receipts. This compatibility
+does not authorize reopening older rights: reconcile all post-checkpoint key,
+device and release changes first, as with refunds and seller revocations.
+Authority imports validate receipt targets/key versions and count only active
+installations against seats. Old tokens cannot regain access through reactivation.
+
+`npm run restore:rehearse:software` uses the existing encrypted age archive,
+checksum verifier and empty-target workflow. Its synthetic state now includes
+replacement, individual deactivation, reset and withdrawal. After restart it
+checks current-key recovery, old-key/token denial, retained withdrawal/history,
+coverage/refund denial, unchanged seat limits and no replayed email/payment.
+The rehearsal does not enable production recovery or a capture schedule.

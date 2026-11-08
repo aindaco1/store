@@ -7,6 +7,7 @@ import { quoteTax } from './tax.js';
 import { enqueueEmailOutbox } from './email-outbox.js';
 import { licensingRequest } from './software-service.js';
 import { softwarePaymentRecovery } from './software-payment-recovery.js';
+import { manageLicense, isLicenseAdministrationAction } from './software-administration.js';
 
 const validId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(value);
 const fail = (message, status = 409) => { throw Object.assign(new Error(message), { status }); };
@@ -309,12 +310,13 @@ export function softwareBilling(ctx, env, injectedStripe) {
     await storage.transaction(tx => queue(tx, { id: 'mail-cancelled', type: 'mail', event: 'cancelled' }));
     return { cancelled: true, cancelAt: result.cancel_at };
   }
-  async function recover(lineId) {
+  async function issuedLicense(lineId) {
     const order = await getOrder(), line = order.snapshot.lines.find(line => line.id === lineId && line.offer);
     const stored = await storage.get(`billing-license:${lineId}`);
     if (!line || !stored?.grantedAt) fail('Issued license not found', 404);
     return { ...await license(order, line), email: order.email };
   }
+  const recover=async lineId=>manageLicense(env,await issuedLicense(lineId),'paid','recover');
   async function customerView() {
     const order = await getOrder(), licenses = [];
     for (const line of order.snapshot.lines.filter(line => line.offer)) {
@@ -325,20 +327,37 @@ export function softwareBilling(ctx, env, injectedStripe) {
       if (!response.ok) fail('License status unavailable', 503);
       licenses.push({ ...base, ...await response.json() });
     }
-    let renewal = null, invoices = [], invoicesTruncated = false;
+    let renewal = null;
     if (order.billing.subscriptionId) {
       const stripe = provider(order), sub = await stripe.subscriptions.retrieve(order.billing.subscriptionId);
       if (sub.livemode !== false || objectId(sub.customer) !== order.billing.customerId) fail('Subscription mismatch');
       renewal = { status: sub.status, cancelled: !!sub.cancel_at_period_end || sub.status === 'canceled', cancelAt: sub.cancel_at ? sub.cancel_at * 1000 : null };
-      const page = await stripe.invoices.list({ subscription: sub.id, limit: 25 });
-      invoicesTruncated = page.has_more;
-      for (const invoice of page.data) {
-        invoices.push({ id: invoice.id, status: invoice.status, amountCents: invoice.amount_due, createdAt: invoice.created * 1000,
-          payable: invoice.status === 'open' && !!await storage.get(`billing-tax:${invoice.id}`) });
-      }
     }
-    return { licenses, renewal, invoices, invoicesTruncated };
+    return {licenses,renewal,...await customerInvoices()};
   }
+  async function customerInvoices(cursor='') {
+    const order=await getOrder();
+    if(!order.billing.subscriptionId)return {invoices:[],invoicesCursor:null,invoicesTruncated:false};
+    const stripe=provider(order);
+    if(cursor) {
+      if(!/^in_[A-Za-z0-9_]{1,100}$/.test(cursor))fail('Invalid invoice cursor',400);
+      const prior=await stripe.invoices.retrieve(cursor);
+      if(prior.livemode!==false || objectId(prior.customer)!==order.billing.customerId || objectId(prior.parent?.subscription_details?.subscription)!==order.billing.subscriptionId)fail('Invoice ownership mismatch',403);
+    }
+    const page=await stripe.invoices.list({subscription:order.billing.subscriptionId,limit:25,...(cursor?{starting_after:cursor}:{})});
+    const invoices=[];
+    for(const invoice of page.data) invoices.push({id:invoice.id,status:invoice.status,amountCents:invoice.amount_due,createdAt:invoice.created*1000,
+      payable:invoice.status==='open' && !!await storage.get(`billing-tax:${invoice.id}`)});
+    return {invoices,invoicesCursor:page.has_more?page.data.at(-1)?.id:null,invoicesTruncated:!!page.has_more};
+  }
+  async function history(kind,cursor='') {
+    const prefixes={payments:'billing-payment:',refunds:'billing-refund:',reviews:'billing-review:',work:'billing-work:'};
+    const prefix=Object.hasOwn(prefixes,kind)?prefixes[kind]:null;
+    if(!prefix || typeof cursor!=='string' || cursor.length>250 || (cursor && !/^[A-Za-z0-9_:-]+$/.test(cursor)))fail('Invalid history cursor',400);
+    const rows=[...await storage.list({prefix,limit:26,...(cursor?{startAfter:prefix+cursor}:{})})];
+    return {entries:rows.slice(0,25).map(([,value])=>{if(kind!=='work')return value;const {id,type,done,review}=value;return {id,type,done,review};}),cursor:rows.length>25?rows[24][0].slice(prefix.length):null};
+  }
+
   async function runJob(order, job) {
     if (job.type === 'refund') return processRefund(order, job.refundRequestId);
     if (job.type === 'invoice') return reconcileInvoice(job.invoiceId);
@@ -417,7 +436,13 @@ export function softwareBilling(ctx, env, injectedStripe) {
           return { reconciled: true };
         }
         if (action === 'recover') return await recover(payload.lineId);
+        if (action === 'administration') {
+          if(!isLicenseAdministrationAction(payload.action))fail('Invalid license action',400);
+          return await manageLicense(env,await issuedLicense(payload.lineId),'paid',payload.action,payload);
+        }
         if (action === 'customer') return await customerView();
+        if (action === 'invoices') return await customerInvoices(payload.cursor);
+        if (action === 'history') return await history(payload.kind,payload.cursor);
         if (['card-setup', 'card-complete', 'card-complete-event', 'invoice-page'].includes(action)) {
           const operation = cardWork.then(async () => {
             if (action === 'card-complete-event' && (await storage.get('billing-card-setup'))?.sessionId !== payload.sessionId) return { ignored: true };
@@ -438,9 +463,9 @@ export function softwareBilling(ctx, env, injectedStripe) {
         if (action === 'drain') { await drain(); return { drained: true }; }
         if (action === 'status') {
           const order = await getOrder();
-          const list = async prefix => [...(await storage.list({ prefix, limit: 100 })).values()];
-          return { orderToken: order.orderToken, lines: order.snapshot.lines, payments: await list('billing-payment:'), refunds: await list('billing-refund:'),
-            reviews: await list('billing-review:'), work: (await list('billing-work:')).map(({ id, type, done, review }) => ({ id, type, done, review })), cancellation: await storage.get('billing-cancellation') };
+          const result={orderToken:order.orderToken,lines:order.snapshot.lines,cancellation:await storage.get('billing-cancellation'),cursors:{}};
+          for(const kind of ['payments','refunds','reviews','work']) {const page=await history(kind);result[kind]=page.entries;result.cursors[kind]=page.cursor;}
+          return result;
         }
         fail('Not found', 404);
       } catch (error) { return { error: error.status ? error.message : 'Software billing operation failed', status: error.status || 503 }; }

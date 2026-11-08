@@ -8,7 +8,8 @@ import { readBoundedJson } from '../../shared/dust-wave-platform/packages/worker
 import { DEFAULT_STRIPE_API_VERSION } from '../../worker/src/stripe.js';
 import { sha256File, verifyChecksumManifest } from './file-integrity.mjs';
 const hash = value => createHash('sha256').update(value).digest('hex');
-const tables = ['grants','installs','coverage','releases'];
+const schemaTables = schema => schema===4 ? ['grants','installs','coverage','releases','administration'] : ['grants','installs','coverage','releases'];
+const normalizeAuthority=(table,row)=>({...({grants:{key_version:''},installs:{active:1,revision:0},releases:{withdrawn:0}}[table]),...row});
 const write = (root,name,value) => fs.writeFileSync(path.join(root,name),JSON.stringify(value)+'\n',{mode:0o600});
 const read = (root,name) => JSON.parse(fs.readFileSync(path.join(root,name),'utf8'));
 const check = (condition,message) => { if (!condition) throw new Error(message); };
@@ -61,7 +62,8 @@ export async function captureSoftwareBackup(snapshotRoot,{checkpoint,request=sof
   const validatePage=page=>check(page.version===1 && page.checkpoint===checkpoint,'Software checkpoint/schema mismatch');
   manifest.store=await json(request,'store',storeRoute,{checkpoint,action:'info'}); validatePage(manifest.store);
   manifest.authority=await json(request,'licensing',authorityRoute,{checkpoint,action:'info'}); validatePage(manifest.authority);
-  check(manifest.authority.schema===3,'Unsupported licensing schema');
+  check([3,4].includes(manifest.authority.schema),'Unsupported licensing schema');
+  const tables=schemaTables(manifest.authority.schema);
   const expectedSource=sourceId || manifest.store.source?.sourceId;
   if(expectedSource || manifest.authority.source) check(/^[a-f0-9]{16}$/.test(expectedSource || '') && [manifest.store,manifest.authority].every(info=>info.source?.sourceId===expectedSource && info.source.phase==='frozen' && info.source.active===0 && info.source.checkpoint===checkpoint && info.paidCheckoutEnabled===false),'Source is not frozen at a matching checkpoint');
   const registry=[];
@@ -118,8 +120,8 @@ export async function captureSoftwareBackup(snapshotRoot,{checkpoint,request=sof
   return {version:1,owners:manifest.owners.length,records:manifest.owners.reduce((sum,owner)=>sum+owner.count,0),authorityRows:Object.values(manifest.tables).reduce((sum,t)=>sum+t.count,0),objects:manifest.objects.length};
 }
 export function validateSoftwareBackup(snapshotRoot) {
-  const root=path.join(snapshotRoot,'software'), manifest=read(root,'manifest.json');
-  check(manifest.version===1 && /^[a-zA-Z0-9_-]{16,100}$/.test(manifest.checkpoint) && manifest.authority?.schema===3 && Object.keys(manifest.tables||{}).sort().join()===tables.slice().sort().join(),'Unsupported software snapshot');
+  const root=path.join(snapshotRoot,'software'), manifest=read(root,'manifest.json'), tables=schemaTables(manifest.authority?.schema);
+  check(manifest.version===1 && /^[a-zA-Z0-9_-]{16,100}$/.test(manifest.checkpoint) && [3,4].includes(manifest.authority?.schema) && Object.keys(manifest.tables||{}).sort().join()===tables.slice().sort().join(),'Unsupported software snapshot');
   const named=new Set(['manifest.json']);
   const file = name => { check(typeof name==='string' && /^[a-zA-Z0-9_-]+\.(json|bin)$/.test(name) && !named.has(name),'Invalid/duplicate software artifact'); named.add(name); return path.join(root,name); };
   const rows = entry => {
@@ -143,9 +145,16 @@ export function validateSoftwareBackup(snapshotRoot) {
   check(grants.size===authority.grants.length,'Duplicate authority grant');
   const periods=new Map(authority.coverage.map(row=>[row.grant_id+':'+row.id,row]));
   check(periods.size===authority.coverage.length,'Duplicate coverage');
+  const matchesGrant=(value,complimentary)=>{
+    const p=complimentary?value.payload:value, g=grants.get(p.id);if(!g)return false;
+    if(!g.key_version)return g.key_hash===value.keyHash;
+    const policy=p.policy;
+    const expected=hash(JSON.stringify(complimentary?[p.id,p.product,p.seats,value.keyHash,policy.kind,policy.start??null,policy.end??null,policy.major??null]:[p.id,p.product,p.seats,value.keyHash,'paid']));
+    return g.digest===expected;
+  };
   for (const records of owners.values()) for(const [key,value] of records) {
-    if(key.startsWith('complimentary:v1:') && value.grantedAt) check(grants.get(value.payload.id)?.key_hash===value.keyHash,'Completed complimentary grant missing from authority');
-    if(key.startsWith('billing-license:') && value.grantedAt) check(grants.get(value.id)?.key_hash===value.keyHash,'Completed paid grant missing from authority');
+    if(key.startsWith('complimentary:v1:') && value.grantedAt) check(matchesGrant(value,true),'Completed complimentary grant missing from authority');
+    if(key.startsWith('billing-license:') && value.grantedAt) check(matchesGrant(value,false),'Completed paid grant missing from authority');
     if(key.startsWith('billing-work:') && value.type==='coverage' && value.done) {
       const license=records.find(([k])=>k==='billing-license:'+value.lineId)?.[1], period=periods.get(license?.id+':'+value.coverageId);
       check(period && period.revision>=value.revision && period.policy===JSON.stringify(value.policy),'Completed coverage/refund missing from authority');
@@ -229,7 +238,7 @@ export async function verifySoftwareRestoreDestination(snapshotRoot,{request,pre
 export async function restoreSoftwareBackup(snapshotRoot,{request=softwareBackupClient({restore:true}),stripeRead,previewId}={}) {
   const checksums=read(snapshotRoot,'checksums.json');
   check(verifyChecksumManifest(snapshotRoot,checksums.artifacts,{requireComplete:true,exclude:['checksums.json']}).ok,'Snapshot integrity failed');
-  const {root,manifest,authority,owners}=validateSoftwareBackup(snapshotRoot), checkpoint=manifest.checkpoint;
+  const {root,manifest,authority,owners}=validateSoftwareBackup(snapshotRoot), checkpoint=manifest.checkpoint, tables=schemaTables(manifest.authority.schema);
   check(typeof stripeRead==='function','Fresh read-only money comparison is required');
   const money=await reconcileSoftwareMoney(snapshotRoot,stripeRead);
   check(money.ok,'Money reconciliation requires review; restore remains closed');
@@ -268,7 +277,7 @@ export async function restoreSoftwareBackup(snapshotRoot,{request=softwareBackup
   };
   for(const table of tables) for(let offset=0;offset<authority[table].length;offset+=25) {
     const actual=await json(request,'licensing',authorityRoute,{checkpoint,action:'export',table,offset});
-    check(JSON.stringify(actual.rows.map(normalize))===JSON.stringify(authority[table].slice(offset,offset+25).map(normalize)),'Restored authority readback failed');
+    check(JSON.stringify(actual.rows.map(row=>normalize(normalizeAuthority(table,row))))===JSON.stringify(authority[table].slice(offset,offset+25).map(row=>normalize(normalizeAuthority(table,row)))),'Restored authority readback failed');
   }
   for (const owner of manifest.owners) await json(request,'store',storeRoute,{checkpoint,action:'finish',owner:owner.name});
   await json(request,'licensing',authorityRoute,{checkpoint,action:'finish'});

@@ -220,7 +220,7 @@ CSRF and rate checks. Bodies are capped at 16 KiB. Actions are audited without k
 
 | Route under `/admin/store/licenses/` | Body | Result |
 | --- | --- | --- |
-| `billing` | `orderToken` | Frozen lines, up to 100 receipts/refunds/reviews/work summaries per family, cancellation state. |
+| `billing` | `orderToken` | Frozen lines, first 25 receipts/refunds/reviews/work summaries per family, continuation cursors, cancellation state. |
 | `paid-recover` | `orderToken`, `lineId` | Already-issued key and matched recipient. |
 | `refunds` | `orderToken`, unique stable `id`, `paymentId`, `allocations` | Durable refund request (202); reuse the exact request to inspect/retry. |
 | `cancel-renewals` | `orderToken` | End-of-period subscription cancellation; existing coverage remains. |
@@ -274,8 +274,7 @@ decline/SCA-required cancellation, and provider cleanup. It does not prove an
 actual browser SCA challenge or public webhook delivery. The report is
 `experiments/software-licensing/paid-runtime-result.json`.
 
-Live prices/seat/support policy, pagination/retention for long-lived operator
-history, key replacement/device administration/release withdrawal, dispute policy,
+Live prices/seat/support policy, approved retention and dispute policy,
 production backup/restore acceptance and app distribution gates remain required
 before launch. Sandbox browser/webhook and approved-recipient Resend evidence is
 recorded in the acceptance section below. No public price, production webhook configuration,
@@ -312,7 +311,7 @@ On a confirmed order page, customers can:
   never creates a replacement charge or removes the draft-invoice tax guard.
 
 Library results are bounded to 100 active coverage periods and 25 eligible builds;
-provider invoice history is limited to 25, with a visible truncation notice.
+provider invoices and operator history use 25-record pages with explicit load-more controls.
 Refresh/reload the private order page if a 15-minute capability expires. Draft
 invoices await Store tax verification and deliberately have no payment button.
 Billing and paid-license Resend templates link to the localized private order
@@ -326,8 +325,9 @@ refunds. The refund form requires an amount and confirmation; an optional existi
 Stripe refund ID imports that refund without sending money again. A session-only
 opaque request hint preserves refund identity after a lost response. Retry the
 same request or reconcile its status; do not manufacture a new ID when uncertain.
-There is no ambiguous-money override. Operator history remains bounded to the
-existing 100 records per family; long-lived-history pagination is a launch gate.
+There is no ambiguous-money override. Operator history is paginated by its existing
+journal keys; displayed pending/review counts describe the loaded records, not a
+global backlog count. No extra history index or copied journal is introduced.
 
 The UI shares one small lazy-loaded renderer and existing Store styles. Copy is
 in English/Spanish catalogs. All customer APIs are private/no-store and verify
@@ -368,3 +368,61 @@ The protected synthetic archive/restore passed in
 The deployed-source extension adds a persistent admission barrier for dedicated
 test Workers; see the backup guide and current deployed-source release evidence.
 Production licensing, paid offers and scheduled licensing capture remain disabled.
+
+
+## Key, installation and release administration
+
+The same private order capability exposes `/software/administration` for an issued
+line, with `action: status|history|replace|deactivate|reset`. Store resolves the line
+within that order; client-supplied grant IDs, products and actor roles are ignored.
+The operator equivalent is `/admin/store/licenses/administration`, scoped by
+`grantId` for complimentary grants or `orderToken` plus `lineId` for paid grants.
+Existing fulfillment permissions, trusted origin, CSRF and rate limits apply;
+paid-order controls and `/admin/store/licenses/releases` require super-admin.
+Production mode remains closed. The UI reuses the existing renderer and catalogs.
+
+Load status before mutation. Submit a stable `id` and the observed `generation`;
+deactivation also requires the observed `installation` and `revision`. Retry the
+same request after a lost reply. Reusing an ID with different meaning or a stale
+revision returns 409. A deliberate refresh loads current state for a new action.
+Key replacement invalidates the previous key and all existing update tokens; use
+**Show license key** afterward and reactivate apps. Deactivation frees one seat;
+reset frees all installations but never edits the purchased seat allowance.
+Installed software keeps working. No device fingerprint or additional telemetry
+is collected; the UI displays the existing installation IDs.
+
+Licensing schema 4 owns current key revision, device tombstones and immutable
+operation receipts. Store derives a replacement from its existing secret and the
+operation ID, so there is no second key-rotation journal to reconcile. Original
+Store key hashes and grant digests remain the identity for coverage/refund replay.
+Key recovery consults authority state and verifies the derived active key hash.
+Replacing a license key does **not** rotate server signing/derivation secrets.
+
+Receipts persist the operation, action, target, role, time, resulting generation
+and an opaque actor reference (admin-email hash or private order hash). Store's
+existing admin audit additionally records the authenticated operator. Public
+customer projections omit authority IDs, key hashes and actor references. Raw
+keys appear only on explicit reveal or in the existing restricted email payload.
+Receipts/tombstones/withdrawal records follow license-lifetime retention pending
+an approved production policy; deleting them can resurrect access and is unsafe.
+
+Super-admins can list and withdraw an ASCII VJ release. Withdrawal is one-way in
+this UI and preserves signed bytes/metadata for recovery. The shared eligibility
+predicate excludes it from libraries, native feeds and GET/HEAD/range delivery.
+Republishing the same release ID cannot undo withdrawal. If a corrected build is
+needed, publish a new immutable release ID through the existing publisher path.
+
+Billing history uses `/admin/store/licenses/history` with the returned cursor and
+allowlisted `kind: payments|refunds|reviews|work`. Customer `/software/invoices`
+pages only the order's subscription and rejects a cursor owned elsewhere. Release
+and administration history are also paginated. The separate customer library's
+100 coverage-period/25 release projection remains explicitly bounded.
+
+Schema-4 authority and a compatible Store reader must travel together in a
+reviewed test deployment. Deploy the schema-4 authority first, then Store; old
+Store callers can still use the original grant/coverage/token contracts. Older
+authority binaries intentionally reject schema 4, so keep the new reader during
+rollback. After any replacement, Store must also retain the current-key recovery
+reader; the old Store recovery implementation would reveal the obsolete key. Do not point old code at a migrated database or reopen an old snapshot
+without reconciling later replacement, deactivation, reset, withdrawal and refunds.
+No public offer, paid-sales flag or scheduled licensing capture is enabled here.

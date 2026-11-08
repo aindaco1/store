@@ -1,5 +1,6 @@
 import { isValidEmail } from './validation.js';
 import { enqueueEmailOutbox } from './email-outbox.js';
+import { manageLicense, isLicenseAdministrationAction } from './software-administration.js';
 
 const RECORD_PREFIX = 'complimentary:v1:';
 const DUE_PREFIX = 'complimentary-due:v1:';
@@ -116,7 +117,7 @@ export function complimentaryLicenses(ctx, env) {
     if (!validId(id)) return { status: 400, error: 'Invalid grant' };
     const record = await ctx.storage.get(RECORD_PREFIX + id);
     if (!record?.grantedAt) return { status: 404, error: 'Issued license not found' };
-    try { return { id, key: await verifiedKey(record), email: record.payload.email, state: record.state }; }
+    try { return { ...await manageLicense(env,{id,key:await verifiedKey(record),product:record.payload.product},'complimentary','recover'), email: record.payload.email, state: record.state }; }
     catch { return { status: 503, error: 'Original licensing key secret required' }; }
   }
   async function list({ cursor = '' } = {}) {
@@ -125,5 +126,12 @@ export function complimentaryLicenses(ctx, env) {
     return { grants: rows.slice(0,25).map(record => ({ ...record.payload, state: record.state, grantedAt: record.grantedAt || null })),
       cursor: rows.length > 25 ? rows[24].payload.id : null };
   }
-  return { issue, drain, recover, list };
+  async function administer(p) {
+    if(!softwareLicensingEnabled(env) || !validId(p.grantId) || !isLicenseAdministrationAction(p.action))return {status:400,error:'Invalid license'};
+    const record=await ctx.storage.get(RECORD_PREFIX+p.grantId);
+    if(!record?.grantedAt)return {status:404,error:'Issued license not found'};
+    try {await verifiedKey(record);return await manageLicense(env,{id:p.grantId,product:record.payload.product},'complimentary',p.action,{...p,actor:'admin'});}
+    catch(error){return {status:error.status||503,error:error.message};}
+  }
+  return { issue, drain, recover, list, administer };
 }

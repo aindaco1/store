@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StoreInventoryCoordinator } from '../../worker/src/tier-inventory-do.js';
 import { complimentaryKey } from '../../worker/src/software-licenses.js';
@@ -15,7 +16,9 @@ beforeEach(() => {
  env={APP_MODE:'test',SOFTWARE_LICENSING_ENABLED:'true',LICENSING_ADMIN_SECRET:'synthetic',LICENSING_KEY_SECRET:'synthetic-key-with-at-least-32-bytes',STORE_STATE:kv,
  RESEND_API_KEY:'re_test',SITE_BASE:'https://shop.test',PLATFORM_NAME:'Dust Wave',SUPPORT_EMAIL:'info@shop.test',ORDERS_EMAIL_FROM:'Dust Wave <orders@shop.test>',I18N_CATALOG_JSON:JSON.stringify({en:{email:{}}}),
  LICENSING_SERVICE:{fetch:async (request:Request)=>{
-   grantCalls++;const p=await request.json() as any;const old=providerGrants.get(p.id);if(old && old!==JSON.stringify(p))return Response.json({error:'conflict'},{status:409});
+   const p=await request.json() as any;
+   if(new URL(request.url).pathname.endsWith('/administration')) {const g=JSON.parse(providerGrants.get(p.target)||'null');return Response.json({keyVersion:'',keyHash:createHash('sha256').update(g.key).digest('hex')});}
+   grantCalls++;const old=providerGrants.get(p.id);if(old && old!==JSON.stringify(p))return Response.json({error:'conflict'},{status:409});
    providerGrants.set(p.id,JSON.stringify(p));if(loseResponse){loseResponse=false;throw new Error('Lost after commit');}return Response.json({id:p.id});
  }}};
  coordinator=new StoreInventoryCoordinator({storage} as never,env);

@@ -13,6 +13,7 @@ import { archiveSensitiveSnapshot, validateBackupSafety } from './store-backup.m
 import { readAndVerifySnapshot, buildStoreRestorePlan, transformKvValuesToRestoreRecords } from './store-restore.mjs';
 import { captureSoftwareBackup, restoreSoftwareBackup, reconcileSoftwareMoney, validateSoftwareBackup } from './lib/software-backup.mjs';
 import { buildChecksumManifest } from './lib/file-integrity.mjs';
+import { complimentaryKey } from '../worker/src/software-licenses.js';
 import { order, orderToken, stripeRead, refund } from '../experiments/software-licensing/recovery-fixture.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url));
 export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore, archiveIdentity, sourceCapture } = {}) {
@@ -49,15 +50,26 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
     const seed = async (request,putObject) => {
     const seeded=await request('store','/fixture/seed',{});assert.equal(seeded.status,200,await seeded.clone().text());const license=await seeded.json();
     await putObject('app.tar.gz',bytes);await putObject('unattached.txt',Buffer.from('unattached synthetic artifact'));
-    for(const [id,releasedAt,version] of [['old',150000,'1.0.0'],['gap',250000,'1.1.0'],['new',350000,'1.2.0']]) {
+    for(const [id,releasedAt,version] of [['old',150000,'1.0.0'],['gap',250000,'1.1.0'],['new',350000,'1.2.0'],['withdrawn',160000,'1.0.1']]) {
       assert.equal((await request('licensing','/internal/publish',{id,product:'ascii-vj-remix',key:'app.tar.gz',major:1,releasedAt,update:{version,platform:'darwin-aarch64',size:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),signature:signer.sign(bytes)}})).status,201);
     }
-    const token=(await (await request('licensing','/v1/activate',{key:license.key,installation:'mac'})).json()).token;assert.ok(token);
+    const oldKey=license.key, staleTokens=[];
+    const activate=async()=>{const r=await request('licensing','/v1/activate',{key:license.key,installation:'mac'});return (await r.json()).token;};
+    staleTokens.push(await activate());
+    const mutation=async p=>{const response=await request('licensing','/internal/administration',{target:license.id,product:license.product,actor:'admin',...p});assert.equal(response.status,200);return response.json();};
+    license.key=await complimentaryKey({LICENSING_KEY_SECRET:secret},license.id,'paid:replacement:restore-rotation');
+    await mutation({action:'replace',operation:'restore-rotation',generation:1,key:license.key});
+    staleTokens.push(await activate());
+    await mutation({action:'deactivate',operation:'restore-deactivation',generation:2,installation:'mac',revision:0});
+    staleTokens.push(await activate());
+    await mutation({action:'reset',operation:'restore-reset',generation:2});
+    const token=await activate();assert.ok(token);
+    await mutation({action:'withdraw',operation:'restore-withdrawal',target:'withdrawn'});
     const compKey='synthetic-revoked-'+secret;
     await request('licensing','/internal/grant',{id:'revoked',key:compKey,product:'ascii-vj-remix',seats:1,policy:{kind:'lifetime'}});
     const revokedToken=(await (await request('licensing','/v1/activate',{key:compKey,installation:'mac'})).json()).token;
     await request('licensing','/internal/revoke',{id:'revoked'});
-    return {license,token,revokedToken};
+    return {license,token,revokedToken,oldKey,staleTokens};
     };
     const capture = async (request,sourceId) => {
     const captured=await captureSoftwareBackup(snapshot,{checkpoint,request,sourceId});
@@ -85,7 +97,7 @@ export async function rehearseSoftwareRestore({ archiveRoundTrip, previewRestore
         assert.equal((await raw(source,service,route,{checkpoint,action:'begin',owner:'software-licenses',count:0},undefined,readSecret)).status,403);
       seeded.captured=await capture(client(source,readSecret));
     }
-    const {license,token,revokedToken,captured}=seeded;
+    const {license,token,revokedToken,captured,oldKey,staleTokens}=seeded;
     const manifest=JSON.parse(fs.readFileSync(path.join(snapshot,'manifest.json'),'utf8'));
     Object.assign(manifest,{includesSoftwareLicensing:true,softwareLicensing:captured,completedAt:new Date().toISOString(),warnings:[],includedDataClasses:['software-licensing-journals-and-artifacts']});
     write(path.join(snapshot,'manifest.json'),manifest);write(path.join(snapshot,'checksums.json'),{schemaVersion:1,artifacts:buildChecksumManifest(snapshot,{exclude:['checksums.json']})});
@@ -140,6 +152,10 @@ assert result['status']=='PASS',result
     assert.equal(await (await download(target,token,'old')).text(),bytes.toString());
     assert.equal((await download(target,token,'gap')).status,403);assert.equal((await download(target,token,'new')).status,403);assert.equal((await download(target,revokedToken,'old')).status,403);
     assert.equal((await post(target,'/v1/activate',{key:license.key,installation:'second-mac'})).status,409);
+    for(const stale of staleTokens)assert.equal((await download(target,stale,'old')).status,403);
+    assert.equal((await post(target,'/v1/activate',{key:oldKey,installation:'mac'})).status,403);
+    assert.equal((await download(target,token,'withdrawn')).status,403);
+    const history=await(await post(target,'/internal/administration',{action:'history',target:license.id,product:license.product})).json();assert.equal(history.entries.length,3);
     const ns=await target.getDurableObjectNamespace('STORE_INVENTORY_COORDINATOR','store');
     const journal=ns.get(ns.idFromName('software-billing:'+orderToken));
     const billing=async(action,p={})=>journal.fetch('https://journal/billing-'+action,{method:'POST',body:JSON.stringify(p)});
@@ -147,7 +163,7 @@ assert result['status']=='PASS',result
     await billing('invoice',{invoiceId:'in_first',eventId:'evt_replayed'});await billing('drain');
     const kv=await target.getKVNamespace('STORE_STATE');assert.equal((await kv.list({prefix:'email-outbox:v1:'})).keys.length,0);
     assert.equal(externalCalls,0);
-    return {ok:true,preview,encrypted:true,archiveVerification:'PASS',captured,restored,checks:['read-only capture credential cannot import','paused mutation rejected','more than one export page','missing page rejected','mismatched KV checkpoint rejected','age round trip and full checksums','fresh refund drift blocks acceptance','restored authority stays closed','artifact readback and signature rebinding','old activation retained and seat limit enforced','coverage gap and refunded renewal denied','seller revocation retained','lost upload reply and complete restore replay safe','original Store key retained','approved KV and mail receipts restored without sessions or pending mail','duplicate payment event produces no new mail'],externalRequests:externalCalls,livePayments:0,realEmails:0,paidCheckoutEnabled:false};
+    return {ok:true,preview,encrypted:true,archiveVerification:'PASS',captured,restored,checks:['read-only capture credential cannot import','paused mutation rejected','more than one export page','missing page rejected','mismatched KV checkpoint rejected','age round trip and full checksums','fresh refund drift blocks acceptance','restored authority stays closed','artifact readback and signature rebinding','old activation retained and seat limit enforced','coverage gap and refunded renewal denied','seller revocation retained','lost upload reply and complete restore replay safe','replacement Store key recovered with original secret','old keys and device tokens remain denied','withdrawal and administration receipts survive restore','approved KV and mail receipts restored without sessions or pending mail','duplicate payment event produces no new mail'],externalRequests:externalCalls,livePayments:0,realEmails:0,paidCheckoutEnabled:false};
   } finally {
     await Promise.allSettled([...runtimes].map(mf=>mf.dispose()));fs.rmSync(temp,{recursive:true,force:true});
     if(previousIdentity===undefined)delete process.env.STORE_BACKUP_AGE_IDENTITY;else process.env.STORE_BACKUP_AGE_IDENTITY=previousIdentity;

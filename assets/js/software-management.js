@@ -53,6 +53,30 @@ function reveal(parent, run, request) {
     control.textContent = t('hide_key');
   }));
 }
+function administration(parent,run,request,changed) {
+  const body=node(parent,'div');
+  button(parent,t('manage_devices'),()=>run(load));
+  async function load() {
+    const state=await request('status');body.replaceChildren();
+    node(body,'p',t('device_count',{count:state.installations.length,seats:state.seats}));
+    for(const device of state.installations) {
+      const row=node(body,'section');node(row,'p',device.installation);
+      if(!state.revoked)mutation(row,'deactivate','deactivate_help',{installation:device.installation,revision:device.revision});
+    }
+    if(!state.revoked) {mutation(body,'replace','replace_help');mutation(body,'reset','reset_help');}
+    const history=node(body,'div');
+    button(body,t('history'),()=>run(()=>loadHistory()));
+    async function loadHistory(cursor='',append=false) {
+      const page=await request('history',{cursor});if(!append)history.replaceChildren();
+      for(const entry of page.entries)node(history,'p',`${date(entry.at)} · ${t('action_'+entry.action)}${entry.installation?' · '+entry.installation:''}`);
+      if(page.cursor) {const more=button(history,t('more'),()=>run(async()=>{await loadHistory(page.cursor,true);more.remove();}));}
+    }
+    function mutation(target,action,explanation,extra={}) {
+      const id=crypto.randomUUID();
+      confirmAction(target,t(action),t(explanation),run,async()=>{await request(action,{id,generation:state.generation,...extra});await changed();});
+    }
+  }
+}
 function coverageText(policy) {
   if (policy.kind === 'lifetime') return t('lifetime');
   if (policy.kind === 'major') return t('major_coverage', { major: policy.major });
@@ -86,6 +110,7 @@ export function mountCustomer(root, { orderToken, token, workerBase }) {
         for (const policy of license.coverage) node(coverage, 'li', coverageText(policy));
       }
       reveal(card, run, () => request('recover', { lineId: license.lineId }));
+      administration(card,run,(action,p={})=>request('administration',{...p,action,lineId:license.lineId}),refresh);
       if (license.releases.length) {
         node(card, 'h4', t('downloads'));
         const list = node(card, 'ul');
@@ -108,12 +133,16 @@ export function mountCustomer(root, { orderToken, token, workerBase }) {
         setupId ||= crypto.randomUUID(); const data = await request('card-setup', { id: setupId }); safeNavigate(data.url, 'checkout.stripe.com');
       }));
       if (!result.renewal.cancelled) confirmAction(section, t('cancel'), t('cancel_help'), run, async () => { await request('cancel'); await refresh(); });
-      for (const invoice of result.invoices) {
-        const row = node(section, 'div', '', 'store-software__invoice');
+      const invoiceList=node(section,'div');
+      function invoicePage(page) {
+      for (const invoice of page.invoices) {
+        const row = node(invoiceList, 'div', '', 'store-software__invoice');
         node(row, 'p', `${date(invoice.createdAt)} · ${money(invoice.amountCents)} · ${t(`invoice_${invoice.status}`)}`);
         if (invoice.payable) button(row, t('pay_invoice'), () => run(async () => { const data = await request('invoice-page', { invoiceId: invoice.id }); safeNavigate(data.url, 'invoice.stripe.com'); }));
       }
-      if (result.invoicesTruncated) node(section, 'p', t('recent_only'));
+      if(page.invoicesCursor) {const more=button(invoiceList,t('more'),()=>run(async()=>{const next=await request('invoices',{cursor:page.invoicesCursor});invoicePage(next);more.remove();}));}
+      }
+      invoicePage(result);
     }
   }
   button(root, t('refresh'), () => run(refresh));
@@ -151,8 +180,8 @@ export async function mountAdmin(root, { request }) {
     node(form, 'button', t('load'), 'btn').type = 'submit';
     const body = node(root, 'div');
     form.addEventListener('submit', event => { event.preventDefault(); const orderToken = order.value.trim(); run(() => loadPaid(orderToken)); });
-    async function loadPaid(orderToken) {
-      const data = await api('billing', { orderToken }); body.replaceChildren();
+    async function loadPaid(orderToken,data) {
+      data ||= await api('billing', { orderToken }); body.replaceChildren();
       const hint = JSON.parse(sessionStorage.getItem(REFUND_HINT) || 'null');
       if (hint && data.refunds.some(refund => refund.request.id === hint.id)) sessionStorage.removeItem(REFUND_HINT);
       const card = node(body, 'section', '', 'store-software__card store-order__panel'); node(card, 'h3', t('paid_status'));
@@ -163,10 +192,13 @@ export async function mountAdmin(root, { request }) {
       for (const line of data.lines.filter(line => line.offer)) {
         const row = node(card, 'section'); node(row, 'h4', line.name);
         reveal(row, run, () => api('paid-recover', { orderToken, lineId: line.id }));
+        administration(row,run,(action,p={})=>api('administration',{...p,action,orderToken,lineId:line.id}),()=>loadPaid(orderToken));
       }
       const reviews = node(card, 'ul');
       for (const review of data.reviews) node(reviews, 'li', t(`review_${review.reason}`) + ` · ${review.paymentId || review.refundId || ''}`);
       for (const refund of data.refunds) node(card, 'p', `${t('refund')} ${refund.request.id} · ${money(refund.amountCents)} · ${t(`refund_${refund.state}`)}`);
+      node(card,'p',t('history_hint'));
+      for(const [kind,cursor] of Object.entries(data.cursors || {})) if(cursor)button(card,t('more_'+kind),()=>run(async()=>{const page=await api('history',{orderToken,kind,cursor});data[kind].push(...page.entries);data.cursors[kind]=page.cursor;await loadPaid(orderToken,data);}));
       for (const payment of data.payments) {
         const details = node(body, 'details', '', 'store-software__card store-order__panel'); node(details, 'summary', `${date(payment.receipt.paidAt)} · ${money(payment.receipt.amountCents)} · ${payment.receipt.id}`);
         for (const item of payment.items) {
@@ -188,6 +220,20 @@ export async function mountAdmin(root, { request }) {
           });
         }
       }
+    }
+  }
+  if(config.paidActions) {
+    const releases=node(root,'section','','store-software__card store-order__panel');node(releases,'h3',t('releases'));
+    const list=node(releases,'div');
+    button(releases,t('load_releases'),()=>run(()=>load()));
+    async function load(cursor='',append=false) {
+      const page=await api('releases',{action:'releases',cursor});if(!append)list.replaceChildren();
+      for(const release of page.releases) {
+        const row=node(list,'section');node(row,'p',`${release.version || release.id} · ${release.platform}`);
+        if(release.withdrawn)node(row,'p',t('withdrawn'));
+        else {const id=crypto.randomUUID();confirmAction(row,t('withdraw'),t('withdraw_help'),run,async()=>{await api('releases',{action:'withdraw',id,releaseId:release.id});await load();});}
+      }
+      if(page.cursor){const more=button(list,t('more'),()=>run(async()=>{await load(page.cursor,true);more.remove();}));}
     }
   }
   const grantForm = node(root, 'form', '', 'store-software__card store-order__panel'); node(grantForm, 'h3', t('complimentary'));
@@ -215,7 +261,10 @@ export async function mountAdmin(root, { request }) {
     for (const grant of data.grants) {
       const card = node(grants, 'section', '', 'store-software__card store-order__panel'); node(card, 'h4', grant.email);
       node(card, 'p', `${grant.id} · ${coverageText(grant.policy)} · ${t(`grant_${grant.state}`)}`);
-      if (grant.grantedAt) reveal(card, run, () => api('recover', { id: grant.id }));
+      if (grant.grantedAt) {
+        reveal(card, run, () => api('recover', { id: grant.id }));
+        administration(card,run,(action,p={})=>api('administration',{...p,action,grantId:grant.id}),()=>loadGrants());
+      }
     }
     if (data.cursor) { const more = button(grants, t('more'), () => run(async () => { more.remove(); await loadGrants(data.cursor,true); })); }
   }

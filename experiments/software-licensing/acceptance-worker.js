@@ -39,7 +39,9 @@ export default {async fetch(request,raw,ctx) {
     let event;try{event=JSON.parse(body);}catch{return reply({error:'invalid'},400);}
     if(!acceptanceOwnsEvent(event,env.ACCEPTANCE_ORDER))return reply({ignored:true});
     const response=await worker.fetch(request,env,ctx);
-    await env.STORE_STATE.put(`acceptance:event:${event.id}`,JSON.stringify({id:event.id,type:event.type,status:response.status,objectId:event.data.object.id,receivedAt:Date.now()}),{expirationTtl:86400});
+    const result=response.ok ? null : await response.clone().json().catch(()=>null);
+    const error=typeof result?.error==='string' && /^[A-Za-z0-9 _:-]{1,160}$/.test(result.error) ? result.error : undefined;
+    await env.STORE_STATE.put(`acceptance:event:${event.id}`,JSON.stringify({id:event.id,type:event.type,status:response.status,objectId:event.data.object.id,receivedAt:Date.now(),...(error?{error}:{})}),{expirationTtl:86400});
     return response;
   }
   if(!acceptanceAuthorized(request,env))return reply({error:'private acceptance'},403);
