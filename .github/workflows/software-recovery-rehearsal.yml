@@ -53,6 +53,7 @@ jobs:
       - name: Install pinned dependencies and existing archive tools
         run: |
           npm ci --prefix store
+          npm ci --prefix store/worker
           npm ci --prefix dust-wave-licensing
           sudo apt-get update
           sudo apt-get install -y age
