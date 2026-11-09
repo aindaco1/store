@@ -1,9 +1,16 @@
-import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './helpers/mobile';
 
+let css: string;
+test.beforeAll(async ({ request }) => {
+  // The site may be built in a different container from the test runner.
+  const response = await request.get('/assets/main.css');
+  await expect(response).toBeOK();
+  expect(response.headers()['content-type']).toContain('text/css');
+  css = await response.text();
+});
+
 test('mobile form text stays readable across component overrides and touch tablet widths', async ({ browser }) => {
-  const css = readFileSync('_site/assets/main.css', 'utf8');
   const context = await browser.newContext({ hasTouch: true, isMobile: true });
   try {
     const page = await context.newPage();
@@ -44,7 +51,7 @@ test('mobile form text stays readable across component overrides and touch table
 
 test('wide pointer-based layouts keep their compact form styling', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.setContent(`<style>${readFileSync('_site/assets/main.css', 'utf8')}</style>
+  await page.setContent(`<style>${css}</style>
     <input type="email" class="store-first-party-cart__input" aria-label="Email">`);
   await expect(page.getByLabel('Email')).toHaveCSS('font-size', '14px');
 });

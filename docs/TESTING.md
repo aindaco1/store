@@ -83,6 +83,11 @@ npm run test:e2e:headless
 
 Runtime-dependent defaults use the Podman stack so Worker and browser checks run against the production-like local environment. Use `npm run test:security:host`, `npm run test:e2e:host`, or `npm run test:e2e:headless:host` only for focused host-debugging sessions where the local Worker/site are already managed separately.
 
+Browser component fixtures load generated styles from the configured site URL,
+not a local `_site` directory. The site and Playwright may run in different
+containers; stylesheet HTTP errors or an unexpected content type still fail the
+fixture before its layout assertions.
+
 Performance and operational policy checks:
 
 ```bash
