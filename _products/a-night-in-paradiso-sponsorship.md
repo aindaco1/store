@@ -7,7 +7,7 @@ price: 0
 image: "/assets/images/products/product-a-night-in-paradiso-sponsorship-20260910-225823.png"
 type: "service"
 fulfillment_type: "service"
-status: "active"
+status: "archived"
 category: "dustwave"
 order: 540
 shipping_preset: ""
@@ -69,6 +69,9 @@ variants:
   price: 1000
   inventory: 0
   status: "active"
+daily_report_emails: []
+pricing_mode: "fixed"
+suggested_amounts: []
 ---
 ## A Talent Showcase, A Variety Broadcast, A Theatre Experience
 
