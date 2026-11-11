@@ -8,7 +8,7 @@ image: "/assets/images/products/the-perfect-casino-night.jpeg"
 image_alt: "The Perfect Casino Night poster with poker chips, playing cards, and illuminated signs for poker and a film showcase on November 7, 2026 at UNM SUB Ballroom C."
 type: "ticket"
 fulfillment_type: "ticket"
-status: "active"
+status: "archived"
 category: "dustwave"
 order: 35
 shipping_preset: ""
