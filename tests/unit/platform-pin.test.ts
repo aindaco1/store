@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = '782831f6b8fed8bb03488300446331222250efe9';
+const expectedCommit = 'fa363d72d3e5c15dbdb6f9596bb80c41ebbbda8d';
 const expectedVersions = {
-  "@dustwave/platform-workspace": "0.49.1",
-  "@dustwave/admin-shell": "0.14.0",
+  "@dustwave/platform-workspace": "0.50.0",
+  "@dustwave/admin-shell": "0.15.0",
   "@dustwave/build-core": "0.2.0",
   "@dustwave/design-core": "0.3.1",
   "@dustwave/inventory-core": "0.1.0",
@@ -76,6 +76,7 @@ describe('shared platform pin', () => {
       'packages/admin-shell/src/tabs-browser.js',
       'packages/admin-shell/src/dirty-controls-browser.js',
       'packages/admin-shell/src/editor-media-browser.js',
+      'packages/admin-shell/src/block-editor-browser.js',
       'packages/admin-shell/src/turnstile-browser.js',
       'packages/admin-shell/src/vendor/qrcode-generator.js',
       'packages/admin-shell/src/credentialed-download.js',
