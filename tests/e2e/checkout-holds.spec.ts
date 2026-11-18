@@ -180,6 +180,7 @@ for (const { softwareRenewal, physical, failFirstMount, failPreparation, editDur
   { physical: false, failFirstMount: false, width: 768 },
   { physical: false, failFirstMount: true, width: 1280 },
   { physical: false, failFirstMount: false, failPreparation: true, width: 390 },
+  { physical: true, failPreparation: 'shipping', width: 390 },
   { physical: true, editDuringPreparation: true, editAfterPreparation: true, width: 1280 },
   { physical: false, editDuringPreparation: true, editAfterPreparation: true, width: 390 },
   { physical: false, editAfterPreparation: true, failCancellation: true, width: 1280 },
@@ -190,7 +191,7 @@ for (const { softwareRenewal, physical, failFirstMount, failPreparation, editDur
   { physical: false, slowEstimates: 'initial', width: 390 },
   { physical: false, editBillingZip: 'NM', slowEstimates: 'edit', width: 390 }
 ]) {
-test(`${softwareRenewal ? 'Software renewal ' : ''}${physical ? 'Physical' : 'Ticket'} ${width}px${slowEstimates ? ` with slow ${slowEstimates} estimates` : delayedFields ? ' with delayed fields' : editBillingZip ? ' with ZIP correction' : failFirstMount ? ' with terminal mount recovery' : failPreparation ? ' with network recovery' : failCancellation ? ' with uncertain cancellation' : editDuringPreparation ? ' with edited details' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
+test(`${softwareRenewal ? 'Software renewal ' : ''}${physical ? 'Physical' : 'Ticket'} ${width}px${slowEstimates ? ` with slow ${slowEstimates} estimates` : delayedFields ? ' with delayed fields' : editBillingZip ? ' with ZIP correction' : failFirstMount ? ' with terminal mount recovery' : failPreparation === 'shipping' ? ' with a changed delivery option' : failPreparation ? ' with network recovery' : failCancellation ? ' with uncertain cancellation' : editDuringPreparation ? ' with edited details' : ''}: automatic payment uses saved details and safe retries`, async ({ page }, testInfo) => {
   let creations = 0; let confirms = 0;
   let succeed = false;
   let finishPreparation!: () => void;
@@ -263,7 +264,14 @@ test(`${softwareRenewal ? 'Software renewal ' : ''}${physical ? 'Physical' : 'Ti
         estimated: Boolean(edited), coverage: edited ? (estimateFallback ? 'state_only' : 'zip_local') : null,
         destination: normalized.destination } } });
   });
-  await page.route('**/shipping/quote', (route) => route.fulfill({ json: { shippingCents: 300, source: 'manual' } }));
+  let refreshedAfterConflict = false;
+  await page.route('**/shipping/quote', (route) => {
+    if (failPreparation === 'shipping' && creations === 1) refreshedAfterConflict = true;
+    return route.fulfill({ json: { shippingCents: 300, source: 'manual' } });
+  });
+  const preparationError = failPreparation === 'shipping'
+    ? 'Delivery options changed. Review shipping and retry.'
+    : 'Payment service unavailable. Please retry.';
   await page.route('**/api/checkout/*', async (route) => {
     const action = new URL(route.request().url()).pathname.split('/').pop();
     const attempt = route.request().postDataJSON().attemptId;
@@ -289,7 +297,8 @@ test(`${softwareRenewal ? 'Software renewal ' : ''}${physical ? 'Physical' : 'Ti
       }
       if (creations === 1) await preparation;
       if (failPreparation && creations === 1) {
-        await route.fulfill({ status: 503, json: { error: 'Payment service unavailable. Please retry.' } });
+        await route.fulfill({ status: failPreparation === 'shipping' ? 409 : 503,
+          json: { error: preparationError, ...(failPreparation === 'shipping' ? { code: 'shipping_option_changed' } : {}) } });
         return;
       }
     }
@@ -372,7 +381,11 @@ test(`${softwareRenewal ? 'Software renewal ' : ''}${physical ? 'Physical' : 'Ti
     });
   }
   if (failPreparation) {
-    await expect(cart.locator('[data-cart-checkout-error]')).toHaveText('Payment service unavailable. Please retry.');
+    await expect(cart.locator('[data-cart-checkout-error]')).toHaveText(preparationError);
+    if (failPreparation === 'shipping') {
+      expect(refreshedAfterConflict).toBe(true);
+      expect(confirms).toBe(0);
+    }
     await expect(cart.locator('[data-cart-custom-checkout-email]')).toBeEnabled();
     await expect(cart.locator('[data-cart-back]')).toBeEnabled();
     await page.waitForTimeout(500); // A failed automatic attempt must not loop.

@@ -392,6 +392,7 @@ runtime:
     shipping_calculating: Calculating shipping...
     shipping_option: Delivery option
     shipping_option_standard: Standard
+    shipping_option_changed: Delivery options changed. Review shipping and retry.
     shipping_option_signature_required: Signature required
     shipping_option_adult_signature_required: Adult signature required
     platform_add_ons: Add-ons

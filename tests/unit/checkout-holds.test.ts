@@ -283,6 +283,36 @@ describe('public checkout gateway', () => {
     return { env, inventoryStub, background, request, postWebhook };
   }
 
+  it('requires a new shipping selection if the mixed-cart quote loses its signature service', async () => {
+    const { env, request, inventoryStub } = await checkoutGateway();
+    const parcel = { id: 'test-parcel', sku: 'test-parcel', price_cents: 1000, currency: 'USD',
+      name: 'Parcel', fulfillment_type: 'physical', shippable: true, shipping: { weight_oz: 5, length_in: 18, width_in: 3, height_in: 3 } };
+    const license = { id: 'test-license', sku: 'test-license', price_cents: 1000, currency: 'USD',
+      name: 'License', fulfillment_type: 'digital', software_license: { product: 'ascii-vj-remix', seats: 1, billing: 'month' } };
+    Object.assign(env, {
+      STORE_CATALOG_JSON: JSON.stringify({ ...catalog, products: [parcel, license] }),
+      SOFTWARE_CHECKOUT_ENABLED: 'true', SOFTWARE_LICENSING_ENABLED: 'true', LICENSING_SERVICE: {},
+      LICENSING_ADMIN_SECRET: 'fixture', LICENSING_KEY_SECRET: 'f'.repeat(32), USPS_ENABLED: 'false'
+    });
+    const frozen: any[] = [];
+    const original = inventoryStub.fetch;
+    vi.spyOn(inventoryStub, 'fetch').mockImplementation(async (url, init) => {
+      if (!url.endsWith('/checkout-pay')) return original(url, init);
+      frozen.push(JSON.parse(String(init.body)).order.orderDraft);
+      return Response.json({ success: true });
+    });
+    const cart = { attemptId: first, items: [parcel, license].map(({ id }) => ({ id, price: 10, quantity: 1 })),
+      customer: { email: 'buyer@example.test' }, shippingAddress: { country: 'US', state: 'CO', postalCode: '80205' } };
+    const stale = await request('intent', { ...cart, shippingOption: 'signature_required', shippingCents: 1070 });
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: 'shipping_option_changed' });
+    expect(frozen).toHaveLength(0);
+    const reviewed = await request('intent', { ...cart, shippingOption: 'standard', shippingCents: 300 });
+    expect(reviewed.status).toBe(200);
+    expect(frozen).toHaveLength(1);
+    expect(frozen[0]).toMatchObject({ shippingOption: 'standard', totals: { shippingCents: 300 } });
+  });
+
   it.each(['ticket', 'contribution'])('checks origin, settles and reuses a paid %s attempt', async (kind) => {
     const { background, request, postWebhook } = await checkoutGateway();
     const contribution = kind === 'contribution';

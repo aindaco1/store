@@ -392,6 +392,7 @@ runtime:
     shipping_calculating: Calculando envío...
     shipping_option: Opción de entrega
     shipping_option_standard: Estándar
+    shipping_option_changed: Cambiaron las opciones de envío. Revisa el envío y vuelve a intentarlo.
     shipping_option_signature_required: Firma requerida
     shipping_option_adult_signature_required: Firma de adulto requerida
     platform_add_ons: Complementos

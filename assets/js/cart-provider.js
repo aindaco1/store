@@ -6645,6 +6645,10 @@
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
+          if (data.code === 'shipping_option_changed') {
+            await refreshCustomCheckoutShippingEstimate();
+            throw new Error(getRuntimeMessage('cart.shippingOptionChanged', data.error));
+          }
           if (data.code === 'hold_expired' || data.code === 'payment_resolving') await refreshCheckoutHold();
           const validationMessage = Array.isArray(data?.errors)
             ? String(data.errors.find((entry) => String(entry?.message || '').trim())?.message || '').trim()

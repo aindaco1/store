@@ -618,6 +618,12 @@ invalidates the old preparation, waits for release, then prepares the new detail
 Late lookup/preparation responses cannot replace current input. Provider failures
 remain visible and offer an explicit retry rather than an automatic retry loop.
 
+In a mixed software and physical cart, Store quotes shipping again during payment
+preparation. If the requested delivery service has become unavailable, the Worker
+returns HTTP 409 with `shipping_option_changed` before calling the payment
+coordinator. Checkout refreshes the estimate and asks the shopper to review
+shipping and retry.
+
 Platform site-shell owns email/ZIP readiness, debouncing, stale lookup rejection,
 detail signatures and first-reveal scrolling. Platform tax-core owns postal/local
 rate references; design-core supplies mobile inputs at least 16px. Each consumer
