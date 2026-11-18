@@ -15110,6 +15110,9 @@ async function handleStoreCheckoutIntent(request, env, ctx = null) {
       if (!normalizedShippingAddress.valid) return privateJsonResponse({ error: 'Shipping address required.' }, 422, env);
       const shipping = await quoteStoreShipment(env, buildStoreShippingTierSelection(validation), normalizedShippingAddress.destination, [], body.shippingOption || 'standard', []);
       if (!shipping.valid) return privateJsonResponse({ error: shipping.error }, 422, env);
+      if (shipping.selectedOption !== (body.shippingOption || 'standard')) {
+        return privateJsonResponse({ code: 'shipping_option_changed', error: 'Delivery options changed. Review shipping and retry.' }, 409, env);
+      }
       submittedShippingCents = shipping.quote.shippingCents;
     }
   }
