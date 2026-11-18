@@ -5,6 +5,35 @@ import { checkAddressConsistency } from '../../worker/src/address-consistency.js
 import { normalizeTaxDestination } from '../../worker/src/tax.js';
 import { isValidEmail } from '../../worker/src/validation.js';
 
+for (const lang of ['en', 'es']) {
+  test(`${lang}: the cart shows the hold notice only while it contains a limited ticket`, async ({ page }) => {
+    const prefix = lang === 'es' ? '/es' : '';
+    const notice = page.getByText(lang === 'es'
+      ? 'Las entradas limitadas se reservan al iniciar la compra. Puedes solicitar más tiempo.'
+      : 'Limited tickets are held when checkout starts. You can request more time.', { exact: true });
+    const shirt = `${prefix}/products/fronteras-t-shirt/`;
+    const cart = page.getByRole('dialog');
+    await gotoCheckoutProduct(page, shirt);
+    await page.locator('#header-cart-btn').click();
+    await expect(cart.locator('.store-first-party-cart__empty')).toBeVisible();
+    await expect(notice).toHaveCount(0);
+    await cart.locator('button[data-cart-close]').first().click();
+    await page.locator('.store-add-item').first().click();
+    await expect(cart.locator('[data-remove-item]')).toHaveCount(1);
+    await expect(notice).toHaveCount(0);
+
+    await gotoCheckoutProduct(page, `${prefix}/products/a-night-in-paradiso/`);
+    await page.locator('.store-add-item').first().click();
+    await expect(notice).toBeVisible();
+    await gotoCheckoutProduct(page, shirt);
+    await page.locator('#header-cart-btn').click();
+    await expect(notice).toBeVisible();
+    await cart.locator('li[data-item-id]').filter({ hasText: 'A Night in Paradiso' }).locator('[data-remove-item]').click();
+    await expect(cart.locator('[data-remove-item]')).toHaveCount(1);
+    await expect(notice).toHaveCount(0);
+  });
+}
+
 test('checkout leaves autofill overlays interactive while locking Store content', async ({ page }) => {
   await routeCheckoutHold(page);
   await page.route('**/api/checkout/release', (route) => route.fulfill({ json: { success: true, phase: 'released' } }));

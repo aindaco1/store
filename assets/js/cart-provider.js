@@ -2980,9 +2980,11 @@
     const pageButton = findStoreAddButtonForCartItem(item);
     const pageEventRegistration = getButtonEventRegistration(pageButton);
     if (!product) {
-      return pageEventRegistration
-        ? { ...item, eventRegistration: pageEventRegistration }
-        : item;
+      return {
+        ...item,
+        inventoryTracking: pageButton ? pageButton.dataset.productInventoryTracking === 'true' : item?.inventoryTracking,
+        ...(pageEventRegistration ? { eventRegistration: pageEventRegistration } : {})
+      };
     }
 
     const parsedId = parseStoreCartItemId(item?.id);
@@ -3035,6 +3037,7 @@
       url: item?.url || product.source_url || product.url || '',
       imageUrl: item?.imageUrl || item?.image || product.image_url || product.image || '',
       shippable: !isNonShippable,
+      inventoryTracking: product.inventory_tracking === true,
       shipping: !isNonShippable && catalogShipping ? catalogShipping : item?.shipping,
       eventRegistration,
       customFields
@@ -3098,6 +3101,7 @@
           imageUrl: item?.imageUrl || '',
           stackable: item?.stackable === true,
           shippable: item?.shippable === true,
+          inventoryTracking: item?.inventoryTracking || undefined,
           maxQuantity: Number.isFinite(Number(item?.maxQuantity)) ? Number(item?.maxQuantity) : undefined,
           eventRegistration: getPersistableEventRegistration(item) || undefined,
           customFields: Array.isArray(item?.customFields) ? item.customFields : undefined
@@ -3360,6 +3364,7 @@
         imageUrl: String(item?.imageUrl || ''),
         stackable: item?.stackable === true,
         shippable: item?.shippable === true,
+        inventoryTracking: item?.inventoryTracking || undefined,
         shipping: item?.shipping && typeof item.shipping === 'object'
           ? item.shipping
           : undefined,
@@ -3982,6 +3987,9 @@
       const isFirstPartyCheckoutEnabled = getRequestedCheckoutProvider() === FIRST_PARTY_CHECKOUT_PROVIDER;
       const pricing = getCurrentDisplayedFirstPartyPricing(state);
       const hasPhysicalItems = cartHasPhysicalItems(items);
+      const hasLimitedTickets = items.some((item) =>
+        item.inventoryTracking === true && getCartItemFieldValue(item, '_product_type') === 'ticket'
+      );
       const checkoutLineItems = buildCheckoutLineItems(items, checkoutHold?.items || []);
       const wantsCustomCheckout = isCheckoutPreview &&
         isFirstPartyCheckoutEnabled &&
@@ -4327,7 +4335,7 @@
         <ul class="store-first-party-cart__items">${itemMarkup}</ul>
         ${cartAddOnMarkup}
         ${cartEstimateMarkup}
-        <p class="store-first-party-cart__note">${escapeHtml(holdMessage('holdBeforeStart', 'Limited tickets are held when checkout starts. You can request more time.'))}</p>
+        ${hasLimitedTickets ? `<p class="store-first-party-cart__note">${escapeHtml(holdMessage('holdBeforeStart', 'Limited tickets are held when checkout starts. You can request more time.'))}</p>` : ''}
         ${checkoutErrorMarkup}
       `;
       const footerActions = isCheckoutPreview ? `

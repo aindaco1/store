@@ -6,6 +6,8 @@ Implementation contract for Store v1.3.8. Deployment and acceptance are recorded
 
 Explicit **Checkout** validates current catalog prices and atomically reserves finite ticket quantities before contact/tax entry. Adding to a cart does not reserve stock. A mixed cart shares one checkout: finite tickets are held early; other finite stock is reserved when payment or a free order begins. Untracked products and free RSVP forms have no artificial ticket countdown.
 
+The cart shows the hold notice below Order Total only while it contains an inventory-tracked ticket. Removing the last such ticket clears the notice.
+
 The initial ticket window is ten minutes. `checkout.hold_seconds` in `_config.yml` is mirrored to `CHECKOUT_HOLD_SECONDS` (600–1800 seconds). The extension allowance is ten; **More time** appears with two minutes left and adds one full window. Duplicate extensions made outside that warning window do not consume another extension. Refreshing or opening another tab reuses the browser's attempt and deadline. This is a reservation, not a waiting room or a guarantee of one person per device.
 
 The timer uses server time and a monotonic browser clock. It does not poll each second. Status is rechecked on foreground/online, expiry, and immediately before payment confirmation. Time changes are not live-announced every second; warnings and recovery states are. Expiry preserves safe cart/contact/address drafts and offers an explicit availability check. RSVP answers remain memory-only. Back/Close releases an unstarted hold; once a payment exists it must first be safely canceled. An uncertain payment stays attached to its attempt, with a status check instead of a second charge.
