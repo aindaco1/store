@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: aindaco1/dust-wave-platform
-          ref: e508ac9273bb6ee768d0541454f851c59dfff638
+          ref: d0b9e9595e2f57cbff26219db2bf78c26235d2f9
           persist-credentials: false
 
       - name: Install decryption tool
