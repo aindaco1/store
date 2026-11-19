@@ -129,6 +129,29 @@ describe('first-party pending cart handoff', () => {
     expect(persisted.tipTouched).toBe(true);
   });
 
+  it.each([
+    ['ticket', true, true],
+    ['ticket', false, false],
+    ['rsvp', true, false],
+    ['physical', true, false],
+    ['digital', false, false]
+  ] as const)('uses catalog hold eligibility for a saved %s item with tracking=%s', async (type, tracked, expected) => {
+    localStorage.clear();
+    (window as any).STORE_CONFIG.addOns = { enabled: false, products: [{
+      id: 'sample', name: 'Sample', fulfillment_type: type, inventory_tracking: tracked, inventory: 5, price: 10
+    }] };
+    localStorage.setItem('store_first_party_cart_state', JSON.stringify({
+      items: [{ id: 'sample', name: 'Sample', quantity: 1, price: 10 }]
+    }));
+    await import('../../assets/js/cart-provider.js');
+    const api = await (window as any).StoreCartProvider.whenReady();
+    await api.api.theme.cart.open();
+    const drawer = document.querySelector('[role="dialog"]');
+    expect(drawer?.querySelector('.store-first-party-cart__item-name')?.textContent).toBe('Sample');
+    expect(drawer?.textContent?.includes('Limited tickets are held when checkout starts.')).toBe(expected);
+    await api.api.theme.cart.close();
+  });
+
   it('preserves a chosen contribution across add, replacement and reload with an opt-in tip', async () => {
     localStorage.clear();
     (window as any).STORE_CONFIG.addOns = { enabled: false, products: [{
