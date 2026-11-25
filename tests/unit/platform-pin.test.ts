@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const repositoryRoot = process.cwd();
 const platformRoot = `${repositoryRoot}/shared/dust-wave-platform`;
-const expectedCommit = 'dc8afe10ce7b07d7ff77e070b48096057a98d00c';
+const expectedCommit = '6ea9c2da6b97ad70bfb39d137ad9c09c88b5539d';
 const expectedVersions = {
-  "@dustwave/platform-workspace": "0.62.0",
+  "@dustwave/platform-workspace": "0.63.0",
   "@dustwave/admin-shell": "0.20.2",
   "@dustwave/document-core": "0.2.0",
   "@dustwave/build-core": "0.2.0",
@@ -19,7 +19,7 @@ const expectedVersions = {
   "@dustwave/shipping-core": "0.2.1",
   "@dustwave/site-shell": "0.6.1",
   "@dustwave/tax-core": "0.4.1",
-  "@dustwave/test-core": "0.5.0",
+  "@dustwave/test-core": "0.6.0",
   "@dustwave/timed-text": "0.11.2",
   "@dustwave/worker-core": "0.20.0"
 };

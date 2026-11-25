@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { hasCanonicalSitemap } from '../shared/dust-wave-platform/packages/test-core/src/robots.js';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 
@@ -140,7 +141,7 @@ export function validateRobotsResponse({ response, body, baseUrl }) {
     errors.push(`robots.txt content type is ${responseType(response) || 'missing'}`);
   }
   if (looksLikeHtml(body) || looksLikeChallenge(body)) errors.push('robots.txt response looks like HTML or a bot challenge');
-  if (!String(body || '').split(/\r?\n/).some((line) => line.trim() === `Sitemap: ${baseUrl}/sitemap.xml`)) {
+  if (!hasCanonicalSitemap(body, baseUrl)) {
     errors.push('robots.txt does not advertise the canonical sitemap URL');
   }
   return errors;
