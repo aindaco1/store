@@ -1,3 +1,4 @@
+import { escapeIcsText, foldIcsLine } from '../../shared/dust-wave-platform/packages/worker-core/src/icalendar.js';
 import { base64Encode } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import { sourceCommand, sourceCheckpointEnv, withStoreSource } from './software-source.js';
 import { recoveryMode, softwareCaptureCredential } from './software-backup.js';
@@ -8349,7 +8350,7 @@ function buildStoreCalendarIcs(env, storedOrder = {}, item = {}, itemId = '', op
     'STATUS:CONFIRMED',
     'END:VEVENT',
     'END:VCALENDAR'
-  ].filter(Boolean).join('\r\n');
+  ].filter(Boolean).map(foldIcsLine).join('\r\n');
 }
 
 function handleStoreCalendar(_request, env, storedOrder = {}, item = {}, itemId = '') {
@@ -14890,14 +14891,6 @@ async function handleAdminStoreOrderCheckIn(request, env, body = {}, ctx = null)
 
 function formatIcsDate(date) {
   return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-}
-
-function escapeIcsText(value) {
-  return String(value || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\r?\n/g, '\\n');
 }
 
 function escapeXml(value) {

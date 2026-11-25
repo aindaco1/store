@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildStoreOrderEmailPayload,
+  buildStoreOrderEventEmailAttachments,
   processStoreEventFollowups,
   processStoreEventReminders,
   queueStoreEventFollowups,
@@ -150,6 +151,17 @@ describe('Store event email attachments and reminders', () => {
     expect(calendar).toContain('METHOD:REQUEST');
     expect(calendar).toContain('SUMMARY:DANCEWAVE');
     expect(calendar).toContain('LOCATION:Sund Brewery\\, 4501 1st St NW\\, Albuquerque\\, NM 87107');
+  });
+
+  it('folds multilingual email invitations without changing the event title', async () => {
+    const order = buildConfirmedEventOrder(new Date());
+    const title = 'Café 🎬, encore; '.repeat(15) + 'fin';
+    order.orderDraft.items[0].name = title;
+    const [attachment] = await buildStoreOrderEventEmailAttachments(buildEnv(), order);
+    const calendar = Buffer.from(attachment.content, 'base64').toString('utf8');
+    expect(calendar.split('\r\n').every(line => Buffer.byteLength(line) <= 75)).toBe(true);
+    expect(calendar).toContain('METHOD:REQUEST\r\n');
+    expect(calendar.replaceAll('\r\n ', '')).toContain(`SUMMARY:${title.replaceAll(',', '\\,').replaceAll(';', '\\;')}\r\n`);
   });
 
   it('sends due event reminders with calendar attachments and order-page ticket links', async () => {
