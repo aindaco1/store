@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+import { hasCanonicalSitemap } from '../shared/dust-wave-platform/packages/test-core/src/robots.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertAbsoluteSiteUrl, auditHreflang, sitemapAlternateLanguages } from '../shared/dust-wave-platform/packages/test-core/src/hreflang.js';
 import { JSDOM } from 'jsdom';
 import {
   validateSitemapResponse,
@@ -81,27 +83,6 @@ function hasType(node, typeName) {
   return Array.isArray(type) ? type.includes(typeName) : type === typeName;
 }
 
-function assertAbsoluteSiteUrl(value, siteBase, label, route, errors) {
-  if (!value) {
-    errors.push(`${route}: missing ${label}`);
-    return null;
-  }
-  let parsed;
-  try {
-    parsed = new URL(value);
-  } catch {
-    errors.push(`${route}: ${label} is not an absolute URL`);
-    return null;
-  }
-  if (`${parsed.origin}` !== siteBase) {
-    errors.push(`${route}: ${label} points outside ${siteBase}`);
-  }
-  if (parsed.search || parsed.hash) {
-    errors.push(`${route}: ${label} should not include query strings or fragments`);
-  }
-  return parsed;
-}
-
 function parseProductFrontMatter() {
   const productDir = path.join(repoRoot, '_products');
   return fs.readdirSync(productDir)
@@ -130,6 +111,7 @@ const textSitemapPath = path.join(siteDir, 'sitemap.txt');
 const robotsPath = path.join(siteDir, 'robots.txt');
 const errors = [];
 const sitemapLocs = new Set();
+let alternateLanguages = new Map();
 const sitemapUrls = [];
 const seenCanonicals = new Map();
 
@@ -163,6 +145,7 @@ if (fs.existsSync(sitemapPath)) {
     errors.push('sitemap.xml: missing xhtml namespace for hreflang alternates');
   }
   const sitemapDocument = new JSDOM(sitemapText, { contentType: 'text/xml' }).window.document;
+  alternateLanguages = sitemapAlternateLanguages(sitemapDocument);
   if (sitemapDocument.querySelector('parsererror')) errors.push('sitemap.xml: malformed XML');
   if (!sitemapText.includes('xhtml:link rel="alternate"')) {
     errors.push('sitemap.xml: missing hreflang alternate links');
@@ -190,7 +173,7 @@ if (fs.existsSync(robotsPath)) {
   for (const removed of ['Disallow: /orders/', 'Disallow: /es/orders/', 'Disallow: /order-success/', 'Disallow: /es/order-success/']) {
     if (robotsText.includes(removed)) errors.push(`robots.txt: ${removed} blocks crawlers from seeing noindex`);
   }
-  if (!robotsText.includes(`Sitemap: ${siteBase}/sitemap.xml`)) {
+  if (!hasCanonicalSitemap(robotsText, siteBase)) {
     errors.push('robots.txt: sitemap directive is missing or not canonical');
   }
 }
@@ -249,15 +232,9 @@ for (const filePath of htmlFiles) {
     }
   }
 
-  const alternates = Array.from(document.querySelectorAll('link[rel="alternate"][hreflang]'));
-  if (alternates.length > 0) {
-    const alternateLangs = new Set(alternates.map((node) => node.getAttribute('hreflang')));
-    if (!alternateLangs.has(lang)) errors.push(`${route}: hreflang alternates missing self language`);
-    if (!alternateLangs.has('x-default')) errors.push(`${route}: hreflang alternates missing x-default`);
-    for (const node of alternates) {
-      assertAbsoluteSiteUrl(node.getAttribute('href'), siteBase, `hreflang ${node.getAttribute('hreflang')}`, route, errors);
-    }
-  }
+  errors.push(...auditHreflang(document, {
+    route, siteBase, lang, expectedLanguages: alternateLanguages.get(canonical)
+  }));
 
   const graph = flattenGraph(parseJsonLd(document, route, errors));
   const organization = graph.find((node) => hasType(node, 'Organization'));

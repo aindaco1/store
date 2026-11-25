@@ -1,3 +1,4 @@
+import { firstReadableTextColor } from '../../shared/dust-wave-platform/packages/worker-core/src/color-contrast.js';
 import { callSoftwareBilling } from './software-billing.js';
 /**
  * Resend email integration for Store admin and order flows.
@@ -216,34 +217,6 @@ function getEmailPlatformDisplayName(env = {}) {
   return `${companyName} ${platformName}`;
 }
 
-function parseHexColor(value) {
-  const normalized = String(value || '').trim();
-  if (/^#[0-9a-f]{3}$/i.test(normalized)) {
-    return normalized.slice(1).split('').map((char) => parseInt(char + char, 16));
-  }
-  if (/^#[0-9a-f]{6}$/i.test(normalized)) {
-    return [
-      parseInt(normalized.slice(1, 3), 16),
-      parseInt(normalized.slice(3, 5), 16),
-      parseInt(normalized.slice(5, 7), 16)
-    ];
-  }
-  return null;
-}
-
-function getAccessibleButtonTextColor(backgroundColor, fallback = '#ffffff') {
-  const channels = parseHexColor(backgroundColor);
-  if (!channels) return fallback;
-  const [red, green, blue] = channels.map((channel) => channel / 255);
-  const linear = [red, green, blue].map((channel) => (
-    channel <= 0.03928
-      ? channel / 12.92
-      : ((channel + 0.055) / 1.055) ** 2.4
-  ));
-  const luminance = (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
-  return luminance > 0.5 ? '#111111' : '#ffffff';
-}
-
 function emailListUnsubscribeHeaders(unsubscribeUrl, siteBaseOrEnv) {
   const href = safeExternalUrl(unsubscribeUrl, getResolvedSiteBase(siteBaseOrEnv));
   if (!href) return {};
@@ -273,7 +246,7 @@ function getEmailTheme(env = {}) {
     borderColor: escapeHtml(getEmailBorderColor(env)),
     primaryColor: escapeHtml(primaryColor),
     buttonRadius: escapeHtml(getEmailButtonRadius(env)),
-    primaryTextColor: getAccessibleButtonTextColor(primaryColor)
+    primaryTextColor: firstReadableTextColor(primaryColor, ['#ffffff', '#111111', '#000000']) ?? '#ffffff'
   };
 }
 

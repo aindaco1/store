@@ -167,6 +167,21 @@ describe('Store ticket check-in page', () => {
     expect(actions.calendar.expiresInSeconds).toBe(actions.ticket.expiresInSeconds);
   });
 
+  it('downloads a folded calendar from the signed ticket action', async () => {
+    const order = buildTicketOrder();
+    const title = 'Proyección 🎬 '.repeat(14).trimEnd();
+    order.orderDraft.items[0].name = title;
+    const { env } = await seedOrder(order);
+    const summary = await getSummary(env);
+    const response = await storeRequest(summary.items[0].actions.calendar.href, env);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/calendar');
+    const calendar = await response.text();
+    expect(calendar.split('\r\n').every(line => Buffer.byteLength(line) <= 75)).toBe(true);
+    expect(calendar).toContain('METHOD:PUBLISH\r\n');
+    expect(calendar.replaceAll('\r\n ', '')).toContain(`SUMMARY:${title}\r\n`);
+  });
+
   it('marks newly generated ticket QR destinations as browser pages', async () => {
     const { env } = await seedOrder();
     const order = buildTicketOrder();

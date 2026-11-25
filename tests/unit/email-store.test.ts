@@ -46,6 +46,20 @@ describe('Store email integration', () => {
     vi.restoreAllMocks();
   });
 
+  it.each([
+    ['#101215', '#ffffff'],
+    ['#d9f4ff', '#111111'],
+    ['#999999', '#111111'],
+    ['#777', '#000000'],
+    ['unknown', '#ffffff'],
+  ])('renders the primary button on %s in %s', async (background, ink) => {
+    const fetchMock = mockResend();
+    await sendAdminLoginEmail({ ...env, EMAIL_COLOR_PRIMARY: background }, {
+      email: 'admin@example.com', loginUrl: env.SITE_BASE + '/admin/', lang: 'en'
+    });
+    expect(getEmailPayload(fetchMock).html).toContain('background: ' + background + '; color: ' + ink + ';');
+  });
+
   it('links software recovery to the localized private order without provider capabilities', async () => {
     const fetchMock = mockResend();
     await sendSoftwareBillingEmail(env, {email:'customer@example.test',orderToken:'store-order-fixture',event:'payment_failed',preferredLang:'es'});

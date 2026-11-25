@@ -117,6 +117,15 @@ function fixture(rows: string[]) {
 }
 
 describe('Snipcart order import mapping', () => {
+  it('retains an order row ending inside a quoted field and ignores blank data rows', () => {
+    const line = row({});
+    const prefix = line.slice(0, line.lastIndexOf(',') + 1);
+    const result = parseSnipcartOrdersCsv(HEADER.join(',') + '\r\n\r\n' + prefix + '"35.00');
+    expect(result.ok).toBe(true);
+    expect(result.rowCount).toBe(1);
+    expect(result.orderCount).toBe(1);
+  });
+
   it('groups Snipcart line items into one confirmed Store order', () => {
     const result = parseSnipcartOrdersCsv(fixture([
       row({ 'Item ID': 'sticker-1', 'Item name': 'DUST WAVE Sticker', 'Unit price': '3.00', Quantity: '2', 'Total price': '6.00', Size: '' }),
