@@ -18,6 +18,8 @@ Local overrides belong in `_config.local.yml`.
 
 Settings published from the admin dashboard write back to `_config.yml` in production through GitHub, or through the local repo sidecar during dev.
 
+Primary email buttons use `EMAIL_COLOR_PRIMARY` as their background. For three- or six-digit hex colors, the template picks the first of white, near-black and black that reaches 4.5:1 text contrast.
+
 ## Public Routes And Localization
 
 English is the canonical locale. Spanish public shells currently exist for:

@@ -1,3 +1,4 @@
+import { base64Encode } from '../../shared/dust-wave-platform/packages/worker-core/src/crypto.js';
 import { sourceCommand, sourceCheckpointEnv, withStoreSource } from './software-source.js';
 import { recoveryMode, softwareCaptureCredential } from './software-backup.js';
 import { callSoftwareBilling, softwareBillingWatchdog } from './software-billing.js';
@@ -6516,10 +6517,7 @@ function base64urlEncodeString(value) {
 }
 
 function base64EncodeString(value) {
-  const bytes = new TextEncoder().encode(String(value || ''));
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
+  return base64Encode(new TextEncoder().encode(String(value || '')));
 }
 
 function base64urlEncodeBytes(bytes) {
