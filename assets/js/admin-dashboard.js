@@ -3424,42 +3424,20 @@
     setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
   }
 
-  function qrSvgMarkup(qr, cellSize, margin) {
-    if (!qr) return '';
-    var moduleCount = qr.getModuleCount();
-    var size = (moduleCount + (margin * 2)) * cellSize;
-    var parts = [
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '" role="img">',
-      '<rect width="100%" height="100%" fill="#fff"/>'
-    ];
-    for (var row = 0; row < moduleCount; row += 1) {
-      for (var col = 0; col < moduleCount; col += 1) {
-        if (!qr.isDark(row, col)) continue;
-        parts.push('<rect x="' + ((col + margin) * cellSize) + '" y="' + ((row + margin) * cellSize) + '" width="' + cellSize + '" height="' + cellSize + '" fill="#000"/>');
-      }
-    }
-    parts.push('</svg>');
-    return parts.join('');
+  var marketingQrTools;
+  var qrPreviewRequest;
+  async function loadMarketingQrTools() {
+    marketingQrTools = await import('../../shared/dust-wave-platform/packages/admin-shell/src/marketing-assets.js');
+    return marketingQrTools;
   }
 
   function drawQrCanvas(qr, canvas, cellSize, margin) {
     if (!qr || !(canvas instanceof HTMLCanvasElement)) return;
-    var moduleCount = qr.getModuleCount();
-    var size = (moduleCount + (margin * 2)) * cellSize;
-    canvas.width = size;
-    canvas.height = size;
-    var context = canvas.getContext('2d');
-    if (!context) return;
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, size, size);
-    context.fillStyle = '#000';
-    for (var row = 0; row < moduleCount; row += 1) {
-      for (var col = 0; col < moduleCount; col += 1) {
-        if (qr.isDark(row, col)) {
-          context.fillRect((col + margin) * cellSize, (row + margin) * cellSize, cellSize, cellSize);
-        }
-      }
+    if (!canvas.getContext('2d')) {
+      canvas.width = canvas.height = (qr.getModuleCount() + 2 * margin) * cellSize;
+      return;
     }
+    marketingQrTools.drawQrCanvas(qr, canvas, { cellSize, margin });
   }
 
   function createStoreMarketingQr(url) {
@@ -3471,7 +3449,8 @@
     return qr;
   }
 
-  function renderStoreMarketingQr(url) {
+  async function renderStoreMarketingQr(url) {
+    var request = qrPreviewRequest = {};
     var preview = $('#admin-store-marketing-qr-preview');
     var status = $('#admin-store-marketing-qr-status');
     storeMarketingCurrentQr = null;
@@ -3487,6 +3466,8 @@
       return;
     }
     try {
+      if (!marketingQrTools) await loadMarketingQrTools();
+      if (request !== qrPreviewRequest) return;
       var qr = createStoreMarketingQr(storeMarketingCurrentQrUrl);
       if (!qr) {
         setStatus(status, 'QR generation is unavailable.');
@@ -3499,6 +3480,7 @@
       preview.appendChild(canvas);
       setStatus(status, '');
     } catch (error) {
+      if (request !== qrPreviewRequest) return;
       logger.warn('Failed to render Store marketing QR code', error);
       setStatus(status, 'QR generation is unavailable.');
     }
@@ -3511,26 +3493,32 @@
     return base + '.' + extension;
   }
 
-  function downloadStoreMarketingQrForUrl(url, extension, options) {
+  async function downloadStoreMarketingQrForUrl(url, extension, options) {
     var status = options && options.status ? options.status : $('#admin-store-marketing-qr-status');
-    var qr = createStoreMarketingQr(url);
-    if (!qr) {
+    try {
+      if (!marketingQrTools) await loadMarketingQrTools();
+      var qr = createStoreMarketingQr(url);
+      if (!qr) {
+        setStatus(status, 'QR generation is unavailable.');
+        return;
+      }
+      if (extension === 'png') {
+        var canvas = document.createElement('canvas');
+        drawQrCanvas(qr, canvas, 12, 4);
+        var link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = storeMarketingQrFilename('png', options && options.row);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else {
+        downloadTextFile(storeMarketingQrFilename('svg', options && options.row), marketingQrTools.qrSvgMarkup(qr, { cellSize: 8, margin: 4, label: 'Store marketing QR code' }), 'image/svg+xml;charset=utf-8');
+      }
+      setStatus(status, 'QR code downloaded.');
+    } catch (error) {
+      logger.warn('Failed to download marketing QR code', error);
       setStatus(status, 'QR generation is unavailable.');
-      return;
     }
-    if (extension === 'png') {
-      var canvas = document.createElement('canvas');
-      drawQrCanvas(qr, canvas, 12, 4);
-      var link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
-      link.download = storeMarketingQrFilename('png', options && options.row);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } else {
-      downloadTextFile(storeMarketingQrFilename('svg', options && options.row), qrSvgMarkup(qr, 8, 4), 'image/svg+xml;charset=utf-8');
-    }
-    setStatus(status, 'QR code downloaded.');
   }
 
   function downloadStoreMarketingQrPng() {

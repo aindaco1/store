@@ -1,3 +1,4 @@
+import { readCsvRows } from "../../shared/dust-wave-platform/packages/document-core/src/csv.js";
 import {
   STORE_ORDER_DRAFT_VERSION,
   STORE_ORDER_STATUS_CONFIRMED
@@ -117,41 +118,14 @@ export function parseSnipcartOrdersCsv(csvText, options = {}) {
 }
 
 function parseCsvRows(text) {
-  const rows = [];
-  let row = [];
-  let field = '';
-  let inQuotes = false;
-
-  for (let index = 0; index < text.length; index++) {
-    const char = text[index];
-    if (char === '"') {
-      if (inQuotes && text[index + 1] === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-    if (char === ',' && !inQuotes) {
-      row.push(field);
-      field = '';
-      continue;
-    }
-    if ((char === '\n' || char === '\r') && !inQuotes) {
-      if (char === '\r' && text[index + 1] === '\n') index += 1;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-      continue;
-    }
-    field += char;
-  }
-
-  row.push(field);
-  if (row.length > 1 || String(row[0] || '').trim()) rows.push(row);
-  return rows;
+  // The route already bounds the file. Keep its blanks and permissive EOF
+  // handling so the existing header and nonempty-order limits retain priority.
+  const size = text.length + 1;
+  return readCsvRows(text, {
+    maxChars: size, maxRows: size, maxColumns: size, maxCellChars: size,
+    includeRow: (row, atEnd) => !atEnd || row.length > 1 || Boolean(row[0].trim()),
+    incomplete: "keep"
+  }).rows;
 }
 
 function groupSnipcartRows(rows) {

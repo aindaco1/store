@@ -2535,6 +2535,20 @@ test.describe('Admin Dashboard', () => {
     await expect(page.locator('#admin-store-marketing-url')).not.toHaveValue(/utm_medium=social/);
     await expect(page.locator('#admin-store-marketing-url')).not.toHaveValue(/utm_campaign=shop/);
     await expect(page.locator('#admin-store-marketing-qr-preview canvas')).toBeVisible();
+    for (const extension of ['svg', 'png']) {
+      const event = page.waitForEvent('download');
+      await page.locator('#admin-store-marketing-qr-download-' + extension).click();
+      const file = await event;
+      expect(file.suggestedFilename()).toMatch(new RegExp('\\.' + extension + '$'));
+      const bytes = fs.readFileSync((await file.path())!);
+      if (extension === 'svg') {
+        expect(bytes.toString()).toContain('role="img" aria-label=');
+        expect(bytes.toString()).toContain('fill="#000"');
+      } else {
+        expect(bytes.readUInt32BE(0)).toBe(0x89504e47);
+        expect(bytes.readUInt32BE(16)).toBe(bytes.readUInt32BE(20));
+      }
+    }
     await expect(page.locator('#admin-store-marketing-referrals')).toContainText('Flyer Crew');
     await expect(page.getByRole('button', { name: 'About QR code' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'About Saved referrals' })).toBeVisible();
